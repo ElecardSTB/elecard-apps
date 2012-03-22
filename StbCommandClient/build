@@ -1,0 +1,9 @@
+#!/bin/sh
+
+PROGRAM=StbCommandClient
+
+CC=sh4-linux-gcc make || exit 1
+
+cp $PROGRAM ${ROOTFS}/opt/elecard/bin/     && echo "INSTALL $PROGRAM -> ${ROOTFS}/opt/elecard/bin/"
+cp $PROGRAM ${ROOTFS}_nfs/opt/elecard/bin/ && echo "INSTALL $PROGRAM -> ${ROOTFS}_nfs/opt/elecard/bin/"
+sh4-linux-strip ${ROOTFS}/opt/elecard/bin/$PROGRAM ${ROOTFS}_nfs/opt/elecard/bin/$PROGRAM
