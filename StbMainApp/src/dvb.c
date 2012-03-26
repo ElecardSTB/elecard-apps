@@ -1426,6 +1426,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 	if (tuner >= VMSP_COUNT)
 	{
+		cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber( tuner-VMSP_COUNT ) );
 		cJSON_AddItemToObject(params, "start", cJSON_CreateNumber(  low_freq/KHZ ) );
 		cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( high_freq/KHZ ) );
 		eprintf("%s: scanning %6u-%6u\n", __FUNCTION__, low_freq/KHZ, high_freq/KHZ);
@@ -1637,6 +1638,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 
 	if (tuner >= VMSP_COUNT)
 	{
+		cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber( tuner-VMSP_COUNT ) );
 		if (st_getDvbTunerType(tuner-VMSP_COUNT) == FE_QPSK)
 		{
 			cJSON_AddItemToObject(params, "start", cJSON_CreateNumber( frequency ) );
