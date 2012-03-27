@@ -75,16 +75,11 @@ typedef struct
 
 typedef struct
 {
-	elcdRpcType_t type;
-	cJSON        *result;
-	char         *pArg;
-} rpcResult_t;
-
-typedef struct
-{
-	unsigned int id;
-	rpcResult_t  res;
-	sem_t        lock;
+	unsigned int    id;
+	elcdRpcType_t   type;
+	cJSON         * jsonResult;
+	char          * pArg;
+	sem_t           lock;
 } rpcSync_t;
 
 typedef struct
@@ -309,8 +304,8 @@ void st_syncCallback(elcdRpcType_t type, cJSON *result, void* pArg)
 {
 	rpcSync_t *s = pArg;
 	interface_removeEvent(st_syncCancel, pArg);
-	s->res.type   = type;
-	s->res.result = result;
+	s->type       = type;
+	s->jsonResult = result;
 	sem_post(&s->lock);
 }
 
@@ -323,7 +318,7 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 {
 	rpcSync_t s;
 
-	s.res.type = elcdRpcInvalid;
+	s.type = elcdRpcInvalid;
 	if (sem_init(&s.lock, 0, 0) != 0 )
 	{
 		eprintf("%s: failed to create semaphore: %s\n", __FUNCTION__, strerror(errno));
@@ -341,7 +336,7 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 	sem_wait(&s.lock);
 
 	sem_destroy(&s.lock);
-	if( s.res.type == elcdRpcInvalid )
+	if( s.type == elcdRpcInvalid )
 	{
 #ifndef RPC_POOL_TRACE
 		dprintf("%s: canceled rpc[%2u]: %6u %s\n", __FUNCTION__, i, pool.waiting[i].id, rpc_cmd_name(pool.waiting[i].cmd));
@@ -352,13 +347,15 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 		st_poolPrint();
 		return -2;
 	}
-	if( type )
-		*type   = s.res.type;
-	if( result )
-		*result = s.res.result;
-	else
-	{
-		cJSON_Delete(s.res.result);
+	if (type) {
+		*type = s.type;
+	}
+
+	if (!result) {
+		cJSON_Delete(s.jsonResult);
+	}
+	else {
+		*result = s.jsonResult;
 	}
 	return 0;
 }
