@@ -2149,8 +2149,14 @@ static void interface_animateMenu(int flipFB, int animate)
 					interface_drawTextWW(pgfx_font, 
 						INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
 						INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-						interfaceInfo.clientX+interfaceInfo.clientWidth-3.3*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH),
-						interfaceInfo.screenHeight - interfaceInfo.marginSize, 10*font_h, 2*font_h, balance_str, ALIGN_RIGHT);
+#ifndef STSDK
+		                interfaceInfo.clientX+interfaceInfo.clientWidth-3.3*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH),
+		                interfaceInfo.screenHeight - interfaceInfo.marginSize, 
+#else
+		                interfaceInfo.clientX+interfaceInfo.clientWidth-(int)(5*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH)), 
+		                interfaceInfo.screenHeight - interfaceInfo.marginSize*5/4, 
+#endif
+						10*font_h, 2*font_h, balance_str, ALIGN_RIGHT);
 				}
 				else
 #endif
@@ -7962,13 +7968,13 @@ static int interface_editNext(interfaceMenu_t *pMenu)
 #ifdef ENABLE_REGPLAT
 		if (pMenu->menuEntry[pMenu->selectedItem].isSelectable == 0)
 		{
-			while (pMenu->selectedItem < pMenu->menuEntryCount && pMenu->menuEntry[pMenu->selectedItem].isSelectable == 0)
+			while ((pMenu->selectedItem + 1 < pMenu->menuEntryCount) && (pMenu->menuEntry[pMenu->selectedItem].isSelectable == 0))
 				pMenu->selectedItem++;
-			if (pMenu->menuEntry[pMenu->selectedItem].type != interfaceMenuEntryEdit)
-				return pMenu->selectedItem;
 		}
 #endif
-		((interfaceEditEntry_t*)pMenu->menuEntry[pMenu->selectedItem].pArg)->active = 1;
+		if (pMenu->menuEntry[pMenu->selectedItem].pArg){
+			((interfaceEditEntry_t*)pMenu->menuEntry[pMenu->selectedItem].pArg)->active = 1;
+		}
 	}
 	return pMenu->selectedItem;
 }

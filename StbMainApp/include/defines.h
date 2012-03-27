@@ -395,12 +395,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* default small font */
 #define DEFAULT_SMALL_FONT		DEFAULT_FONT
 
+#ifndef STSDK
 /* default font height */
 #define DEFAULT_FONT_HEIGHT	(18)
 
 /* default small (description) font height */
 #define DEFAULT_SMALL_FONT_HEIGHT (16)
 
+#else
+#define DEFAULT_FONT_HEIGHT          (24)
+#define DEFAULT_SMALL_FONT_HEIGHT    (20)
+#endif
 /*************************************
  * Interface options (interface.h)
  *************************************/
