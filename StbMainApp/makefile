@@ -162,7 +162,7 @@ endif
 ifeq ($(ENABLE_SCARDS),1)
     OBJECTS += src/libcard.a
     LOCAL_LDFLAGS += -lpcsclite
-    LOCAL_CFLAGS += -DSHOW_CARD_MENU=$(ENABLE_SCARDS)
+    LOCAL_CFLAGS += -DENABLE_SCARDS=$(ENABLE_SCARDS)
 endif
 
 ifeq ($(ENABLE_DLNA),1)
