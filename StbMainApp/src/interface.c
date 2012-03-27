@@ -7964,6 +7964,8 @@ static int interface_editNext(interfaceMenu_t *pMenu)
 		{
 			while (pMenu->selectedItem < pMenu->menuEntryCount && pMenu->menuEntry[pMenu->selectedItem].isSelectable == 0)
 				pMenu->selectedItem++;
+			if (pMenu->menuEntry[pMenu->selectedItem].type != interfaceMenuEntryEdit)
+				return pMenu->selectedItem;
 		}
 #endif
 		((interfaceEditEntry_t*)pMenu->menuEntry[pMenu->selectedItem].pArg)->active = 1;
