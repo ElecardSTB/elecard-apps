@@ -235,7 +235,7 @@ void parser_startElement(void *data, const char *el, const char **attr) {
 					if (strcmp(attr[i], "url")==0)
 					{
 						const char *str = strstr(attr[i+1], "/v/");
-						if( str == NULL )
+						if (str == NULL)
 						{
 							dprintf("%s: Can't find Youtube VIDEO_ID in '%s'\n", __FUNCTION__, attr[i+1]);
 							break;
@@ -315,7 +315,7 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 	youtube_parser.state = parseStart;
 #endif // ENABLE_EXPAT
 
-	if( url == 0 || pCallback == 0 )
+	if ( url == 0 || pCallback == 0 )
 		return -2;
 
 	hnd = curl_easy_init();
@@ -381,7 +381,7 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 		if (entry->Type() == TiXmlNode::TINYXML_ELEMENT && strcasecmp(entry->Value(), "entry") == 0)
 		{
 			item = xmlConfigGetElement(entry, "media:group", 0);
-			if( item != NULL )
+			if ( item != NULL )
 			{
 				video_name = (char *)xmlConfigGetText(item, "media:title");
 				video_url = NULL;
@@ -392,22 +392,22 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 				{
 					if (child->Type() == TiXmlNode::TINYXML_ELEMENT )
 					{
-						if(strcasecmp(child->Value(), "media:content") == 0)
+						if (strcasecmp(child->Value(), "media:content") == 0)
 						{
 							elem = (TiXmlElement *)child;
 							video_type = elem->Attribute("type");
-							if( strcmp( video_type, "application/x-shockwave-flash" ) == 0)
+							if (strcmp( video_type, "application/x-shockwave-flash" ) == 0)
 							{
 								video_url = elem->Attribute("url");
 							}
-						} else if(thumbnail== 0 && strcasecmp(child->Value(), "media:thumbnail") == 0)
+						} else if (thumbnail== 0 && strcasecmp(child->Value(), "media:thumbnail") == 0)
 						{
 							elem = (TiXmlElement *)child;
 							thumbnail = elem->Attribute("url");
 						}
 					}
 				}
-				if( video_url != NULL )
+				if (video_url != NULL)
 				{
 					//dprintf("%s: Adding Youtube video '%s' url='%s' thumb='%s'\n", __FUNCTION__,video_name,video_url,thumbnail);
 					pCallback(video_url,video_name,thumbnail);
@@ -424,11 +424,11 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 void youtube_addMenuEntry(const char *url, const char *name, const char *thumbnail)
 {
 	const char *str;
-	if( youtubeInfo.count >= YOUTUBE_MAX_LINKS || youtubeInfo.count < 0)
+	if (youtubeInfo.count >= YOUTUBE_MAX_LINKS || youtubeInfo.count < 0)
 		return;
 
 	str = strstr(url, "/v/");
-	if( str == NULL )
+	if (str == NULL)
 	{
 		dprintf("%s: Can't find Youtube VIDEO_ID in '%s'\n", __FUNCTION__, url);
 		return;
@@ -436,10 +436,10 @@ void youtube_addMenuEntry(const char *url, const char *name, const char *thumbna
 	strncpy( youtubeInfo.videos[youtubeInfo.count].video_id, &str[3], 11 );
 	youtubeInfo.videos[youtubeInfo.count].video_id[11] = 0;
 	str = name != NULL ? name : url;
-	if( thumbnail != NULL )
+	if (thumbnail != NULL)
 	{
 		size_t thumbnail_len = strlen(thumbnail);
-		if( thumbnail_len < sizeof( youtubeInfo.videos[youtubeInfo.count].thumbnail ) )
+		if (thumbnail_len < sizeof( youtubeInfo.videos[youtubeInfo.count].thumbnail ))
 		{
 			memcpy( youtubeInfo.videos[youtubeInfo.count].thumbnail, thumbnail, thumbnail_len+1 );
 		} else
@@ -473,10 +473,10 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	static char err_buff[CURL_ERROR_SIZE];
 	int videoIndex = GET_NUMBER(pArg);
 
-	if( videoIndex == CHANNEL_CUSTOM )
+	if (videoIndex == CHANNEL_CUSTOM)
 	{
 		str = strstr( appControlInfo.mediaInfo.lastFile, "watch?v=" );
-		if( str == NULL )
+		if (str == NULL)
 		{
 			eprintf("%s: can't file YouTube ID in %s\n", __FUNCTION__, appControlInfo.mediaInfo.lastFile);
 			interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_error, 3000);
@@ -484,14 +484,14 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		}
 		str += 8;
 		str[sizeof(youtubeInfo.current_id)-1] = 0;
-		if( strlen(str) != YOUTUBE_ID_LENGTH-1 )
+		if (strlen(str) != YOUTUBE_ID_LENGTH-1)
 		{
 			eprintf("%s: invalid YouTube ID %s\n", __FUNCTION__, str);
 			interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_error, 3000);
 			return -1;
 		}
 		memcpy( youtubeInfo.current_id, str, sizeof(youtubeInfo.current_id) );
-	} else if( videoIndex < 0 || videoIndex >= youtubeInfo.count )
+	} else if (videoIndex < 0 || videoIndex >= youtubeInfo.count)
 	{
 		eprintf("%s: there is no stream %d\n", __FUNCTION__, videoIndex);
 		interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_error, 3000);
@@ -530,7 +530,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		return 1;
 	}
 
-	/* Finf direct link to video */
+	/* Find direct link to video */
 
 	//fmt_url_map = strstr(curl_data, "fmt_url_map=");
 	char *fmt_url_map;
@@ -598,7 +598,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	if (videoIndex != CHANNEL_CUSTOM)
 	{
 		youtubeInfo.index = videoIndex;
-		if( interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, videoIndex+1, temp, sizeof(temp) ) == 0 )
+		if (interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, videoIndex+1, temp, sizeof(temp) ) == 0)
 			descr = temp;
 		thumbnail = youtubeInfo.videos[videoIndex].thumbnail[0] ? youtubeInfo.videos[videoIndex].thumbnail : NULL;
 		appControlInfo.playbackInfo.channel = videoIndex+1;
@@ -617,7 +617,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 int  youtube_startNextChannel(int direction, void* pArg)
 {
-	if( youtubeInfo.count == 0 )
+	if (youtubeInfo.count == 0)
 		return 1;
 
 	int indexChange = (direction?-1:1);
@@ -628,7 +628,7 @@ int  youtube_startNextChannel(int direction, void* pArg)
 
 int  youtube_setChannel(int channel, void* pArg)
 {
-	if( channel < 1 || channel > youtubeInfo.count )
+	if (channel < 1 || channel > youtubeInfo.count)
 		return 1;
 
 	return youtube_streamChange((interfaceMenu_t*)&YoutubeMenu, SET_NUMBER(channel-1));
@@ -638,7 +638,7 @@ char *youtube_getCurrentURL()
 {
 	static char url[YOUTUBE_LINK_SIZE];
 
-	if( youtubeInfo.current_id[0] == 0 )
+	if (youtubeInfo.current_id[0] == 0)
 		url[0] = 0;
 	else
 		snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.current_id);
@@ -691,7 +691,7 @@ static int youtube_fillMenu( interfaceMenu_t* pMenu, void *pArg )
 	}
 
 #ifdef ENABLE_EXPAT
-	if( youtubeInfo.search[0] == 0 )
+	if (youtubeInfo.search[0] == 0)
 		snprintf(url, sizeof(url), "http://gdata.youtube.com/feeds/api/standardfeeds/top_rated?time=today&format=5");
 	else
 	{
@@ -700,7 +700,7 @@ static int youtube_fillMenu( interfaceMenu_t* pMenu, void *pArg )
 		         YOUTUBE_MAX_LINKS, youtubeInfo.search_offset*YOUTUBE_MAX_LINKS+1, youtubeInfo.search);
 	}
 #else
-	if( youtubeInfo.search[0] == 0 )
+	if (youtubeInfo.search[0] == 0)
 		//snprintf(url, sizeof(url), "http://gdata.youtube.com/feeds/api/standardfeeds/recently_featured?format=5&max-results=%d&start-index=%d", YOUTUBE_LINKS_PER_PAGE, (page-1)*YOUTUBE_LINKS_PER_PAGE+1);
 		snprintf(url, sizeof(url), "http://gdata.youtube.com/feeds/api/standardfeeds/top_rated?time=today&format=5&max-results=%d&start-index=%d",
 		         YOUTUBE_LINKS_PER_PAGE, (page-1)*YOUTUBE_LINKS_PER_PAGE+1);
@@ -712,7 +712,7 @@ static int youtube_fillMenu( interfaceMenu_t* pMenu, void *pArg )
 #endif // ENABLE_EXPAT
 	youtube_getVideoList(url, youtube_addMenuEntry, page);
 
-	if(( youtubeInfo.count == 0 ) && ( page == 1 ))
+	if (( youtubeInfo.count == 0 ) && ( page == 1 ))
 	{
 		str = _T("NO_MOVIES");
 		interface_addMenuEntryDisabled( (interfaceMenu_t*)&YoutubeMenu, str, thumbnail_info );
@@ -733,7 +733,7 @@ static int youtube_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 	char url[YOUTUBE_LINK_SIZE];
 	if (selectedIndex > 0 )
 	{
-		switch( cmd->command )
+		switch (cmd->command)
 		{
 			case interfaceCommandGreen:
 				snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.videos[selectedIndex-1].video_id);
@@ -785,13 +785,13 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 
 static char *youtube_getLastSearch(int index, void* pArg)
 {
-	if( index == 0 )
+	if (index == 0)
 	{
 		static char last_search[sizeof(youtubeInfo.search)];
 		int search_length;
 
 		search_length = utf8_uritomb(youtubeInfo.search, strlen(youtubeInfo.search), last_search, sizeof(last_search)-1 );
-		if( search_length < 0 )
+		if (search_length < 0)
 		{
 			return youtubeInfo.search;
 		}
@@ -817,7 +817,7 @@ static void *youtube_MenuVideoSearchThread(void* pArg)
 	interfaceMenu_t *pMenu = (interfaceMenu_t *) pArg;
 	int old_count = -1;
 
-	if(youtubeInfo.search[0] == 0)
+	if (youtubeInfo.search[0] == 0)
 		page = 2;
 	else
 		page = 1;
@@ -825,7 +825,7 @@ static void *youtube_MenuVideoSearchThread(void* pArg)
 	pthread_cleanup_push(youtube_MenuVideoSearchThreadTerm, NULL);
 
 #ifndef ENABLE_EXPAT
-	for(; (( page < YOUTUBE_MAX_LINKS/YOUTUBE_LINKS_PER_PAGE + 1 ) && 
+	for (;(( page < YOUTUBE_MAX_LINKS/YOUTUBE_LINKS_PER_PAGE + 1 ) &&
 	       ( old_count != youtubeInfo.count )); page++)
 	{
 		old_count = youtubeInfo.count;
