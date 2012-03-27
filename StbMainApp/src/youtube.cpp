@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tinyxml.h>
 #endif // ENABLE_EXPAT
 
+#include <string>
 #include <pthread.h>
 
 /***********************************************
@@ -61,13 +62,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define YOUTUBE_ID_LENGTH         (12)
 #define YOUTUBE_LINK_SIZE         (48)
 #define YOUTUBE_THUMBNAIL_SIZE    (64)
-#ifdef ENABLE_EXPAT
-#define YOUTUBE_LIST_BUFFER_SIZE  (32*1024)
-#else
-//#define YOUTUBE_LIST_BUFFER_SIZE  (35*1024)
-#define YOUTUBE_LIST_BUFFER_SIZE  (128*1024)
-#endif // ENABLE_EXPAT
-#define YOUTUBE_INFO_BUFFER_SIZE  (24*1024)
 #define YOUTUBE_MAX_LINKS (32)
 #define YOUTUBE_LINKS_PER_PAGE (4)
 #define YOUTUBE_NEW_SEARCH (-1)
@@ -81,13 +75,6 @@ typedef struct
 	char video_id[YOUTUBE_ID_LENGTH];
 	char thumbnail[YOUTUBE_THUMBNAIL_SIZE];
 } youtubeVideo_t;
-
-typedef struct
-{
-	char   *data;
-	size_t  size;
-	size_t  pos;
-} curlBufferInfo_t;
 
 typedef struct
 {
@@ -165,19 +152,13 @@ static void youtube_runSearch(void* pArg);
 
 static size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
 {
-	curlBufferInfo_t *info = (curlBufferInfo_t*)userp;
+	std::string *data = (std::string *)userp;
 	size_t wholesize = size*nmemb;
 
 	if (youtubeInfo.youtube_canceled)
 		return 0;
-	if (info->pos+wholesize >= info->size)
-	{
-		wholesize = info->size - info->pos - 1;
-	}
 
-	memcpy(&info->data[info->pos], buffer, wholesize);
-	info->pos += wholesize;
-	info->data[info->pos] = 0;
+	data->append((const char*)buffer, wholesize);
 	return wholesize;
 }
 
@@ -320,12 +301,7 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 	TiXmlNode *entry;
 	TiXmlNode *child;
 	TiXmlElement *elem;
-	static char curl_data[YOUTUBE_LIST_BUFFER_SIZE];
-	static curlBufferInfo_t buffer;
-	buffer.data = curl_data;
-	buffer.size = sizeof(curl_data);
-	buffer.pos  = 0;
-	curl_data[0] = 0;
+	std::string video_list;
 #else
 	XML_Parser p = XML_ParserCreate(NULL);
 	if (!p)
@@ -346,7 +322,7 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 
 #ifndef ENABLE_EXPAT
 	curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
-	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, &buffer);
+	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, &video_list);
 #else
 	curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, youtube_parseXml);
 	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, p);
@@ -387,7 +363,7 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 		return -1;
 	}
 #ifndef ENABLE_EXPAT
-	list = xmlConfigParse( curl_data );
+	list = xmlConfigParse(video_list.c_str());
 	if (list == NULL
 		|| (item = xmlConfigGetElement(list, "feed", 0)) == NULL)
 	{
@@ -493,21 +469,8 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	char *str;
 	static char url[MAX_URL];
 	static char url_tmp[MAX_URL];
-	static char curl_data[YOUTUBE_INFO_BUFFER_SIZE];
+	static std::string video_info;
 	static char err_buff[CURL_ERROR_SIZE];
-	static curlBufferInfo_t buffer;
-	char *fmt_url_map;
-	//int supported_formats[] = { 18, 17, 34, 5, 0 };
-	int supported_formats[] = { 34, 18, 0 };
-	/* 37/1920x1080/9/0/115
-	   22/1280x720/9/0/115
-	   35/854x480/9/0/115
-	   34/640x360/9/0/115
-	   5/320x240/7/0/0 */
-	char *fmt_url;
-	int i;
-	int len_str;
-	int len_url = 0;
 	int videoIndex = GET_NUMBER(pArg);
 
 	if( videoIndex == CHANNEL_CUSTOM )
@@ -538,16 +501,12 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		memcpy( youtubeInfo.current_id, youtubeInfo.videos[videoIndex].video_id, sizeof(youtubeInfo.current_id) );
 	}
 
-	buffer.data = curl_data;
-	buffer.size = sizeof(curl_data);
-	buffer.pos  = 0;
-
-	curl_data[0] = 0;
+	video_info.clear();
 	sprintf(url,"http://www.youtube.com/get_video_info?video_id=%s%s",youtubeInfo.current_id, "&eurl=&el=detailpage&ps=default&gl=US&hl=en");
 	hnd = curl_easy_init();
 
 	curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
-	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, &buffer);
+	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, &video_info);
 	curl_easy_setopt(hnd, CURLOPT_URL, url);
 	curl_easy_setopt(hnd, CURLOPT_ERRORBUFFER, err_buff);
 	curl_easy_setopt(hnd, CURLOPT_SSL_VERIFYHOST, 2);
@@ -559,7 +518,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	ret = curl_easy_perform(hnd);
 
-	eprintf("%s: video info for %s acquired (length %d)\n", __FUNCTION__, youtubeInfo.current_id, buffer.pos);
+	eprintf("%s: video info for %s acquired (length %d)\n", __FUNCTION__, youtubeInfo.current_id, video_info.length());
 	eprintf("%s:  YouTube URL %s\n", __FUNCTION__, url);
 
 	curl_easy_cleanup(hnd);
@@ -570,53 +529,52 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_error, 3000);
 		return 1;
 	}
-/*
-	fmt_url_map = strstr(curl_data, "fmt_list=");
-	if( fmt_url_map )
-	{
-		fmt_url_map += sizeof("fmt_list=")-1;
-		for( str = fmt_url_map; *str && *str != '&'; str++ );
-		if( *str != '&' )
-			str = NULL;
-		else
-			*str = 0;
 
-		if( utf8_urltomb(fmt_url_map, strlen(fmt_url_map)+1, url, sizeof(url)-1 ) > 0 )
-		{
-			eprintf("%s: fmt_list='%s'\n", __FUNCTION__, url);
-		}
-	}
-*/
+	/* Finf direct link to video */
+
 	//fmt_url_map = strstr(curl_data, "fmt_url_map=");
-    fmt_url_map = strstr(curl_data, "url_encoded_fmt_stream_map=");
+	char *fmt_url_map;
+	//int supported_formats[] = { 18, 17, 34, 5, 0 };
+	int supported_formats[] = { 34, 18, 0 };
+	/* 37/1920x1080/9/0/115
+	   22/1280x720/9/0/115
+	   35/854x480/9/0/115
+	   34/640x360/9/0/115
+	   5/320x240/7/0/0 */
+
+	char *fmt_url;
+	int i;
+	char buffer[video_info.length()+1];
+	strcpy(buffer, video_info.c_str());
+	fmt_url_map = strstr(buffer, "url_encoded_fmt_stream_map=");
 	char temp[512];
-	if( fmt_url_map )
+	if (fmt_url_map)
 	{
 		//fmt_url_map += sizeof("fmt_url_map=")-1;
 		fmt_url_map += sizeof("url_encoded_fmt_stream_map=")-1;
-		for( str = fmt_url_map; *str && *str != '&'; str++ );
-		if( *str != '&' )
+		for (str = fmt_url_map; *str && *str != '&'; str++);
+		if (*str != '&')
 			str = NULL;
 		else
 			*str = 0;
 
-		for( i = 0; supported_formats[i] != 0; i++ )
+		for (i = 0; supported_formats[i] != 0; i++)
 		{
 			//sprintf(temp, "%d%%7C", supported_formats[i]);
 			sprintf(temp, "itag%%3D%d", supported_formats[i]); // find format tag field
-			if( (fmt_url = strstr( fmt_url_map, temp )) != NULL )
+			if ((fmt_url = strstr( fmt_url_map, temp )) != NULL)
 			{
 				fmt_url += strlen(temp) + 9;// skip "%2Curl%3D"
 				str = strstr( fmt_url, "%26quality" ); // find end url
-				if( str )
+				if (str)
 					*str = 0;
 				eprintf("%s:  URL %s\n", __FUNCTION__, fmt_url);
-				if( utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 ) < 0 )
+				if (utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 ) < 0)
 				{
 					eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, fmt_url);
 				} else
 				{
-					if( utf8_urltomb(url_tmp, strlen(url_tmp)+1, url, sizeof(url)-1 ) < 0 )
+					if (utf8_urltomb(url_tmp, strlen(url_tmp)+1, url, sizeof(url)-1 ) < 0)
 					{
 						eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, url_tmp);
 					} else {
@@ -626,7 +584,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 				}
 			}
 		}
-		if( supported_formats[i] == 0 )
+		if (supported_formats[i] == 0)
 		{
 			interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_warning, 0);
 			return 1;
@@ -637,7 +595,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	char *descr     = NULL;
 	char *thumbnail = NULL;
-	if( videoIndex != CHANNEL_CUSTOM )
+	if (videoIndex != CHANNEL_CUSTOM)
 	{
 		youtubeInfo.index = videoIndex;
 		if( interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, videoIndex+1, temp, sizeof(temp) ) == 0 )
