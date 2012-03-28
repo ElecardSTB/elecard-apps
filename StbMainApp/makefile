@@ -522,11 +522,13 @@ ifeq ($(ENABLE_REGPLAT),1)
 src/libregplat.a: third_party/regplat/$(ARCH)/libregplat.a
 	cp third_party/regplat/$(ARCH)/libregplat.a src/libregplat.a
 
-REGPLAT_SOURCES=$(wildcard third_party/regplat/*.cpp)
-third_party/regplat/$(ARCH)/libregplat.a: $(REGPLAT_SOURCES) $(wildcard third_party/regplat/*.h)
+REGPLAT_SOURCES=$(wildcard third_party/regplat/*.c)
+REGPLAT_CPPSRCS=$(wildcard third_party/regplat/*.cpp)
+REGPLAT_OBJECTS=$(patsubst %.c,%.o,$(REGPLAT_SOURCES)) $(patsubst %.cpp,%.o,$(REGPLAT_CPPSRCS))
+
+third_party/regplat/$(ARCH)/libregplat.a: $(REGPLAT_OBJECTS) $(wildcard third_party/regplat/*.h)
 	$(Q)mkdir -p third_party/regplat/$(ARCH)
-	$(CC) $(LOCAL_CFLAGS) -o third_party/regplat/$(ARCH)/regplat.o -c $(REGPLAT_SOURCES)
-	$(AR) rcs third_party/regplat/$(ARCH)/libregplat.a third_party/regplat/$(ARCH)/regplat.o
+	$(AR) rcs third_party/regplat/$(ARCH)/libregplat.a $(REGPLAT_OBJECTS)
 endif
 
 ifeq ($(ENABLE_VIDIMAX),1)
@@ -534,10 +536,10 @@ src/libvidimax.a: third_party/vidimax/$(ARCH)/libvidimax.a
 	cp third_party/vidimax/$(ARCH)/libvidimax.a src/libvidimax.a
 
 VIDIMAX_SOURCES=$(wildcard third_party/vidimax/*.c)
-third_party/vidimax/$(ARCH)/libvidimax.a: $(VIDIMAX_SOURCES) $(wildcard third_party/vidimax/*.h)
+VIDIMAX_OBJECTS=$(patsubst %.c,%.o,$(VIDIMAX_SOURCES))
+third_party/vidimax/$(ARCH)/libvidimax.a: $(VIDIMAX_OBJECTS) $(wildcard third_party/vidimax/*.h)
 	$(Q)mkdir -p third_party/vidimax/$(ARCH)
-	$(CC) $(LOCAL_CFLAGS) -o third_party/vidimax/$(ARCH)/vidimax.o -c $(VIDIMAX_SOURCES)
-	$(AR) rcs third_party/vidimax/$(ARCH)/libvidimax.a third_party/vidimax/$(ARCH)/vidimax.o
+	$(AR) rcs third_party/vidimax/$(ARCH)/libvidimax.a $(VIDIMAX_OBJECTS)
 endif
 
 copy_hdfiles:
