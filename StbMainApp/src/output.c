@@ -1028,11 +1028,11 @@ int setParam(const char *path, const char *param, const char *value)
 #ifdef ENABLE_WIFI
 int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if( value == NULL || value[0] == 0 )
+	if (value == NULL || value[0] == 0)
 		return 1;
 
 	size_t essid_len = strlen(value);
-	if( essid_len >= sizeof(wifiInfo.essid) )
+	if (essid_len >= sizeof(wifiInfo.essid))
 		return 1;
 
 	memcpy( wifiInfo.essid, value, essid_len+1 );
@@ -1042,14 +1042,17 @@ int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
-	if(	setParam(path, "ESSID", value) != 0	&& bDisplayedWarning == 0)
+	if (setParam(path, "ESSID", value) != 0	&& bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 #endif // STBPNX
 #ifdef STSDK
-	if( setParam(STB_HOSTAPD_CONF, "ssid", value) != 0 && bDisplayedWarning == 0)
+	if (wifiInfo.wanMode)
+		output_writeWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
+	else
+	if (setParam(STB_HOSTAPD_CONF, "ssid", value) != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -5000,7 +5003,7 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 	getParam(path, "WAN_MODE", "0", temp);
 	wifiInfo.wanMode = strtol( temp, NULL, 10 );
 #endif
-	if( wifiInfo.wanMode || exists )
+	if (wifiInfo.wanMode || exists)
 	{
 		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN" );
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiWAN, SET_NUMBER(i), thumbnail_configure);
@@ -5011,7 +5014,7 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 	{
 		sprintf(buf, "%s: %s", iface_name, _T("OFF") );
 		interface_addMenuEntryDisabled((interfaceMenu_t*)&WifiSubMenu, buf, thumbnail_no);
-		if( WifiSubMenu.baseMenu.selectedItem >= 0 )
+		if (WifiSubMenu.baseMenu.selectedItem >= 0)
 			WifiSubMenu.baseMenu.selectedItem = MENU_ITEM_BACK;
 	}
 
