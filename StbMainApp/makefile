@@ -564,11 +564,11 @@ ifneq ($(STAPISDK_VERSION),)
 	$(Q)mkdir -p $(VM_SHARE)/fonts
 	$(Q)mkdir -p $(VM_SHARE)/icons
 	$(Q)mkdir -p $(VM_SHARE)/images
-	$(Q)install -m0644 hd/*.json $(VM_SHARE)/
-	$(Q)install -m0644 hd/fonts/*.ttf $(VM_SHARE)/fonts/
-	$(Q)install -m0644 hd/icons/*.png $(VM_SHARE)/icons/
-	$(Q)install -m0644 hd/images/*.png $(VM_SHARE)/images/
-	$(Q)install -m0644 hd/images/*.jpg $(VM_SHARE)/images/
+	$(Q)install -m0644 third_party/vidimax/resources/*.json $(VM_SHARE)/
+	$(Q)install -m0644 third_party/vidimax/resources/fonts/*.ttf $(VM_SHARE)/fonts/
+	$(Q)install -m0644 third_party/vidimax/resources/icons/*.png $(VM_SHARE)/icons/
+	$(Q)install -m0644 third_party/vidimax/resources/images/*.png $(VM_SHARE)/images/
+	$(Q)install -m0644 third_party/vidimax/resources/images/*.jpg $(VM_SHARE)/images/
 endif
 ifeq ($(ARCH),)
 	rm -rf $(VM_SHARE)/*
