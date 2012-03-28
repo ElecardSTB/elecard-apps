@@ -82,7 +82,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define STREAM_INFO_GET_SCREEN(info)     (((ptrdiff_t)info >> 16) & 0xFFFF)
 #define STREAM_INFO_GET_STREAM(info)     ( (ptrdiff_t)info        & 0xFFFF)
 
-#define RTP_AUDIO_TRACL_LIST    "/config/StbMainApp/audiotracks.txt"
+#define RTP_AUDIO_TRACL_LIST    CONFIG_DIR "/audiotracks.txt"
 
 #define DATA_BUFF_SIZE (32*1024)
 

@@ -279,6 +279,7 @@ DATA_DIR =    $(ROOTFS)/$(TARGET_DATA_DIR)
 ifneq ($(STAPISDK_VERSION),)
 DEFAULTS_DIR =  $(ROOTFS)/etc/defaults/elecard/StbMainApp
 TARGET_CONFIG_DIR = /var/etc/elecard/StbMainApp
+SYSTEM_CONFIG_DIR = /var/etc
 ROOTFS_NFS = $(ROOTFS)_nfs
 ifeq ($(ENABLE_VIDIMAX),1)
 VM_SHARE = $(ROOTFS)/opt/elecard/share/vidimax
@@ -294,16 +295,19 @@ endif
 ifeq ($(ARCH),mips)
 DEFAULTS_DIR = $(ROOTFS)/config.defaults/StbMainApp
 TARGET_CONFIG_DIR = /config/StbMainApp
+SYSTEM_CONFIG_DIR = /config
 endif
 
 DEFAULTS_DIR ?= $(ROOTFS)/opt/elecard/etc/defaults
 # NB: TARGET_CONFIG_DIR is evaluated on target!
 TARGET_CONFIG_DIR ?= /opt/elecard/etc
+SYSTEM_CONFIG_DIR ?= /etc
 
 LOCAL_CFLAGS += \
 	-DIMAGE_DIR="\"$(TARGET_DATA_DIR)/images/\"" \
 	-DFONT_DIR="\"$(TARGET_DATA_DIR)/fonts/\"" \
 	-DCONFIG_DIR="\"$(TARGET_CONFIG_DIR)\"" \
+	-DSYSTEM_CONFIG_DIR="\"$(SYSTEM_CONFIG_DIR)\"" \
 	-DRTSP_STREAM_FILE="\"$(TARGET_CONFIG_DIR)/streams.txt\"" \
 	-DCHANNEL_FILE_NAME="\"$(TARGET_CONFIG_DIR)/channels.conf\"" \
 	-DSETTINGS_FILE="\"$(TARGET_CONFIG_DIR)/settings.conf\"" \

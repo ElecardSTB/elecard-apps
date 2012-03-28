@@ -89,7 +89,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MENU_ITEM_EVENT        (1)
 
 #ifdef ENABLE_DVB
-#define OFFAIR_SERVICES_FILENAME         "/config/StbMainApp/offair.conf"
 #define OFFAIR_MULTIVIEW_FILENAME        "/tmp/dvb.ts"
 #define OFFAIR_MULTIVIEW_INFOFILE        "/tmp/dvb.multi"
 

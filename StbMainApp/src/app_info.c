@@ -617,8 +617,8 @@ set_overrides:
 	appControlInfo.playbackInfo.bAutoPlay = 0;
 	appControlInfo.playbackInfo.bResumeAfterStart = 0;
 
-	system("cp -f /channels.conf /config/StbMainApp/");
-	system("cp -f /offair.conf /config/StbMainApp/");
+	system("cp -f /channels.conf " CHANNEL_FILE_NAME);
+	system("cp -f /offair.conf " OFFAIR_SERVICES_FILENAME);
 
 #endif // #ifdef ENABLE_TEST_MODE
 

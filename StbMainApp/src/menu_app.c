@@ -280,7 +280,7 @@ void menu_buildMainMenu()
 		str = _T("INTERNET_BROWSING");
 		interface_addMenuEntry((interfaceMenu_t*)&WebServicesMenu, str, open_browser, NULL, thumbnail_internet);
 #ifndef HIDE_EXTRA_FUNCTIONS
-		if (helperFileExists("/config/konqueror/konq-embedrc-mw"))
+		if (helperFileExists(MW_CONFIG_FILE))
 		{
 			str = _T("MIDDLEWARE");
 			interface_addMenuEntry((interfaceMenu_t*)&interfaceMainMenu, str, open_browser_mw, NULL, thumbnail_elecardtv);
@@ -402,7 +402,7 @@ void menu_buildMainMenu()
 		str = _T("INTERNET_BROWSING");
 		interface_addMenuEntry((interfaceMenu_t*)&WebServicesMenu, str, open_browser, NULL, thumbnail_internet);
 #ifndef HIDE_EXTRA_FUNCTIONS
-		if (helperFileExists("/config/konqueror/konq-embedrc-mw"))
+		if (helperFileExists(MW_CONFIG_FILE))
 		{
 			str = _T("MIDDLEWARE");
 			interface_addMenuEntry((interfaceMenu_t*)&interfaceMainMenu, str, open_browser_mw, NULL, thumbnail_elecardtv);

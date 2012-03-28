@@ -46,9 +46,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define STATS_PATH     "/config/StbMainApp/"
-#define STATS_FILE     "/config/StbMainApp/stats.txt"
-#define STATS_TMP_FILE "/config/StbMainApp/stats_today.txt"
+#define STATS_FILE     CONFIG_DIR "/stats.txt"
+#define STATS_TMP_FILE CONFIG_DIR "/stats_today.txt"
 #define STATS_RESOLUTION      (60)
 #define STATS_SAMPLE_COUNT    (24*60*60 / STATS_RESOLUTION)
 #define STATS_UPDATE_INTERVAL (1000*STATS_RESOLUTION)

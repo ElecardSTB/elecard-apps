@@ -44,7 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS  *
 ********************/
 
-#define SAMBA_CONFIG "/config/samba.auto"
+#define SAMBA_CONFIG SYSTEM_CONFIG_DIR "/samba.auto"
 
 /*********************
 * EXPORTED TYPEDEFS  *

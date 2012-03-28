@@ -2108,15 +2108,19 @@ static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 		return 0;
 	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 	{
+#if (defined __i386__) || (defined __x86_64__)
+		system("rm -R " CONFIG_DIR "/*");
+#else
 #ifdef STB225
 		system("mount -o rw,remount /");
 #endif
-		system("rm -R /config/*");
+		system("rm -R " SYSTEM_CONFIG_DIR "/*");
 #ifdef STB225
 		system("mount -o ro,remount /");
 #endif
 		system("sync");
 		system("reboot");
+#endif
 		return 0;
 	}
 

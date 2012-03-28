@@ -251,6 +251,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define VERIMATRIX_VKS_PORT			(12699)
 
+#ifndef CONFIG_DIR
+	#define CONFIG_DIR "/opt/elecard/etc"
+#endif
+
+#ifndef SYSTEM_CONFIG_DIR
+	#define SYSTEM_CONFIG_DIR "/etc"
+#endif
+
 /* Set to path to verimatrix ini file */
 #ifndef VERIMATRIX_INI_FILE
 	#define VERIMATRIX_INI_FILE		"/config/verimatrix/VERIMATRIX.INI"
@@ -268,7 +276,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /* set to path to stream.txt file which contains RTSP file list (if HTTP server is unavailable) */
 #ifndef RTSP_STREAM_FILE
-	#define RTSP_STREAM_FILE	"/config/StbMainApp/streams.txt"
+	#define RTSP_STREAM_FILE	CONFIG_DIR "/streams.txt"
 #endif
 
 #ifndef DIVERSITY_FILE
@@ -276,11 +284,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #ifndef SETTINGS_FILE
-	#define SETTINGS_FILE	"/config/StbMainApp/settings.conf"
+	#define SETTINGS_FILE	CONFIG_DIR "/settings.conf"
 #endif
 
 #ifndef STB_CONFIG_FILE
-	#define STB_CONFIG_FILE		"/config/settings.conf"
+	#define STB_CONFIG_FILE		SYSTEM_CONFIG_DIR "/settings.conf"
 #endif
 
 #ifndef STB_CONFIG_OVERRIDE_FILE
@@ -292,31 +300,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #ifndef STB_PROVIDER_PROFILE
-	#define STB_PROVIDER_PROFILE		"/config/StbMainApp/provider"
+	#define STB_PROVIDER_PROFILE		CONFIG_DIR "/provider"
 #endif
 
 #ifndef PLAYLIST_FILENAME
-	#define PLAYLIST_FILENAME	"/config/StbMainApp/playlist.m3u"
+	#define PLAYLIST_FILENAME	CONFIG_DIR "/playlist.m3u"
 #endif
 
 #ifndef ADDRESSBOOK_FILENAME
-	#define ADDRESSBOOK_FILENAME	"/config/StbMainApp/addressbook.m3u"
+	#define ADDRESSBOOK_FILENAME	CONFIG_DIR "/addressbook.m3u"
 #endif
 
 #ifndef DIALED_FILENAME
-	#define DIALED_FILENAME	"/config/StbMainApp/dialed.m3u"
+	#define DIALED_FILENAME	CONFIG_DIR "/dialed.m3u"
 #endif
 
 #ifndef ANSWERED_FILENAME
-	#define ANSWERED_FILENAME	"/config/StbMainApp/answered.m3u"
+	#define ANSWERED_FILENAME	CONFIG_DIR "/answered.m3u"
 #endif
 
 #ifndef MISSED_FILENAME
-	#define MISSED_FILENAME	"/config/StbMainApp/missed.m3u"
+	#define MISSED_FILENAME	CONFIG_DIR "/missed.m3u"
 #endif
 
 #ifndef VOIP_CONFIG_FILE
-	#define VOIP_CONFIG_FILE "/config/StbMainApp/voip.conf"
+	#define VOIP_CONFIG_FILE CONFIG_DIR "/voip.conf"
 #endif
 
 #ifndef NETWORK_INTERFACES_FILE
@@ -336,11 +344,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #ifndef STB_WPA_SUPPLICANT_CONF
-#ifdef STBPNX
-	#define STB_WPA_SUPPLICANT_CONF    "/config/wpa_supplicant.conf"
-#else
-	#define STB_WPA_SUPPLICANT_CONF    "/var/etc/wpa_supplicant.conf"
-#endif
+	#define STB_WPA_SUPPLICANT_CONF    SYSTEM_CONFIG_DIR "/wpa_supplicant.conf"
 #endif
 
 #ifndef STB_WPA_SUPPLICANT_CTRL_DIR
@@ -451,7 +455,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /** Default DVB channel file which contains available channel list
  */
 #ifndef CHANNEL_FILE_NAME
-	#define CHANNEL_FILE_NAME   "/config/StbMainApp/channels.conf"
+	#define CHANNEL_FILE_NAME   CONFIG_DIR "/channels.conf"
+#endif
+
+#ifndef OFFAIR_SERVICES_FILENAME
+	#define OFFAIR_SERVICES_FILENAME         CONFIG_DIR "/offair.conf"
 #endif
 
 /** Default path to profile locations storage

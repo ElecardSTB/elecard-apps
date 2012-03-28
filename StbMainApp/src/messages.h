@@ -45,7 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS  *
 ********************/
 
-#define MESSAGES_DIR "/config/messages/"
+#define MESSAGES_DIR SYSTEM_CONFIG_DIR "/messages/"
 
 /*******************************************************************
 * EXPORTED DATA                                                    *
