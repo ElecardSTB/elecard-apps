@@ -1237,27 +1237,27 @@ static int output_changeWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	size_t key_len = strlen(value);
 
-	if( wifiInfo.auth == wifiAuthWEP )
+	if ( wifiInfo.auth == wifiAuthWEP )
 	{
-		if( key_len != 10 )
+		if ( key_len != 10 )
 		{
 			interface_showMessageBox(_T("WIRELESS_PASSWORD_INCORRECT"), thumbnail_error, 0);
 			return 1;
 		} else
 		{
 			int j;
-			for( j = 0; j < 10; j++ )
-				if( value[j] < '0' || value[j] > '9' )
+			for ( j = 0; j < 10; j++ )
+				if ( value[j] < '0' || value[j] > '9' )
 				{
 					interface_showMessageBox(_T("WIRELESS_PASSWORD_INCORRECT"), thumbnail_error, 0);
 					return 1;
 				}
 		}
-	} else if( key_len < 8 )
+	} else if ( key_len < 8 )
 	{
 		interface_showMessageBox(_T("WIRELESS_PASSWORD_TOO_SHORT"), thumbnail_error, 0);
 		return 1;
-	} else if( key_len >= sizeof( wifiInfo.key ) )
+	} else if ( key_len >= sizeof( wifiInfo.key ) )
 	{
 		interface_showMessageBox(_T("WIRELESS_PASSWORD_INCORRECT"), thumbnail_error, 0);
 		return 1;
@@ -1271,14 +1271,14 @@ static int output_changeWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
-	if( setParam(path, "KEY", value) != 0 && bDisplayedWarning == 0)
+	if (setParam(path, "KEY", value) != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 #endif // STBPNX
 #ifdef STSDK
-	if( output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
+	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -5008,7 +5008,8 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN" );
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiWAN, SET_NUMBER(i), thumbnail_configure);
 #ifdef USE_WPA_SUPPLICANT
-		output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
+		if (wifiInfo.wanMode)
+			output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
 #endif
 	} else
 	{
@@ -6174,7 +6175,7 @@ int output_readInterfacesFile(void)
 	wifiInfo.auth = wifiAuthWPA2PSK;
 	wifiInfo.encryption = wifiEncAES;
 
-	if( wifiInfo.wanMode )
+	if (wifiInfo.wanMode)
 	{
 		output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
 	} else
@@ -6186,23 +6187,23 @@ int output_readInterfacesFile(void)
 		wifiInfo.currentChannel = strtol(buf, NULL, 10);
 
 		getParam( STB_HOSTAPD_CONF, "wep_key0", "", buf );
-		if( buf[0] != 0 )
+		if (buf[0] != 0)
 		{
 			wifiInfo.auth = wifiAuthWEP;
 		} else
 		{
 			getParam( STB_HOSTAPD_CONF, "wpa_passphrase", "", buf );
-			if( buf[0] != 0 )
+			if (buf[0] != 0)
 				wifiInfo.auth = wifiAuthWPAPSK;
 			else
 				wifiInfo.auth = wifiAuthOpen;
 		}
 		strncpy( wifiInfo.key, buf, sizeof(wifiInfo.key) );
 		wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
-		if( wifiInfo.auth > wifiAuthWEP )
+		if (wifiInfo.auth > wifiAuthWEP)
 		{
 			getParam( STB_HOSTAPD_CONF, "wpa_pairwise", "", buf );
-			if( strstr( buf, "CCMP" ) )
+			if (strstr( buf, "CCMP" ))
 			{
 				wifiInfo.auth = wifiAuthWPA2PSK;
 				wifiInfo.encryption = wifiEncAES;
