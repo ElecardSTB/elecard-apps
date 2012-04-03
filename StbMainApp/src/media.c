@@ -675,6 +675,7 @@ int media_startNextChannel(int direction, void* pArg)
 {
 	int             indexChange = (direction?-1:1);
 	char            playingDir[MAX_URL];
+	char           *playingFile = NULL;
 	char           *str;
 	struct dirent **playDirEntries;
 	int             playDirCount;
@@ -736,25 +737,26 @@ int media_startNextChannel(int direction, void* pArg)
 	/* We are already playing some file in some (!=current) dir */
 	/* So we need to navigate back to that dir and select next/previous file to play */
 	strcpy(playingDir,appControlInfo.mediaInfo.filename);
-	*(rindex(playingDir,'/')+1) = 0;
+	playingFile = rindex(appControlInfo.mediaInfo.filename,'/')+1;
+	playingDir[(playingFile-appControlInfo.mediaInfo.filename)]=0;
 	playingPath = playingDir;
 	playDirCount = scandir(playingDir, &playDirEntries, media_select_current, alphasort);
-	if(playDirCount < 0)
+	if (playDirCount < 0)
 	{
 		interface_showMessageBox(_T("ERR_FILE_NOT_FOUND"), thumbnail_error, 0);
 		return 1;
 	}
 
-	if(playDirCount < 2) /* Nothing to navigate to */
+	if (playDirCount < 2) /* Nothing to navigate to */
 	{
 		eprintf("%s: '%s' file count < 2\n", __FUNCTION__, playingDir);
 		goto cleanup;
 	}
 
 	/* Trying to get index of playing file in directory listing */
-	for( i = 0 ; i < playDirCount; ++i )
+	for ( i = 0 ; i < playDirCount; ++i )
 	{
-		if(strstr(appControlInfo.mediaInfo.filename,playDirEntries[i]->d_name))
+		if (strcmp(playingFile, playDirEntries[i]->d_name) == 0)
 		{
 			current_index = i;
 			break;
