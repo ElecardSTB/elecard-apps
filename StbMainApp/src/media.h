@@ -152,6 +152,12 @@ mediaType media_getMediaType(const char *filename);
  */
 int media_select_usb(const struct dirent * de);
 
+/* like strcmp but compare sequences of digits numerically */
+int strnaturalcmp(const char *s1, const char *s2);
+
+int naturalsort (const struct dirent **e1,
+                 const struct dirent **e2);
+
 #ifdef __cplusplus
 }
 #endif

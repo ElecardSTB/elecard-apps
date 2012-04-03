@@ -55,6 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <limits.h>
 #include <time.h>
 #include <curl/curl.h>
+#include <dirent.h>
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -371,6 +372,7 @@ typedef struct __stb810_mediaInfo
 	int                  currentFile;
 	mediaType            typeIndex; // filter used in USB menu
 	int                  maxFile;
+	int                (*fileSorting)(const struct dirent **, const struct dirent **);
 #ifdef STB225
 	int32_t              endOfStreamCountdown;
 	int                  endOfFileReported;

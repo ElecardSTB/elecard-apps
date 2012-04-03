@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "output.h"
 #include "messages.h"
 #include "playlist.h"
+#include "media.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -383,6 +384,11 @@ int loadAppSettings()
 					break;
 				}
 			//dprintf("%s: Media type index %d\n", __FUNCTION__, appControlInfo.mediaInfo.typeIndex);
+		}
+		else if (sscanf(buf, "FILE_SORTING=%[^\r\n ]", val) == 1)
+		{
+			if (strcasecmp(val, "natural") == 0)
+				appControlInfo.mediaInfo.fileSorting = naturalsort;
 		}
 		else if (sscanf(buf, "PLAYBACK_MODE=%[^\r\n ]", val) == 1)
 		{
@@ -744,6 +750,7 @@ int saveAppSettings()
 	fprintf(fd, "LANGUAGE=%s\n",                  l10n_currentLanguage);
 	fprintf(fd, "MEDIA_FILTER=%s\n",              appControlInfo.mediaInfo.typeIndex < 0 ?
 	                                                "showall" : mediaTypeNames[appControlInfo.mediaInfo.typeIndex] );
+	fprintf(fd, "FILE_SORTING=%s\n",              appControlInfo.mediaInfo.fileSorting == naturalsort ? "natural" : "alpha" );
 	fprintf(fd, "PLAYBACK_MODE=%s\n",             playbackModeNames[appControlInfo.mediaInfo.playbackMode]);
 	fprintf(fd, "SLIDESHOW_MODE=%s\n",            slideshowModeNames[appControlInfo.slideshowInfo.defaultState]);
 	fprintf(fd, "ANIMATION=%d\n",                 interfaceInfo.animation);
@@ -819,8 +826,6 @@ int saveProxySettings(void)
 
 void appInfo_init(void)
 {
-
-			  
 	appControlInfo.pictureInfo.skinTone           = 0;
 	appControlInfo.pictureInfo.greenStretch       = 0;
 	appControlInfo.pictureInfo.blueStretch        = 0;
@@ -834,6 +839,7 @@ void appInfo_init(void)
 	appControlInfo.mediaInfo.active               = 0;
 	appControlInfo.mediaInfo.endOfStream          = 0;
 	appControlInfo.mediaInfo.playbackMode         = playback_sequential;
+	appControlInfo.mediaInfo.fileSorting          = alphasort;
 
 	appControlInfo.slideshowInfo.defaultState     = slideshowShow;
 	appControlInfo.slideshowInfo.state            = 0;

@@ -324,6 +324,40 @@ mediaType media_getMediaType(const char *filename)
 	return mediaAll;
 }
 
+int strnaturalcmp(const char *s1, const char *s2) {
+  for (;;) {
+    if (*s2 == '\0')
+      return *s1 != '\0';
+    else if (*s1 == '\0')
+      return 1;
+    else if (!(isdigit(*s1) && isdigit(*s2))) {
+      if (*s1 != *s2)
+        return (int)*s1 - (int)*s2;
+      else
+        (++s1, ++s2);
+    } else {
+      char *lim1, *lim2;
+      unsigned long n1 = strtoul(s1, &lim1, 10);
+      unsigned long n2 = strtoul(s2, &lim2, 10);
+      if (n1 > n2)
+        return 1;
+      else if (n1 < n2)
+        return -1;
+      s1 = lim1;
+      s2 = lim2;
+    }
+  }
+}
+
+int naturalsort (const struct dirent **e1,
+                 const struct dirent **e2)
+{
+	int result = ((*e1)->d_type & DT_DIR) - ((*e2)->d_type & DT_DIR);
+	if (result)
+		return result;
+	return strnaturalcmp((*e1)->d_name, (*e2)->d_name);
+}
+
 #ifdef STBPNX
 static int  media_adjustStoragePath(char *oldPath, char *newPath)
 {
@@ -342,7 +376,7 @@ static int  media_adjustStoragePath(char *oldPath, char *newPath)
 	dprintf("%s: %s\n", __FUNCTION__,filePath);
 	strcpy(_currentPath,currentPath);
 	strcpy(currentPath,usbRoot);
-	storageCount = scandir(usbRoot, &storages, media_select_dir, alphasort);
+	storageCount = scandir(usbRoot, &storages, media_select_dir, appControlInfo.mediaInfo.fileSorting);
 	strcpy(currentPath,_currentPath);
 	if(storageCount < 0)
 	{
@@ -740,7 +774,7 @@ int media_startNextChannel(int direction, void* pArg)
 	playingFile = rindex(appControlInfo.mediaInfo.filename,'/')+1;
 	playingDir[(playingFile-appControlInfo.mediaInfo.filename)]=0;
 	playingPath = playingDir;
-	playDirCount = scandir(playingDir, &playDirEntries, media_select_current, alphasort);
+	playDirCount = scandir(playingDir, &playDirEntries, media_select_current, appControlInfo.mediaInfo.fileSorting);
 	if (playDirCount < 0)
 	{
 		interface_showMessageBox(_T("ERR_FILE_NOT_FOUND"), thumbnail_error, 0);
@@ -1327,7 +1361,7 @@ int  media_slideshowNext(int direction)
 		return -2;
 	c = delimeter[1];
 	delimeter[1] = 0;
-	imageDirCount = scandir(appControlInfo.slideshowInfo.filename, &imageDirEntries, media_select_image, alphasort);
+	imageDirCount = scandir(appControlInfo.slideshowInfo.filename, &imageDirEntries, media_select_image, appControlInfo.mediaInfo.fileSorting);
 	delimeter[1] = c;
 
 	if(imageDirCount < 0)
@@ -1423,7 +1457,7 @@ static int media_showCover(char* filename)
 	if( delimeter == NULL )
 		return -2;
 	delimeter[1] = 0;
-	imageDirCount = scandir(appControlInfo.slideshowInfo.filename, &imageDirEntries, media_select_image, alphasort);
+	imageDirCount = scandir(appControlInfo.slideshowInfo.filename, &imageDirEntries, media_select_image, appControlInfo.mediaInfo.fileSorting);
 
 	if(imageDirCount < 0)
 	{
@@ -2419,8 +2453,8 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
 	if( hasDrives > 0)
 	{
 		/* Build directory list */
-		media_currentDirCount = scandir(currentPath, &media_currentDirEntries, media_select_dir, alphasort);
-		media_currentFileCount = scandir(currentPath, &media_currentFileEntries, media_select_list, alphasort);
+		media_currentDirCount = scandir(currentPath, &media_currentDirEntries, media_select_dir, appControlInfo.mediaInfo.fileSorting);
+		media_currentFileCount = scandir(currentPath, &media_currentFileEntries, media_select_list, appControlInfo.mediaInfo.fileSorting);
 		if( media_currentFileCount + media_currentDirCount > 100 ) // displaying lot of items takes more time then scanning
 		{
 			interface_showLoading();

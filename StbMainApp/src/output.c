@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES                                *
 ************************************************/
 
-#include "off_air.h"
+#include "output.h"
 
 #include "debug.h"
 #include "l10n.h"
@@ -43,12 +43,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gfx.h"
 #include "backend.h"
 #include "menu_app.h"
-#include "output.h"
+#include "off_air.h"
 #include "sound.h"
-#ifdef ENABLE_STATS
 #include "stats.h"
-#endif
 #include "stsdk.h"
+#include "media.h"
 
 #include "dvb.h"
 #include "rtp.h"
@@ -246,6 +245,7 @@ static int output_toggleInterfaceAnimation(interfaceMenu_t* pMenu, void* pArg);
 #endif
 static int output_toggleResumeAfterStart(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleFileSorting(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleHighlightColor(interfaceMenu_t* pMenu, void* pArg);
 static int output_togglePlayControlTimeout(interfaceMenu_t* pMenu, void* pArg);
 static int output_togglePlayControlShowOnStart(interfaceMenu_t* pMenu, void* pArg);
@@ -844,6 +844,19 @@ static int output_toggleResumeAfterStart(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.playbackInfo.bAutoPlay = (appControlInfo.playbackInfo.bAutoPlay + 1) % 2;
+
+	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
+	{
+		bDisplayedWarning = 1;
+		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	}
+
+	return output_fillInterfaceMenu(pMenu, pArg);
+}
+
+int output_toggleFileSorting(interfaceMenu_t* pMenu, void* pArg)
+{
+	appControlInfo.mediaInfo.fileSorting = appControlInfo.mediaInfo.fileSorting == naturalsort ? alphasort : naturalsort;
 
 	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
 	{
@@ -5471,6 +5484,9 @@ int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	sprintf( buf, "%s: %s", _T("AUTOPLAY"), _T( appControlInfo.playbackInfo.bAutoPlay ? "ON" : "OFF" ) );
 	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleAutoPlay, NULL, settings_interface);
+
+	sprintf( buf, "%s: %s", _T("FILE_SORTING"), _T( appControlInfo.mediaInfo.fileSorting == naturalsort ? "SORT_NATURAL" : "SORT_ALPHA" ));
+	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleFileSorting, NULL, settings_interface);
 
 #ifdef STB82
 	char *str;
