@@ -389,6 +389,8 @@ int loadAppSettings()
 		{
 			if (strcasecmp(val, "natural") == 0)
 				appControlInfo.mediaInfo.fileSorting = naturalsort;
+			else
+				appControlInfo.mediaInfo.fileSorting = alphasort;
 		}
 		else if (sscanf(buf, "PLAYBACK_MODE=%[^\r\n ]", val) == 1)
 		{
