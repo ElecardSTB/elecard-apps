@@ -85,7 +85,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #define SHORT_PATH                              (100)
 
-#define MAX_MESSAGE_BOX_LENGTH                  (4*2048)
+#define MAX_MESSAGE_BOX_LENGTH                  (8*1024)
+#define MAX_SCROLL_BOX_LENGTH                  (32*1024)
 
 #define MAX_FIELD_PATTERN_LENGTH                (128)
 #define MAX_FIELD_PATTERNS                      (10)
@@ -748,7 +749,7 @@ typedef struct
 	interfaceMessageBoxType_t type;
 	int   icon;
 	char  title[MENU_ENTRY_INFO_LENGTH];
-	char  message[MAX_MESSAGE_BOX_LENGTH*4];
+	char  message[MAX_SCROLL_BOX_LENGTH];
 	int   offset;
 	int   maxOffset;
 	int   visibleLines;
