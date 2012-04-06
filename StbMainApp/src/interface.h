@@ -765,6 +765,7 @@ typedef struct
 		int   lineCount;
 	} scrolling;
 	const char *poster;
+	DFBRectangle target;
 	/** If type is interfaceMessageBoxCallback then return value 0 closes message box.
 	 * If type is interfaceMessageBoxScrolling then return value 0 mean command was processed by callback,
 	 * non-zero mean to execute default action (scroll or close)
@@ -1452,6 +1453,11 @@ void interface_showScrollingBox(const char *text, int icon, menuConfirmFunction 
 void interface_showScrollingBoxColor(const char *text, int icon, menuConfirmFunction pCallback, void *pArg,
                                      int br, int bg, int bb, int ba,
                                      int  r, int  g, int  b, int  a);
+
+void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFunction pCallback, void *pArg,
+                                      int x, int y, int w, int h,
+                                      int br, int bg, int bb, int ba,
+                                      int  r, int  g, int  b, int  a);
 
 /**
  *  @brief Displays message box with poster, scrollable text and custom user input handler

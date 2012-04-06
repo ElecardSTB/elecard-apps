@@ -1353,8 +1353,8 @@ void interface_displayMessageBox()
 				else
 #endif
 				interface_displayScrollingTextBoxColor(
-					interfaceInfo.clientX, interfaceInfo.clientY,
-					interfaceInfo.clientWidth, interfaceInfo.clientHeight,
+					interfaceInfo.messageBox.target.x, interfaceInfo.messageBox.target.y,
+					interfaceInfo.messageBox.target.w, interfaceInfo.messageBox.target.h,
 					interfaceInfo.messageBox.message, interfaceInfo.messageBox.scrolling.offset,
 					interfaceInfo.messageBox.scrolling.visibleLines, interfaceInfo.messageBox.scrolling.lineCount,
 					interfaceInfo.messageBox.icon,
@@ -7700,6 +7700,17 @@ void interface_showScrollingBoxColor(const char *text, int icon, menuConfirmFunc
                                      int br, int bg, int bb, int ba,
                                      int  r, int  g, int  b, int  a)
 {
+	interface_showScrollingBoxCustom(text, icon, pCallback, pArg,
+		br, bg, bb, ba, r, g, b, a,
+		interfaceInfo.clientX, interfaceInfo.clientY,
+		interfaceInfo.clientWidth, interfaceInfo.clientHeight);
+}
+
+void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFunction pCallback, void *pArg,
+                                      int x, int y, int w, int h,
+                                      int br, int bg, int bb, int ba,
+                                      int  r, int  g, int  b, int  a)
+{
 	int maxWidth;
 
 	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
@@ -7725,6 +7736,10 @@ void interface_showScrollingBoxColor(const char *text, int icon, menuConfirmFunc
 	interfaceInfo.messageBox.colors.border.G = bg;
 	interfaceInfo.messageBox.colors.border.B = bb;
 	interfaceInfo.messageBox.colors.border.A = ba;
+	interfaceInfo.messageBox.target.x = x;
+	interfaceInfo.messageBox.target.y = y;
+	interfaceInfo.messageBox.target.w = w;
+	interfaceInfo.messageBox.target.h = h;
 	interfaceInfo.messageBox.type = interfaceMessageBoxScrolling;
 
 	interface_displayMenu(1);
