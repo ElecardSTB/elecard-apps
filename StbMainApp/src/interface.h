@@ -750,11 +750,17 @@ typedef struct
 	int   icon;
 	char  title[MENU_ENTRY_INFO_LENGTH];
 	char  message[MAX_SCROLL_BOX_LENGTH];
-	int   offset;
-	int   maxOffset;
-	int   visibleLines;
-	int   lineCount;
-	interfaceColor_t titleColor;
+	struct
+	{
+		interfaceColor_t title;
+	} colors;
+	struct
+	{
+		int   offset; // index of first visible line
+		int   maxOffset;
+		int   visibleLines;
+		int   lineCount;
+	} scrolling;
 	const char *poster;
 	/** If type is interfaceMessageBoxCallback then return value 0 closes message box.
 	 * If type is interfaceMessageBoxScrolling then return value 0 mean command was processed by callback,

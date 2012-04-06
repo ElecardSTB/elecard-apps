@@ -1329,16 +1329,16 @@ void interface_displayMessageBox()
 					interface_displayScrollingTextBox(
 						interfaceInfo.clientX, interfaceInfo.clientY,
 						interfaceInfo.clientWidth, interfaceInfo.clientHeight+2*interfaceInfo.paddingSize,
-						interfaceInfo.messageBox.message, interfaceInfo.messageBox.offset,
-						interfaceInfo.messageBox.visibleLines, interfaceInfo.messageBox.lineCount,
+						interfaceInfo.messageBox.message, interfaceInfo.messageBox.scrolling.offset,
+						interfaceInfo.messageBox.scrolling.visibleLines, interfaceInfo.messageBox.scrolling.lineCount,
 						interfaceInfo.messageBox.icon);
 				else
 #endif
 				interface_displayScrollingTextBox(
 					interfaceInfo.clientX, interfaceInfo.clientY,
 					interfaceInfo.clientWidth, interfaceInfo.clientHeight,
-					interfaceInfo.messageBox.message, interfaceInfo.messageBox.offset,
-					interfaceInfo.messageBox.visibleLines, interfaceInfo.messageBox.lineCount,
+					interfaceInfo.messageBox.message, interfaceInfo.messageBox.scrolling.offset,
+					interfaceInfo.messageBox.scrolling.visibleLines, interfaceInfo.messageBox.scrolling.lineCount,
 					interfaceInfo.messageBox.icon);
 				break;
 			case interfaceMessageBoxPoster:
@@ -1361,10 +1361,10 @@ static int interface_displayPosterBox()
 	pgfx_font->GetAscender(pgfx_font, &fa);
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 	gfx_drawRectangle(DRAWING_SURFACE,
-	                  interfaceInfo.messageBox.titleColor.R,
-	                  interfaceInfo.messageBox.titleColor.G,
-	                  interfaceInfo.messageBox.titleColor.B,
-	                  interfaceInfo.messageBox.titleColor.A,
+	                  interfaceInfo.messageBox.colors.title.R,
+	                  interfaceInfo.messageBox.colors.title.G,
+	                  interfaceInfo.messageBox.colors.title.B,
+	                  interfaceInfo.messageBox.colors.title.A,
 	                  interfaceInfo.clientX, interfaceInfo.clientY,
 	                  interfaceInfo.clientWidth, INTERFACE_POSTER_TITLE_HEIGHT);
 
@@ -1398,8 +1398,8 @@ static int interface_displayPosterBox()
 			interfaceInfo.clientX + INTERFACE_POSTER_PICTURE_WIDTH,
 			interfaceInfo.clientY + INTERFACE_POSTER_TITLE_HEIGHT,
 			interfaceInfo.clientWidth - INTERFACE_POSTER_PICTURE_WIDTH, h,
-			interfaceInfo.messageBox.message, interfaceInfo.messageBox.offset,
-			interfaceInfo.messageBox.visibleLines, interfaceInfo.messageBox.lineCount, -1);
+			interfaceInfo.messageBox.message, interfaceInfo.messageBox.scrolling.offset,
+			interfaceInfo.messageBox.scrolling.visibleLines, interfaceInfo.messageBox.scrolling.lineCount, -1);
 		x = interfaceInfo.clientX + INTERFACE_POSTER_PICTURE_WIDTH/2;
 	} else
 		x = interfaceInfo.clientX + interfaceInfo.clientWidth/2;
@@ -3426,37 +3426,37 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 			switch ( cmd->command )
 			{
 				case interfaceCommandUp:
-					if ( interfaceInfo.messageBox.offset > 0 )
+					if ( interfaceInfo.messageBox.scrolling.offset > 0 )
 					{
-						interfaceInfo.messageBox.offset--;
+						interfaceInfo.messageBox.scrolling.offset--;
 						interface_displayMenu(1);
 					}
 					break;
 				case interfaceCommandDown:
-					if ( interfaceInfo.messageBox.offset + interfaceInfo.messageBox.visibleLines < interfaceInfo.messageBox.lineCount )
+					if ( interfaceInfo.messageBox.scrolling.offset + interfaceInfo.messageBox.scrolling.visibleLines < interfaceInfo.messageBox.scrolling.lineCount )
 					{
-						interfaceInfo.messageBox.offset++;
+						interfaceInfo.messageBox.scrolling.offset++;
 						interface_displayMenu(1);
 					}
 					break;
 				case interfaceCommandPageUp:
-					if ( interfaceInfo.messageBox.offset > 0 )
+					if ( interfaceInfo.messageBox.scrolling.offset > 0 )
 					{
-						interfaceInfo.messageBox.offset -= interfaceInfo.messageBox.visibleLines - 1;
-						if (interfaceInfo.messageBox.offset < 0 )
+						interfaceInfo.messageBox.scrolling.offset -= interfaceInfo.messageBox.scrolling.visibleLines - 1;
+						if (interfaceInfo.messageBox.scrolling.offset < 0 )
 						{
-							interfaceInfo.messageBox.offset = 0;
+							interfaceInfo.messageBox.scrolling.offset = 0;
 						}
 						interface_displayMenu(1);
 					}
 					break;
 				case interfaceCommandPageDown:
-					if ( interfaceInfo.messageBox.offset + interfaceInfo.messageBox.visibleLines < interfaceInfo.messageBox.lineCount )
+					if ( interfaceInfo.messageBox.scrolling.offset + interfaceInfo.messageBox.scrolling.visibleLines < interfaceInfo.messageBox.scrolling.lineCount )
 					{
-						interfaceInfo.messageBox.offset += interfaceInfo.messageBox.visibleLines - 1;
-						if (interfaceInfo.messageBox.offset + interfaceInfo.messageBox.visibleLines >= interfaceInfo.messageBox.lineCount )
+						interfaceInfo.messageBox.scrolling.offset += interfaceInfo.messageBox.scrolling.visibleLines - 1;
+						if (interfaceInfo.messageBox.scrolling.offset + interfaceInfo.messageBox.scrolling.visibleLines >= interfaceInfo.messageBox.scrolling.lineCount )
 						{
-							interfaceInfo.messageBox.offset = interfaceInfo.messageBox.lineCount - interfaceInfo.messageBox.visibleLines;
+							interfaceInfo.messageBox.scrolling.offset = interfaceInfo.messageBox.scrolling.lineCount - interfaceInfo.messageBox.scrolling.visibleLines;
 						}
 						interface_displayMenu(1);
 					}
@@ -7651,14 +7651,14 @@ void interface_showScrollingBox(const char *text, int icon, menuConfirmFunction 
 	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
 
 	maxWidth = interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH - ( icon > 0 ? interfaceInfo.thumbnailSize + interfaceInfo.paddingSize : 0 );
-	interface_formatTextWW(text, pgfx_font, maxWidth, interfaceInfo.clientHeight - 2*interfaceInfo.paddingSize, sizeof(interfaceInfo.messageBox.message), interfaceInfo.messageBox.message, &interfaceInfo.messageBox.lineCount, &interfaceInfo.messageBox.visibleLines);
+	interface_formatTextWW(text, pgfx_font, maxWidth, interfaceInfo.clientHeight - 2*interfaceInfo.paddingSize, sizeof(interfaceInfo.messageBox.message), interfaceInfo.messageBox.message, &interfaceInfo.messageBox.scrolling.lineCount, &interfaceInfo.messageBox.scrolling.visibleLines);
 
-	interfaceInfo.messageBox.maxOffset = interfaceInfo.messageBox.lineCount - interfaceInfo.messageBox.visibleLines;
-	if ( interfaceInfo.messageBox.maxOffset < 0 )
+	interfaceInfo.messageBox.scrolling.maxOffset = interfaceInfo.messageBox.scrolling.lineCount - interfaceInfo.messageBox.scrolling.visibleLines;
+	if ( interfaceInfo.messageBox.scrolling.maxOffset < 0 )
 	{
-		interfaceInfo.messageBox.maxOffset = 0;
+		interfaceInfo.messageBox.scrolling.maxOffset = 0;
 	}
-	interfaceInfo.messageBox.offset = 0;
+	interfaceInfo.messageBox.scrolling.offset = 0;
 	interfaceInfo.messageBox.icon = icon;
 	interfaceInfo.messageBox.pCallback = pCallback;
 	interfaceInfo.messageBox.pArg = pArg;
@@ -7674,13 +7674,13 @@ void interface_showPosterBox(const char *text, const char *title, int tr, int tg
 
 	if ( text )
 	{
-		interface_formatTextWW(text, pgfx_font, interfaceInfo.clientWidth - INTERFACE_POSTER_PICTURE_WIDTH - INTERFACE_SCROLLBAR_WIDTH, interfaceInfo.clientHeight - INTERFACE_POSTER_TITLE_HEIGHT, sizeof(interfaceInfo.messageBox.message), interfaceInfo.messageBox.message, &interfaceInfo.messageBox.lineCount, &interfaceInfo.messageBox.visibleLines);
-		interfaceInfo.messageBox.maxOffset = interfaceInfo.messageBox.lineCount - interfaceInfo.messageBox.visibleLines;
-		if ( interfaceInfo.messageBox.maxOffset < 0 )
+		interface_formatTextWW(text, pgfx_font, interfaceInfo.clientWidth - INTERFACE_POSTER_PICTURE_WIDTH - INTERFACE_SCROLLBAR_WIDTH, interfaceInfo.clientHeight - INTERFACE_POSTER_TITLE_HEIGHT, sizeof(interfaceInfo.messageBox.message), interfaceInfo.messageBox.message, &interfaceInfo.messageBox.scrolling.lineCount, &interfaceInfo.messageBox.scrolling.visibleLines);
+		interfaceInfo.messageBox.scrolling.maxOffset = interfaceInfo.messageBox.scrolling.lineCount - interfaceInfo.messageBox.scrolling.visibleLines;
+		if ( interfaceInfo.messageBox.scrolling.maxOffset < 0 )
 		{
-			interfaceInfo.messageBox.maxOffset = 0;
+			interfaceInfo.messageBox.scrolling.maxOffset = 0;
 		}
-		interfaceInfo.messageBox.offset = 0;
+		interfaceInfo.messageBox.scrolling.offset = 0;
 	}
 	else
 		interfaceInfo.messageBox.message[0] = 0;
@@ -7690,10 +7690,10 @@ void interface_showPosterBox(const char *text, const char *title, int tr, int tg
 	else
 		interfaceInfo.messageBox.title[0] = 0;
 
-	interfaceInfo.messageBox.titleColor.R = tr;
-	interfaceInfo.messageBox.titleColor.G = tg;
-	interfaceInfo.messageBox.titleColor.B = tb;
-	interfaceInfo.messageBox.titleColor.A = ta;
+	interfaceInfo.messageBox.colors.title.R = tr;
+	interfaceInfo.messageBox.colors.title.G = tg;
+	interfaceInfo.messageBox.colors.title.B = tb;
+	interfaceInfo.messageBox.colors.title.A = ta;
 	interfaceInfo.messageBox.icon         = icon;
 	interfaceInfo.messageBox.poster       = poster;
 	interfaceInfo.messageBox.pCallback    = pCallback;
