@@ -3380,7 +3380,7 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 	}
 #endif // ENABLE_REGPLAT
 
-#if (defined STB225) && 1
+#if (defined STB225)
 //printf("%s[%d]: cmd->command=%d\n", __FILE__, __LINE__, cmd->command);
 	if (((cmd->command == DIKS_RADIO) ||
 	     (cmd->command == DIKS_ZOOM)) &&
@@ -3526,10 +3526,12 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 
 	}
 	/* Hot keys */
-	else if (!interfaceInfo.lockMenu && 
+	else if (!interfaceInfo.lockMenu &&
 	         (cmd->command == interfaceCommandServices ||
 	          cmd->command == interfaceCommandPhone ||
-	          cmd->command == interfaceCommandWeb) )
+	          cmd->command == interfaceCommandWeb ||
+	          cmd->command == interfaceCommandFavorites)
+	        )
 	{
 		static interfaceMenu_t *lastMenu = (interfaceMenu_t*)&OutputMenu;
 		static int              lastShow = 1;

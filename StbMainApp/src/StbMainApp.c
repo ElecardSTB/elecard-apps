@@ -496,10 +496,15 @@ interfaceCommand_t parseEvent(DFBEvent *event)
 			//ADD_FALLTHROUGH('m')
 			ADD_HANDLER(DIKS_NEXT, interfaceCommandNext)
 			//ADD_FALLTHROUGH(DIKS_TAB)
+#if (defined STBPNX) // STB820/225 remotes don't have EPG button
 			ADD_HANDLER(DIKS_EPG, interfaceCommandChangeMenuStyle)
+#endif
 			//ADD_FALLTHROUGH('i')
 			ADD_FALLTHROUGH(DIKS_CUSTOM1) // 'i' on stb remote
+#if (defined STBPNX)
 			ADD_HANDLER(DIKS_INFO, interfaceCommandServices)
+			ADD_HANDLER(DIKS_FAVORITES, interfaceCommandWeb)
+#endif
 			//ADD_HANDLER(DIKS_TV, interfaceCommandAudioTracks)
 			ADD_HANDLER(DIKS_RED, interfaceCommandRed)
 			ADD_HANDLER(DIKS_GREEN, interfaceCommandGreen)
