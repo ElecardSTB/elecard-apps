@@ -753,6 +753,9 @@ typedef struct
 	struct
 	{
 		interfaceColor_t title;
+		interfaceColor_t text;
+		interfaceColor_t border;
+		interfaceColor_t background;
 	} colors;
 	struct
 	{
@@ -1397,6 +1400,13 @@ void interface_displayScrollingTextBox( int x, int y, int w, int h,
                                         int lineOffset, int visibleLines,
                                         int lineCount, int icon);
 
+void interface_displayScrollingTextBoxColor( int x, int y, int w, int h,
+                                             const char *message,
+                                             int lineOffset, int visibleLines,
+                                             int lineCount, int icon,
+                                             int br, int bg, int bb, int ba,
+                                             int r, int g, int b, int a);
+
 void interface_displayCustomScrollingTextBox( int x, int y, int w, int h,
                                               const char *message,
                                               int lineOffset, int visibleLines,
@@ -1438,6 +1448,10 @@ void interface_showMessageBox(const char *text, int icon, int hideDelay);
  *  @sa interface_hideMessageBox()
  */
 void interface_showScrollingBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg);
+
+void interface_showScrollingBoxColor(const char *text, int icon, menuConfirmFunction pCallback, void *pArg,
+                                     int br, int bg, int bb, int ba,
+                                     int  r, int  g, int  b, int  a);
 
 /**
  *  @brief Displays message box with poster, scrollable text and custom user input handler

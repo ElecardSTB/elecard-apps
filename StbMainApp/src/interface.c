@@ -173,6 +173,8 @@ static int interface_channelNumberReset(void *pArg);
 
 static int interface_channelNumberHide (void *pArg);
 
+static void messageBox_setDefaultColors(void);
+
 static int interface_displayPosterBox();
 
 static int interface_hideMessageBoxEvent(void *pArg);
@@ -1271,16 +1273,25 @@ void interface_displayCustomScrollingTextBox( int x, int y, int w, int h,
 void interface_displayScrollingTextBox( int x, int y, int w, int h, const char *message,
                                         int lineOffset, int visibleLines, int lineCount, int icon)
 {
+	interface_displayScrollingTextBoxColor(x, y, w, h, message, lineOffset, visibleLines, lineCount, icon,
+	                                       INTERFACE_MESSAGE_BOX_BORDER_RED,  INTERFACE_MESSAGE_BOX_BORDER_GREEN,
+	                                       INTERFACE_MESSAGE_BOX_BORDER_BLUE, INTERFACE_MESSAGE_BOX_BORDER_ALPHA,
+	                                       INTERFACE_MESSAGE_BOX_RED,  INTERFACE_MESSAGE_BOX_GREEN,
+	                                       INTERFACE_MESSAGE_BOX_BLUE, INTERFACE_MESSAGE_BOX_ALPHA);
+}
+
+void interface_displayScrollingTextBoxColor( int x, int y, int w, int h,
+                                             const char *message,
+                                             int lineOffset, int visibleLines,
+                                             int lineCount, int icon,
+                                             int br, int bg, int bb, int ba,
+                                             int r, int g, int b, int a)
+{
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 
 	//dprintf("%s: draw box\n", __FUNCTION__);
-	gfx_drawRectangle(DRAWING_SURFACE, 
-	                  INTERFACE_MESSAGE_BOX_RED,  INTERFACE_MESSAGE_BOX_GREEN,
-	                  INTERFACE_MESSAGE_BOX_BLUE, INTERFACE_MESSAGE_BOX_ALPHA,
-	                  x, y, w, h);
-	interface_drawOuterBorder(DRAWING_SURFACE,
-	                          INTERFACE_MESSAGE_BOX_BORDER_RED,  INTERFACE_MESSAGE_BOX_BORDER_GREEN,
-	                          INTERFACE_MESSAGE_BOX_BORDER_BLUE, INTERFACE_MESSAGE_BOX_BORDER_ALPHA,
+	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y, w, h);
+	interface_drawOuterBorder(DRAWING_SURFACE, br, bg, bb, ba,
 	                          x, y, w, h, interfaceInfo.borderWidth, interfaceBorderSideAll);
 
 	interface_displayCustomScrollingTextBox(x,y,w,h,message,lineOffset,visibleLines,lineCount,icon);
@@ -1317,11 +1328,18 @@ void interface_displayMessageBox()
 #endif
 				tprintf("| Confirmation: YES/NO |");
 			case interfaceMessageBoxSimple:
-				interface_displayCustomTextBox(
+				interface_displayCustomTextBoxColor(
 					interfaceInfo.screenWidth/2, interfaceInfo.screenHeight/2,
 					interfaceInfo.messageBox.message,
 					interfaceInfo.messageBox.icon > 0 ? resource_thumbnails[interfaceInfo.messageBox.icon] : NULL, 
-					0, NULL, 0, icons);
+					0, NULL, 0, icons,
+					interfaceInfo.messageBox.colors.border.R, interfaceInfo.messageBox.colors.border.G,
+					interfaceInfo.messageBox.colors.border.B, interfaceInfo.messageBox.colors.border.A,
+					interfaceInfo.messageBox.colors.text.R, interfaceInfo.messageBox.colors.text.G,
+					interfaceInfo.messageBox.colors.text.B, interfaceInfo.messageBox.colors.text.A,
+					interfaceInfo.messageBox.colors.background.R, interfaceInfo.messageBox.colors.background.G,
+					interfaceInfo.messageBox.colors.background.B, interfaceInfo.messageBox.colors.background.A,
+   					pgfx_font);
 				break;
 			case interfaceMessageBoxScrolling:
 #ifdef ENABLE_REGPLAT
@@ -1334,12 +1352,16 @@ void interface_displayMessageBox()
 						interfaceInfo.messageBox.icon);
 				else
 #endif
-				interface_displayScrollingTextBox(
+				interface_displayScrollingTextBoxColor(
 					interfaceInfo.clientX, interfaceInfo.clientY,
 					interfaceInfo.clientWidth, interfaceInfo.clientHeight,
 					interfaceInfo.messageBox.message, interfaceInfo.messageBox.scrolling.offset,
 					interfaceInfo.messageBox.scrolling.visibleLines, interfaceInfo.messageBox.scrolling.lineCount,
-					interfaceInfo.messageBox.icon);
+					interfaceInfo.messageBox.icon,
+					interfaceInfo.messageBox.colors.border.R, interfaceInfo.messageBox.colors.border.G,
+					interfaceInfo.messageBox.colors.border.B, interfaceInfo.messageBox.colors.border.A,
+					interfaceInfo.messageBox.colors.background.R, interfaceInfo.messageBox.colors.background.G,
+					interfaceInfo.messageBox.colors.background.B, interfaceInfo.messageBox.colors.background.A);
 				break;
 			case interfaceMessageBoxPoster:
 				interface_displayPosterBox();
@@ -6256,6 +6278,26 @@ void interface_channelNumberShow(int channelNumber)
 	interface_addEvent(interface_channelNumberHide, NULL, 1000*interfacePlayControl.showTimeout, 1);
 }
 
+void messageBox_setDefaultColors(void)
+{
+	interfaceInfo.messageBox.colors.text.R = INTERFACE_BOOKMARK_RED;
+	interfaceInfo.messageBox.colors.text.G = INTERFACE_BOOKMARK_GREEN;
+	interfaceInfo.messageBox.colors.text.B = INTERFACE_BOOKMARK_BLUE;
+	interfaceInfo.messageBox.colors.text.A = INTERFACE_BOOKMARK_ALPHA;
+	interfaceInfo.messageBox.colors.background.R = INTERFACE_MESSAGE_BOX_RED;
+	interfaceInfo.messageBox.colors.background.G = INTERFACE_MESSAGE_BOX_GREEN;
+	interfaceInfo.messageBox.colors.background.B = INTERFACE_MESSAGE_BOX_BLUE;
+	interfaceInfo.messageBox.colors.background.A = INTERFACE_MESSAGE_BOX_ALPHA;
+	interfaceInfo.messageBox.colors.border.R = INTERFACE_MESSAGE_BOX_BORDER_RED;
+	interfaceInfo.messageBox.colors.border.G = INTERFACE_MESSAGE_BOX_BORDER_GREEN;
+	interfaceInfo.messageBox.colors.border.B = INTERFACE_MESSAGE_BOX_BORDER_BLUE;
+	interfaceInfo.messageBox.colors.border.A = INTERFACE_MESSAGE_BOX_BORDER_ALPHA;
+	interfaceInfo.messageBox.colors.title.R = INTERFACE_BORDER_RED;
+	interfaceInfo.messageBox.colors.title.G = INTERFACE_BORDER_GREEN;
+	interfaceInfo.messageBox.colors.title.B = INTERFACE_BORDER_BLUE;
+	interfaceInfo.messageBox.colors.title.A = INTERFACE_BORDER_ALPHA;
+}
+
 void interface_showConfirmationBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
 {
 	interface_removeEvent(interface_hideMessageBoxEvent, (void*)0);
@@ -6263,9 +6305,9 @@ void interface_showConfirmationBox(const char *text, int icon, menuConfirmFuncti
 	STRMAXCPY(interfaceInfo.messageBox.message, text, MAX_MESSAGE_BOX_LENGTH);
 
 	interfaceInfo.messageBox.icon = icon;
-
 	interfaceInfo.messageBox.pCallback = pCallback;
 	interfaceInfo.messageBox.pArg = pArg;
+	messageBox_setDefaultColors();
 
 	interfaceInfo.messageBox.type = interfaceMessageBoxCallback;
 
@@ -6285,6 +6327,7 @@ void interface_showMessageBox(const char *text, int icon, int hideDelay)
 	STRMAXCPY(interfaceInfo.messageBox.message, text, sizeof(interfaceInfo.messageBox.message));
 
 	interfaceInfo.messageBox.icon = icon;
+	messageBox_setDefaultColors();
 
 	interfaceInfo.messageBox.type = interfaceMessageBoxSimple;
 
@@ -7646,6 +7689,17 @@ int interface_formatTextWW(const char *text, IDirectFBFont *font, int maxWidth, 
 
 void interface_showScrollingBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
 {
+	interface_showScrollingBoxColor(text, icon, pCallback, pArg,
+		INTERFACE_MESSAGE_BOX_BORDER_RED,  INTERFACE_MESSAGE_BOX_BORDER_GREEN,
+		INTERFACE_MESSAGE_BOX_BORDER_BLUE, INTERFACE_MESSAGE_BOX_BORDER_ALPHA,
+		INTERFACE_MESSAGE_BOX_RED,  INTERFACE_MESSAGE_BOX_GREEN,
+		INTERFACE_MESSAGE_BOX_BLUE, INTERFACE_MESSAGE_BOX_ALPHA);
+}
+
+void interface_showScrollingBoxColor(const char *text, int icon, menuConfirmFunction pCallback, void *pArg,
+                                     int br, int bg, int bb, int ba,
+                                     int  r, int  g, int  b, int  a)
+{
 	int maxWidth;
 
 	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
@@ -7662,6 +7716,15 @@ void interface_showScrollingBox(const char *text, int icon, menuConfirmFunction 
 	interfaceInfo.messageBox.icon = icon;
 	interfaceInfo.messageBox.pCallback = pCallback;
 	interfaceInfo.messageBox.pArg = pArg;
+	messageBox_setDefaultColors();
+	interfaceInfo.messageBox.colors.background.R = r;
+	interfaceInfo.messageBox.colors.background.G = g;
+	interfaceInfo.messageBox.colors.background.B = b;
+	interfaceInfo.messageBox.colors.background.A = a;
+	interfaceInfo.messageBox.colors.border.R = br;
+	interfaceInfo.messageBox.colors.border.G = bg;
+	interfaceInfo.messageBox.colors.border.B = bb;
+	interfaceInfo.messageBox.colors.border.A = ba;
 	interfaceInfo.messageBox.type = interfaceMessageBoxScrolling;
 
 	interface_displayMenu(1);
@@ -7690,6 +7753,7 @@ void interface_showPosterBox(const char *text, const char *title, int tr, int tg
 	else
 		interfaceInfo.messageBox.title[0] = 0;
 
+	messageBox_setDefaultColors();
 	interfaceInfo.messageBox.colors.title.R = tr;
 	interfaceInfo.messageBox.colors.title.G = tg;
 	interfaceInfo.messageBox.colors.title.B = tb;
