@@ -1327,12 +1327,13 @@ void interface_displayMessageBox()
 				}
 #endif
 				tprintf("| Confirmation: YES/NO |");
+				// fall through
 			case interfaceMessageBoxSimple:
 				interface_displayCustomTextBoxColor(
-					interfaceInfo.screenWidth/2, interfaceInfo.screenHeight/2,
+					interfaceInfo.messageBox.target.x, interfaceInfo.messageBox.target.y,
 					interfaceInfo.messageBox.message,
 					interfaceInfo.messageBox.icon > 0 ? resource_thumbnails[interfaceInfo.messageBox.icon] : NULL, 
-					0, NULL, 0, icons,
+					interfaceInfo.messageBox.target.w, NULL, interfaceInfo.messageBox.target.h, icons,
 					interfaceInfo.messageBox.colors.border.R, interfaceInfo.messageBox.colors.border.G,
 					interfaceInfo.messageBox.colors.border.B, interfaceInfo.messageBox.colors.border.A,
 					interfaceInfo.messageBox.colors.text.R, interfaceInfo.messageBox.colors.text.G,
@@ -1387,11 +1388,11 @@ static int interface_displayPosterBox()
 	                  interfaceInfo.messageBox.colors.title.G,
 	                  interfaceInfo.messageBox.colors.title.B,
 	                  interfaceInfo.messageBox.colors.title.A,
-	                  interfaceInfo.clientX, interfaceInfo.clientY,
-	                  interfaceInfo.clientWidth, INTERFACE_POSTER_TITLE_HEIGHT);
+	                  interfaceInfo.messageBox.target.x, interfaceInfo.messageBox.target.y,
+	                  interfaceInfo.messageBox.target.w, INTERFACE_POSTER_TITLE_HEIGHT);
 
 	len = getMaxStringLength(interfaceInfo.messageBox.title,
-	                         interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize);
+	                         interfaceInfo.messageBox.target.w - 2*interfaceInfo.paddingSize);
 	if (len < (int)strlen(interfaceInfo.messageBox.title))
 		tmp = interfaceInfo.messageBox.title[len];
 	interfaceInfo.messageBox.title[len] = 0;
@@ -1400,8 +1401,8 @@ static int interface_displayPosterBox()
 	gfx_drawText(DRAWING_SURFACE, pgfx_font,
 	             INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, 
 	             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-	             interfaceInfo.clientX + (interfaceInfo.clientWidth - title_rect.w)/2, 
-	             interfaceInfo.clientY + (INTERFACE_POSTER_TITLE_HEIGHT + fa)/2,
+	             interfaceInfo.messageBox.target.x + (interfaceInfo.messageBox.target.w - title_rect.w)/2, 
+	             interfaceInfo.messageBox.target.y + (INTERFACE_POSTER_TITLE_HEIGHT + fa)/2,
 	             interfaceInfo.messageBox.title, 0 /* no box */, 1 /* shadow */);
 	interfaceInfo.messageBox.title[len] = tmp;
 
@@ -1409,25 +1410,25 @@ static int interface_displayPosterBox()
 	gfx_drawRectangle(DRAWING_SURFACE,
 	                  INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
 	                  INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
-	                  interfaceInfo.clientX, interfaceInfo.clientY+INTERFACE_POSTER_TITLE_HEIGHT,
-	                  interfaceInfo.clientWidth, interfaceInfo.clientHeight-INTERFACE_POSTER_TITLE_HEIGHT);
+	                  interfaceInfo.messageBox.target.x, interfaceInfo.messageBox.target.y+INTERFACE_POSTER_TITLE_HEIGHT,
+	                  interfaceInfo.messageBox.target.w, interfaceInfo.messageBox.target.h-INTERFACE_POSTER_TITLE_HEIGHT);
 
-	h = interfaceInfo.clientHeight - INTERFACE_POSTER_TITLE_HEIGHT;
-	y = interfaceInfo.clientY + INTERFACE_POSTER_TITLE_HEIGHT + h/2;
+	h = interfaceInfo.messageBox.target.h - INTERFACE_POSTER_TITLE_HEIGHT;
+	y = interfaceInfo.messageBox.target.y + INTERFACE_POSTER_TITLE_HEIGHT + h/2;
 	if ( interfaceInfo.messageBox.message[0] )
 	{
 		interface_displayCustomScrollingTextBox(
-			interfaceInfo.clientX + INTERFACE_POSTER_PICTURE_WIDTH,
-			interfaceInfo.clientY + INTERFACE_POSTER_TITLE_HEIGHT,
-			interfaceInfo.clientWidth - INTERFACE_POSTER_PICTURE_WIDTH, h,
+			interfaceInfo.messageBox.target.x + INTERFACE_POSTER_PICTURE_WIDTH,
+			interfaceInfo.messageBox.target.y + INTERFACE_POSTER_TITLE_HEIGHT,
+			interfaceInfo.messageBox.target.w - INTERFACE_POSTER_PICTURE_WIDTH, h,
 			interfaceInfo.messageBox.message, interfaceInfo.messageBox.scrolling.offset,
 			interfaceInfo.messageBox.scrolling.visibleLines, interfaceInfo.messageBox.scrolling.lineCount, -1);
-		x = interfaceInfo.clientX + INTERFACE_POSTER_PICTURE_WIDTH/2;
+		x = interfaceInfo.messageBox.target.x + INTERFACE_POSTER_PICTURE_WIDTH/2;
 	} else
-		x = interfaceInfo.clientX + interfaceInfo.clientWidth/2;
+		x = interfaceInfo.messageBox.target.x + interfaceInfo.messageBox.target.w/2;
 
 	if ( 0 != interface_drawImage(DRAWING_SURFACE, interfaceInfo.messageBox.poster,
-	                              x, y, INTERFACE_POSTER_PICTURE_WIDTH,  interfaceInfo.clientHeight,
+	                              x, y, INTERFACE_POSTER_PICTURE_WIDTH,  interfaceInfo.messageBox.target.h,
 	                              0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0)
 	   )
 	{
@@ -6307,6 +6308,10 @@ void interface_showConfirmationBox(const char *text, int icon, menuConfirmFuncti
 	interfaceInfo.messageBox.icon = icon;
 	interfaceInfo.messageBox.pCallback = pCallback;
 	interfaceInfo.messageBox.pArg = pArg;
+	interfaceInfo.messageBox.target.x = interfaceInfo.screenWidth/2;
+	interfaceInfo.messageBox.target.y = interfaceInfo.screenHeight/2;
+	interfaceInfo.messageBox.target.w = 0;
+	interfaceInfo.messageBox.target.h = 0;
 	messageBox_setDefaultColors();
 
 	interfaceInfo.messageBox.type = interfaceMessageBoxCallback;
@@ -6328,6 +6333,10 @@ void interface_showMessageBox(const char *text, int icon, int hideDelay)
 
 	interfaceInfo.messageBox.icon = icon;
 	messageBox_setDefaultColors();
+	interfaceInfo.messageBox.target.x = interfaceInfo.screenWidth/2;
+	interfaceInfo.messageBox.target.y = interfaceInfo.screenHeight/2;
+	interfaceInfo.messageBox.target.w = 0;
+	interfaceInfo.messageBox.target.h = 0;
 
 	interfaceInfo.messageBox.type = interfaceMessageBoxSimple;
 
@@ -7701,9 +7710,9 @@ void interface_showScrollingBoxColor(const char *text, int icon, menuConfirmFunc
                                      int  r, int  g, int  b, int  a)
 {
 	interface_showScrollingBoxCustom(text, icon, pCallback, pArg,
-		br, bg, bb, ba, r, g, b, a,
 		interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight);
+		interfaceInfo.clientWidth, interfaceInfo.clientHeight,
+		br, bg, bb, ba, r, g, b, a);
 }
 
 void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFunction pCallback, void *pArg,
@@ -7768,6 +7777,10 @@ void interface_showPosterBox(const char *text, const char *title, int tr, int tg
 	else
 		interfaceInfo.messageBox.title[0] = 0;
 
+	interfaceInfo.messageBox.target.x = interfaceInfo.clientX;
+	interfaceInfo.messageBox.target.y = interfaceInfo.clientY;
+	interfaceInfo.messageBox.target.w = interfaceInfo.clientWidth;
+	interfaceInfo.messageBox.target.h = interfaceInfo.clientHeight;
 	messageBox_setDefaultColors();
 	interfaceInfo.messageBox.colors.title.R = tr;
 	interfaceInfo.messageBox.colors.title.G = tg;
