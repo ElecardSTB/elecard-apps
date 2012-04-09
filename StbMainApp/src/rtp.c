@@ -1609,7 +1609,7 @@ static int rtp_sortByGenre()
 static int stream_compare(const void *e1, const void *e2)
 {
 	const sdp_desc *s1 = e1, *s2 = e2;
-	int res = s1->connection.address.IPv4.s_addr - s2->connection.address.IPv4.s_addr;
+	int res = ntohl(s1->connection.address.IPv4.s_addr) - ntohl(s2->connection.address.IPv4.s_addr);
 	if (res) return res;
 	return s1->media[0].port - s2->media[0].port;
 }
