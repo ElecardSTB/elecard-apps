@@ -581,12 +581,26 @@ static int output_cancelFormat(void* pArg)
 	return ret;
 }
 
+static int output_getFormatHeight(const char *format)
+{
+	const char *s = strchr(format, 'x');
+	if (!s) s = format;
+	return strtol(s, NULL, 10);
+}
+
 static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	interface_removeEvent(output_cancelFormat, NULL);
 
 	if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 	{
+		int old_height = output_getFormatHeight(output_currentFormat);
+		int new_height = output_getFormatHeight(pMenu->menuEntry[pMenu->selectedItem].info);
+		if (old_height != new_height)
+		{
+			// Command should be sent after framebuffer device is closed
+			helperStartApp("StbCommandClient -f /tmp/elcd.sock '{\"method\":\"initfb\",\"params\":[],\"id\": 1}'");
+		} else
 		output_fillFormatMenu();
 		return 0;
 	}
