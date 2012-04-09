@@ -1765,7 +1765,9 @@ void rtp_getPlaylist(int which)
 				eprintf("%s: failed to start update EPG thread\n", __FUNCTION__);
 		}
 		rtp_fillStreamMenu(which);
-	} else if ( rtp_sap_collected == 0 )
+	}
+	if ( rtp_sap_collected == 0 &&
+	    (appControlInfo.rtpMenuInfo.usePlaylistURL == 0 || streams.count == 0))
 	{
 		int ret;
 
