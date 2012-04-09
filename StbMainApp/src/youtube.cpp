@@ -349,7 +349,7 @@ int youtube_getVideoList(const char *url, youtubeEntryHandler pCallback, int pag
 #ifdef ENABLE_EXPAT
 	XML_ParserFree(p);
 #else
-	dprintf("%s: page %d of '%s' acquired (length %d)\n", __FUNCTION__, page, youtubeInfo.search[0] ? youtubeInfo.search : "standard feeds", buffer.pos);
+	dprintf("%s: page %d of '%s' acquired (length %d)\n", __FUNCTION__, page, youtubeInfo.search[0] ? youtubeInfo.search : "standard feeds", video_list.size());
 #endif
 
 	curl_easy_cleanup(hnd);
