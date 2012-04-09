@@ -476,13 +476,11 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
         case DSETV_NTSC_M_JPN:
 #endif
 			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 0);
-            //menuInfra_setSelected(&StandardMenu, 0);
 			system("/config.templates/scripts/dispmode ntsc");
             break;
 
         case DSETV_SECAM:
 			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 1);
-            //menuInfra_setSelected(&StandardMenu, 1);
 			system("/config.templates/scripts/dispmode secam");
             break;
 
@@ -494,7 +492,6 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
         case DSETV_PAL_NC:
 #endif
 			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 2);
-            //menuInfra_setSelected(&StandardMenu, 2);
 			system("/config.templates/scripts/dispmode pal");
             break;
 
@@ -504,7 +501,6 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 #ifdef STBPNX
         case DSETV_PAL_M:
 			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 3);
-            //menuInfra_setSelected(&StandardMenu, 3);
 			system("/config.templates/scripts/dispmode pal60");
             break;
         case DSETV_DIGITAL:
@@ -512,7 +508,6 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
             appControlInfo.outputInfo.encConfig[0].out_connectors = DSOC_COMPONENT;
             appControlInfo.outputInfo.encConfig[0].flags = (DSECONF_OUT_SIGNALS | DSECONF_CONNECTORS );
 			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 0);
-            //menuInfra_setSelected(&StandardMenu, 0);
             break;
 #endif
         default:
@@ -538,7 +533,6 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 	system("reboot");
 
     output_fillStandardMenu();
-    //menuInfra_display((void*)&StandardMenu);
 	interface_displayMenu(1);
 
 #ifdef ENABLE_DVB
@@ -624,25 +618,20 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
     {
         case(DSOS_YCBCR) :
 			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 3);
-            //menuInfra_setSelected(&FormatMenu, 0);
             break;
         case(DSOS_YC) :
 			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 0);
-            //menuInfra_setSelected(&FormatMenu, 0);
             break;
         case(DSOS_CVBS) :
 			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 1);
-            //menuInfra_setSelected(&FormatMenu, 1);
             break;
         case(DSOS_RGB) :
 			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 2);
-            //menuInfra_setSelected(&FormatMenu, 2);
             break;
         default:
             break;
     }*/
     output_fillFormatMenu();
-    //menuInfra_display((void*)&FormatMenu);
 	interface_displayMenu(1);
 #endif // STB82
 #ifdef STSDK
@@ -672,15 +661,12 @@ static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
     {
         case(DSOSB_4x3) :
 			interface_setSelectedItem((interfaceMenu_t*)&BlankingMenu, 0);
-            //menuInfra_setSelected(&BlankingMenu, 0);
             break;
         case(DSOSB_16x9) :
 			interface_setSelectedItem((interfaceMenu_t*)&BlankingMenu, 1);
-            //menuInfra_setSelected(&BlankingMenu, 1);
             break;
         case(DSOSB_OFF) :
 			interface_setSelectedItem((interfaceMenu_t*)&BlankingMenu, 2);
-            //menuInfra_setSelected(&BlankingMenu, 2);
             break;
         default:
             break;
@@ -688,7 +674,6 @@ static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
 
     gfx_setOutputFormat(0);
     //output_fillBlankingMenu();
-    //menuInfra_display((void*)&BlankingMenu);
 	interface_displayMenu(1);
 
     return 0;
@@ -717,7 +702,6 @@ static int output_toggleAudio(interfaceMenu_t *pMenu, void* pArg)
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -2483,7 +2467,6 @@ static int output_toggleDvbDiagnosticsOnStart(interfaceMenu_t *pMenu, void* pArg
 	}
 
 	output_fillDVBMenu(pMenu, pArg);
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -2503,7 +2486,6 @@ static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 	offair_initServices();
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -2519,7 +2501,6 @@ static int output_toggleDvbNetworkSearch(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	output_fillDVBMenu(pMenu, pArg);
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -2548,7 +2529,6 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	output_fillDVBMenu(pMenu, pArg);
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -2572,7 +2552,6 @@ static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	output_fillDVBMenu(pMenu, pArg);
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -2588,7 +2567,6 @@ static int output_toggleDvbSpeed(interfaceMenu_t *pMenu, void* pArg)
     }
 
     output_fillDVBMenu(pMenu, pArg);
-    //menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
     return 0;
 }
@@ -2604,7 +2582,6 @@ static int output_toggleDvbExtScan(interfaceMenu_t *pMenu, void* pArg)
     }
 
     output_fillDVBMenu(pMenu, pArg);
-    //menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
     return 0;
 }
@@ -2879,7 +2856,6 @@ static int output_toggleVMEnable(interfaceMenu_t *pMenu, void* pArg)
     }
 
     output_fillNetworkMenu(pMenu, 0);
-    //menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
     return 0;
 }
@@ -3051,7 +3027,6 @@ static int output_toggleSMEnable(interfaceMenu_t *pMenu, void* pArg)
     }
 
     output_fillNetworkMenu(pMenu, 0);
-    //menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
     return 0;
 }
@@ -3124,7 +3099,6 @@ static int output_toggleAspectRatio(interfaceMenu_t *pMenu, void* pArg)
 	}
 
     output_fillVideoMenu(pMenu, pArg);
-    //menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
     return 0;
 }
@@ -3145,7 +3119,6 @@ static int output_toggleAutoScale(interfaceMenu_t *pMenu, void* pArg)
 	}
 
     output_fillVideoMenu(pMenu, pArg);
-    //menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
     return 0;
 }
@@ -3161,7 +3134,6 @@ static int output_toggleScreenFiltration(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	output_fillVideoMenu(pMenu, pArg);
-	//menuInfra_display(&OutputMenu);
 	interface_displayMenu(1);
 	return 0;
 }
@@ -3197,14 +3169,9 @@ static void output_fillStandardMenu(void)
 #else
 				str = (char*) tv_standards[n].name;
 #endif
-				interface_addMenuEntry((interfaceMenu_t*)&StandardMenu, str, output_setStandard, (void*) tv_standards[n].standard, tv_standards[n].standard == appControlInfo.outputInfo.encConfig[0].tv_standard ? thumbnail_selected : thumbnail_tvstandard);
+				interface_addMenuEntry((interfaceMenu_t*)&StandardMenu, str, output_setStandard, (void*) tv_standards[n].standard,
+				                       tv_standards[n].standard == appControlInfo.outputInfo.encConfig[0].tv_standard ? thumbnail_selected : thumbnail_tvstandard);
 				position++;
-/*                menuInfra_setEntry(&StandardMenu,
-                                   position++,
-                                   menuEntryText,
-                                   (tv_standards[n].standard == DSETV_DIGITAL) ?  (char*)resolutions[0].name : (char*) tv_standards[n].name,
-                                   output_setStandard,
-                                   (void*) tv_standards[n].standard);*/
             }
         }
     }
@@ -3221,8 +3188,6 @@ static void output_fillStandardMenu(void)
 	}
 #endif
     /* Ensure that the correct entry is selected */
-    //menuInfra_setSelected(&StandardMenu, selected);
-    //menuInfra_setHighlight(&StandardMenu, selected);
 	interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, selected);
 }
 
@@ -3511,14 +3476,10 @@ static void output_fillFormatMenu(void)
 				{
 					selected = position;
 				}
-				interface_addMenuEntryCustom((interfaceMenu_t*)&FormatMenu, interfaceMenuEntryText, signalName, strlen(signalName)+1, signalEnable, output_setFormat, NULL, NULL, NULL, (void*) signals[n].signal, signals[n].signal == appControlInfo.outputInfo.encConfig[0].out_signals ? thumbnail_selected : thumbnail_channels);
+				interface_addMenuEntryCustom((interfaceMenu_t*)&FormatMenu, interfaceMenuEntryText, signalName, strlen(signalName)+1,
+				                             signalEnable, output_setFormat, NULL, NULL, NULL, (void*) signals[n].signal,
+				                             signals[n].signal == appControlInfo.outputInfo.encConfig[0].out_signals ? thumbnail_selected : thumbnail_channels);
 				position++;
-				/*menuInfra_setEntry(&FormatMenu,
-				position++,
-				menuEntryText,
-				(char*) signals[n].name,
-				output_setFormat,
-				(void*) signals[n].signal);*/
 			}
 		}
 	}
@@ -3585,13 +3546,10 @@ static void output_fillBlankingMenu(void)
 	//BlankingMenu.prev = &OutputMenu;
 	str = "4 x 3";
 	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_4x3, thumbnail_configure);
-	//menuInfra_setEntry(&BlankingMenu, position++, menuEntryText, "4 x 3", output_setBlanking, (void*)DSOSB_4x3);
 	str = "16 x 9";
 	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_16x9, thumbnail_configure);
-	//menuInfra_setEntry(&BlankingMenu, position++, menuEntryText, "16 x 9", output_setBlanking, (void*)DSOSB_16x9);
 	str = "None";
 	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_OFF, thumbnail_configure);
-	//menuInfra_setEntry(&BlankingMenu, position++, menuEntryText, "None", output_setBlanking, (void*)DSOSB_OFF);
 }
 
 long get_info_progress()
@@ -4030,7 +3988,9 @@ void output_setColorValue(long value, void *pArg)
 
 int output_showColorSlider(interfaceMenu_t *pMenu, void* pArg)
 {
-	if(interfacePlayControl.activeButton == interfacePlayControlStop && appControlInfo.slideshowInfo.state == slideshowDisabled && appControlInfo.slideshowInfo.showingCover == 0)
+	if (interfacePlayControl.activeButton == interfacePlayControlStop &&
+	    appControlInfo.slideshowInfo.state == slideshowDisabled &&
+	    appControlInfo.slideshowInfo.showingCover == 0)
 	{
 		gfx_decode_and_render_Image_to_layer(IMAGE_DIR "wallpaper_test.png", screenMain);
 		gfx_showImage(screenMain);
@@ -4218,7 +4178,6 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
     {
 		str = _T("TV_STANDARD");
 		interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&StandardMenu, thumbnail_tvstandard);
-        //menuInfra_setEntry(&VideoSubMenu, position++, menuEntryText, "TV Standard", menuInfra_display, (void*)&StandardMenu);
     }
 
     /* We only enable this menu when we are outputting SD and we do not only have the HD denc. (HDMI is not denc[0])*/
@@ -4227,14 +4186,12 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
 	{
 		str = _T("TV_FORMAT");
 		interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&FormatMenu, thumbnail_channels);
-        //menuInfra_setEntry(&VideoSubMenu, position++, menuEntryText, "Format", menuInfra_display, (void*)&FormatMenu);
 #ifdef STB82
         /*Only add slow blanking if we have the capability*/
         if(appControlInfo.outputInfo.encDesc[0].caps & DSOCAPS_SLOW_BLANKING)
         {
 			str = _T("TV_BLANKING");
 			interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&BlankingMenu, thumbnail_configure);
-            //menuInfra_setEntry(&VideoSubMenu, position++, menuEntryText, "Blanking", menuInfra_display, (void*)&BlankingMenu);
             output_fillBlankingMenu();
         }
 #endif
@@ -4251,11 +4208,6 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
 		_T("AUTO_STRETCH_ENABLED");
 	sprintf(buf, "%s: %s", _T("SCALE_MODE"), str);
 	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, buf, output_toggleAutoScale, NULL, settings_size);
-    /*menuInfra_setEntry(&VideoSubMenu, position++, menuEntryText,
-                       appControlInfo.outputInfo.autoScale == videoMode_native ? "Native Resolution" :
-                       appControlInfo.outputInfo.autoScale == videoMode_scale ? "Auto Scale Enabled" :
-                       "Auto Stretch Enabled", output_toggleAutoScale, NULL);
-    menuInfra_setSelected(&VideoSubMenu, NONE_SELECTED);*/
 #ifndef HIDE_EXTRA_FUNCTIONS
 	sprintf(buf, "%s: %s", _T("AUDIO_OUTPUT"), appControlInfo.soundInfo.rcaOutput == 0 ? "SCART" : "RCA");
 	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, buf, output_toggleAudio, NULL, thumbnail_sound);
@@ -5052,7 +5004,8 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			str = "Ad-Hoc";
 		}
 		sprintf(buf, "%s %s: %s", iface_name, _T("MODE"), str);
-		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, wifiInfo.wanMode, output_toggleWifiMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
+		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
+		                             wifiInfo.wanMode, output_toggleWifiMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
 		getParam(path, "BOOTPROTO", "static", temp);
 		if (strcmp("dhcp+dns", temp) == 0)
@@ -5065,7 +5018,8 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			wifiInfo.dhcp = 0;
 		}
 		sprintf(buf, "%s %s: %s", iface_name, _T("ADDR_MODE"), temp);
-		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
+		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1
+		                             wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
 		if( wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0 )
 		{
@@ -5304,10 +5258,12 @@ static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_toggleIPTVPlaylist, NULL, thumbnail_configure);
 
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
-	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpPlaylist, thumbnail_enterurl);
+	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
+	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpPlaylist, thumbnail_enterurl);
 
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_EPG"), appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
-	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpEpg, thumbnail_enterurl);
+	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
+	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpEpg, thumbnail_enterurl);
 
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %ld", _T("IPTV_WAIT_TIMEOUT"), appControlInfo.rtpMenuInfo.pidTimeout);
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_toggleIPTVtimeout, pArg, thumbnail_configure);
@@ -5378,7 +5334,8 @@ static int output_fillVODMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	if( appControlInfo.rtspInfo[screenMain].usePlaylistURL )
 	{
-		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"), appControlInfo.rtspInfo[screenMain].streamInfoUrl != 0 ? appControlInfo.rtspInfo[screenMain].streamInfoUrl : _T("NONE"));
+		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"),
+			appControlInfo.rtspInfo[screenMain].streamInfoUrl != 0 ? appControlInfo.rtspInfo[screenMain].streamInfoUrl : _T("NONE"));
 		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleURL, (void*)optionVodPlaylist, thumbnail_enterurl);
 	}
 	else
@@ -5446,7 +5403,8 @@ int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 			case gatewayModeFull:   str = _T("GATEWAY_FULL"); break;
 			default:                str = _T("OFF"); break;
 		}
-		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == output_gatewayMode ? NULL : output_toggleGatewayMode, (void*)mode,  mode == output_gatewayMode ? radiobtn_filled : radiobtn_empty);
+		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == output_gatewayMode ? NULL : output_toggleGatewayMode,
+		                       (void*)mode,  mode == output_gatewayMode ? radiobtn_filled : radiobtn_empty);
 	}
 #endif
 #ifdef STSDK
@@ -5463,7 +5421,8 @@ int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 			default:
 				continue;
 		}
-		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode, (void*)mode,  mode == networkInfo.lanMode ? radiobtn_filled : radiobtn_empty);
+		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode,
+		                       (void*)mode,  mode == networkInfo.lanMode ? radiobtn_filled : radiobtn_empty);
 	}
 #endif
 
@@ -5593,8 +5552,6 @@ void output_fillOutputMenu(void)
     {
         /* Ensure that the correct format entry is selected */
 		interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 1);
-        /*menuInfra_setSelected(&FormatMenu, 2);
-        menuInfra_setHighlight(&FormatMenu, 2);*/
     }
 #endif
 }
@@ -5612,45 +5569,30 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	output_readInterfacesFile();
 #endif
 	createListMenu(&OutputMenu, _T("SETTINGS"), thumbnail_configure, NULL, pParent,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 #if (defined(STB225) || defined(STSDK))
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 #endif // #ifdef STB225
 
 	createListMenu(&TimeSubMenu, _T("TIME_DATE_CONFIG"), settings_datetime, NULL, (interfaceMenu_t*)&OutputMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 #ifdef ENABLE_DVB
 	createListMenu(&DVBSubMenu, _T("DVB_CONFIG"), settings_dvb, NULL, (interfaceMenu_t*)&OutputMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 #endif
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, (interfaceMenu_t*)&OutputMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&StandardMenu, _T("TV_STANDARD"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&FormatMenu, _T("TV_FORMAT"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
+		interfaceListMenuIconThumbnail,
 #ifdef STSDK
 		output_enterFormatMenu, NULL, NULL);
 #else
@@ -5658,19 +5600,13 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #endif
 
 	createListMenu(&BlankingMenu, _T("TV_BLANKING"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&TimeZoneMenu, _T("TIME_ZONE"), settings_datetime, NULL, (interfaceMenu_t*)&TimeSubMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, (interfaceMenu_t*)&OutputMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&WANSubMenu, "WAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_fillWANMenu, NULL, SET_NUMBER(ifaceWAN));
@@ -5684,9 +5620,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_fillLANMenu, NULL, SET_NUMBER(ifaceLAN));
 
 	createListMenu(&GatewaySubMenu, _T("GATEWAY_MODE"), settings_network, NULL, (interfaceMenu_t*)&LANSubMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 #endif
 #ifdef ENABLE_WIFI
 	int wifi_icons[4] = { 0, 0, 0, statusbar_f4_enterurl };
