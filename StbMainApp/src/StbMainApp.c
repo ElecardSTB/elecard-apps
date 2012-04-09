@@ -1473,7 +1473,8 @@ void *keyThread(void *pArg)
 	IDirectFBEventBuffer *eventBuffer = (IDirectFBEventBuffer*)pArg;
 	DFBInputDeviceKeySymbol lastsym;
 	int allow_repeat = 0;
-	int timediff,res_standby;
+	unsigned long timediff;
+	int res_standby;
 	struct timeval lastpress, currentpress, currenttime;
 	interfaceCommand_t lastcmd;
 	interfaceCommandEvent_t curcmd;
@@ -1550,19 +1551,23 @@ void *keyThread(void *pArg)
 	while ( keepCommandLoopAlive )
 	{
 		DFBEvent event;
+		DFBResult result;
 
 		//dprintf("%s: WaitForEventWithTimeout\n", __FUNCTION__);
-
 		if (flushEventsFlag)
 		{
 			eventBuffer->Reset(eventBuffer);
 		}
 
-		eventBuffer->WaitForEventWithTimeout(eventBuffer, 1, 0);
-
+		eventBuffer->WaitForEventWithTimeout(eventBuffer, 3, 0);
 		flushEventsFlag = 0;
 
-		if ( eventBuffer->HasEvent(eventBuffer) == DFB_OK )
+		result = eventBuffer->HasEvent(eventBuffer);
+		if (result == DFB_BUFFEREMPTY)
+		{
+			continue;
+		}
+		if (result  == DFB_OK )
 		{
 			eventBuffer->GetEvent(eventBuffer, &event);
 			eventBuffer->Reset(eventBuffer);
@@ -1570,7 +1575,6 @@ void *keyThread(void *pArg)
 			if (!gIgnoreEventTimestamp)
 			{
 				gettimeofday(&currenttime, NULL);
-
 				timediff = (currenttime.tv_sec-event.input.timestamp.tv_sec)*1000000+(currenttime.tv_usec-event.input.timestamp.tv_usec);
 
 				if (timediff > OUTDATE_TIMEOUT)
