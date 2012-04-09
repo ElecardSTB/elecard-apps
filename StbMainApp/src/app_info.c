@@ -1019,7 +1019,7 @@ void appInfo_init(void)
 	loadVoipSettings();
 
 #ifdef ENABLE_MESSAGES
-	appControlInfo.messagesInfo.newMessages = messages_checkNew();
+	appControlInfo.messagesInfo.newMessage = messages_checkNew();
 #endif
 
 #ifdef ENABLE_VIDIMAX

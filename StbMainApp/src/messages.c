@@ -51,10 +51,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <time.h>
 
-/***********************************************
-* LOCAL MACROS                                 *
-************************************************/
-
 /******************************************************************
 * EXPORTED DATA                                                   *
 *******************************************************************/
@@ -82,42 +78,49 @@ static int messages_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
 ********************************************************************************/
 
-int messages_displayFile(const char *filename)
+int messages_showFile(const char *filename)
 {
 	int f;
 	int status;
 	struct stat stat_info;
-	char buf[MAX_MESSAGE_BOX_LENGTH];
+	char buf[MAX_SCROLL_BOX_LENGTH];
 
 	status = lstat( filename, &stat_info);
-	if(status<0 || !(stat_info.st_mode & S_IFREG) || S_ISLNK(stat_info.st_mode) )
+	if (status<0 || !(stat_info.st_mode & S_IFREG) || S_ISLNK(stat_info.st_mode) )
 	{
 		interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_error, 3000);
 		return 1;
 	}
-	if( stat_info.st_size > MAX_MESSAGE_BOX_LENGTH )
+	if (stat_info.st_size > MAX_SCROLL_BOX_LENGTH)
 	{
 		interface_showMessageBox(_T("ERR_FILE_TOO_BIG"), thumbnail_error, 3000);
 		return 1;
 	}
 	f = open(filename, O_RDONLY);
-	if( f < 0 )
+	if (f < 0)
 	{
 		interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_error, 3000);
 		return 1;
 	}
-	status = read(f, buf, MAX_MESSAGE_BOX_LENGTH);
-	if( status >= 0 )
+	status = read(f, buf, MAX_SCROLL_BOX_LENGTH);
+	if (status >= 0)
 	{
-		if( status > MAX_MESSAGE_BOX_LENGTH-3 )
+		if ( status > MAX_SCROLL_BOX_LENGTH-3 )
 		{
-			status = MAX_MESSAGE_BOX_LENGTH-3;
+			status = MAX_SCROLL_BOX_LENGTH-3;
 		}
 		buf[status] = 0;
 		buf[status+1] = 0;
 	}
 	close(f);
-	interface_showScrollingBox(buf, 0, NULL, NULL);
+
+	interface_showScrollingBoxCustom(buf, 0, NULL, NULL,
+		interfaceInfo.clientX + interfaceInfo.marginSize, interfaceInfo.clientY,
+		interfaceInfo.clientWidth - 2*interfaceInfo.marginSize, interfaceInfo.clientHeight,
+		INTERFACE_MESSAGE_BOX_BORDER_RED,  INTERFACE_MESSAGE_BOX_BORDER_GREEN,
+		INTERFACE_MESSAGE_BOX_BORDER_BLUE, INTERFACE_MESSAGE_BOX_BORDER_ALPHA,
+		INTERFACE_MESSAGE_BOX_RED,  INTERFACE_MESSAGE_BOX_GREEN,
+		INTERFACE_MESSAGE_BOX_BLUE, 0x88);
 	return 0;
 }
 
@@ -130,15 +133,13 @@ int messages_select(const struct dirent * de)
 	sprintf(full_path, "%s%s", MESSAGES_DIR, de->d_name);
 	status = lstat( full_path, &stat_info);
 	/* Files with size > 2GB will give overflow error */
-	if( status<0 && errno != EOVERFLOW )
-	{
-		return 0;
-	} else if ( status>=0 && (!(stat_info.st_mode & S_IFREG) || S_ISLNK(stat_info.st_mode)) )
+	if ((status<0  && errno != EOVERFLOW) ||
+	    (status>=0 && (!(stat_info.st_mode & S_IFREG) || S_ISLNK(stat_info.st_mode))))
 	{
 		return 0;
 	}
 	nameLength = strlen(full_path);
-	if( strncasecmp( &full_path[nameLength-4], ".txt", 4 ) == 0 )
+	if (strncasecmp(&full_path[nameLength-4], ".txt", 4) == 0)
 	{
 		return 1;
 	}
@@ -156,9 +157,9 @@ static void messages_freeBrowseInfo()
 {
 	int i;
 
-	if(messages_entries != NULL)
+	if (messages_entries != NULL)
 	{
-		for( i = 0 ; i < messages_count; ++i )
+		for ( i = 0 ; i < messages_count; ++i )
 			free(messages_entries[i]);
 		free(messages_entries);
 		messages_entries = NULL;
@@ -186,18 +187,18 @@ int messages_fillMenu(interfaceMenu_t *pMenu, void *pArg)
 	messages_freeBrowseInfo();
 
 	messages_count = scandir(MESSAGES_DIR, &messages_entries, messages_select, alphasort);
-	if( messages_count <= 0 )
+	if ( messages_count <= 0 )
 	{
 		str = _T("NO_FILES");
 		interface_addMenuEntryDisabled((interfaceMenu_t *)&MessagesMenu, str, 0);
 		return 0;
 	}
 
-	for( i = 0; i < messages_count; i++ )
+	for ( i = 0; i < messages_count; i++ )
 	{
 		sprintf(full_path, "%s%s", MESSAGES_DIR, messages_entries[i]->d_name);
 		status = lstat( full_path, &stat_info);
-		if( status >= 0 && stat_info.st_mtime <= appControlInfo.messagesInfo.lastWatched )
+		if ( status >= 0 && stat_info.st_mtime <= appControlInfo.messagesInfo.lastWatched )
 		{
 			status = thumbnail_message_open;
 		} else
@@ -206,7 +207,7 @@ int messages_fillMenu(interfaceMenu_t *pMenu, void *pArg)
 		str[strlen(str)-4] = 0;
 		interface_addMenuEntry((interfaceMenu_t *)&MessagesMenu, str, messages_showMessage, (void*)i, status);
 	}
-	if( interface_getSelectedItem((interfaceMenu_t*)&MessagesMenu) >= messages_count )
+	if ( interface_getSelectedItem((interfaceMenu_t*)&MessagesMenu) >= messages_count )
 	{
 		interface_setSelectedItem((interfaceMenu_t*)&MessagesMenu, messages_count-1 );
 	}
@@ -223,15 +224,16 @@ static int messages_showMessage(interfaceMenu_t *pMenu, void *pArg)
 	int         status;
 
 	sprintf(full_path, "%s%s", MESSAGES_DIR, messages_entries[messageIndex]->d_name);
-	if( (res = messages_displayFile(full_path)) == 0 )
+	if ( (res = messages_showFile(full_path)) == 0 )
 	{
-		if( MessagesMenu.baseMenu.menuEntry[messageIndex].thumbnail == thumbnail_message_new && (messageIndex == 0 || MessagesMenu.baseMenu.menuEntry[messageIndex-1].thumbnail == thumbnail_message_open ) )
+		if ( MessagesMenu.baseMenu.menuEntry[messageIndex].thumbnail == thumbnail_message_new &&
+		    (messageIndex == 0 || MessagesMenu.baseMenu.menuEntry[messageIndex-1].thumbnail == thumbnail_message_open))
 		{
-			status = lstat( full_path, &stat_info);
-			if( status >= 0 && stat_info.st_mtime > appControlInfo.messagesInfo.lastWatched )
+			status = lstat(full_path, &stat_info);
+			if (status >= 0 && stat_info.st_mtime > appControlInfo.messagesInfo.lastWatched)
 			{
 				appControlInfo.messagesInfo.lastWatched = stat_info.st_mtime;
-				appControlInfo.messagesInfo.newMessages = messages_checkNew();
+				appControlInfo.messagesInfo.newMessage = messages_checkNew();
 				saveAppSettings();
 				messages_fillMenu(pMenu, pArg);
 			}
@@ -245,7 +247,7 @@ static int messages_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 	int messageIndex = interface_getSelectedItem((interfaceMenu_t*)&MessagesMenu);
 	char full_path[PATH_MAX];
 
-	if( messages_count <= 0 || messageIndex < 0 )
+	if ( messages_count <= 0 || messageIndex < 0 )
 		return 1;
 
 	switch( cmd->command )
@@ -262,33 +264,33 @@ static int messages_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 	return 1;
 }
 
-int messages_checkNew()
+char* messages_checkNew()
 {
 	struct dirent *de;
 	DIR *dir;
 	struct stat stat_info;
-	char full_path[PATH_MAX];
+	static char full_path[PATH_MAX];
 	int status;
 
 	dir = opendir(MESSAGES_DIR);
 	if (dir != NULL)
 	{
-		while((de = readdir(dir))!=NULL)
+		while ((de = readdir(dir)) != NULL)
 		{
-			if(de->d_type == DT_REG || de->d_type == DT_UNKNOWN )
+			if (de->d_type == DT_REG || de->d_type == DT_UNKNOWN)
 			{
-				sprintf(full_path, "%s%s", MESSAGES_DIR, de->d_name);
-				status = lstat( full_path, &stat_info);
-				if( status >= 0 && stat_info.st_mtime > appControlInfo.messagesInfo.lastWatched )
+				snprintf(full_path, sizeof(full_path), "%s%s", MESSAGES_DIR, de->d_name);
+				status = lstat(full_path, &stat_info);
+				if (status >= 0 && stat_info.st_mtime > appControlInfo.messagesInfo.lastWatched)
 				{
 					closedir(dir);
-					return 1;
+					return full_path;
 				}
 			}
 		}
 		closedir(dir);
 	}
-	return 0;
+	return NULL;
 }
 
 #endif // ENABLE_MESSAGES

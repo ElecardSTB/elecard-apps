@@ -47,6 +47,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define MESSAGES_DIR SYSTEM_CONFIG_DIR "/messages/"
 
+// Show recieved messages immediately
+//#define MESSAGES_NAGGING
+
 /*******************************************************************
 * EXPORTED DATA                                                    *
 ********************************************************************/
@@ -59,9 +62,10 @@ extern interfaceListMenu_t MessagesMenu;
 
 void messages_buildMenu(interfaceMenu_t *pParent);
 
-int messages_displayFile(const char *filename);
+int messages_showFile(const char *filename);
 int messages_fillMenu(interfaceMenu_t *pMenu, void *pArg);
-int messages_checkNew();
+/** @return full path to new message or nul */
+char* messages_checkNew(void);
 
 #endif // ENABLE_MESSAGES
 

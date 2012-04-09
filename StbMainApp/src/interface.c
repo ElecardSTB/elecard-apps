@@ -5045,7 +5045,7 @@ static void interface_displayCall()
 #ifdef ENABLE_MESSAGES
 static void interface_displayMessageNotify()
 {
-	if ( appControlInfo.messagesInfo.newMessages )
+	if ( appControlInfo.messagesInfo.newMessage )
 	{
 		interface_drawImage(pgfx_frameBuffer, IMAGE_DIR "thumbnail_message_new.png", interfaceInfo.screenWidth - interfaceInfo.marginSize + interfaceInfo.paddingSize, interfaceInfo.marginSize, 0, 0, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignRight|interfaceAlignTop, NULL, NULL);
 	}

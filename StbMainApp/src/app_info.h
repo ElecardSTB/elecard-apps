@@ -620,7 +620,7 @@ typedef struct __stb810_multiviewInfo
 typedef struct __stb810_messagesInfo
 {
 	time_t               lastWatched;
-	int                  newMessages;
+	char*                newMessage;
 } stb810_messagesInfo;
 #endif
 

@@ -61,6 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "downloader.h"
 #include "dlna.h"
 #include "youtube.h"
+#include "messages.h"
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h" 
 #endif
@@ -354,7 +355,7 @@ static void stub_signal_handler(int signal)
 
 static void usr1_signal_handler(int sig)
 {
-	eprintf("App: Got USR1 (signal %d), updating USB!\n", signal);
+	eprintf("App: Got USR1 (signal %d), updating USB!\n", sig);
 	media_storagesChanged();
 #ifdef ENABLE_PVR
 	pvr_storagesChanged();
@@ -363,11 +364,15 @@ static void usr1_signal_handler(int sig)
 
 static void hup_signal_handler(int sig)
 {
-	eprintf("App: Got HUP (signal %d), reloading config!\n", signal);
+	eprintf("App: Got HUP (signal %d), reloading config!\n", sig);
 	loadAppSettings();
 	loadVoipSettings();
 #ifdef STSDK
 	output_readInterfacesFile();
+#endif
+#if (defined ENABLE_MESSAGES) && (defined MESSAGES_NAGGING)
+	if (appControlInfo.messagesInfo.newMessage)
+		messages_showFile(appControlInfo.messagesInfo.newMessage);
 #endif
 }
 
@@ -1427,10 +1432,15 @@ void *testServerThread(void *pArg)
 #ifdef ENABLE_MESSAGES
 				else if (strncmp(ibuf, "newmsg", 6) == 0)
 				{
-					appControlInfo.messagesInfo.newMessages = 1;
+					appControlInfo.messagesInfo.newMessage = messages_checkNew();
+					if (appControlInfo.messagesInfo.newMessage)
+#ifdef MESSAGES_NAGGING
+					messages_showFile(appControlInfo.messagesInfo.newMessage);
+#else
 					interface_displayMenu(1);
-				}
 #endif
+				}
+#endif // ENABLE_MESSAGES
 				else
 				{
 #ifdef TEST_SERVER_INET
