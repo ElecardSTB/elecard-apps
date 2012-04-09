@@ -1606,6 +1606,14 @@ static int rtp_sortByGenre()
 	return 0;
 }
 
+static int stream_compare(const void *e1, const void *e2)
+{
+	const sdp_desc *s1 = e1, *s2 = e2;
+	int res = s1->connection.address.IPv4.s_addr - s2->connection.address.IPv4.s_addr;
+	if (res) return res;
+	return s1->media[0].port - s2->media[0].port;
+}
+
 static void *stream_list_updater(void *pArg)
 {
 	int i;
@@ -1648,9 +1656,11 @@ static void *stream_list_updater(void *pArg)
 			mysem_release(rtp_semaphore);
 
 			dprintf("%s: found streams: %d\n", __FUNCTION__, streams.count);
-			if( streams.count > 0 )
+			if (streams.count > 0)
 			{
 				rtp_sap_collected = 1;
+
+				qsort(streams.items, streams.count, sizeof(streams.items[0]), stream_compare);
 
 				mysem_get(rtp_epg_semaphore);
 				for( i = 0; i < streams.count; i++ )
@@ -1719,9 +1729,9 @@ void rtp_getPlaylist(int which)
 #if (defined STB225)
 	rtp_sap_collected = 0;
 #endif
-	if( appControlInfo.rtpMenuInfo.usePlaylistURL != 0 )
+	if (appControlInfo.rtpMenuInfo.usePlaylistURL != 0)
 	{
-		if( rtp_sap_collected )
+		if (rtp_sap_collected)
 		{
 			/* Streams were collected using SAP announces. List reset is needed */
 			streams.count = 0;
@@ -1730,28 +1740,28 @@ void rtp_getPlaylist(int which)
 
 		rtp[which].collectFlag = 1;
 
-		if( streams.count == 0 )
+		if (streams.count == 0)
 		{
 			dprintf("%s: get playlist from %s\n", __FUNCTION__, appControlInfo.rtpMenuInfo.playlist);
 
-			if( PLAYLIST_ERR_DOWNLOAD == playlist_getFromURL( appControlInfo.rtpMenuInfo.playlist, rtp_urlHandler, NULL ))
+			if (PLAYLIST_ERR_DOWNLOAD == playlist_getFromURL( appControlInfo.rtpMenuInfo.playlist, rtp_urlHandler, NULL))
 			{
 				interface_showMessageBox(_T("ERR_SERVICE_UNAVAILABLE"), thumbnail_error, 0);
 			}
 
-			if( streams.count > 0 )
+			if (streams.count > 0)
 			{
 				rtp_loadAudioTrackList();
 				rtp_sortByGenre();
 			}
 		}
-		if( appControlInfo.rtpMenuInfo.epg[0] != 0 )
+		if (appControlInfo.rtpMenuInfo.epg[0] != 0)
 		{
 			pthread_t *thread;
 
 			dprintf("%s: Starting EPG thread\n", __FUNCTION__);
 			CREATE_THREAD(thread, rtp_epgThread, NULL );
-			if( thread == NULL )
+			if (thread == NULL)
 				eprintf("%s: failed to start update EPG thread\n", __FUNCTION__);
 		}
 		rtp_fillStreamMenu(which);
