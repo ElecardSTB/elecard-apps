@@ -250,6 +250,8 @@ static int playlist_stream_change(interfaceMenu_t *pMenu, void* pArg)
 		{
 			appControlInfo.playbackInfo.playlistMode = playlistModeFavorites;
 			appControlInfo.playbackInfo.streamSource = streamSourceFavorites;
+			appControlInfo.playbackInfo.thumbnail[0] = 0;
+			strcpy(appControlInfo.playbackInfo.description, m3u_description);
 			strcpy(playlist_lastURL, URL);
 			dprintf("%s: offair_playURL(%s)\n", __FUNCTION__,URL);
 			offair_playURL(URL,screenMain);
