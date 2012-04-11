@@ -1426,8 +1426,10 @@ void *testServerThread(void *pArg)
 					} else {
 						sprintf(obuf, "notactive");
 					}
+				} else if (strcmp(ibuf, "iprenew") == 0)
+				{
+					interface_showMessageBox(_T("RENEW_IN_PROGRESS"), settings_renew, 5000);
 				}
-
 
 #ifdef ENABLE_MESSAGES
 				else if (strncmp(ibuf, "newmsg", 6) == 0)
