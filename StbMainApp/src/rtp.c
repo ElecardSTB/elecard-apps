@@ -1824,9 +1824,10 @@ static int rtp_setChannelFromURL(interfaceMenu_t *pMenu, char *value, char *desc
 
 	dprintf("%s: url '%s' screen %d\n", __FUNCTION__, value, which);
 
-	if( value == NULL )
+	if (value == NULL)
 		return 1;
 
+	if (value != appControlInfo.rtpMenuInfo.lastUrl)
 	strcpy(appControlInfo.rtpMenuInfo.lastUrl, value);
 
 	if ((res = parseURL(value, &url)) != 0)
@@ -1836,24 +1837,24 @@ static int rtp_setChannelFromURL(interfaceMenu_t *pMenu, char *value, char *desc
 		return -1;
 	}
 
-	if( playlistModeFavorites != appControlInfo.playbackInfo.playlistMode )
+	if (playlistModeFavorites != appControlInfo.playbackInfo.playlistMode)
 	{
 		channelNumber= rtp_getChannelNumber(appControlInfo.rtpMenuInfo.lastUrl);
 	}
 
-	if(CHANNEL_CUSTOM == channelNumber)
+	if (CHANNEL_CUSTOM == channelNumber)
 	{
 		rtp[which].stream_info.custom_url = 1;
 	
-		switch( url.protocol )
+		switch (url.protocol)
 		{
 			case mediaProtoRTP:
 			case mediaProtoUDP:
-				if( !description )
+				if (!description)
 					sprintf(appControlInfo.playbackInfo.description, "%s: %s", _T("CHANNEL"), value);
 				else
 					strcpy(appControlInfo.playbackInfo.description, description);
-				if( !thumbnail )
+				if (!thumbnail)
 					appControlInfo.playbackInfo.thumbnail[0] = 0;
 				else
 					strcpy(appControlInfo.playbackInfo.thumbnail, thumbnail);
