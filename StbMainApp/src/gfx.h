@@ -620,6 +620,8 @@ int gfx_getVideoProviderAudioStream(int videoLayer);
 
 int gfx_setVideoProviderAudioStream(int videoLayer, int audioStream);
 
+int gfx_setVideoProviderLive(int videoLayer);
+
 int gfx_resumeVideoProvider(int videoLayer);
 
 /* Wait for last operation with providers to finish */

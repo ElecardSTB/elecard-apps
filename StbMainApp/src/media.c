@@ -1701,6 +1701,12 @@ int media_startPlayback()
 		double 					position_stream;
 		int						ret_val;
 
+		if (appControlInfo.mediaInfo.bHttp &&
+		    appControlInfo.playbackInfo.playlistMode == playlistModeIPTV)
+		{
+			gfx_setVideoProviderLive(screenMain);
+		}
+
 #ifdef ENABLE_AUTOPLAY
 		playingStream = 1;
 #endif

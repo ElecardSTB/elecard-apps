@@ -4303,6 +4303,26 @@ int gfx_setVideoProviderAudioStream (int videoLayer, int audioStream)
 	return 0;
 }
 
+int gfx_setVideoProviderLive(int videoLayer)
+{
+#ifdef STB82
+	DFBEvent provEvent;
+	int compatibility = httpServerCompatLiveStreaming;
+
+	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	
+	provEvent.clazz = DFEC_USER;
+	provEvent.user.type = userEventSetCompatibility;
+	provEvent.user.data = &compatibility;
+
+	if (gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent) != DFB_OK)
+	{
+		return -1;
+	}
+#endif
+	return 0;
+}
+
 void gfx_waitForProviders()
 {
 	mysem_get(gfx_semaphore);
