@@ -2888,12 +2888,10 @@ int gfx_getPosition (double *plength,double *pposition)
 
 #ifdef STBPNX
 	length = gfx_getVideoProviderLength(screenMain);
-	dprintf("%s: -- length = %f \n", __FUNCTION__,length);
 	if (length<2)
 		return -1;
 
 	position = gfx_getVideoProviderPosition(screenMain);
-	dprintf("%s: -- position = %f \n", __FUNCTION__,position);
 #endif
 #ifdef STSDK
 	elcdRpcType_t type;

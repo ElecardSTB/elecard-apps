@@ -1036,8 +1036,11 @@ int media_check_status(void *pArg)
 
 
 	status = gfx_getVideoProviderStatus(screenMain);
-	
-	dprintf("%s: %d\n", __FUNCTION__, status);
+
+#ifdef DEBUG
+	if (status != DVSTATE_PLAY)
+		dprintf("%s: %d\n", __FUNCTION__, status);
+#endif
 
 	switch( status )
 	{
