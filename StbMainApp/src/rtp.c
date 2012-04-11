@@ -1697,8 +1697,6 @@ static void *stream_list_updater(void *pArg)
 
 	rtp_sdp_stop_collecting(rtp[which].rtp_session);
 
-	rtp[which].collectThread = 0;
-
 	dprintf("%s: exit normal\n", __FUNCTION__);
 
 	return NULL;
@@ -1714,9 +1712,10 @@ static int rtp_stopCollect(interfaceMenu_t* pMenu, void *pArg)
 
 	rtp[which].collectFlag = 0;
 
-	while (rtp[which].collectThread != 0)
+	if (rtp[which].collectThread != 0)
 	{
-		usleep(100000);
+		pthread_join(rtp[which].collectThread, NULL);
+		rtp[which].collectThread = 0;
 	}
 
 	dprintf("%s: out\n", __FUNCTION__);
@@ -1771,6 +1770,12 @@ void rtp_getPlaylist(int which)
 	{
 		int ret;
 
+		if (rtp[which].collectThread != 0)
+		{
+			rtp[which].collectFlag = 0;
+			pthread_join(rtp[which].collectThread, NULL);
+		}
+
 		dprintf("%s: start thread\n", __FUNCTION__);
 
 		rtp_cleanupPlaylist(which);
@@ -1780,8 +1785,6 @@ void rtp_getPlaylist(int which)
 		ret = pthread_create(&rtp[which].collectThread, NULL, stream_list_updater, SET_NUMBER(which));
 		if (ret != 0)
 			eprintf("%s: failed to create collect thread: %s\n", __FUNCTION__, strerror(errno));
-		else
-			pthread_detach(rtp[which].collectThread);
 	}
 }
 
