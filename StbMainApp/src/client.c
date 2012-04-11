@@ -77,7 +77,7 @@ int client_connect(socketClient_t *s)
 	if( s->before_connect )
 		s->before_connect(s);
 
-	dprintf("%s: %s\n", __FUNCTION__, s->remote.sun_path);
+	//dprintf("%s: %s\n", __FUNCTION__, s->remote.sun_path);
 
 	if (s->socket_fd != INVALID_SOCKET)
 	{
@@ -88,7 +88,7 @@ int client_connect(socketClient_t *s)
 
 	if( stat( s->remote.sun_path, &st) < 0)
 	{
-		dprintf("%s: Can't stat %s\n", __FUNCTION__, s->remote.sun_path);
+		//dprintf("%s: Can't stat %s\n", __FUNCTION__, s->remote.sun_path);
 		goto connect_failed;
 	}
 
