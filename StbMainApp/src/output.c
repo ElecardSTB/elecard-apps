@@ -5032,7 +5032,7 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			wifiInfo.dhcp = 0;
 		}
 		sprintf(buf, "%s %s: %s", iface_name, _T("ADDR_MODE"), temp);
-		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1
+		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
 		if( wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0 )
