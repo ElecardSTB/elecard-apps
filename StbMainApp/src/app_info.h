@@ -148,7 +148,10 @@ typedef enum
 	"VOD", \
 	"USB", \
 	"Favorites", \
-	"YouTube" }
+	"DLNA", \
+	"YouTube", \
+	"Rutube", \
+	}
 
 /* Trick Mode Speeds */
 typedef enum

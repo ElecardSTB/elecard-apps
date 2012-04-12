@@ -1128,6 +1128,7 @@ void media_pauseOrStop(int stop)
 		interface_notifyText(NULL,0);
 		interface_playControlSlider(0, 0, 0);
 		interface_playControlSelect(interfacePlayControlStop);
+		appControlInfo.mediaInfo.bHttp = 0;
 	} else
 	{
 		interface_playControlSelect(interfacePlayControlPause);
