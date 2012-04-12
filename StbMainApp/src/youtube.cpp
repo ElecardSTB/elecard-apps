@@ -464,6 +464,8 @@ int youtube_streamStart()
 
 static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 {
+	// assert (pMenu == _M &YoutubeMenu);
+
 	CURLcode ret;
 	CURL *hnd;
 	char *str;
@@ -598,7 +600,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	if (videoIndex != CHANNEL_CUSTOM)
 	{
 		youtubeInfo.index = videoIndex;
-		if (interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, videoIndex+1, temp, sizeof(temp) ) == 0)
+		if (interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, videoIndex+1+(youtubeInfo.search_offset > 0), temp, sizeof(temp) ) == 0)
 			descr = temp;
 		thumbnail = youtubeInfo.videos[videoIndex].thumbnail[0] ? youtubeInfo.videos[videoIndex].thumbnail : NULL;
 		appControlInfo.playbackInfo.channel = videoIndex+1;
@@ -729,22 +731,27 @@ static int youtube_fillMenu( interfaceMenu_t* pMenu, void *pArg )
 
 static int youtube_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	int selectedIndex = interface_getSelectedItem((interfaceMenu_t*)&YoutubeMenu);
-	char url[YOUTUBE_LINK_SIZE];
-	if (selectedIndex > 0 )
+	// assert (pMenu == _M &YoutubeMenu);
+
+	int selectedIndex = interface_getSelectedItem(pMenu);
+	if (selectedIndex > 0 && pMenu->menuEntry[selectedIndex].pAction == youtube_streamChange)
 	{
+		char url[YOUTUBE_LINK_SIZE];
+		int videoIndex = GET_NUMBER(interface_getMenuEntryArg(pMenu, selectedIndex));
+		// assert (videoIndex >= 0 && videoIndex < youtubeInfo.count);
+
 		switch (cmd->command)
 		{
 			case interfaceCommandGreen:
-				snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.videos[selectedIndex-1].video_id);
-				eprintf("Youtube: Stream %02d: '%s'\n", selectedIndex-1, url);
+				snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.videos[videoIndex].video_id);
+				eprintf("Youtube: Stream %02d: '%s'\n", videoIndex, url);
 				interface_showMessageBox(url, -1, 0);
 				return 0;
 #ifdef ENABLE_FAVORITES
 			case interfaceCommandYellow:
 				char description[MENU_ENTRY_INFO_LENGTH];
-				interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, selectedIndex, description, sizeof(description) );
-				snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.videos[selectedIndex-1].video_id);
+				interface_getMenuEntryInfo( pMenu, selectedIndex, description, sizeof(description) );
+				snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.videos[videoIndex].video_id);
 				eprintf("Youtube: Add to Playlist '%s'\n", url);
 				playlist_addUrl( url, description );
 				return 0;
