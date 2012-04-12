@@ -1039,12 +1039,12 @@ int setParam(const char *path, const char *param, const char *value)
 #ifdef ENABLE_WIFI
 int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if (value == NULL || value[0] == 0)
+	if (value == NULL)
 		return 1;
 
 	size_t essid_len = strlen(value);
-	if (essid_len >= sizeof(wifiInfo.essid))
-		return 1;
+	if (essid_len < 1 || essid_len >= sizeof(wifiInfo.essid))
+		return 0;
 
 	memcpy( wifiInfo.essid, value, essid_len+1 );
 #ifdef STBPNX
@@ -1090,11 +1090,11 @@ static int output_toggleESSID(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_changeWifiChannel(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if( value == NULL || value[0] == 0 )
+	if (value == NULL)
 		return 1;
 
 	int channel = strtol( value, NULL, 10 );
-	if( channel < 1 || channel > wifiInfo.channelCount )
+	if (channel < 1 || channel > wifiInfo.channelCount)
 		return 0;
 
 	wifiInfo.currentChannel = channel;
@@ -1243,7 +1243,7 @@ static int output_changeWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	menuActionFunction pAction = pArg;
 
-	if( value == NULL || value[0] == 0 )
+	if ( value == NULL )
 		return 1;
 
 	size_t key_len = strlen(value);
