@@ -583,6 +583,7 @@ int rtp_startVideo(int which)
 #ifdef RTP_RECONNECT
 	if( ret == 0 ) {
 #endif
+	appControlInfo.mediaInfo.bHttp = 0;
 	appControlInfo.rtpInfo[which].active = 1;
 
 	rtp_setStateCheckTimer(which, 1);
