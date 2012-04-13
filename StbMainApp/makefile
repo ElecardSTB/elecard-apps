@@ -226,6 +226,7 @@ ifeq ($(ENABLE_REGPLAT),1)
 	OBJECTS += src/libregplat.a
 	LOCAL_CFLAGS += -DENABLE_REGPLAT=$(ENABLE_REGPLAT)
 	LOCAL_LDFLAGS += -Lsrc -lregplat -ldl
+	INSTALL_EXTRA += copy_regplat
 endif
 
 ifeq ($(ENABLE_VIDIMAX),1)
@@ -529,6 +530,11 @@ REGPLAT_OBJECTS=$(patsubst %.c,%.o,$(REGPLAT_SOURCES)) $(patsubst %.cpp,%.o,$(RE
 third_party/regplat/$(ARCH)/libregplat.a: $(REGPLAT_OBJECTS) $(wildcard third_party/regplat/*.h)
 	$(Q)mkdir -p third_party/regplat/$(ARCH)
 	$(AR) rcs third_party/regplat/$(ARCH)/libregplat.a $(REGPLAT_OBJECTS)
+
+copy_regplat:
+	@echo 'INSTALL third_party/regplat/resources/images -> $(DATA_DIR)/images'
+	-$(Q)install -m0644 third_party/regplat/resources/images/*.png $(DATA_DIR)/images/
+	-$(Q)install -m0644 third_party/regplat/resources/images/*.jpg $(DATA_DIR)/images/
 endif
 
 ifeq ($(ENABLE_VIDIMAX),1)
