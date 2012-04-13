@@ -1887,34 +1887,6 @@ static void interface_animateMenu(int flipFB, int animate)
 	}*/
 	interface_displayBackground();
 
-/*	interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "logo-rd.png", 200, 100, 0, 0, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, NULL, NULL);
-	eprintf("%s: interface_drawImage\n", __func__);
-	usleep(500000);
-	extern IDirectFBDisplayLayer *pgfx_videoLayer[];
-	DFBCHECK( pgfx_dfb->GetDisplayLayer(pgfx_dfb, 0, &pgfx_videoLayer[0]) );
-	IDirectFBDisplayLayer* pDispLayer = pgfx_videoLayer[0];
-	eprintf("%s: displayer = %p\n", __func__, pDispLayer);
-	usleep(500000);
-	pgfx_videoLayer[0]->SetCooperativeLevel(pgfx_videoLayer[0], DLSCL_SHARED);
-	eprintf("%s: SetCooperativeLevel 1\n", __func__);
-	usleep(500000);
-	DFBCHECK( pDispLayer->SetOpacity(pDispLayer, 128));
-	eprintf("%s: SetOpacity\n", __func__);
-	usleep(500000);
-//	pgfx_videoLayer[0]->SetCooperativeLevel(pgfx_videoLayer[0], DLSCL_SHARED);
-//	eprintf("%s: SetCooperativeLevel\n", __func__);
-//	usleep(500000);
-	eprintf("%s: interface_drawImage\n", __func__);
-	interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "logo-rd.png", 200, 300, 0, 0, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, NULL, NULL);
-	usleep(500000);
-	eprintf("%s: flip\n", __func__);
-	interface_flipSurface();
-	eprintf("%s: 3\n", __func__);
-
-	mysem_release(interface_semaphore);
-	eprintf("%s: out\n", __func__);
-	return;*/
-
 #ifdef SHOW_LOGO_TEXT
 	/* Show logo text */
 	int lw = 330;
