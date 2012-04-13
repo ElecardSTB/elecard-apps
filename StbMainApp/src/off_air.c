@@ -1929,6 +1929,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
+	appControlInfo.mediaInfo.bHttp = 0;
 	appControlInfo.dvbInfo[screenMain].channel = channelNumber;
 	appControlInfo.dvbInfo[screenMain].audio_track = 0;
 	appControlInfo.dvbInfo[screenMain].scrambled = dvb_getScrambled(offair_services[channelNumber].service);
