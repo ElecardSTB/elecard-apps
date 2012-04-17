@@ -152,7 +152,7 @@ ssize_t client_read (socketClient_t *s, char *buf, size_t len)
 	res = select(s->socket_fd+1, &rfds, NULL, NULL, &tv);
 	if( res <= 0 )
 	{
-		dprintf("%s: res = %d, timeout %d on %s\n", __FUNCTION__, res, CLIENT_READ_TIMEOUT, s->remote.sun_path);
+		//dprintf("%s: res = %d, timeout %d on %s\n", __FUNCTION__, res, CLIENT_READ_TIMEOUT, s->remote.sun_path);
 		return res;
 	}
 
