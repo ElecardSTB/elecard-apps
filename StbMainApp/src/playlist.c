@@ -536,7 +536,7 @@ static int playlist_fillMenu(char *value)
 				icon = thumbnail_internet;
 			} else
 			{
-				eprintf("playlist: '%s' unsupported!\n");
+				eprintf("playlist: '%s' unsupported!\n", m3u_url);
 				continue;
 			}
 			snprintf(desc, sizeof(desc), "%03d: %s", i+1, m3u_description);
