@@ -297,8 +297,11 @@ int wireless_setNetwork(interfaceMenu_t* pMenu, void *pArg)
 {
 	output_changeESSID         (_M &WifiSubMenu,        wl_list[wl_selected].essid, (void*)ifaceWireless);
 	output_changeAuthMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].auth);
-	// We always must call output_changeWifiEncryption only after output_changeAuthMode as it can reset encryption!
-	output_changeWifiEncryption(_M &WifiSubMenu, (void*)wl_list[wl_selected].encr);
+	if (wl_list[wl_selected].auth > wifiAuthWEP)
+	{
+		// We always must call output_changeWifiEncryption only after output_changeAuthMode as it can reset encryption!
+		output_changeWifiEncryption(_M &WifiSubMenu, (void*)wl_list[wl_selected].encr);
+	}
 	output_changeWifiMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].mode);
 	return 0;
 }
