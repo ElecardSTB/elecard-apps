@@ -70,10 +70,11 @@ MediaRenderer/DMRCommon.h\
 MediaRenderer/DMRConfiguration.h\
 PlaySingleUri/PlaySingleUri.h
 
-OBJ = $(patsubst %.c,%.o,$(SRC))
+OBJ = $(patsubst %.c,$(BUILD_TARGET)%.o,$(SRC))
 MYCFLAGS = -I./ -I../  -I./CdsObjects  -I./HttpFiles  -I./MediaServerBrowser  -I./FileAbstractionFiles  -I./ProtocolInfoParser  -I./StringUtils \
-	-I./PlaylistTrackManager  -I./MediaRenderer  -I./PlaySingleUri -DINCLUDE_FEATURE_PLAYSINGLEURI -DINCLUDE_FEATURE_DISPLAY -DINCLUDE_FEATURE_VOLUME -DMICROSTACK_NO_STDAFX \
-	-DMSCP -Os -Wall -D_POSIX -D_DEBUG -D_VERBOSE -DOutputDebugString=puts
+	-I./PlaylistTrackManager  -I./MediaRenderer  -I./PlaySingleUri \
+	-DINCLUDE_FEATURE_PLAYSINGLEURI -DINCLUDE_FEATURE_DISPLAY -DINCLUDE_FEATURE_VOLUME -DMICROSTACK_NO_STDAFX -DMSCP \
+	-Os -Wall -Wextra -D_POSIX -D_DEBUG -D_VERBOSE -DOutputDebugString=puts -D_FILE_OFFSET_BITS=64 \
 
 ifneq ($(BUILD_TARGET),)
     CC=${CROSS_COMPILE}gcc
@@ -81,8 +82,9 @@ ifneq ($(BUILD_TARGET),)
     LD=${CROSS_COMPILE}gcc
 endif
 
-%.o:%.c $(HDR)
-	$(CROSS_COMPILE)gcc -c $(MYCFLAGS) -fPIC -o $@ $<
+$(BUILD_TARGET)%.o:%.c $(HDR)
+	@test -z $(BUILD_TARGET) || mkdir -p `dirname $@`
+	$(CC) -c $(MYCFLAGS) -fPIC -o $@ $<
 
 all: $(OUT)$(DLLSUFFIX) $(OUT)$(LIBSUFFIX)
 
@@ -96,5 +98,5 @@ $(OUT)$(LIBSUFFIX): $(OBJ)
 
 clean:
 	rm -f $(OBJ) $(OUT)$(LIBSUFFIX) $(OUT)$(DLLSUFFIX)
-	if [ "$(BUILD_TARGET)" ]; then rm -f $(BUILD_TARGET)*; fi
+	if [ "$(BUILD_TARGET)" ]; then rm -rf $(BUILD_TARGET); fi
 
