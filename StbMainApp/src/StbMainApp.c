@@ -2188,8 +2188,10 @@ int helperStartApp(const char* filename)
 	return 0;
 }
 
+#ifdef ENABLE_BROWSER
 int is_open_browserAuto()
 {
+#ifdef STBPNX
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
 	getParam(DHCP_VENDOR_FILE, "A_homepage", "", buf);
@@ -2202,13 +2204,15 @@ int is_open_browserAuto()
 	getParam(BROWSER_CONFIG_FILE, "AutoLoadingMW", "OFF", buf);
 	if(buf[0]==0)
 		return 0;
-	if(strcmp(buf,"ON"))
-		return 0;
-	return 1;
+	if(strcmp(buf,"ON") == 0)
+		return 1;
+#endif
+	return 0;
 }
 
 int open_browserAuto()
 {
+#ifdef STBPNX
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char open_link[MENU_ENTRY_INFO_LENGTH];
 
@@ -2244,8 +2248,10 @@ int open_browserAuto()
 	}
 
 	system(open_link);
+#endif
 	return 1;
 }
+#endif // ENABLE_BROWSER
 
 void tprintf(const char *str, ...)
 {
@@ -2272,7 +2278,9 @@ int main(int argc, char *argv[])
 
 	appInfo_init();
 
+#ifdef ENABLE_BROWSER
 	open_browserAuto();
+#endif
 /*
 	npt_range range = { 5.0f, 10.0f };
 	prtspConnection connection;
@@ -2318,7 +2326,9 @@ int main(int argc, char *argv[])
 		{
 			eprintf("App: Starting %s\n", startApp);
 			//sleep(1);
+#ifdef ENABLE_BROWSER
 			if(!is_open_browserAuto())
+#endif
 				system(startApp);
 			startApp[0] = 0;
 			/*restart = 1;

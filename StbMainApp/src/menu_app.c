@@ -87,20 +87,10 @@ interfaceListMenu_t interfaceMainMenu;
 * FUNCTION IMPLEMENTATION                                          *
 ********************************************************************/
 
-int menu_channelsMenuSelected(interfaceMenu_t *pMenu, void *pArg)
-{
-	interface_menuActionShowMenu(pMenu, (void*)pMenu->pParentMenu);
-
-	return 0;
-}
-
-long getone()
-{
-	return 50;
-}
-
+#ifdef ENABLE_BROWSER
 int open_browser(interfaceMenu_t* pMenu, void* pArg)
 {
+#ifdef STBPNX
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char open_link[MENU_ENTRY_INFO_LENGTH];
 
@@ -113,12 +103,13 @@ int open_browser(interfaceMenu_t* pMenu, void* pArg)
 	else
 		sprintf(open_link,"/usr/local/webkit/_start.sh");
 	helperStartApp(open_link);
-
+#endif
 	return 0;
 }
 
 int open_browser_mw(interfaceMenu_t* pMenu, void* pArg)
 {
+#ifdef STBPNX
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char open_link[MENU_ENTRY_INFO_LENGTH];
 
@@ -131,8 +122,10 @@ int open_browser_mw(interfaceMenu_t* pMenu, void* pArg)
 	else
 		sprintf(open_link,"/usr/local/webkit/_start.sh");
 	helperStartApp(open_link);
+#endif
 	return 0;
 }
+#endif // ENABLE_BROWSER
 
 static int menu_confirmShutdown(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {

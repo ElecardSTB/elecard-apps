@@ -2224,20 +2224,24 @@ char *output_getMWAddr(int field, void* pArg)
 {
 	if( field == 0 )
 	{
+#ifdef STBPNX
 		static char MWaddr[MENU_ENTRY_INFO_LENGTH];
 		getParam(BROWSER_CONFIG_FILE, "HomeURL", "", MWaddr);
 		return MWaddr;
-	} else
-		return NULL;
+#endif
+	}
+	return NULL;
 }
 
 static int output_changeMWAddr(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	int ret;
+	int ret = 0;
 
 	if( value == NULL )
 		return 1;
+
+#ifdef STBPNX
+	char buf[MENU_ENTRY_INFO_LENGTH];
 
 	strcpy(buf, value);
 
@@ -2255,7 +2259,7 @@ static int output_changeMWAddr(interfaceMenu_t *pMenu, char *value, void* pArg)
 		output_fillWebMenu(pMenu, 0);
 		interface_displayMenu(1);
 	}
-
+#endif
 	return ret;
 }
 
@@ -2267,6 +2271,7 @@ static int output_toggleMWAddr(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_toggleMWAutoLoading(interfaceMenu_t *pMenu, void* pArg)
 {
+#ifdef STBPNX
 	char *str;
 	char temp[256];
 
@@ -2284,9 +2289,10 @@ static int output_toggleMWAutoLoading(interfaceMenu_t *pMenu, void* pArg)
 	setParam(BROWSER_CONFIG_FILE, "AutoLoadingMW",str);
 	output_fillWebMenu(pMenu, 0);
 	interface_displayMenu(1);
+#endif
 	return 0;
 }
-#endif
+#endif // ENABLE_BROWSER
 
 static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -5380,6 +5386,7 @@ static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleProxyPasswd, pArg, thumbnail_enterurl);
 
 #ifdef ENABLE_BROWSER
+#ifdef STBPNX
 	char temp[MENU_ENTRY_INFO_LENGTH];
 
 		getParam(BROWSER_CONFIG_FILE, "HomeURL", "", temp);
@@ -5397,6 +5404,7 @@ static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
 			sprintf(buf, "%s: %s", _T("MW_AUTO_MODE"), _T("OFF"));
 			interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleMWAutoLoading, pArg, thumbnail_configure);
 		}
+#endif
 #endif
 	return 0;
 }
