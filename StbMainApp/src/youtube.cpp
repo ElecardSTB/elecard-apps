@@ -536,13 +536,17 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	//fmt_url_map = strstr(curl_data, "fmt_url_map=");
 	char *fmt_url_map;
-	//int supported_formats[] = { 18, 17, 34, 5, 0 };
+#ifdef STBPNX
 	int supported_formats[] = { 34, 18, 0 };
-	/* 37/1920x1080/9/0/115
-	   22/1280x720/9/0/115
-	   35/854x480/9/0/115
-	   34/640x360/9/0/115
-	   5/320x240/7/0/0 */
+#else
+	int supported_formats[] = { 37, 22, 35, 34, 18, 0 };
+#endif
+	/* 37: MP4 1920x1080 H.264
+	   22: MP4 1280x720  H.264
+	   35: FLV  854x480  H.264
+	   34: FLV  640x360  H.264
+	   18: MP4  640x360  H.264
+	*/
 
 	char *fmt_url;
 	int i;
