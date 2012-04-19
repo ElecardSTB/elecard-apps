@@ -23,7 +23,7 @@
 //
 //////////////////////////////////////////////////////////////////////////
 //
-// Authors: Victoria Tihonova <Victoria.Tihonova@elecard.ru>
+// Authors: Victoria Peshkova <Victoria.Peshkova@elecard.ru>
 // 
 // Purpose: Vidimax exported function prototypes.
 //

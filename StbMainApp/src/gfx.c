@@ -2755,13 +2755,11 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 		}
 	}
 	cJSON_Delete(res);
-	/*
+	
 	if (force == GFX_STOP)
 	{
-		res = NULL;
-		ret = st_rpcSync( elcmd_closestream, NULL, &type, &res );
-		cJSON_Delete(res);
-	}*/
+		strcpy(gfx_videoProvider[videoLayer].name, "");
+	}
 #endif
 	eprintf ("gfx: Done with video provider\n");
 }
@@ -4059,6 +4057,54 @@ finish_attr_init:
 	dprintf("%s[%d]: %s done\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
+void gfx_clearImageList()
+{
+	stb810_gfxImageEntry* pEntry;
+	pEntry = pgfx_ImageList;
+	while (pEntry)
+	{
+		stb810_gfxImageEntry* pNext;
+		dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
+		pEntry->pImage->Release(pEntry->pImage);
+		pNext = pEntry->pNext;
+		gfx_removeImageFromList(pEntry, &pgfx_ImageList);
+		gfx_addImageToList(pEntry, &pgfx_FreeList);
+		pEntry = pNext;
+	}
+	return;
+}
+
+void gfx_clearImageListExcept(char ** names, int count)
+{
+	stb810_gfxImageEntry* pEntry;
+	unsigned char skip;
+	if (!count || !names) return;
+	pEntry = pgfx_ImageList;
+	while (pEntry)
+	{
+		stb810_gfxImageEntry* pNext;
+		int i;
+		skip = 0;
+		for (i=0; i<count; i++){
+			if (!names[i]) continue;
+			if (!strcmp(pEntry->filename, names[i])){
+				pNext = pEntry->pNext;
+				pEntry = pNext;
+				skip = 1;
+				break;
+			}
+		}
+		if (!skip) {
+			pEntry->pImage->Release(pEntry->pImage);
+			pNext = pEntry->pNext;
+			gfx_removeImageFromList(pEntry, &pgfx_ImageList);
+			gfx_addImageToList(pEntry, &pgfx_FreeList);
+			pEntry = pNext;
+		}
+	}
+	return;
+}
+
 void gfx_terminate(void)
 {
 	int i;
@@ -4125,7 +4171,8 @@ void gfx_terminate(void)
 	st_terminate();
 #endif
 
-	pEntry = pgfx_ImageList;
+	gfx_clearImageList();
+	/*pEntry = pgfx_ImageList;
 	while (pEntry)
 	{
 		stb810_gfxImageEntry* pNext;
@@ -4135,7 +4182,7 @@ void gfx_terminate(void)
 		gfx_removeImageFromList(pEntry, &pgfx_ImageList);
 		gfx_addImageToList(pEntry, &pgfx_FreeList);
 		pEntry = pNext;
-	}
+	}*/
 
 	/* Release the super interface. */
 	dprintf("gfx: Releasing DirectFB Interface...\n");
