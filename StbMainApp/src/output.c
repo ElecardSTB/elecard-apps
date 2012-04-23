@@ -2525,6 +2525,7 @@ static int output_toggleDvbNetworkSearch(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
+#ifdef STBPNX
 static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 {
 	stb810_dvbfeInfo *fe;
@@ -2552,6 +2553,7 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 	interface_displayMenu(1);
 	return 0;
 }
+#endif
 
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -2787,13 +2789,15 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef STSDK
 	if( offair_getTuner() < VMSP_COUNT ) {
 #endif
-
 	sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
 	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
-
+#ifdef STSDK
+	}
+#endif
+#ifdef STBPNX
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
-
+#endif
 	if (dvb_getType(0) == FE_OFDM)
 	{
 		switch (appControlInfo.dvbtInfo.bandwidth)
@@ -2826,6 +2830,15 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 		interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
 	}
 
+	sprintf(buf, "%s: %ld %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, _T("KHZ"));
+	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)0, thumbnail_configure);
+
+	sprintf(buf, "%s: %ld %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, _T("KHZ"));
+	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)1, thumbnail_configure);
+
+#ifdef STSDK
+	if( offair_getTuner() < VMSP_COUNT ) {
+#endif
 	if (appControlInfo.dvbCommonInfo.adapterSpeed > 0)
 	{
 		sprintf(buf, "%s: %d%%", _T("DVB_SPEED"), 100-100*appControlInfo.dvbCommonInfo.adapterSpeed/10);
@@ -2838,17 +2851,10 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 	sprintf(buf,"%s: %s", _T("DVB_EXT_SCAN") , _T( appControlInfo.dvbCommonInfo.extendedScan == 0 ? "OFF" : "ON" ));
 	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbExtScan, NULL, thumbnail_configure);
 
-	sprintf(buf, "%s: %ld %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, _T("KHZ"));
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)0, thumbnail_configure);
-
-	sprintf(buf, "%s: %ld %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, _T("KHZ"));
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)1, thumbnail_configure);
-
 	sprintf(buf, "%s: %ld %s", _T("DVB_STEP_FREQ"), fe->frequencyStep, _T("KHZ"));
 	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)2, thumbnail_configure);
-
 #ifdef STSDK
-	} // offair_getTuner() < VSMP_COUNT
+	}
 #endif
 
 	interface_menuActionShowMenu(pMenu, (void*)&DVBSubMenu);
