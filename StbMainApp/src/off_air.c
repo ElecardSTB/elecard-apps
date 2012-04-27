@@ -206,7 +206,7 @@ static void wizard_cleanup(int finished);
 #ifdef ENABLE_DVB
 static interfaceListMenu_t EPGMenu;
 
-static long offair_currentFrequency, offair_currentFrequencyNumber, offair_currentFrequencyNumberMax;
+static __u32 offair_currentFrequency, offair_currentFrequencyNumber, offair_currentFrequencyNumberMax;
 
 /* offair_indeces used to display sorted list of channels */
 static int  offair_indeces[MAX_MEMORIZED_SERVICES];
@@ -635,6 +635,15 @@ int offair_frequencyMonitor(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
+static char* offair_getLastFrequency(int field, void* pArg)
+{
+	if (field != 0)
+		return NULL;
+	static char frequency[10];
+	snprintf(frequency, sizeof(frequency), "%u", offair_currentFrequency);
+	return frequency;
+}
+
 int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[BUFFER_SIZE];
@@ -643,9 +652,11 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 	__u32 freq_step = FREQUENCY_STEP_KHZ*KHZ;
 	tunerFormat tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
+	if (offair_currentFrequency < low_freq || offair_currentFrequency > high_freq)
+		offair_currentFrequency = low_freq;
 
 	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"), low_freq / KHZ, high_freq / KHZ, dvb_getType(0) == FE_QPSK ? _T("MHZ") : _T("KHZ"));
-	interface_getText(pMenu, buf, "\\d{6}", offair_getUserFrequency, NULL, inputModeDirect, pArg);
+	interface_getText(pMenu, buf, "\\d{6}", offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
 	return 0;
 }
 
