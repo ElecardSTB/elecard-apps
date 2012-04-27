@@ -671,7 +671,9 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	if( value == NULL)
 		return 1;
 
-	frequency = strtol(value,NULL,10) * KHZ;
+	frequency = strtol(value,NULL,10);
+	if(frequency < 10000000)//temporary, compare with 10.000.000
+		frequency *= KHZ;
 	tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 
