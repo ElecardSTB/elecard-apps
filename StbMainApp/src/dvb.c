@@ -261,25 +261,6 @@ static pmysem_t dvb_filter_semaphore;
 #define ZERO_SCAN_MESAGE()	//scan_messages[0] = 0
 #define SCAN_MESSAGE(...)	//sprintf(&scan_messages[strlen(scan_messages)], __VA_ARGS__)
 
-#ifdef STSDK
-static const struct { fe_modulation_t value; const char *name; } modulation_names[] =
-{
-	{QPSK,    "qpsk"},
-	{QAM_16,  "qam16"},
-	{QAM_32,  "qam32"},
-	{QAM_64,  "qam64"},
-	{QAM_128, "qam128"},
-	{QAM_256, "qam256"},
-	{VSB_8,   "vsb8"},
-	{VSB_16,  "vsb16"},
-	{PSK_8,   "psk8"},
-	{APSK_16, "apsk16"},
-	{APSK_32, "apsk32"},
-	{DQPSK,   "dqpsk"},
-	{0,NULL}
-};
-#endif
-
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
@@ -1447,17 +1428,8 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 		cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber( tuner-VMSP_COUNT ) );
 		cJSON_AddItemToObject(params, "start", cJSON_CreateNumber(  low_freq/KHZ ) );
 		cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( high_freq/KHZ ) );
-		if (st_getDvbTunerType(tuner-VMSP_COUNT) == FE_QAM)
-		{
-			int i;
-			for (i=0;modulation_names[i].name!=NULL;i++)
-				if (modulation_names[i].value == appControlInfo.dvbcInfo.modulation)
-				{
-					cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modulation_names[i].name));
-					break;
-				}
-			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbcInfo.symbolRate ));
-		}
+
+		st_setTuneParams(tuner-VMSP_COUNT, params);
 		eprintf("%s: scanning %6u-%6u\n", __FUNCTION__, low_freq/KHZ, high_freq/KHZ);
 		res = st_rpcSyncTimeout(elcmd_dvbscan, params, 30, &type, &result );
 		cJSON_Delete(params);
@@ -1680,24 +1652,12 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 		{
 			cJSON_AddItemToObject(params, "start", cJSON_CreateNumber( frequency ) );
 			//cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( frequency ) );
-			cJSON_AddItemToObject(params, "symbolrate",
-			                      cJSON_CreateNumber( appControlInfo.dvbsInfo.symbolRate ) );
 		} else
 		{
 			cJSON_AddItemToObject(params, "start", cJSON_CreateNumber( frequency/KHZ ) );
 			cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( frequency/KHZ ) );
-			if (st_getDvbTunerType(tuner-VMSP_COUNT) == FE_QAM)
-			{
-				int i;
-				cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbcInfo.symbolRate ) );
-				for (i=0;modulation_names[i].name!=NULL;i++)
-					if (modulation_names[i].value == appControlInfo.dvbcInfo.modulation)
-					{
-						cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modulation_names[i].name) );
-						break;
-					}
-			}
 		}
+		st_setTuneParams(tuner-VMSP_COUNT, params);
 	} else
 	{
 		if ((frontend_fd = dvb_openFrontend(tuner, O_RDWR)) < 0)

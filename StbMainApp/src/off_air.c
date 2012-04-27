@@ -1667,6 +1667,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 			return;
 		}
 		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(offair_services[appControlInfo.dvbInfo[which].channel].service->media.frequency/KHZ) );
+		st_setTuneParams(param->vmsp-VMSP_COUNT, params);
 		cJSON *result = NULL;
 		elcdRpcType_t type = elcdRpcInvalid;
 		eprintf("%s: tuning %d to %6u\n", __FUNCTION__, param->vmsp-VMSP_COUNT, offair_services[appControlInfo.dvbInfo[which].channel].service->media.frequency/KHZ);

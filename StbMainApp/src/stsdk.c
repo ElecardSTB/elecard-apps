@@ -115,6 +115,23 @@ static void* st_poolThread(void* pArg);
 #ifdef ENABLE_DVB
 static int st_tuner = tunerNotFound;
 static st_tunerType_t st_tuners[TUNER_MAX_NUMBER];
+
+static const struct { fe_modulation_t value; const char *name; } modulation_names[] =
+{
+	{QPSK,    "qpsk"},
+	{QAM_16,  "qam16"},
+	{QAM_32,  "qam32"},
+	{QAM_64,  "qam64"},
+	{QAM_128, "qam128"},
+	{QAM_256, "qam256"},
+	{VSB_8,   "vsb8"},
+	{VSB_16,  "vsb16"},
+	{PSK_8,   "psk8"},
+	{APSK_16, "apsk16"},
+	{APSK_32, "apsk32"},
+	{DQPSK,   "dqpsk"},
+	{0,NULL}
+};
 #endif
 static rpcPool_t pool;
 
@@ -485,6 +502,27 @@ fe_type_t st_getDvbTunerType(int tuner)
 		case tunerTypeDVBS: return FE_QPSK;
 	}
 	return 0;
+}
+
+void st_setTuneParams(int tuner, cJSON *params)
+{
+	switch (st_tuners[tuner])
+	{
+		case tunerTypeDVBC:;
+			int i;
+			for (i=0;modulation_names[i].name!=NULL;i++)
+				if (modulation_names[i].value == appControlInfo.dvbcInfo.modulation)
+				{
+					cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modulation_names[i].name));
+					break;
+				}
+			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbcInfo.symbolRate ));
+			break;
+		case tunerTypeDVBS:
+			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbsInfo.symbolRate ));
+			break;
+		default:;
+	}
 }
 #endif // ENABLE_DVB
 

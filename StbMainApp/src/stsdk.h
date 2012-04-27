@@ -92,6 +92,7 @@ int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, voi
 
 #ifdef ENABLE_DVB
 int st_getDvbTuner(void);
+void st_setTuneParams(int tuner, cJSON *params);
 
 fe_type_t st_getDvbTunerType(int tuner);
 #endif
