@@ -640,7 +640,7 @@ static char* offair_getLastFrequency(int field, void* pArg)
 	if (field != 0)
 		return NULL;
 	static char frequency[10];
-	snprintf(frequency, sizeof(frequency), "%u", offair_currentFrequency);
+	snprintf(frequency, sizeof(frequency), "%u", offair_currentFrequency/KHZ);
 	return frequency;
 }
 
@@ -671,9 +671,7 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	if( value == NULL)
 		return 1;
 
-	frequency = strtol(value,NULL,10);
-	if(frequency < 10000000)//temporary, compare with 10.000.000
-		frequency *= KHZ;
+	frequency  = strtol(value,NULL,10) * KHZ;
 	tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 
