@@ -606,7 +606,7 @@ int checkPowerOff(DFBEvent event)
 				//dprintf("%s: go to standby\n", __FUNCTION__);
 				appControlInfo.inStandby = 1;
 
-#if (defined ENABLE_PVR && defined ENABLE_DVB)
+#if (defined ENABLE_PVR && defined ENABLE_DVB && defined STBPNX)
 				if( pvr_isPlayingDVB(screenMain) )
 				{
 					offair_stopVideo(screenMain, 1);

@@ -91,6 +91,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #define ENABLE_USB
 
+/** @def ENABLE_PVR Enable PVR functions (defined in Makefile)
+ */
+//#define ENABLE_PVR
+
 #ifdef ENABLE_DVB
 	/** @def ENABLE_TELETEXT Enable DVB Teletext
 	 */
@@ -185,10 +189,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /** @def ENABLE_MULTI_VIEW Enable multiview feature
  */
 #define ENABLE_MULTI_VIEW
-
-/** @def ENABLE_PVR Enable PVR functions
- */
-#define ENABLE_PVR
 
 /** @def ENABLE_PPP Enable PPP connections (defined in Makefile)
  */
