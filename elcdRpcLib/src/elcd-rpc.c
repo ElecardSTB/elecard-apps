@@ -71,6 +71,9 @@ const char* rpc_cmd_names[] = {
 [elcmd_dvbclearservices] = "dvbclearservices",
 [elcmd_dvbscan]     = "dvbscan",
 [elcmd_dvbtune]     = "dvbtune",
+[elcmd_recstart]    = "recstart",
+[elcmd_recstop]     = "recstop",
+[elcmd_reclist]     = "reclist",
 // todo: make sure this array match elcdRpcCommand_t enum in rpc.h
 [elcmd_cmd_count]   = NULL,
 };

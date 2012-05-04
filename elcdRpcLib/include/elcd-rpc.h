@@ -66,6 +66,7 @@ typedef enum
 	elcmd_dvbclearservices,
 	elcmd_dvbscan,
 	elcmd_dvbtune,
+	elcmd_reclist,
 	elcmd_getstream,
 	elcmd_sync = elcmd_getstream,
 	// All following commands are asynchronous
@@ -76,6 +77,8 @@ typedef enum
 	elcmd_play,
 	elcmd_pause,
 	elcmd_stop,
+	elcmd_recstart,
+	elcmd_recstop,
 // todo: put new commands before this line,
 // then add matching entry to rpc_cmd_names array in rpc.c
 	elcmd_cmd_count,
@@ -98,7 +101,8 @@ typedef enum
 	case elcmd_dvbtuners: \
 	case elcmd_dvbclearservices: \
 	case elcmd_dvbscan: \
-	case elcmd_dvbtune
+	case elcmd_dvbtune: \
+	case elcmd_reclist
 
 #define case_all_async \
 	case elcmd_closestream: \
@@ -107,7 +111,9 @@ typedef enum
 	case elcmd_setpos: \
 	case elcmd_play: \
 	case elcmd_pause: \
-	case elcmd_stop
+	case elcmd_stop: \
+	case elcmd_recstart: \
+	case elcmd_recstop \
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
