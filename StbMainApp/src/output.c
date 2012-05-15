@@ -2426,7 +2426,7 @@ static int output_toggleVODINFOIP(interfaceMenu_t *pMenu, void* pArg)
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg)
 {
 	char *str;
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	if( pvr_hasDVBRecords() )
 		str = _T("DVB_CLEAR_SERVICES_CONFIRM_CANCEL_PVR");
 	else

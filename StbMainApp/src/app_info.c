@@ -944,7 +944,7 @@ void appInfo_init(void)
 #ifdef ENABLE_PVR
 	appControlInfo.pvrInfo.directory[0]           = 0;
 	appControlInfo.pvrInfo.active                 = 0;
-	appControlInfo.pvrInfo.dvb.channel            = -1;
+	appControlInfo.pvrInfo.dvb.channel            = STBPVR_DVB_CHANNEL_NONE;
 	appControlInfo.pvrInfo.dvb.service            = NULL;
 	appControlInfo.pvrInfo.dvb.event_id           = -1;
 	memset(&appControlInfo.pvrInfo.rtp, 0, sizeof(appControlInfo.pvrInfo.rtp));

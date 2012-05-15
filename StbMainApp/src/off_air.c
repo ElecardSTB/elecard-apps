@@ -1849,6 +1849,7 @@ static void offair_getServiceDescription(EIT_service_t *service, char *desc, cha
 }
 
 #ifdef ENABLE_PVR
+#ifdef STBPNX
 int offair_startPvrVideo( int which )
 {
 	int ret;
@@ -1896,7 +1897,8 @@ int offair_startPvrVideo( int which )
 	}
 	return ret;
 }
-#endif
+#endif // STBPNX
+#endif // ENABLE_PVR
 
 int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -1918,7 +1920,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		return -1;
 	}
 
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	if ( appControlInfo.pvrInfo.dvb.channel >= 0 )
 	{
 		if( offair_getIndex(appControlInfo.pvrInfo.dvb.channel) == channelNumber )
@@ -2295,7 +2297,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	time_t event_tt, event_len, end_tt;
 	struct tm event_tm, *t;
 	interfaceColor_t sel_color = { ERM_HIGHLIGHTED_CELL_RED, ERM_HIGHLIGHTED_CELL_GREEN, ERM_HIGHLIGHTED_CELL_BLUE, ERM_HIGHLIGHTED_CELL_ALPHA };
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	pvrJob_t *job;
 	int job_channel;
 #endif
@@ -2543,6 +2545,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 		gfx_drawRectangle(DRAWING_SURFACE, ERM_TITLE_RED, ERM_TITLE_GREEN, ERM_TITLE_BLUE, ERM_TITLE_ALPHA, x, y, interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize, fh);
 	}
 #ifdef ENABLE_PVR
+#ifdef STBPNX
 	/* Record jobs */
 	for( event_element = pvr_jobs; event_element != NULL; event_element = event_element->next )
 	{
@@ -2584,7 +2587,8 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			}
 		}
 	}
-#endif
+#endif // STBPNX
+#endif // ENABLE_PVR
 	/* Current time */
 	time(&event_tt);
 	if(event_tt > pEpg->curOffset && event_tt < end_tt && (t = localtime(&event_tt)) != NULL)
@@ -3037,6 +3041,7 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		} else return 0;
 		break;
 #ifdef ENABLE_PVR
+#ifdef STBPNX
 	case interfaceCommandRed:
 		switch( pMenu->selectedItem )
 		{
@@ -3078,7 +3083,8 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		default: ;
 		}
 		break;
-#endif
+#endif // STBPNX
+#endif // ENABLE_PVR
 	case interfaceCommandGreen:
 		if( pMenu->selectedItem == MENU_ITEM_EVENT )
 		{
@@ -3563,7 +3569,7 @@ void offair_clearServiceList(int permanent)
 	offair_stopVideo(screenMain, 1);
 	dvb_clearServiceList(permanent);
 	offair_initServices();
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	pvr_purgeDVBRecords();
 #endif
 }
@@ -4256,7 +4262,7 @@ parsing_done:
 		frequency,srv_id,ts_id,vpid,apid,vt,at,pcr);
 
 
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	if ( appControlInfo.pvrInfo.dvb.channel >= 0 )
 	{
 		pvr_showStopPvr( interfaceInfo.currentMenu, (void*)-1 );

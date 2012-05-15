@@ -144,6 +144,7 @@ int  pvr_record(int which, char *url, char *desc );
 int  pvr_manageRecord(int which, char *url, char *desc );
 
 #ifdef ENABLE_DVB
+#ifdef STBPNX
 /**
 *   @brief Start simultanious playback and recording of a DVB channel on a given screen
 * 
@@ -154,21 +155,10 @@ int  pvr_manageRecord(int which, char *url, char *desc );
 */
 void pvr_startPlaybackDVB(int which);
 
-/**
-*   @brief Function used to stop Pvr recording from a given tuner
-*
-*   @param  which   I       Tuner to be used
-*
-*   @retval void
-*/
-void pvr_stopRecordingDVB(int which);
-
 /** Function used to determine status of playback of recording DVB stream
  *  @return 1 if STB is playing DVB stream which is recording right now, 0 otherwise
  */
 int  pvr_isPlayingDVB(int which);
-
-int  pvr_isRecordingDVB(void);
 
 /** Function used to determine presence of DVB recordings
  *  @return 1 if STB is recording DVB now or has scheduled DVB records, 0 otherwise
@@ -178,7 +168,19 @@ int  pvr_hasDVBRecords(void);
 /** Cancel current and all scheduled DVB records and update job list
  */
 void pvr_purgeDVBRecords(void);
-#endif
+#endif // STBPNX
+
+/**
+*   @brief Function used to stop Pvr recording from a given tuner
+*
+*   @param  which   I       Tuner to be used
+*
+*   @retval void
+*/
+void pvr_stopRecordingDVB(int which);
+
+int  pvr_isRecordingDVB(void);
+#endif // ENABLE_DVB
 
 int  pvr_showStopPvr( interfaceMenu_t *pMenu, void* pArg );
 

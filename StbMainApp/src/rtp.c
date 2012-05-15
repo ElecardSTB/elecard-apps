@@ -174,8 +174,10 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 static int rtp_menuEntryDisplay(interfaceMenu_t *pMenu, DFBRectangle *rect, int i);
 
 #ifdef ENABLE_PVR
+#ifdef STBPNX
 static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int rtp_epgEntryDisplay(interfaceMenu_t *pMenu, DFBRectangle *rect, int i);
+#endif
 #endif
 
 #ifdef ENABLE_MULTI_VIEW
@@ -264,7 +266,7 @@ void rtp_buildMenu(interfaceMenu_t *pParent)
 		/* interfaceInfo.clientX, interfaceInfo.clientY,
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuNoThumbnail,
 		NULL, NULL, NULL);
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	interface_setCustomKeysCallback((interfaceMenu_t*)&rtpEpgMenu, rtp_epgKeyCallback);
 #endif
 
@@ -2099,7 +2101,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 			} else
 				interface_showMessageBox(URL, thumbnail_info, 0);
 			return 0;
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 		case interfaceCommandRecord:
 #if 1
 			{
@@ -2123,7 +2125,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 			{
 				pvr_record(which, rtp_info[streamNumber].url, streams.items[streamNumber].session_name );
 			}
-#endif
+#endif // ENABLE_PVR && STBPNX
 			return 0;
 #endif
 #ifdef ENABLE_MULTI_VIEW
@@ -2684,7 +2686,7 @@ int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg)
 		strncpy(&text[strlen(text)], (char*)event->description.event_name, sizeof(text)-6);
 		text[sizeof(text)-1] = 0;
 		interface_addMenuEntryCustom( (interfaceMenu_t *)&rtpEpgMenu, interfaceMenuEntryText, text, strlen(text)+1, 1, NULL, NULL, NULL,
-#ifdef ENABLE_PVR
+#if (defined ENABLE_PVR) && (defined STBPNX)
 			rtp_epgEntryDisplay,
 #else
 			NULL,
@@ -2697,6 +2699,7 @@ int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef ENABLE_PVR
+#ifdef STBPNX
 static EIT_event_t* rtp_findEvent( int channelNumber, unsigned int event_id )
 {
 	list_element_t *element;
@@ -2846,6 +2849,7 @@ static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 	}
 	return 1;
 }
+#endif // STBPNX
 
 int rtp_recordNow()
 {
@@ -2862,7 +2866,7 @@ int rtp_recordNow()
 		return pvr_record( screenMain, appControlInfo.rtpMenuInfo.lastUrl, appControlInfo.playbackInfo.description );
 	}
 }
-#endif
+#endif // ENABLE_PVR
 
 static int rtp_saveAudioTrackList()
 {
