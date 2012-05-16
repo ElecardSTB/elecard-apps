@@ -136,7 +136,7 @@ static int menu_confirmShutdown(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 	{
 		gfx_stopVideoProviders(screenMain);
 		gfx_stopVideoProviders(screenPip);
-		system("halt");
+		system("poweroff");
 		//keepCommandLoopAlive = 0;
 		return 0;
 	}

@@ -594,7 +594,7 @@ int checkPowerOff(DFBEvent event)
 			//dprintf("%s: repeat 3 sec - halt\n", __FUNCTION__);
 			/* Standby button has been held for 3 seconds. Power off. */
 			/*interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
-			system("halt");*/
+			system("poweroff");*/
 		} else if (!repeat && currentPress.tv_sec - lastChange.tv_sec >= 3)
 		{
 			interfaceCommandEvent_t cmd;
@@ -797,7 +797,7 @@ int checkPowerOff(DFBEvent event)
 		}
 	} else if ( event.input.button == 9 ) // PSU button, just do power off
 	{
-		system("halt");
+		system("poweroff");
 	}
 
 	return 0;
