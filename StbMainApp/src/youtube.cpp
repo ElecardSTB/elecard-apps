@@ -534,12 +534,11 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	/* Find direct link to video */
 
-	//fmt_url_map = strstr(curl_data, "fmt_url_map=");
 	char *fmt_url_map;
 #ifdef STBPNX
 	int supported_formats[] = { 34, 18, 0 };
 #else
-	int supported_formats[] = { 37, 22, 35, 34, 18, 0 };
+	int supported_formats[] = { 37, 22, 18, 35, 34, 0 };
 #endif
 	/* 37: MP4 1920x1080 H.264
 	   22: MP4 1280x720  H.264
@@ -548,59 +547,76 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	   18: MP4  640x360  H.264
 	*/
 
-	char *fmt_url;
+	int selected_fmt = sizeof(supported_formats)/sizeof(supported_formats[0])-1;
+	int fmt;
+	char *fmt_url, *next_url, *fmt_str;
 	int i;
 	char buffer[video_info.length()+1];
 	strcpy(buffer, video_info.c_str());
 	fmt_url_map = strstr(buffer, "url_encoded_fmt_stream_map=");
-	char temp[512];
-	if (fmt_url_map)
-	{
-		//fmt_url_map += sizeof("fmt_url_map=")-1;
-		fmt_url_map += sizeof("url_encoded_fmt_stream_map=")-1;
-		for (str = fmt_url_map; *str && *str != '&'; str++);
-		if (*str != '&')
-			str = NULL;
-		else
-			*str = 0;
 
-		for (i = 0; supported_formats[i] != 0; i++)
-		{
-			//sprintf(temp, "%d%%7C", supported_formats[i]);
-			sprintf(temp, "itag%%3D%d", supported_formats[i]); // find format tag field
-			if ((fmt_url = strstr( fmt_url_map, temp )) != NULL)
-			{
-				fmt_url += strlen(temp) + 9;// skip "%2Curl%3D"
-				str = strstr( fmt_url, "%26quality" ); // find end url
-				if (str)
-					*str = 0;
-				eprintf("%s:  URL %s\n", __FUNCTION__, fmt_url);
-				if (utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 ) < 0)
-				{
-					eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, fmt_url);
-				} else
-				{
-					if (utf8_urltomb(url_tmp, strlen(url_tmp)+1, url, sizeof(url)-1 ) < 0)
-					{
-						eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, url_tmp);
-					} else {
-						eprintf("%s: selected format %d\n", __FUNCTION__, supported_formats[i]);
-						break;
-					}
-				}
-			}
-		}
-		if (supported_formats[i] == 0)
-		{
-			interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_warning, 0);
-			return 1;
-		}
+	if (!fmt_url_map)
+	{
+		eprintf("%s: url_encoded_fmt_stream_map not found\n", __FUNCTION__);
+		goto getinfo_failed;
 	}
 
-	eprintf("Youtube: Playing '%s'\n", url);
+	fmt_url_map += sizeof("url_encoded_fmt_stream_map=")-1;
+	str = strchr(fmt_url_map, '&');
+	if (str) *str = 0;
 
+	fmt_url = NULL;
+	str = fmt_url_map;
+	do
+	{
+		next_url = strstr(str, "%2C");
+		if (next_url)
+		{
+			next_url[0]=0;
+			next_url+=3;
+		}
+
+		fmt_str = strstr(str, "itag%3D");
+		if (fmt_str)
+		{
+			fmt_str+=7;
+			fmt = strtol(fmt_str,NULL,10);
+			for (i=0;supported_formats[i]!=0;i++)
+				if (fmt == supported_formats[i])
+					break;
+			if (i<selected_fmt)
+			{
+				selected_fmt = i;
+				fmt_url = str+6; // "url%3D"
+			}
+			if (selected_fmt == 0 && fmt_url)
+				break;
+		}
+		str = next_url;
+	} while(str);
+
+	if (!fmt_url)
+	{
+		eprintf("%s: no supported format found\n", __FUNCTION__);
+		goto getinfo_failed;
+	}
+	
+	str = strstr( fmt_url, "%26quality" ); // find end url
+	if (str) *str = 0;
+
+	//eprintf("%s: encoded url: %s\n", __FUNCTION__, fmt_url);
+	if (utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 ) < 0 ||
+	    utf8_urltomb(url_tmp, strlen(url_tmp)+1, url,     sizeof(url)-1     ) < 0)
+	{
+		eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, fmt_url);
+		goto getinfo_failed;
+	}
+
+	eprintf("Youtube: Playing (format %2d) '%s'\n", supported_formats[selected_fmt], url );
+	{
 	char *descr     = NULL;
 	char *thumbnail = NULL;
+	char temp[MENU_ENTRY_INFO_LENGTH];
 	if (videoIndex != CHANNEL_CUSTOM)
 	{
 		youtubeInfo.index = videoIndex;
@@ -617,8 +633,12 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	}
 	appControlInfo.playbackInfo.streamSource = streamSourceYoutube;
 	media_playURL(screenMain, url, descr, thumbnail != NULL ? thumbnail : resource_thumbnails[thumbnail_youtube] );
-
+	}
 	return 0;
+
+getinfo_failed:
+	interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_warning, 0);
+	return 1;
 }
 
 int  youtube_startNextChannel(int direction, void* pArg)
