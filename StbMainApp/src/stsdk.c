@@ -310,17 +310,9 @@ int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, voi
 	return res;
 }
 
-static int st_syncCancel(void *pArg)
-{
-	rpcSync_t *s = pArg;
-	sem_post(&s->lock);
-	return 0;
-}
-
 void st_syncCallback(elcdRpcType_t type, cJSON *result, void* pArg)
 {
 	rpcSync_t *s = pArg;
-	interface_removeEvent(st_syncCancel, pArg);
 	s->type       = type;
 	s->jsonResult = result;
 	sem_post(&s->lock);
@@ -349,8 +341,10 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 		return -1;
 	}
 
-	interface_addEvent( st_syncCancel, &s, timeout*1000, 1);
-	sem_wait(&s.lock);
+	struct timespec t;
+	t.tv_sec  = time(NULL)+timeout;
+	t.tv_nsec = 0;
+	sem_timedwait(&s.lock, &t);
 
 	sem_destroy(&s.lock);
 	if( s.type == elcdRpcInvalid )
