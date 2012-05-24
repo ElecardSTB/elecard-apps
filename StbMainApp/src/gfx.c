@@ -805,6 +805,13 @@ stb810_gfxImageEntry *gfx_findImageEntryByName( const char* filename )
 	return pEntry;
 }
 
+static void gfx_freeImageEntry(stb810_gfxImageEntry* pEntry)
+{
+	dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
+	pEntry->pImage->Release(pEntry->pImage);
+	FREE(pEntry->filename);
+}
+
 void gfx_releaseImageEntry( stb810_gfxImageEntry* pImageEntry )
 {
 	if (pImageEntry != NULL)
@@ -813,7 +820,7 @@ void gfx_releaseImageEntry( stb810_gfxImageEntry* pImageEntry )
 		//eprintf("%s: Freeing of image surface '%s' %dx%d\n", __FUNCTION__, pImageEntry->filename, pImageEntry->width, pImageEntry->height);
 		gfx_removeImageFromList(pImageEntry, &pgfx_ImageList);
 		gfx_addImageToList(pImageEntry, &pgfx_FreeList);
-		pImageEntry->pImage->Release(pImageEntry->pImage);
+		gfx_freeImageEntry(pImageEntry);
 	}
 }
 
@@ -918,7 +925,7 @@ static IDirectFBSurface * gfx_decodeImageInternal(const char* img_source, const 
 	pImageProvider->Release(pImageProvider);
 	
 	gfx_removeImageFromList (pEntry, &pgfx_FreeList);
-	strcpy (pEntry->filename, url);
+	helperSafeStrCpy (&pEntry->filename, url);
 	pEntry->width = width;
 	pEntry->height = height;
 	pEntry->stretch = stretchToSize;
@@ -4072,8 +4079,7 @@ void gfx_clearImageList()
 	while (pEntry)
 	{
 		stb810_gfxImageEntry* pNext;
-		dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
-		pEntry->pImage->Release(pEntry->pImage);
+		gfx_freeImageEntry(pEntry);
 		pNext = pEntry->pNext;
 		gfx_removeImageFromList(pEntry, &pgfx_ImageList);
 		gfx_addImageToList(pEntry, &pgfx_FreeList);
@@ -4103,7 +4109,7 @@ void gfx_clearImageListExcept(char ** names, int count)
 			}
 		}
 		if (!skip) {
-			pEntry->pImage->Release(pEntry->pImage);
+			gfx_freeImageEntry(pEntry);
 			pNext = pEntry->pNext;
 			gfx_removeImageFromList(pEntry, &pgfx_ImageList);
 			gfx_addImageToList(pEntry, &pgfx_FreeList);
@@ -4180,17 +4186,6 @@ void gfx_terminate(void)
 #endif
 
 	gfx_clearImageList();
-	/*pEntry = pgfx_ImageList;
-	while (pEntry)
-	{
-		stb810_gfxImageEntry* pNext;
-		dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
-		pEntry->pImage->Release(pEntry->pImage);
-		pNext = pEntry->pNext;
-		gfx_removeImageFromList(pEntry, &pgfx_ImageList);
-		gfx_addImageToList(pEntry, &pgfx_FreeList);
-		pEntry = pNext;
-	}*/
 
 	/* Release the super interface. */
 	dprintf("gfx: Releasing DirectFB Interface...\n");
