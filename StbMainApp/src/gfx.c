@@ -108,7 +108,7 @@ typedef enum
 
 typedef struct
 {
-	char                     name[512];
+	char                     name[MAX_URL];
 	int                      active;
 	bool                     paused;    /* Is Instance paused? */
 	double                   savedPos;
@@ -1417,7 +1417,7 @@ void gfx_setStartPosition (int videoLayer, long posInSec)
 int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, char* options)
 {
 	int result = 0;
-	/// assert( strlen(videoSource) < sizeof(gfx_videoProvider[videoLayer].name) );
+
 	dprintf("gfx: Video provider required is %s - current is %s\n", videoSource, gfx_videoProvider[videoLayer].name);
 #ifdef STBxx
 	IDirectFBSurface * pSurface;
@@ -1455,7 +1455,11 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 			eprintf("gfx: %s not supported by installed video providers!\n", videoSource);
 			result = -1;
 		}
-		strcpy(gfx_videoProvider[videoLayer].name, videoSource);
+		size_t source_len = strlen(videoSource);
+		if (source_len < sizeof(gfx_videoProvider[videoLayer].name))
+			memcpy(gfx_videoProvider[videoLayer].name, videoSource, source_len+1);
+		else
+			gfx_videoProvider[videoLayer].name[0] = 0;
 	}
 
 	if ( gfx_videoProvider[videoLayer].instance )
@@ -1624,7 +1628,11 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 				goto finished;
 			}
 
-			strcpy(gfx_videoProvider[videoLayer].name, videoSource);
+			size_t source_len = strlen(videoSource);
+			if (source_len < sizeof(gfx_videoProvider[videoLayer].name))
+				memcpy(gfx_videoProvider[videoLayer].name, videoSource, source_len+1);
+			else
+				gfx_videoProvider[videoLayer].name[0] = 0;
 		} else
 		{
 			result = -1;
@@ -2733,7 +2741,7 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 			gfx_videoProvider[videoLayer].instance = NULL;
 			gfx_videoProvider[videoLayer].paused = 0;
 		}
-		strcpy(gfx_videoProvider[videoLayer].name, "");
+		gfx_videoProvider[videoLayer].name[0] = 0;
 	}
 #endif // STBxx
 #ifdef STSDK
@@ -2758,7 +2766,7 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 	
 	if (force == GFX_STOP)
 	{
-		strcpy(gfx_videoProvider[videoLayer].name, "");
+		gfx_videoProvider[videoLayer].name[0] = 0;
 	}
 #endif
 	eprintf ("gfx: Done with video provider\n");
@@ -4262,7 +4270,7 @@ static void gfx_formatChange ()
 				gfx_videoProvider[i].active = 0;
 			}
 			gfx_videoProvider[i].instance->Release (gfx_videoProvider[i].instance);
-			strcpy (gfx_videoProvider[i].name, "");
+			gfx_videoProvider[i].name[0] = 0;
 			gfx_videoProvider[i].instance = NULL;
 			gfx_videoProvider[i].paused = 0;
 		}
