@@ -751,7 +751,7 @@ static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&DVBTMenu;
 #endif
 			break;
-		case pvrJobTypeRTP:  PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu[screenMain]; break;
+		case pvrJobTypeRTP:  PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu; break;
 		case pvrJobTypeHTTP: PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&interfaceMainMenu; break;
 	}
 
@@ -1204,7 +1204,7 @@ void pvr_recordNow(void)
 		PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&DVBTMenu;
 	} else
 #endif
-	if (appControlInfo.rtpInfo[screenMain].active)// || appControlInfo.playbackInfo.streamSource == streamSourceIPTV )
+	if (appControlInfo.rtpInfo.active)// || appControlInfo.playbackInfo.streamSource == streamSourceIPTV )
 	{
 		rtp_recordNow();
 	} else if( appControlInfo.mediaInfo.active )
@@ -1245,7 +1245,7 @@ int pvr_record(int which, char *url, char *desc )
 		strcpy(pvrEditInfo.job.info.http.url, url);
 		if( appControlInfo.playbackInfo.playlistMode == playlistModeIPTV )
 		{
-			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu[screenMain];
+			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
 		}
 #endif // STBPNX
 		return 0;
@@ -1291,7 +1291,7 @@ int pvr_record(int which, char *url, char *desc )
 					interface_showMessageBox( _T("ERR_PVR_RECORD"), thumbnail_error, 5000);
 				}
 				pvrEditInfo.job.type = pvrJobTypeRTP;
-				PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu[screenMain];
+				PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
 				return 0;
 			} else
 				eprintf("%s: RTP URL '%s' is too long\n", __FUNCTION__, url);

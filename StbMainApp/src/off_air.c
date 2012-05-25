@@ -1770,7 +1770,6 @@ static int offair_startStopDVB(interfaceMenu_t *pMenu, void* pArg)
 	{
 		offair_startVideo(GET_NUMBER(pArg));
 	}
-	//interface_menuActionShowMenu(pMenu, (void*)&rtpStreamMenu[which]);
 	return 0;
 }
 

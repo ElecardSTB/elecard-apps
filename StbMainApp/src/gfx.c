@@ -2788,7 +2788,7 @@ void gfx_stopVideoProviders (int which)
 	}
 
 	/* Stop any exisiting rtp video display */
-	if (appControlInfo.rtpInfo[which].active)
+	if (appControlInfo.rtpInfo.active)
 	{
 		rtp_stopVideo(which);
 	}
@@ -4220,7 +4220,7 @@ static void gfx_formatChange ()
 		media_stopPlayback();
 	}
 	/* Stop any exisiting rtp video display */
-	if (appControlInfo.rtpInfo[screenMain].active)
+	if (appControlInfo.rtpInfo.active)
 	{
 		rtp_stopVideo(screenMain);
 	}

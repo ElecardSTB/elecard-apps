@@ -866,7 +866,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 			void *show_menu = NULL;
 			switch (appControlInfo.playbackInfo.playlistMode)
 			{
-				case playlistModeIPTV: show_menu = (void*)&rtpStreamMenu[screenMain]; break;
+				case playlistModeIPTV: show_menu = (void*)&rtpStreamMenu; break;
 				case playlistModeFavorites: show_menu = (void*)&playlistMenu; break;
 #ifdef ENABLE_DLNA
 				case playlistModeDLNA: show_menu = (void*)&BrowseServersMenu; break;

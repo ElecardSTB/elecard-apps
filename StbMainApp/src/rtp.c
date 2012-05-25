@@ -197,7 +197,7 @@ static int rtp_loadAudioTrackList();
 *******************************************************************/
 
 static interfaceListMenu_t rtpEpgMenu;
-rtp_common_instance rtp[screenOutputs];
+rtp_common_instance rtp;
 
 static struct rtp_list streams;
 
@@ -231,7 +231,7 @@ rtp_common_instance rtp_multiview[4];
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
 ***************************************************************************/
 
-interfaceListMenu_t rtpStreamMenu[screenOutputs];
+interfaceListMenu_t rtpStreamMenu;
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -240,29 +240,27 @@ interfaceListMenu_t rtpStreamMenu[screenOutputs];
 
 void rtp_buildMenu(interfaceMenu_t *pParent)
 {
-	int which = 0;
 	int rtp_icons[4] = { statusbar_f1_sorting, statusbar_f2_info, statusbar_f3_add, statusbar_f4_enterurl };
 
-	rtp[which].selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
+	rtp.selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
 
-	for ( which=0; which<screenOutputs; which++ )
 	{
-		createListMenu(&rtpStreamMenu[which], _T("TV_CHANNELS_LIST"), thumbnail_multicast, rtp_icons, pParent,
+		createListMenu(&rtpStreamMenu, _T("TV_CHANNELS_LIST"), thumbnail_multicast, rtp_icons, pParent,
 					   /* interfaceInfo.clientX, interfaceInfo.clientY,
 					   interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-					   NULL, rtp_stopCollect, SET_NUMBER(which));
-		interface_setCustomKeysCallback((interfaceMenu_t*)&rtpStreamMenu[which], rtp_keyCallback);
+					   NULL, rtp_stopCollect, SET_NUMBER(screenMain));
+		interface_setCustomKeysCallback((interfaceMenu_t*)&rtpStreamMenu, rtp_keyCallback);
 
-		rtp_common_init_instance(&rtp[which]);
-		rtp_session_init(&rtp[which].rtp_session);
+		rtp_common_init_instance(&rtp);
+		rtp_session_init(&rtp.rtp_session);
 	}
 
-	createListMenu(&rtpGenreMenu, _T("CHOOSE_GENRE"), thumbnail_multicast, NULL, (interfaceMenu_t*)&rtpStreamMenu[screenMain],
+	createListMenu(&rtpGenreMenu, _T("CHOOSE_GENRE"), thumbnail_multicast, NULL, (interfaceMenu_t*)&rtpStreamMenu,
 		/* interfaceInfo.clientX, interfaceInfo.clientY,
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
 		NULL, NULL, NULL);
 
-	createListMenu(&rtpEpgMenu, _T("EPG"), thumbnail_epg, NULL, (interfaceMenu_t*)&rtpStreamMenu[screenMain],
+	createListMenu(&rtpEpgMenu, _T("EPG"), thumbnail_epg, NULL, (interfaceMenu_t*)&rtpStreamMenu,
 		/* interfaceInfo.clientX, interfaceInfo.clientY,
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuNoThumbnail,
 		NULL, NULL, NULL);
@@ -280,12 +278,7 @@ void rtp_buildMenu(interfaceMenu_t *pParent)
 
 void rtp_cleanupMenu()
 {
-	int which = 0;
-
-	for ( which=0; which<screenOutputs; which++ )
-	{
-		rtp_session_destroy(rtp[which].rtp_session);
-	}
+	rtp_session_destroy(rtp.rtp_session);
 	rtp_cleanupEPG();
 	mysem_destroy(rtp_semaphore);
 	mysem_destroy(rtp_epg_semaphore);
@@ -294,10 +287,9 @@ void rtp_cleanupMenu()
 
 static int rtp_stateTimerEvent(void *pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 	DFBVideoProviderStatus status;
 
-	status = gfx_getVideoProviderStatus(which);
+	status = gfx_getVideoProviderStatus(screenMain);
 	switch( status )
 	{
 		case DVSTATE_FINISHED:
@@ -305,10 +297,10 @@ static int rtp_stateTimerEvent(void *pArg)
 			interface_showMenu(1, 0);
 			if( status == DVSTATE_FINISHED )
 				interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 0);
-			rtp_stopVideo(which);
+			rtp_stopVideo(screenMain);
 			break;
 		default:
-			rtp_setStateCheckTimer(which, 1);
+			rtp_setStateCheckTimer(screenMain, 1);
 	}
 
 	return 0;
@@ -330,7 +322,6 @@ static void rtp_setStateCheckTimer(int which, int bEnable)
 static int rtp_checkStream(void *pArg)
 {
 	struct timeval lastts, curts;
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 	suseconds_t timeout_threshold;
 	int redraw;
 
@@ -338,29 +329,29 @@ static int rtp_checkStream(void *pArg)
 
 	timeout_threshold = RTP_TIMEOUT*1000000;
 
-	if (appControlInfo.rtpInfo[which].active != 0)
+	if (appControlInfo.rtpInfo.active != 0)
 	{
-		rtp_get_last_data_timestamp(rtp[which].rtp_session, &lastts);
+		rtp_get_last_data_timestamp(rtp.rtp_session, &lastts);
 		gettimeofday(&curts, 0);
 
 		if ((curts.tv_sec - lastts.tv_sec)*1000000+(curts.tv_usec - lastts.tv_usec) >= timeout_threshold)
 		{
-			if (rtp[which].data_timeout == 0)
+			if (rtp.data_timeout == 0)
 			{
 				eprintf("RTP: TIMEOUT %d while waiting for data\n", timeout_threshold);
-				rtp[which].data_timeout = 1;
+				rtp.data_timeout = 1;
 				interface_notifyText(_T("ERR_NO_DATA"), 1);
 			}
 		} else
 		{
-			redraw = rtp[which].data_timeout;
-			rtp[which].data_timeout = 0;
+			redraw = rtp.data_timeout;
+			rtp.data_timeout = 0;
 			interface_notifyText(NULL, redraw);
 		}
 		interface_addEvent(rtp_checkStream, pArg, 1000, 1);
 	} else
 	{
-		rtp[which].data_timeout = 0;
+		rtp.data_timeout = 0;
 		interface_notifyText(NULL, 0);
 		interface_removeEvent(rtp_checkStream, pArg);
 	}
@@ -379,17 +370,17 @@ void rtp_stopVideo(int which)
 #endif
 	interface_playControlSelect(interfacePlayControlStop);
 
-	if ( appControlInfo.rtpInfo[which].active != 0 )
+	if ( appControlInfo.rtpInfo.active != 0 )
 	{
 		rtp_setStateCheckTimer(which, 0);
-		rtp_stop_receiver(rtp[which].rtp_session);
+		rtp_stop_receiver(rtp.rtp_session);
 
 		dprintf("%s: screen%s\n", __FUNCTION__, which ? "Pip" : "Main");
-		rtp_common_close(&rtp[which]);
+		rtp_common_close(&rtp);
 
 		gfx_stopVideoProvider(which, 1, 1);
-		unlink(rtp[which].pipeString);
-		appControlInfo.rtpInfo[which].active = 0;
+		unlink(rtp.pipeString);
+		appControlInfo.rtpInfo.active = 0;
 #ifdef ENABLE_MULTI_VIEW
 		appControlInfo.multiviewInfo.count = 0;
 #endif
@@ -417,10 +408,10 @@ int rtp_startVideo(int which)
 
 	dprintf("%s: got sem\n", __FUNCTION__);
 
-	if ( rtp[which].selectedDesc.connection.address.IPv4.s_addr == INADDR_NONE )
+	if ( rtp.selectedDesc.connection.address.IPv4.s_addr == INADDR_NONE )
 	{
 //		if (streams.items[0].is_mp2t) {
-//			memcpy(&rtp[which].streamdesc, &streams.items[0], sizeof(sdp_desc));
+//			memcpy(&rtp.streamdesc, &streams.items[0], sizeof(sdp_desc));
 //		} else {
 		mysem_release(rtp_semaphore);
 		interface_hideLoadingAnimation();
@@ -430,8 +421,8 @@ int rtp_startVideo(int which)
 //		}
 	}
 
-	if (rtp[which].selectedDesc.media[0].fmt == payloadTypeH264 ||
-		rtp[which].selectedDesc.media[0].fmt == payloadTypeMpeg2)
+	if (rtp.selectedDesc.media[0].fmt == payloadTypeH264 ||
+		rtp.selectedDesc.media[0].fmt == payloadTypeMpeg2)
 	{
 #if 1
 		mysem_release(rtp_semaphore);
@@ -442,9 +433,9 @@ int rtp_startVideo(int which)
 #else
 		qualifier[0] = 0;
 		sprintf(pipeString,"%s://%s:%d",
-			proto_toa(rtp[which].selectedDesc.media[0].proto),
-			inet_ntoa(rtp[which].selectedDesc.connection.address.IPv4),
-			rtp[which].selectedDesc.media[0].port);
+			proto_toa(rtp.selectedDesc.media[0].proto),
+			inet_ntoa(rtp.selectedDesc.connection.address.IPv4),
+			rtp.selectedDesc.media[0].port);
 		dprintf("RTP: start video url=%s\n",pipeString);
 		ret = gfx_startVideoProvider(pipeString, which, 1, qualifier);
 
@@ -459,16 +450,16 @@ int rtp_startVideo(int which)
 
 		if ( ret != 0 )
 		{
-			rtp_common_close(&rtp[which]);
+			rtp_common_close(&rtp);
 			mysem_release(rtp_semaphore);
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			eprintf("RTP: Failed to start video provider %s\n", pipeString);
 			return ret;
 		}
 
-		if ((ret = rtp_common_open(NULL, rtp[which].pipeString, "/dev/dsppipe0", rtp[which].pipeString, 0, 0, 0, &rtp[which].dvrfd, NULL, NULL, NULL)) != 0)
+		if ((ret = rtp_common_open(NULL, rtp.pipeString, "/dev/dsppipe0", rtp.pipeString, 0, 0, 0, &rtp.dvrfd, NULL, NULL, NULL)) != 0)
 		{
-			rtp_common_close(&rtp[which]);
+			rtp_common_close(&rtp);
 			mysem_release(rtp_semaphore);
 			interface_hideLoadingAnimation();
 			interface_showMessageBox(_T("ERR_SPECIAL_FILE"), thumbnail_error, 0);
@@ -478,11 +469,11 @@ int rtp_startVideo(int which)
 
 		dprintf("%s: start h264 receiver\n", __FUNCTION__);
 
-		rtp_change_eng(rtp[which].rtp_session, RTP_ENGINE);	// set RTP engine
+		rtp_change_eng(rtp.rtp_session, RTP_ENGINE);	// set RTP engine
 
-		if ((ret = rtp_start_receiver(rtp[which].rtp_session, &rtp[which].selectedDesc, -1, 0, appControlInfo.useVerimatrix|appControlInfo.useSecureMedia)) != 0)
+		if ((ret = rtp_start_receiver(rtp.rtp_session, &rtp.selectedDesc, -1, 0, appControlInfo.useVerimatrix|appControlInfo.useSecureMedia)) != 0)
 		{
-			rtp_common_close(&rtp[which]);
+			rtp_common_close(&rtp);
 			gfx_stopVideoProvider(which, 1, 1);
 			mysem_release(rtp_semaphore);
 			interface_hideLoadingAnimation();
@@ -491,29 +482,29 @@ int rtp_startVideo(int which)
 			return -1;
 		}
 
-		//rtp[which].dvrfd = open("/rtp_h264.dump", O_CREAT|O_TRUNC|O_WRONLY);
+		//rtp.dvrfd = open("/rtp_h264.dump", O_CREAT|O_TRUNC|O_WRONLY);
 
-		if (rtp[which].selectedDesc.media[0].sps_pps.length > 0)
+		if (rtp.selectedDesc.media[0].sps_pps.length > 0)
 		{
 			char buf[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-			//dprintf("%s: Write %d bytes of media[0].sps_pps\n", __FUNCTION__, rtp[which].selectedDesc.media[0].sps_pps.length);
+			//dprintf("%s: Write %d bytes of media[0].sps_pps\n", __FUNCTION__, rtp.selectedDesc.media[0].sps_pps.length);
 			*((short*)&buf[0]) = 1; // video
-			*((short*)&buf[2]) = 12+rtp[which].selectedDesc.media[0].sps_pps.length;
-			write(rtp[which].dvrfd, buf, 12);
-			write(rtp[which].dvrfd, rtp[which].selectedDesc.media[0].sps_pps.data, rtp[which].selectedDesc.media[0].sps_pps.length);
+			*((short*)&buf[2]) = 12+rtp.selectedDesc.media[0].sps_pps.length;
+			write(rtp.dvrfd, buf, 12);
+			write(rtp.dvrfd, rtp.selectedDesc.media[0].sps_pps.data, rtp.selectedDesc.media[0].sps_pps.length);
 			/*
 			int fd = open("/sps_pps.dump", O_CREAT|O_TRUNC|O_WRONLY);
-			write(fd, rtp[which].selectedDesc.media[0].sps_pps.data, rtp[which].selectedDesc.media[0].sps_pps.length);
+			write(fd, rtp.selectedDesc.media[0].sps_pps.data, rtp.selectedDesc.media[0].sps_pps.length);
 			close(fd);
 			*/
 		}
 
-		dprintf("%s: start output: dvr %d, fdv %d, fda %d, fdp %d\n", __FUNCTION__, rtp[which].dvrfd, rtp[which].fdv, rtp[which].fda, rtp[which].fdp);
+		dprintf("%s: start output: dvr %d, fdv %d, fda %d, fdp %d\n", __FUNCTION__, rtp.dvrfd, rtp.fdv, rtp.fda, rtp.fdp);
 
-		if (rtp_start_output(rtp[which].rtp_session, rtp[which].dvrfd, rtp[which].fdv) != 0)
+		if (rtp_start_output(rtp.rtp_session, rtp.dvrfd, rtp.fdv) != 0)
 		{
-			rtp_stop_receiver(rtp[which].rtp_session);
-			rtp_common_close(&rtp[which]);
+			rtp_stop_receiver(rtp.rtp_session);
+			rtp_common_close(&rtp);
 			gfx_stopVideoProvider(which, 1, 1);
 			mysem_release(rtp_semaphore);
 			interface_hideLoadingAnimation();
@@ -522,13 +513,13 @@ int rtp_startVideo(int which)
 			return -1;
 		}
 #endif
-	} else if (rtp[which].selectedDesc.media[0].fmt == payloadTypeMpegTS)
+	} else if (rtp.selectedDesc.media[0].fmt == payloadTypeMpegTS)
 	{
 		qualifier[0] = 0;
 		sprintf(pipeString,"%s://%s:%d",
-			proto_toa(rtp[which].selectedDesc.media[0].proto),
-			inet_ntoa(rtp[which].selectedDesc.connection.address.IPv4),
-			rtp[which].selectedDesc.media[0].port);
+			proto_toa(rtp.selectedDesc.media[0].proto),
+			inet_ntoa(rtp.selectedDesc.connection.address.IPv4),
+			rtp.selectedDesc.media[0].port);
 
 		if (appControlInfo.rtpMenuInfo.channel >= 0 &&
 		    appControlInfo.rtpMenuInfo.channel != CHANNEL_CUSTOM &&
@@ -544,7 +535,7 @@ int rtp_startVideo(int which)
 
 		if ( ret != 0 )
 		{
-			rtp_common_close(&rtp[which]);
+			rtp_common_close(&rtp);
 			eprintf("RTP: Failed to start video provider url=%s\n", pipeString);
 #ifndef RTP_RECONNECT
 			mysem_release(rtp_semaphore);
@@ -578,7 +569,7 @@ int rtp_startVideo(int which)
 			mysem_release(rtp_semaphore);
 			interface_hideLoadingAnimation();
 			interface_showMessageBox(_T("ERR_RTP_RECEIVER"), thumbnail_error, 0);
-			eprintf("RTP: Unknown payload type %d\n", rtp[which].selectedDesc.media[0].fmt);
+			eprintf("RTP: Unknown payload type %d\n", rtp.selectedDesc.media[0].fmt);
 			return -1;
 	}
 
@@ -586,7 +577,7 @@ int rtp_startVideo(int which)
 	if( ret == 0 ) {
 #endif
 	appControlInfo.mediaInfo.bHttp = 0;
-	appControlInfo.rtpInfo[which].active = 1;
+	appControlInfo.rtpInfo.active = 1;
 
 	rtp_setStateCheckTimer(which, 1);
 	//rtp_checkStream(STREAM_INFO_SET(which, 0));
@@ -830,11 +821,11 @@ static int rtp_fillStreamMenu(int which)
 	}
 	//dprintf("%s: %d compose %d (%08X)\n", __FUNCTION__, which, streams.count, streams);
 
-	selected = interface_getSelectedItem((interfaceMenu_t*)&rtpStreamMenu[which]);
+	selected = interface_getSelectedItem((interfaceMenu_t*)&rtpStreamMenu);
 
-	interface_clearMenuEntries((interfaceMenu_t*)&rtpStreamMenu[which]);
+	interface_clearMenuEntries((interfaceMenu_t*)&rtpStreamMenu);
 
-	interfaceMenu_t *pMenu = (interfaceMenu_t*)&rtpStreamMenu[which];
+	interfaceMenu_t *pMenu = (interfaceMenu_t*)&rtpStreamMenu;
 	// maxima
 	menuEventFunction savReinit = pMenu->reinitializeMenu;
 	pMenu->reinitializeMenu = NULL;
@@ -876,7 +867,7 @@ static int rtp_fillStreamMenu(int which)
 				}
 				if( str != NULL )
 				{
-					interface_addMenuEntry((interfaceMenu_t*)&rtpStreamMenu[which], str, (menuActionFunction)menuDefaultActionShowMenu, &rtpGenreMenu, -1);
+					interface_addMenuEntry((interfaceMenu_t*)&rtpStreamMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &rtpGenreMenu, -1);
 				}
 			}
 			//dprintf("%s: Check-add stream 0 (fmt %d): %d: %s %s:%d\n", __FUNCTION__, streams.items[streamNumber].media[0].fmt, position, streams.items[streamNumber].session_name, inet_ntoa(streams.items[streamNumber].connection.address.IPv4), streams.items[streamNumber].media[0].port);
@@ -894,7 +885,7 @@ static int rtp_fillStreamMenu(int which)
 						{
 							sprintf(channelEntry, "%d: %s://%s:%d", sortedNumber+1, streams.items[sortedNumber].media[0].proto == mediaProtoRTP ? "rtp" : "udp", inet_ntoa(streams.items[sortedNumber].connection.address.IPv4), streams.items[sortedNumber].media[0].port);
 						}
-						interface_addMenuEntryCustom((interfaceMenu_t*)&rtpStreamMenu[which], interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
+						interface_addMenuEntryCustom((interfaceMenu_t*)&rtpStreamMenu, interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
 #ifdef ENABLE_AUTOPLAY
 						  rtp_stream_selected, rtp_stream_deselected,
 #else
@@ -907,7 +898,7 @@ static int rtp_fillStreamMenu(int which)
 						{
 							// ignore fast PIDs and @ before address
 							if( src.port == cmp.port && strcmp( src.address, cmp.address ) == 0 )
-								selected = interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu[which])-1;
+								selected = interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu)-1;
 						}
 					}
 					break;
@@ -922,7 +913,7 @@ static int rtp_fillStreamMenu(int which)
 						snprintf(channelEntry, sizeof(channelEntry)-1, "%d: %s", sortedNumber+1, rtp_info[sortedNumber].url);
 					}
 					channelEntry[sizeof(channelEntry)-1] = 0;
-					interface_addMenuEntryCustom((interfaceMenu_t*)&rtpStreamMenu[which], interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
+					interface_addMenuEntryCustom((interfaceMenu_t*)&rtpStreamMenu, interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
 #ifdef ENABLE_AUTOPLAY
 					  NULL, rtp_stream_deselected,
 #else
@@ -930,7 +921,7 @@ static int rtp_fillStreamMenu(int which)
 #endif
 					  rtp_menuEntryDisplay, STREAM_INFO_SET(which, sortedNumber), (streams.items[sortedNumber].media[0].proto == mediaProtoRTSP ? thumbnail_vod : thumbnail_internet));
 					if( !last_channel_is_udp && 0 == strcmp( appControlInfo.rtpMenuInfo.lastUrl, rtp_info[sortedNumber].url ))
-						selected = interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu[which])-1;
+						selected = interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu)-1;
 					break;
 				default:;
 			}
@@ -943,13 +934,13 @@ static int rtp_fillStreamMenu(int which)
 	if (streams.count <= 0 || (genre_index != GENRE_COUNT && cur_genre == GENRE_INVALID))
 	{
 		str = _T("NO_CHANNELS");
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&rtpStreamMenu[which], str, thumbnail_info);
+		interface_addMenuEntryDisabled((interfaceMenu_t*)&rtpStreamMenu, str, thumbnail_info);
 		selected = MENU_ITEM_MAIN;
-	} else if (selected >= interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu[which]))
+	} else if (selected >= interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu))
 	{
 		selected = MENU_ITEM_MAIN;
 	}
-	interface_setSelectedItem((interfaceMenu_t*)&rtpStreamMenu[which], selected);
+	interface_setSelectedItem((interfaceMenu_t*)&rtpStreamMenu, selected);
 
 	//dprintf("%s: compose done\n", __FUNCTION__);
 
@@ -978,17 +969,12 @@ static int rtp_getURL(char *url, int which, int channelNumber)
 
 int rtp_startNextChannel(int direction, void* pArg)
 {
-	int which;
 	int streamNumber;
 	int prev = -1;
 	int found = 0;
 	int new_index = -1;
 	int first = -1;
 	unsigned char genre;
-
-	which = STREAM_INFO_GET_SCREEN(pArg);
-	if( which < 0 )
-		which = screenMain;
 
 	if(appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
 	{
@@ -1016,8 +1002,8 @@ int rtp_startNextChannel(int direction, void* pArg)
 				if ( strcmp( appControlInfo.rtpMenuInfo.lastUrl, rtp_info[sorted_streams[streamNumber]].url ) == 0 )
 /*				     (playlistModeIPTV == appControlInfo.playbackInfo.playlistMode && 0 == strcmp( appControlInfo.rtpMenuInfo.lastUrl, rtp_info[sorted_streams[streamNumber]].url )) ||
 				     (playlistModeIPTV != appControlInfo.playbackInfo.playlistMode &&
-				      rtp[which].selectedDesc.connection.address.IPv4.s_addr == streams.items[sorted_streams[streamNumber]].connection.address.IPv4.s_addr &&
-				      rtp[which].selectedDesc.media[0].port == streams.items[sorted_streams[streamNumber]].media[0].port) ) */
+				      rtp.selectedDesc.connection.address.IPv4.s_addr == streams.items[sorted_streams[streamNumber]].connection.address.IPv4.s_addr &&
+				      rtp.selectedDesc.media[0].port == streams.items[sorted_streams[streamNumber]].media[0].port) ) */
 				{
 					found = 1;
 					if (first != streamNumber && direction != 0) // prev
@@ -1055,8 +1041,8 @@ int rtp_startNextChannel(int direction, void* pArg)
 					if ( strcmp( appControlInfo.rtpMenuInfo.lastUrl, rtp_info[streamNumber].url ) == 0 )
 /*					    (playlistModeIPTV == appControlInfo.playbackInfo.playlistMode && 0 == strcmp( appControlInfo.rtpMenuInfo.lastUrl, rtp_info[streamNumber].url )) ||
 					    (playlistModeIPTV != appControlInfo.playbackInfo.playlistMode &&
-					     rtp[which].selectedDesc.connection.address.IPv4.s_addr == streams.items[streamNumber].connection.address.IPv4.s_addr &&
-					     rtp[which].selectedDesc.media[0].port == streams.items[streamNumber].media[0].port))*/
+					     rtp.selectedDesc.connection.address.IPv4.s_addr == streams.items[streamNumber].connection.address.IPv4.s_addr &&
+					     rtp.selectedDesc.media[0].port == streams.items[streamNumber].media[0].port))*/
 					{
 						found = 1;
 						if (first != streamNumber && direction != 0) // prev
@@ -1076,7 +1062,7 @@ int rtp_startNextChannel(int direction, void* pArg)
 	mysem_release(rtp_semaphore);
 
 	if (new_index >= 0)
-		rtp_stream_change(interfaceInfo.currentMenu, STREAM_INFO_SET(which, new_index));
+		rtp_stream_change(interfaceInfo.currentMenu, STREAM_INFO_SET(screenMain, new_index));
 
 	return 0;
 }
@@ -1094,8 +1080,6 @@ static int rtp_audioChange(void* pArg)
 
 int rtp_play_callback(interfacePlayControlButton_t button, void *pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
-
 	dprintf("%s: %d\n", __FUNCTION__, button);
 
 	switch( button )
@@ -1107,18 +1091,18 @@ int rtp_play_callback(interfacePlayControlButton_t button, void *pArg)
 			rtp_startNextChannel(0, pArg);
 			break;
 		case interfacePlayControlPlay:
-			if ( !appControlInfo.rtpInfo[which].active )
-				rtp_startVideo(which);
+			if ( !appControlInfo.rtpInfo.active )
+				rtp_startVideo(screenMain);
 			break;
 		case interfacePlayControlStop:
-			rtp_stopVideo(which);
+			rtp_stopVideo(screenMain);
 			break;
 		case interfacePlayControlAddToPlaylist:
-			playlist_addUrl(appControlInfo.rtpMenuInfo.lastUrl, rtp[which].selectedDesc.session_name);
+			playlist_addUrl(appControlInfo.rtpMenuInfo.lastUrl, rtp.selectedDesc.session_name);
 			break;
 		case interfacePlayControlMode:
 			if(appControlInfo.rtpMenuInfo.usePlaylistURL != 0 && appControlInfo.rtpMenuInfo.epg[0] != 0 )
-				rtp_showEPG(which, rtp_setupPlayControl);
+				rtp_showEPG(screenMain, rtp_setupPlayControl);
 			break;
 		default:
 			return 1;
@@ -1134,7 +1118,6 @@ int rtp_play_callback(interfacePlayControlButton_t button, void *pArg)
 #ifdef ENABLE_AUTOPLAY
 static int rtp_stream_selected(interfaceMenu_t *pMenu, void* pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 	int streamNumber = STREAM_INFO_GET_STREAM(pArg);
 
 	dprintf("%s: %d\n", __FUNCTION__, streamNumber);
@@ -1143,9 +1126,9 @@ static int rtp_stream_selected(interfaceMenu_t *pMenu, void* pArg)
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if ( /*memcmp(&rtp[which].streamdesc, &streams.items[streamNumber], sizeof(sdp_desc)) != 0 ||*/ appControlInfo.rtpInfo[which].active == 0 )
+	if ( /*memcmp(&rtp.streamdesc, &streams.items[streamNumber], sizeof(sdp_desc)) != 0 ||*/ appControlInfo.rtpInfo.active == 0 )
 	{
-		rtp[which].playingFlag = 0;
+		rtp.playingFlag = 0;
 
 		interface_addEvent(rtp_stream_start, pArg, 3000, 1);
 	}
@@ -1159,22 +1142,16 @@ static int rtp_stream_selected(interfaceMenu_t *pMenu, void* pArg)
 
 static int rtp_stream_deselected(interfaceMenu_t *pMenu, void* pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
-	//int streamNumber = STREAM_INFO_GET_STREAM(pArg);
-
-	//dprintf("%s: %d\n", __FUNCTION__, streamNumber);
-
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 	//int streamNumber = STREAM_INFO_GET_STREAM(pArg);
 
 	dprintf("%s: in\n", __FUNCTION__);
 
 	interface_removeEvent(rtp_stream_start, pArg);
 
-	if ( rtp[which].playingFlag == 0 )
+	if ( rtp.playingFlag == 0 )
 	{
 		interface_playControlDisable(1);
-		rtp[which].selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
+		rtp.selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
 		rtp_stopVideo(which);
 	}
 
@@ -1186,20 +1163,19 @@ static int rtp_stream_deselected(interfaceMenu_t *pMenu, void* pArg)
 
 static int rtp_stream_start(void* pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 	int streamNumber = STREAM_INFO_GET_STREAM(pArg);
 
 	dprintf("%s: stream check\n", __FUNCTION__);
 
-	//dprintf("%s: show menu %d, active %d\n", __FUNCTION__, interfaceInfo.showMenu, appControlInfo.rtpInfo[which].active);
+	//dprintf("%s: show menu %d, active %d\n", __FUNCTION__, interfaceInfo.showMenu, appControlInfo.rtpInfo.active);
 
-	if ( /*interfaceInfo.showMenu &&*/ /*(memcmp(&rtp[which].streamdesc, &streams.items[streamNumber], sizeof(sdp_desc)) != 0 ||*/
-	     appControlInfo.rtpInfo[which].active == 0 /*)*/
+	if ( /*interfaceInfo.showMenu &&*/ /*(memcmp(&rtp.streamdesc, &streams.items[streamNumber], sizeof(sdp_desc)) != 0 ||*/
+	     appControlInfo.rtpInfo.active == 0 /*)*/
 	   )
 	{
 		if (CHANNEL_CUSTOM != streamNumber)
 		{
-			memcpy(&rtp[which].selectedDesc, &streams.items[streamNumber], sizeof(sdp_desc));
+			memcpy(&rtp.selectedDesc, &streams.items[streamNumber], sizeof(sdp_desc));
 			strcpy(appControlInfo.rtpMenuInfo.lastUrl, rtp_info[streamNumber].url );
 		}
 
@@ -1210,28 +1186,28 @@ static int rtp_stream_start(void* pArg)
 
 		dprintf("%s: start video %d\n", __FUNCTION__, streamNumber);
 
-		rtp_startVideo(which);
+		rtp_startVideo(screenMain);
 
 		if( CHANNEL_CUSTOM != streamNumber && rtp_info[streamNumber].audio > 0 )
 		{
 			dprintf("%s: setting default audio %d for channel %d\n", __FUNCTION__, rtp_info[streamNumber].audio, streamNumber);
-			gfx_setVideoProviderAudioStream(which, rtp_info[streamNumber].audio);
+			gfx_setVideoProviderAudioStream(screenMain, rtp_info[streamNumber].audio);
 		}
 
 		//dprintf("%s: refill menu\n", __FUNCTION__);
 		//rtp_fillStreamMenu(which);
 
-		//if ( appControlInfo.rtpInfo[which].active != 0 )
+		//if ( appControlInfo.rtpInfo.active != 0 )
 		rtp_setupPlayControl(pArg);
 
 		saveAppSettings();
 		/*else
 		{
 			interface_playControlDisable(0);
-			//rtp[which].selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
+			//rtp.selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
 			return -1;
 		}*/
-		if ( appControlInfo.rtpInfo[which].active == 0 )
+		if ( appControlInfo.rtpInfo.active == 0 )
 		{
 #ifndef RTP_RECONNECT
 			interface_playControlSelect(interfacePlayControlStop);
@@ -1247,7 +1223,7 @@ static int rtp_stream_start(void* pArg)
 #ifdef RTP_RECONNECT
 	return 0;
 #else
-	return appControlInfo.rtpInfo[which].active != 0 ? 0 : -1;
+	return appControlInfo.rtpInfo.active != 0 ? 0 : -1;
 #endif
 }
 
@@ -1261,26 +1237,25 @@ int rtp_reconnectEvent(void* pArg)
 
 static int rtp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 	int streamNumber = STREAM_INFO_GET_STREAM(pArg);
 
-	dprintf("%s: %d %d (0x%04x)\n", __FUNCTION__, which, streamNumber, streamNumber);
+	dprintf("%s: %d (0x%04x)\n", __FUNCTION__, streamNumber, streamNumber);
 
-	rtp[which].playingFlag = 1;
+	rtp.playingFlag = 1;
 
 #ifdef RTP_RECONNECT
 	interface_removeEvent(rtp_reconnectEvent, NULL);
 #endif
 	interface_removeEvent(rtp_stream_start, pArg);
 
-	if ( appControlInfo.rtpInfo[which].active != 0 )
+	if ( appControlInfo.rtpInfo.active != 0 )
 	{
 		/*interface_playControlDisable(1);
-		rtp[which].streamDesc.connection.address.IPv4.s_addr = INADDR_NONE;*/
+		rtp.streamDesc.connection.address.IPv4.s_addr = INADDR_NONE;*/
 		// force showState to NOT be triggered
 		
 		interfacePlayControl.activeButton = interfacePlayControlStop;
-		rtp_stopVideo(which);
+		rtp_stopVideo(screenMain);
 	}
 
 	appControlInfo.rtpMenuInfo.channel = streamNumber;
@@ -1302,19 +1277,19 @@ static int rtp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 					char desc[MENU_ENTRY_INFO_LENGTH];
 					sprintf(desc, "%s: %s", _T("CHANNEL"), streams.items[streamNumber].session_name);
 					appControlInfo.playbackInfo.playlistMode = playlistModeIPTV;
-					return media_playURL(which, rtp_info[streamNumber].url, desc, rtp_info[streamNumber].thumb ? rtp_info[streamNumber].thumb : resource_thumbnails[thumbnail_multicast]);
+					return media_playURL(screenMain, rtp_info[streamNumber].url, desc, rtp_info[streamNumber].thumb ? rtp_info[streamNumber].thumb : resource_thumbnails[thumbnail_multicast]);
 				}
 			case mediaProtoRTSP:
 				{
 					char desc[MENU_ENTRY_INFO_LENGTH];
 					sprintf(desc, "%s: %s", _T("CHANNEL"), streams.items[streamNumber].session_name);
 					appControlInfo.playbackInfo.playlistMode = playlistModeIPTV;
-					return rtsp_playURL(which, rtp_info[streamNumber].url, desc, rtp_info[streamNumber].thumb ? rtp_info[streamNumber].thumb : resource_thumbnails[thumbnail_multicast]);
+					return rtsp_playURL(screenMain, rtp_info[streamNumber].url, desc, rtp_info[streamNumber].thumb ? rtp_info[streamNumber].thumb : resource_thumbnails[thumbnail_multicast]);
 				}
 			default:
 				appControlInfo.playbackInfo.playlistMode = playlistModeIPTV;
 		}
-		rtp[which].stream_info.custom_url = 0;
+		rtp.stream_info.custom_url = 0;
 	}
 
 	if ( rtp_stream_start(pArg) == 0 )
@@ -1335,7 +1310,6 @@ static void rtp_setupPlayControl(void *pArg)
 {
 	int buttons;
 	int streamNumber = STREAM_INFO_GET_STREAM(pArg);
-	int which = STREAM_INFO_GET_SCREEN(pArg);
 
 	buttons = interfacePlayControlStop|interfacePlayControlPlay;
 	buttons |= appControlInfo.playbackInfo.playlistMode != playlistModeFavorites ? interfacePlayControlAddToPlaylist :  interfacePlayControlMode;
@@ -1345,13 +1319,13 @@ static void rtp_setupPlayControl(void *pArg)
 		if(appControlInfo.rtpMenuInfo.usePlaylistURL != 0 && appControlInfo.rtpMenuInfo.epg[0] != 0 && rtp_getProgramInfo( streamNumber, 0, rtpInfoTypeName ) == 0 && channel_buff[0] != 0 )
 			strcpy(appControlInfo.playbackInfo.description, rtpEpgInfo.program.info);
 		else
-			sprintf(appControlInfo.playbackInfo.description, "%s: %s", _T("CHANNEL"), rtp[which].selectedDesc.session_name);
+			sprintf(appControlInfo.playbackInfo.description, "%s: %s", _T("CHANNEL"), rtp.selectedDesc.session_name);
 		if(rtp_info[streamNumber].thumb)
 			strcpy(appControlInfo.playbackInfo.thumbnail, rtp_info[streamNumber].thumb);
 		else
 			appControlInfo.playbackInfo.thumbnail[0] = 0;
 	}
-	if ( CHANNEL_CUSTOM != streamNumber || rtp[which].stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
+	if ( CHANNEL_CUSTOM != streamNumber || rtp.stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
 	{
 		buttons|= interfacePlayControlPrevious|interfacePlayControlNext;
 	}
@@ -1376,7 +1350,7 @@ static void rtp_setupPlayControl(void *pArg)
 	interface_playControlSetup(rtp_play_callback, pArg, buttons, appControlInfo.playbackInfo.description, thumbnail_multicast);
 	interface_playControlSetAudioCallback( rtp_audioChange );
 
-	if ( CHANNEL_CUSTOM != streamNumber || rtp[which].stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
+	if ( CHANNEL_CUSTOM != streamNumber || rtp.stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
 		interface_playControlSetChannelCallbacks(rtp_startNextChannel,
 			appControlInfo.playbackInfo.playlistMode == playlistModeFavorites ? playlist_setChannel : (appControlInfo.rtpMenuInfo.usePlaylistURL != 0 ? rtp_setChannel : NULL));
 	if( appControlInfo.playbackInfo.channel >= 0 )
@@ -1388,19 +1362,15 @@ static void rtp_setupPlayControl(void *pArg)
 
 int rtp_setChannel(int channel, void* pArg)
 {
-	int which = STREAM_INFO_GET_SCREEN(pArg);
-
-	if( which < 0 || which >= screenOutputs ) // fix for playURL from media/rtsp
-		which = screenMain;
 	if( channel < 1 || channel > streams.count )
 		return 1;
 	channel--;
 
 #ifdef ENABLE_AUTOPLAY
 	if( streams.items[channel].media[0].proto == mediaProtoRTP || streams.items[channel].media[0].proto == mediaProtoUDP )
-		rtp_stream_selected((interfaceMenu_t*)&rtpStreamMenu[which], STREAM_INFO_SET(which, channel));
+		rtp_stream_selected((interfaceMenu_t*)&rtpStreamMenu, STREAM_INFO_SET(which, channel));
 #endif
-	rtp_stream_change((interfaceMenu_t*)&rtpStreamMenu[which], STREAM_INFO_SET(which, channel));
+	rtp_stream_change((interfaceMenu_t*)&rtpStreamMenu, STREAM_INFO_SET(screenMain, channel));
 
 	return 0;
 }
@@ -1626,20 +1596,20 @@ static void *stream_list_updater(void *pArg)
 
 	which = GET_NUMBER(pArg);
 	
-	rtp_sdp_start_collecting(rtp[which].rtp_session);
+	rtp_sdp_start_collecting(rtp.rtp_session);
 
-	while (rtp[which].collectFlag && streams.count <= 0 ) // collect SAP announces until we found something
+	while (rtp.collectFlag && streams.count <= 0 ) // collect SAP announces until we found something
 	{
 		interface_showLoadingAnimation();
 
-		rtp_sdp_set_collecting_state(rtp[which].rtp_session, 1);
+		rtp_sdp_set_collecting_state(rtp.rtp_session, 1);
 
 		dprintf("%s: collecting/waiting\n", __FUNCTION__);
 
 		i = 0;
 		while (i++ < sleepTime*10)
 		{
-			if (rtp[which].collectFlag)
+			if (rtp.collectFlag)
 			{
 				usleep(100000);
 			} else
@@ -1650,12 +1620,12 @@ static void *stream_list_updater(void *pArg)
 			}
 		}
 
-		if (rtp[which].collectFlag)
+		if (rtp.collectFlag)
 		{
 			mysem_get(rtp_semaphore);
-			rtp_sdp_set_collecting_state(rtp[which].rtp_session, 0);
-			//memcpy(&streams, rtp_sdp_set_collecting_state(rtp[which].rtp_session, 0), sizeof(struct rtp_list));
-			rtp_get_found_streams(rtp[which].rtp_session, &streams);
+			rtp_sdp_set_collecting_state(rtp.rtp_session, 0);
+			//memcpy(&streams, rtp_sdp_set_collecting_state(rtp.rtp_session, 0), sizeof(struct rtp_list));
+			rtp_get_found_streams(rtp.rtp_session, &streams);
 			mysem_release(rtp_semaphore);
 
 			dprintf("%s: found streams: %d\n", __FUNCTION__, streams.count);
@@ -1698,7 +1668,7 @@ static void *stream_list_updater(void *pArg)
 		}
 	}
 
-	rtp_sdp_stop_collecting(rtp[which].rtp_session);
+	rtp_sdp_stop_collecting(rtp.rtp_session);
 
 	dprintf("%s: exit normal\n", __FUNCTION__);
 
@@ -1713,12 +1683,12 @@ static int rtp_stopCollect(interfaceMenu_t* pMenu, void *pArg)
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	rtp[which].collectFlag = 0;
+	rtp.collectFlag = 0;
 
-	if (rtp[which].collectThread != 0)
+	if (rtp.collectThread != 0)
 	{
-		pthread_join(rtp[which].collectThread, NULL);
-		rtp[which].collectThread = 0;
+		pthread_join(rtp.collectThread, NULL);
+		rtp.collectThread = 0;
 	}
 
 	dprintf("%s: out\n", __FUNCTION__);
@@ -1740,7 +1710,7 @@ void rtp_getPlaylist(int which)
 			rtp_sap_collected = 0;
 		}
 
-		rtp[which].collectFlag = 1;
+		rtp.collectFlag = 1;
 
 		if (streams.count == 0)
 		{
@@ -1773,19 +1743,19 @@ void rtp_getPlaylist(int which)
 	{
 		int ret;
 
-		if (rtp[which].collectThread != 0)
+		if (rtp.collectThread != 0)
 		{
-			rtp[which].collectFlag = 0;
-			pthread_join(rtp[which].collectThread, NULL);
+			rtp.collectFlag = 0;
+			pthread_join(rtp.collectThread, NULL);
 		}
 
 		dprintf("%s: start thread\n", __FUNCTION__);
 
 		rtp_cleanupPlaylist(which);
 
-		rtp[which].collectFlag = 1;
+		rtp.collectFlag = 1;
 
-		ret = pthread_create(&rtp[which].collectThread, NULL, stream_list_updater, SET_NUMBER(which));
+		ret = pthread_create(&rtp.collectThread, NULL, stream_list_updater, SET_NUMBER(which));
 		if (ret != 0)
 			eprintf("%s: failed to create collect thread: %s\n", __FUNCTION__, strerror(errno));
 	}
@@ -1850,7 +1820,7 @@ static int rtp_setChannelFromURL(interfaceMenu_t *pMenu, char *value, char *desc
 
 	if (CHANNEL_CUSTOM == channelNumber)
 	{
-		rtp[which].stream_info.custom_url = 1;
+		rtp.stream_info.custom_url = 1;
 	
 		switch (url.protocol)
 		{
@@ -1896,7 +1866,7 @@ static int rtp_setChannelFromURL(interfaceMenu_t *pMenu, char *value, char *desc
 
 		strcpy(desc.session_name, value);
 
-		memcpy(&rtp[which].selectedDesc, &desc, sizeof(sdp_desc));
+		memcpy(&rtp.selectedDesc, &desc, sizeof(sdp_desc));
 	}
 
 	return rtp_stream_change(pMenu, STREAM_INFO_SET(which, channelNumber));
@@ -1947,7 +1917,7 @@ int rtp_initStreamMenu(interfaceMenu_t *pMenu, void* pArg)
 		interface_showMenu(1, 0);
 	}
 
-	interface_menuActionShowMenu(pMenu, &rtpStreamMenu[which]);
+	interface_menuActionShowMenu(pMenu, &rtpStreamMenu);
 
 	return 0;
 }
@@ -1956,7 +1926,7 @@ static int rtp_changeGenre(interfaceMenu_t* pMenu, void *pArg)
 {
 	genre_index = GET_NUMBER(pArg) & 0x00FF;
 	rtp_fillStreamMenu(screenMain);
-	interface_menuActionShowMenu(pMenu, &rtpStreamMenu[screenMain]);
+	interface_menuActionShowMenu(pMenu, &rtpStreamMenu);
 	return 0;
 }
 
@@ -2920,9 +2890,9 @@ static int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pAr
 			if( strncmp( rtp_info[appControlInfo.rtpMenuInfo.channel].url, URL_RTP_MEDIA, sizeof(URL_RTP_MEDIA)-1 ) == 0 ||
 			    strncmp( rtp_info[appControlInfo.rtpMenuInfo.channel].url, URL_UDP_MEDIA, sizeof(URL_UDP_MEDIA)-1 ) == 0)
 			{
-				rtp_multiviewPlay( (interfaceMenu_t*)&rtpStreamMenu[screenMain], CHANNEL_INFO_SET(screenMain, appControlInfo.rtpMenuInfo.channel) );
+				rtp_multiviewPlay( (interfaceMenu_t*)&rtpStreamMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.rtpMenuInfo.channel) );
 			} else
-				rtp_multiviewPlay( (interfaceMenu_t*)&rtpStreamMenu[screenMain], CHANNEL_INFO_SET(screenMain, CHANNEL_CUSTOM) );
+				rtp_multiviewPlay( (interfaceMenu_t*)&rtpStreamMenu, CHANNEL_INFO_SET(screenMain, CHANNEL_CUSTOM) );
 			return 0;
 		}
 	}
@@ -2965,7 +2935,7 @@ static int rtp_multi_callback(pinterfaceCommandEvent_t cmd, void* pArg)
 			return 0;
 		case interfaceCommandOk:
 		case interfaceCommandEnter:
-			rtp_stream_change( (interfaceMenu_t*)&rtpStreamMenu[screenMain], appControlInfo.multiviewInfo.pArg[appControlInfo.multiviewInfo.selected] );
+			rtp_stream_change( (interfaceMenu_t*)&rtpStreamMenu, appControlInfo.multiviewInfo.pArg[appControlInfo.multiviewInfo.selected] );
 			return 0;
 		default:
 			return interface_multiviewProcessCommand(cmd,pArg);
@@ -3100,7 +3070,7 @@ static int rtp_multiviewPlay(interfaceMenu_t *pMenu, void *pArg)
 		return 1;
 	}
 
-	appControlInfo.rtpInfo[which].active = 1;
+	appControlInfo.rtpInfo.active = 1;
 	appControlInfo.rtpMenuInfo.channel = CHANNEL_CUSTOM;
 
 	interface_playControlSetup(NULL, appControlInfo.multiviewInfo.pArg[0], 0, NULL, thumbnail_channels);
@@ -3124,7 +3094,7 @@ static void* rtp_epgThread(void *pArg)
 
 	for( i = 0; i < (unsigned)streams.count; i++ )
 	{
-		if ( rtp[screenMain].collectFlag == 0 )
+		if ( rtp.collectFlag == 0 )
 		{
 			eprintf("%s: aborted\n", __FUNCTION__);
 			break;
@@ -3144,7 +3114,7 @@ static void* rtp_epgThread(void *pArg)
 void rtp_cleanupEPG()
 {
 	int which;
-	rtp[screenMain].collectFlag = 0;
+	rtp.collectFlag = 0;
 
 	mysem_get(rtp_epg_semaphore);
 	for ( which=0; which<RTP_MAX_STREAM_COUNT; which++ )
@@ -3165,7 +3135,7 @@ void rtp_cleanupPlaylist(int which)
 	rtp_sap_collected = 0;
 	appControlInfo.rtpMenuInfo.channel = CHANNEL_CUSTOM;
 
-	interface_clearMenuEntries((interfaceMenu_t*)&rtpStreamMenu[which]);
-	interface_addMenuEntryDisabled((interfaceMenu_t*)&rtpStreamMenu[which], _T("SEARCHING_CHANNELS"), thumbnail_search);
-	interface_setSelectedItem((interfaceMenu_t*)&rtpStreamMenu[which], MENU_ITEM_MAIN);
+	interface_clearMenuEntries((interfaceMenu_t*)&rtpStreamMenu);
+	interface_addMenuEntryDisabled((interfaceMenu_t*)&rtpStreamMenu, _T("SEARCHING_CHANNELS"), thumbnail_search);
+	interface_setSelectedItem((interfaceMenu_t*)&rtpStreamMenu, MENU_ITEM_MAIN);
 }

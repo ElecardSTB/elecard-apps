@@ -678,7 +678,7 @@ typedef struct __stb810_controlInfo
 	stb810_pvrInfo       pvrInfo;
 #endif
 	// dgk
-	stb810_rtpInfo       rtpInfo[screenOutputs];
+	stb810_rtpInfo       rtpInfo;
 	stb810_rtspInfo      rtspInfo[screenOutputs];
 	stb810_rtpMenuInfo   rtpMenuInfo;
 	// end dgk
