@@ -1989,7 +1989,6 @@ void cleanup()
 	dprintf("%s: close video providers\n", __FUNCTION__);
 
 	gfx_stopVideoProviders(screenMain);
-	gfx_stopVideoProviders(screenPip);
 	media_slideshowStop(1);
 
 	/*

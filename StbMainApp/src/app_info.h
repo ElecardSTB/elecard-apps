@@ -221,10 +221,8 @@ typedef enum
 {
 	tunerNotPresent = 0,
 	tunerInactive,
-	tunerDVBPip,
 	tunerDVBMain,
-	tunerDVBPvr2,
-	tunerDVBPvr1,
+	tunerDVBPvr,
 	tunerStatusGaurd
 } stb810_tunerStatus;
 

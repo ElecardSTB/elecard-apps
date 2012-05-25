@@ -275,17 +275,11 @@ tunerFormat offair_getTuner(void)
 				{
 					switch ( status )
 					{
-						case(tunerDVBPip) :
-							offair_stopVideo(screenPip, 1);
-							break;
 						case(tunerDVBMain) :
 							offair_stopVideo(screenMain, 1);
 							break;
 #ifdef ENABLE_PVR
-						case(tunerDVBPvr2) :
-							pvr_stopRecordingDVB(screenPip);
-							break;
-						case(tunerDVBPvr1) :
+						case(tunerDVBPvr) :
 							pvr_stopRecordingDVB(screenMain);
 							break;
 #endif
@@ -736,14 +730,11 @@ void offair_stopVideo(int which, int reset)
 
 #ifdef ENABLE_DVB_DIAG
 		interface_removeEvent(offair_updatePSI, NULL);
-		interface_removeEvent(offair_updatePSI, (void*)screenPip);
 #endif
 
 		interface_removeEvent(offair_updateEPG, NULL);
-		interface_removeEvent(offair_updateEPG, (void*)screenPip);
 #ifdef ENABLE_STATS
 		interface_removeEvent(offair_updateStatsEvent, NULL);
-		interface_removeEvent(offair_updateStatsEvent, (void*)screenPip);
 		offair_updateStats(which);
 #endif
 
@@ -776,7 +767,7 @@ void offair_stopVideo(int which, int reset)
 		}
 #endif
 
-		dprintf("%s: Stop video screen %s\n", __FUNCTION__, which == screenPip ? "Pip" : "Main");
+		dprintf("%s: Stop video \n", __FUNCTION__);
 		dvb_stopDVB(appControlInfo.dvbInfo.tuner, reset);
 		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
 		appControlInfo.dvbInfo.active = 0;
@@ -1625,13 +1616,13 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 	int ret;
 	gfx_stopVideoProviders(which);
 
-	dprintf("%s: Start video on screen%s, tuner %d\n", __FUNCTION__, which == screenPip ? "Pip" : "Main", param->vmsp);
+	dprintf("%s: Start video on tuner %d\n", __FUNCTION__, param->vmsp);
 
 	appControlInfo.dvbInfo.tuner = param->vmsp;
 #ifdef STSDK
 	if( appControlInfo.dvbInfo.tuner < VMSP_COUNT ) {
 #endif
-	appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = which ? tunerDVBPip : tunerDVBMain;
+	appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerDVBMain;
 
 #ifdef STBTI
 	sprintf(filename, "ln -s /dev/dvb/adapter%d/dvr0 %s", appControlInfo.dvbInfo.tuner, OFFAIR_MULTIVIEW_FILENAME);
@@ -1649,7 +1640,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 	}
 #endif
 	sprintf(qualifier, "%s%s%s%s%s",
-		(which==screenPip) ? ":SD:NoSpdif:I2S1" : "",
+		"", // (which==screenPip) ? ":SD:NoSpdif:I2S1" : "",
 		audio_type == AC3 ? ":AC3" : "",
 		video_type == H264 ? ":H264" : ( video_type == MPEG2 ? ":MPEG2" : ""),
 		audio_type == AAC ? ":AAC" : AUDIO_MPEG,
