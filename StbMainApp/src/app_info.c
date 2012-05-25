@@ -153,18 +153,18 @@ int loadAppSettings()
 	while (fgets(buf, BUFFER_SIZE, fd) != NULL)
 	{
 		//dprintf("%s: Read '%s'\n", __FUNCTION__, buf);
-		if (sscanf(buf, "VODIP=%15s", appControlInfo.rtspInfo[0].streamIP) == 1)
+		if (sscanf(buf, "VODIP=%15s", appControlInfo.rtspInfo.streamIP) == 1)
 		{
-			//dprintf("%s: streamurl %s\n", __FUNCTION__, appControlInfo.rtspInfo[0].streamIP);
-		} else if (sscanf(buf, "VODINFOIP=%15s", appControlInfo.rtspInfo[0].streamInfoIP) == 1)
+			//dprintf("%s: streamurl %s\n", __FUNCTION__, appControlInfo.rtspInfo.streamIP);
+		} else if (sscanf(buf, "VODINFOIP=%15s", appControlInfo.rtspInfo.streamInfoIP) == 1)
 		{
-			//dprintf("%s: streaminfoip %s\n", __FUNCTION__, appControlInfo.rtspInfo[0].streamInfoIP);
-		} else if (sscanf(buf, "VODINFOURL=%[^\r\n]", appControlInfo.rtspInfo[0].streamInfoUrl) == 1)
+			//dprintf("%s: streaminfoip %s\n", __FUNCTION__, appControlInfo.rtspInfo.streamInfoIP);
+		} else if (sscanf(buf, "VODINFOURL=%[^\r\n]", appControlInfo.rtspInfo.streamInfoUrl) == 1)
 		{
-			//dprintf("%s: streaminfourl %s\n", __FUNCTION__, appControlInfo.rtspInfo[0].streamInfoUrl);
-		} else if (sscanf(buf, "VODUSEPLAYLIST=%d", &appControlInfo.rtspInfo[0].usePlaylistURL) == 1)
+			//dprintf("%s: streaminfourl %s\n", __FUNCTION__, appControlInfo.rtspInfo.streamInfoUrl);
+		} else if (sscanf(buf, "VODUSEPLAYLIST=%d", &appControlInfo.rtspInfo.usePlaylistURL) == 1)
 		{
-			//dprintf("%s: use vod playlist %d\n", __FUNCTION__, appControlInfo.rtspInfo[0].usePlaylistURL);
+			//dprintf("%s: use vod playlist %d\n", __FUNCTION__, appControlInfo.rtspInfo.usePlaylistURL);
 		} else if (sscanf(buf, "USEPCR=%d", &appControlInfo.bProcessPCR) == 1)
 		{
 			//dprintf("%s: usepcr %d\n", __FUNCTION__, appControlInfo.bProcessPCR);
@@ -680,10 +680,10 @@ int saveAppSettings()
 		eprintf("Failed to open %s for writing\n", SETTINGS_FILE);
 		return -1;
 	}
-	fprintf(fd, "VODIP=%s\n",                     appControlInfo.rtspInfo[0].streamIP);
-	fprintf(fd, "VODINFOIP=%s\n",                 appControlInfo.rtspInfo[0].streamInfoIP);
-	fprintf(fd, "VODINFOURL=%s\n",                appControlInfo.rtspInfo[0].streamInfoUrl);
-	fprintf(fd, "VODUSEPLAYLIST=%d\n",            appControlInfo.rtspInfo[0].usePlaylistURL);
+	fprintf(fd, "VODIP=%s\n",                     appControlInfo.rtspInfo.streamIP);
+	fprintf(fd, "VODINFOIP=%s\n",                 appControlInfo.rtspInfo.streamInfoIP);
+	fprintf(fd, "VODINFOURL=%s\n",                appControlInfo.rtspInfo.streamInfoUrl);
+	fprintf(fd, "VODUSEPLAYLIST=%d\n",            appControlInfo.rtspInfo.usePlaylistURL);
 	fprintf(fd, "AUDIO_OUTPUT=%s\n",              appControlInfo.soundInfo.rcaOutput == 0 ? "SCART" : "RCA");
 	fprintf(fd, "BTRACK=%d\n",                    appControlInfo.bUseBufferModel);
 	fprintf(fd, "NORSYNC=%d\n",                   appControlInfo.bRendererDisableSync);
@@ -963,12 +963,12 @@ void appInfo_init(void)
 	appControlInfo.bRendererDisableSync           = 0;
 	appControlInfo.bProcessPCR                    = 1;
 
-	strcpy(appControlInfo.rtspInfo[0].streamIP,     RTSP_SERVER_ADDR);
-	strcpy(appControlInfo.rtspInfo[0].streamInfoIP, RTSP_SERVER_ADDR);
-	appControlInfo.rtspInfo[0].streamInfoUrl[0]   = 0;
-	appControlInfo.rtspInfo[0].streamInfoFiles    = globalInfoFiles;
-	appControlInfo.rtspInfo[0].RTSPPort           = RTSP_SERVER_PORT;
-	strcpy(appControlInfo.rtspInfo[0].streamFile,   RTSP_STREAM_FILE);
+	strcpy(appControlInfo.rtspInfo.streamIP,     RTSP_SERVER_ADDR);
+	strcpy(appControlInfo.rtspInfo.streamInfoIP, RTSP_SERVER_ADDR);
+	appControlInfo.rtspInfo.streamInfoUrl[0]   = 0;
+	appControlInfo.rtspInfo.streamInfoFiles    = globalInfoFiles;
+	appControlInfo.rtspInfo.RTSPPort           = RTSP_SERVER_PORT;
+	strcpy(appControlInfo.rtspInfo.streamFile,   RTSP_STREAM_FILE);
 
 #ifdef STB82
 	/* get rank1 limit (it is ether equals to rank0 limit or is greater) and convert it to megabytes */

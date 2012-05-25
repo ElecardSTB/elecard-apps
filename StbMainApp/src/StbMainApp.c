@@ -385,24 +385,24 @@ static void parse_commandLine(int argc, char *argv[])
 	{
 		if ( strcmp(argv[i], "-stream_info_url") == 0 )
 		{
-			strcpy(appControlInfo.rtspInfo[0].streamInfoIP, argv[i+1]);
+			strcpy(appControlInfo.rtspInfo.streamInfoIP, argv[i+1]);
 			i++;
 		} else if ( strcmp(argv[i], "-stream_url") == 0 )
 		{
-			strcpy(appControlInfo.rtspInfo[0].streamIP, argv[i+1]);
+			strcpy(appControlInfo.rtspInfo.streamIP, argv[i+1]);
 			i++;
 		} else if ( strcmp(argv[i], "-rtsp_port") == 0 )
 		{
-			appControlInfo.rtspInfo[0].RTSPPort = atoi(argv[i+1]);
+			appControlInfo.rtspInfo.RTSPPort = atoi(argv[i+1]);
 			i++;
 		} else if ( strcmp(argv[i], "-stream_info_file") == 0 )
 		{
 			strcpy(infoFiles[0], argv[i+1]);
-			appControlInfo.rtspInfo[0].streamInfoFiles = (char**)infoFiles;
+			appControlInfo.rtspInfo.streamInfoFiles = (char**)infoFiles;
 			i++;
 		} else if ( strcmp(argv[i], "-stream_file") == 0 )
 		{
-			strcpy(appControlInfo.rtspInfo[0].streamFile, argv[i+1]);
+			strcpy(appControlInfo.rtspInfo.streamFile, argv[i+1]);
 			i++;
 		} else if ( !strcmp(argv[i], "-i2s1") )
 		{

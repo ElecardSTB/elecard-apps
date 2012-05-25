@@ -679,7 +679,7 @@ typedef struct __stb810_controlInfo
 #endif
 	// dgk
 	stb810_rtpInfo       rtpInfo;
-	stb810_rtspInfo      rtspInfo[screenOutputs];
+	stb810_rtspInfo      rtspInfo;
 	stb810_rtpMenuInfo   rtpMenuInfo;
 	// end dgk
 	stb810_mediaInfo     mediaInfo;

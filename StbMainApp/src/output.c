@@ -1986,7 +1986,7 @@ static char* output_getOption(outputUrlOption option)
 #endif
 #ifdef ENABLE_VOD
 		case optionVodPlaylist:
-			return appControlInfo.rtspInfo[screenMain].streamInfoUrl;
+			return appControlInfo.rtspInfo.streamInfoUrl;
 #endif
 		default:;
 	}
@@ -2189,7 +2189,7 @@ static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_VOD
 static int output_toggleVODPlaylist(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.rtspInfo[screenMain].usePlaylistURL = (appControlInfo.rtspInfo[screenMain].usePlaylistURL+1)%2;
+	appControlInfo.rtspInfo.usePlaylistURL = (appControlInfo.rtspInfo.usePlaylistURL+1)%2;
 	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
@@ -2365,7 +2365,7 @@ static int output_changeVODIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return -1;
 	}
 
-	strcpy(appControlInfo.rtspInfo[0].streamIP, value);
+	strcpy(appControlInfo.rtspInfo.streamIP, value);
 
 	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
 	{
@@ -2391,7 +2391,7 @@ static int output_changeVODINFOIP(interfaceMenu_t *pMenu, char *value, void* pAr
 		return -1;
 	}
 
-	strcpy(appControlInfo.rtspInfo[0].streamInfoIP, value);
+	strcpy(appControlInfo.rtspInfo.streamInfoIP, value);
 
 	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
 	{
@@ -2407,7 +2407,7 @@ static int output_changeVODINFOIP(interfaceMenu_t *pMenu, char *value, void* pAr
 
 static int output_toggleVODIP(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_parseIP( appControlInfo.rtspInfo[0].streamIP );
+	output_parseIP( appControlInfo.rtspInfo.streamIP );
 	interface_getText(pMenu, _T("ENTER_VOD_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVODIP, output_getIPfield, inputModeDirect, NULL);
 
 	return 0;
@@ -2415,7 +2415,7 @@ static int output_toggleVODIP(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_toggleVODINFOIP(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_parseIP( appControlInfo.rtspInfo[0].streamInfoIP );
+	output_parseIP( appControlInfo.rtspInfo.streamInfoIP );
 	interface_getText(pMenu, _T("ENTER_VOD_INFO_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVODINFOIP, output_getIPfield, inputModeDirect, NULL);
 
 	return 0;
@@ -2946,7 +2946,7 @@ static int output_getVMRootCert(interfaceMenu_t *pMenu, void* pArg)
 
 	memset(rootcert, 0, sizeof(rootcert));
 
-	sprintf(info_url, "http://%s/%s", appControlInfo.rtspInfo[0].streamInfoIP, "rootcert.pem");
+	sprintf(info_url, "http://%s/%s", appControlInfo.rtspInfo.streamInfoIP, "rootcert.pem");
 
 	curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
 	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, rootcert);
@@ -5355,22 +5355,22 @@ static int output_fillVODMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&VODSubMenu);
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"), appControlInfo.rtspInfo[screenMain].usePlaylistURL ? "URL" : _T("IP_ADDRESS") );
+	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"), appControlInfo.rtspInfo.usePlaylistURL ? "URL" : _T("IP_ADDRESS") );
 	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODPlaylist, NULL, thumbnail_configure);
 
-	if( appControlInfo.rtspInfo[screenMain].usePlaylistURL )
+	if( appControlInfo.rtspInfo.usePlaylistURL )
 	{
 		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"),
-			appControlInfo.rtspInfo[screenMain].streamInfoUrl != 0 ? appControlInfo.rtspInfo[screenMain].streamInfoUrl : _T("NONE"));
+			appControlInfo.rtspInfo.streamInfoUrl != 0 ? appControlInfo.rtspInfo.streamInfoUrl : _T("NONE"));
 		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleURL, (void*)optionVodPlaylist, thumbnail_enterurl);
 	}
 	else
 	{
-		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_INFO_IP_ADDRESS"), appControlInfo.rtspInfo[0].streamInfoIP);
+		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_INFO_IP_ADDRESS"), appControlInfo.rtspInfo.streamInfoIP);
 		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODINFOIP, NULL, thumbnail_enterurl);
 	}
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_IP_ADDRESS"), appControlInfo.rtspInfo[0].streamIP);
+	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_IP_ADDRESS"), appControlInfo.rtspInfo.streamIP);
 	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODIP, NULL, thumbnail_enterurl);
 
 	return 0;
@@ -5812,16 +5812,16 @@ static int output_setProfile(interfaceMenu_t *pMenu, void* pArg)
 		} else
 		if( strcmp( buffer, "VODIP") == 0 )
 		{
-			strcpy( appControlInfo.rtspInfo[0].streamIP, value );
+			strcpy( appControlInfo.rtspInfo.streamIP, value );
 		} else
 		if( strcmp( buffer, "VODINFOURL" ) == 0 )
 		{
-			strcpy( appControlInfo.rtspInfo[0].streamInfoUrl, value );
-			appControlInfo.rtspInfo[0].usePlaylistURL = value[0] != 0;
+			strcpy( appControlInfo.rtspInfo.streamInfoUrl, value );
+			appControlInfo.rtspInfo.usePlaylistURL = value[0] != 0;
 		} else
 		if( strcmp( buffer, "VODINFOIP" ) == 0 )
 		{
-			strcpy( appControlInfo.rtspInfo[0].streamIP, "VODIP" );
+			strcpy( appControlInfo.rtspInfo.streamIP, "VODIP" );
 		} else
 		if( strcmp( buffer, "FWUPDATEURL" ) == 0 && value_len > 0 &&
 			/* URL can have any characters, so we should  */
