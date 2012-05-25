@@ -6003,10 +6003,10 @@ void interface_playControlSetup(playControlCallback pCallback, void *pArg, inter
 
 	interfacePlayControl.enabledButtons = buttons;
 #ifdef ENABLE_PVR
-	dprintf("%s: dvb active = %d pvrActive = %d\n", __FUNCTION__,appControlInfo.dvbInfo[screenMain].active, pvr_getActive());
+	dprintf("%s: dvb active = %d pvrActive = %d\n", __FUNCTION__,appControlInfo.dvbInfo.active, pvr_getActive());
 	if ( pvr_getActive()
 #ifdef ENABLE_DVB
-		|| appControlInfo.dvbInfo[screenMain].active
+		|| appControlInfo.dvbInfo.active
 #endif
 	  )
 	{
@@ -6336,7 +6336,7 @@ void interface_playControlRefresh(int redraw)
 #ifdef ENABLE_PVR
 	if ( pvr_getActive()
 #ifdef ENABLE_DVB
-		|| appControlInfo.dvbInfo[screenMain].active
+		|| appControlInfo.dvbInfo.active
 #endif
 	  )
 	{

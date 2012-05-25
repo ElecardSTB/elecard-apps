@@ -1251,8 +1251,6 @@ void dvb_exportServiceList(char* filename)
 	mysem_get(dvb_semaphore);
 	dump_services(dvb_services, filename );
 	mysem_release(dvb_semaphore);
-	/*appControlInfo.dvbInfo[screenMain].channel =
-	appControlInfo.dvbInfo[screenPip].channel = 0;*/
 
 	dprintf("DVB: Services exported\n");
 }
@@ -1289,12 +1287,6 @@ int dvb_readServicesFromDump(char* filename)
 	res = services_load_from_dump(&dvb_services, filename);
 	mysem_release(dvb_semaphore);
 
-	/*// Goes in the way of auto-loading last selected channel
-	appControlInfo.pvrInfo.recordInfo[screenMain].channel =
-	appControlInfo.pvrInfo.recordInfo[screenPip].channel =
-	appControlInfo.dvbInfo[screenMain].channel =
-	appControlInfo.dvbInfo[screenPip].channel = 0;
-	*/
 	return res;
 }
 

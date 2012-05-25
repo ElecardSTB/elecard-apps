@@ -295,9 +295,9 @@ int loadAppSettings()
 		{
 			//dprintf("%s: service list %s\n", __FUNCTION__, appControlInfo.offairInfo.serviceList);
 		}
-		else if (sscanf(buf, "LASTDVBCHANNEL=%d", &appControlInfo.dvbInfo[screenMain].channel) == 1)
+		else if (sscanf(buf, "LASTDVBCHANNEL=%d", &appControlInfo.dvbInfo.channel) == 1)
 		{
-			//dprintf("%s: Last DVB channel %d\n", __FUNCTION__, appControlInfo.dvbInfo[screenMain].channel);
+			//dprintf("%s: Last DVB channel %d\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
 		}
 #endif /* ENABLE_DVB */
 #ifdef ENABLE_VERIMATRIX
@@ -720,7 +720,7 @@ int saveAppSettings()
 	fprintf(fd, "SHOWSCRAMBLED=%d\n",             appControlInfo.offairInfo.dvbShowScrambled);
 	fprintf(fd, "DVBSORTING=%s\n",                serviceSortNames[appControlInfo.offairInfo.sorting]);
 	fprintf(fd, "DVBSERVICELIST=%s\n",            appControlInfo.offairInfo.serviceList);
-	fprintf(fd, "LASTDVBCHANNEL=%d\n",            appControlInfo.dvbInfo[screenMain].channel);
+	fprintf(fd, "LASTDVBCHANNEL=%d\n",            appControlInfo.dvbInfo.channel);
 #endif
 #ifdef ENABLE_PVR
 	fprintf(fd, "PVRDIRECTORY=%s\n",              appControlInfo.pvrInfo.directory);
@@ -922,19 +922,12 @@ void appInfo_init(void)
 	appControlInfo.dvbsInfo.symbolRate            = 22000;
 	appControlInfo.dvbsInfo.band                  = dvbsBandK;
 
-	appControlInfo.dvbInfo[screenMain].active     = 0;
-	appControlInfo.dvbInfo[screenMain].tuner      = 0;
-	appControlInfo.dvbInfo[screenMain].scrambled  = 0;
-	appControlInfo.dvbInfo[screenMain].channel    = 0;
-	appControlInfo.dvbInfo[screenMain].channelChange = 0;
-	appControlInfo.dvbInfo[screenMain].showInfo   = 0;
-
-	appControlInfo.dvbInfo[screenPip].active      = 0;
-	appControlInfo.dvbInfo[screenPip].tuner       = 0;
-	appControlInfo.dvbInfo[screenPip].scrambled   = 0;
-	appControlInfo.dvbInfo[screenPip].channel     = 0;
-	appControlInfo.dvbInfo[screenPip].channelChange = 0;
-	appControlInfo.dvbInfo[screenPip].showInfo    = 0;
+	appControlInfo.dvbInfo.active     = 0;
+	appControlInfo.dvbInfo.tuner      = 0;
+	appControlInfo.dvbInfo.scrambled  = 0;
+	appControlInfo.dvbInfo.channel    = 0;
+	appControlInfo.dvbInfo.channelChange = 0;
+	appControlInfo.dvbInfo.showInfo   = 0;
 
 	appControlInfo.offairInfo.dvbShowScrambled    = 0;
 	appControlInfo.offairInfo.sorting             = serviceSortNone;

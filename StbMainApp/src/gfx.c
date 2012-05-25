@@ -2800,7 +2800,7 @@ void gfx_stopVideoProviders (int which)
 	}
 
 #ifdef ENABLE_DVB
-	if (appControlInfo.dvbInfo[which].active)
+	if (appControlInfo.dvbInfo.active)
 	{
 		/* Stop any DVB playback */
 		offair_stopVideo(which, 1);
@@ -4231,15 +4231,10 @@ static void gfx_formatChange ()
 	}
 #ifdef ENABLE_DVB
 	/*Stop off_air playback*/
-	if (appControlInfo.dvbInfo[screenMain].active)
+	if (appControlInfo.dvbInfo.active)
 	{
 		/* Stop any DVB playback on Main*/
 		offair_stopVideo(screenMain, 1);
-	}
-	if (appControlInfo.dvbInfo[screenPip].active)
-	{
-		/* Stop any DVB playback on the Pip*/
-		offair_stopVideo(screenPip, 1);
 	}
 #endif
 	/*Now shutdown all DirectFB stuff*/

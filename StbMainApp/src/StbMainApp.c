@@ -1351,7 +1351,7 @@ void *testServerThread(void *pArg)
 					sprintf(&obuf[strlen(obuf)], "Total %d Channels\r\n", dvb_getNumberOfServices());
 				} else if (strstr(ibuf, "dvbcurrent") == ibuf)
 				{
-					if (appControlInfo.dvbInfo[screenMain].active)
+					if (appControlInfo.dvbInfo.active)
 					{
 						int index = 0, item = 0;
 
@@ -1364,7 +1364,7 @@ void *testServerThread(void *pArg)
 							}
 							if (dvb_hasMedia(service))
 							{
-								if (service == offair_services[appControlInfo.dvbInfo[screenMain].channel].service)
+								if (service == offair_services[appControlInfo.dvbInfo.channel].service)
 								{
 									sprintf(obuf, "%d: %s%s\r\n", item, dvb_getServiceName(service), dvb_getScrambled(service) ? " (scrambled)" : "");
 									break;
@@ -1498,9 +1498,9 @@ void *keyThread(void *pArg)
 		{
 #ifdef ENABLE_DVB
 			case streamSourceDVB:
-				eprintf("App: Autostart %d DVB channel\n", appControlInfo.dvbInfo[screenMain].channel);
+				eprintf("App: Autostart %d DVB channel\n", appControlInfo.dvbInfo.channel);
 				res = offair_channelChange((interfaceMenu_t*)&interfaceMainMenu,
-					CHANNEL_INFO_SET(screenMain,appControlInfo.dvbInfo[screenMain].channel));
+					CHANNEL_INFO_SET(screenMain,appControlInfo.dvbInfo.channel));
 				break;
 #endif
 			case streamSourceIPTV:

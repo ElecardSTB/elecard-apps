@@ -267,7 +267,6 @@ typedef struct
 	stb810_signalStatus  lastSignalStatus;
 	stb810_signalStatus  savedSignalStatus;
 	int                  reportedSignalStatus;
-	screenOutput         output;
 } stb810_dvbInfo;
 
 typedef struct __stb810_dvbCommonInfo
@@ -667,7 +666,7 @@ typedef struct __stb810_controlInfo
 	
 #ifdef ENABLE_DVB
 	stb810_tunerInfo     tunerInfo[inputTuners];
-	stb810_dvbInfo       dvbInfo[screenOutputs];
+	stb810_dvbInfo       dvbInfo;
 	stb810_dvbtInfo      dvbtInfo;
 	stb810_dvbcInfo      dvbcInfo;
 	stb810_dvbsInfo      dvbsInfo;
