@@ -49,7 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED DATA    *
 ********************/
 
-extern interfaceListMenu_t rtpStreamMenu[screenOutputs];
+extern interfaceListMenu_t rtpStreamMenu;
 extern interfaceEpgMenu_t  rtpRecordMenu;
 
 /********************************

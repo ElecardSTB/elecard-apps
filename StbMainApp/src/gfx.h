@@ -118,7 +118,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 typedef struct __stb810_gfxImageEntry
 {
-	char filename[256];
+	char *filename;
 	IDirectFBSurface *pImage;
 	int width;
 	int height;

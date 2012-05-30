@@ -275,16 +275,16 @@ static void *pvrThread(void *pArg)
 					switch(*cmd)
 					{
 						case 'i': //idle
-							dprintf("%s: pvr.channel %d dvb.channel %d req %d\n", __FUNCTION__, appControlInfo.pvrInfo.dvb.channel, appControlInfo.dvbInfo[screenMain].channel, pvr_requestedDvbChannel);
+							dprintf("%s: pvr.channel %d dvb.channel %d req %d\n", __FUNCTION__, appControlInfo.pvrInfo.dvb.channel, appControlInfo.dvbInfo.channel, pvr_requestedDvbChannel);
 							channel = appControlInfo.pvrInfo.dvb.channel;
 							appControlInfo.pvrInfo.dvb.channel = STBPVR_DVB_CHANNEL_NONE;
 							interface_playControlRefresh(0);
 							if( pvr_requestedDvbChannel != STBPVR_DVB_CHANNEL_NONE )
 							{
 								offair_channelChange( interfaceInfo.currentMenu, (void*)CHANNEL_INFO_SET(screenMain, pvr_requestedDvbChannel));
-							} else if( appControlInfo.dvbInfo[screenMain].active && offair_getIndex( channel ) == appControlInfo.dvbInfo[screenMain].channel )
+							} else if( appControlInfo.dvbInfo.active && offair_getIndex( channel ) == appControlInfo.dvbInfo.channel )
 							{
-								offair_channelChange( interfaceInfo.currentMenu, (void*)CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo[screenMain].channel)); // restart normal playback
+								offair_channelChange( interfaceInfo.currentMenu, (void*)CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel)); // restart normal playback
 							}
 							pvr_requestedDvbChannel = STBPVR_DVB_CHANNEL_NONE;
 							if( channel  != STBPVR_DVB_CHANNEL_NONE )
@@ -308,7 +308,7 @@ static void *pvrThread(void *pArg)
 							displayedWarning = 0;
 							pvr_requestedDvbChannel = STBPVR_DVB_CHANNEL_NONE;
 							appControlInfo.pvrInfo.dvb.channel = atoi( value );
-							if( appControlInfo.dvbInfo[screenMain].active == 0 )
+							if( appControlInfo.dvbInfo.active == 0 )
 							{
 								offair_startPvrVideo(screenMain); // restart playback
 							}
@@ -316,7 +316,7 @@ static void *pvrThread(void *pArg)
 						case 'o': // starts soon
 							channel = atoi( value );
 							if( appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 && 
-							    channel != appControlInfo.pvrInfo.dvb.channel && (appControlInfo.pvrInfo.dvb.channel >= 0 || appControlInfo.dvbInfo[screenMain].active ))
+							    channel != appControlInfo.pvrInfo.dvb.channel && (appControlInfo.pvrInfo.dvb.channel >= 0 || appControlInfo.dvbInfo.active ))
 							{
 								pvr_showStopPvr( interfaceInfo.currentMenu, (void*)(-pvrJobTypeDVB) );
 							}
@@ -563,7 +563,7 @@ void pvr_startPlaybackDVB(int which)
 
 int  pvr_isPlayingDVB(int which)
 {
-	return appControlInfo.dvbInfo[screenMain].active && offair_getIndex( appControlInfo.pvrInfo.dvb.channel ) == appControlInfo.dvbInfo[screenMain].channel;
+	return appControlInfo.dvbInfo.active && offair_getIndex( appControlInfo.pvrInfo.dvb.channel ) == appControlInfo.dvbInfo.channel;
 }
 
 int  pvr_hasDVBRecords(void)
@@ -751,7 +751,7 @@ static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&DVBTMenu;
 #endif
 			break;
-		case pvrJobTypeRTP:  PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu[screenMain]; break;
+		case pvrJobTypeRTP:  PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu; break;
 		case pvrJobTypeHTTP: PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&interfaceMainMenu; break;
 	}
 
@@ -1150,7 +1150,7 @@ void pvr_recordNow(void)
 
 #ifdef ENABLE_DVB
 
-	if( appControlInfo.dvbInfo[screenMain].active )
+	if( appControlInfo.dvbInfo.active )
 	{
 		int channel = offair_getCurrentServiceIndex(screenMain);
 #ifdef STBPNX
@@ -1177,7 +1177,7 @@ void pvr_recordNow(void)
 #ifdef STSDK
 		//offair_stopVideo( screenMain, 1 );
 
-		int tuner = appControlInfo.dvbInfo[screenMain].tuner;
+		int tuner = appControlInfo.dvbInfo.tuner;
 		if (tuner >= VMSP_COUNT)
 			tuner -= VMSP_COUNT;
 		elcdRpcType_t type;
@@ -1197,14 +1197,14 @@ void pvr_recordNow(void)
 		if (type == elcdRpcResult && answer && answer->type == cJSON_String && 
 		    strcmp(answer->valuestring, "ok") == 0)
 		{
-			appControlInfo.pvrInfo.dvb.channel = appControlInfo.dvbInfo[screenMain].channel;
+			appControlInfo.pvrInfo.dvb.channel = appControlInfo.dvbInfo.channel;
 			offair_fillDVBTMenu();
 		}
 #endif
 		PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&DVBTMenu;
 	} else
 #endif
-	if (appControlInfo.rtpInfo[screenMain].active)// || appControlInfo.playbackInfo.streamSource == streamSourceIPTV )
+	if (appControlInfo.rtpInfo.active)// || appControlInfo.playbackInfo.streamSource == streamSourceIPTV )
 	{
 		rtp_recordNow();
 	} else if( appControlInfo.mediaInfo.active )
@@ -1245,7 +1245,7 @@ int pvr_record(int which, char *url, char *desc )
 		strcpy(pvrEditInfo.job.info.http.url, url);
 		if( appControlInfo.playbackInfo.playlistMode == playlistModeIPTV )
 		{
-			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu[screenMain];
+			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
 		}
 #endif // STBPNX
 		return 0;
@@ -1291,7 +1291,7 @@ int pvr_record(int which, char *url, char *desc )
 					interface_showMessageBox( _T("ERR_PVR_RECORD"), thumbnail_error, 5000);
 				}
 				pvrEditInfo.job.type = pvrJobTypeRTP;
-				PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu[screenMain];
+				PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
 				return 0;
 			} else
 				eprintf("%s: RTP URL '%s' is too long\n", __FUNCTION__, url);

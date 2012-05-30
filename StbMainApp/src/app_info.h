@@ -221,10 +221,8 @@ typedef enum
 {
 	tunerNotPresent = 0,
 	tunerInactive,
-	tunerDVBPip,
 	tunerDVBMain,
-	tunerDVBPvr2,
-	tunerDVBPvr1,
+	tunerDVBPvr,
 	tunerStatusGaurd
 } stb810_tunerStatus;
 
@@ -267,7 +265,6 @@ typedef struct
 	stb810_signalStatus  lastSignalStatus;
 	stb810_signalStatus  savedSignalStatus;
 	int                  reportedSignalStatus;
-	screenOutput         output;
 } stb810_dvbInfo;
 
 typedef struct __stb810_dvbCommonInfo
@@ -667,7 +664,7 @@ typedef struct __stb810_controlInfo
 	
 #ifdef ENABLE_DVB
 	stb810_tunerInfo     tunerInfo[inputTuners];
-	stb810_dvbInfo       dvbInfo[screenOutputs];
+	stb810_dvbInfo       dvbInfo;
 	stb810_dvbtInfo      dvbtInfo;
 	stb810_dvbcInfo      dvbcInfo;
 	stb810_dvbsInfo      dvbsInfo;
@@ -679,8 +676,8 @@ typedef struct __stb810_controlInfo
 	stb810_pvrInfo       pvrInfo;
 #endif
 	// dgk
-	stb810_rtpInfo       rtpInfo[screenOutputs];
-	stb810_rtspInfo      rtspInfo[screenOutputs];
+	stb810_rtpInfo       rtpInfo;
+	stb810_rtspInfo      rtspInfo;
 	stb810_rtpMenuInfo   rtpMenuInfo;
 	// end dgk
 	stb810_mediaInfo     mediaInfo;

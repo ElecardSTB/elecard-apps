@@ -153,7 +153,7 @@ extern service_index_t offair_services[MAX_MEMORIZED_SERVICES];
 extern int  offair_serviceCount;
 
 extern interfaceListMenu_t DVBTMenu;
-extern interfaceListMenu_t DVBTOutputMenu[];
+extern interfaceListMenu_t DVBTOutputMenu;
 #endif
 
 extern interfaceEpgMenu_t  EPGRecordMenu;

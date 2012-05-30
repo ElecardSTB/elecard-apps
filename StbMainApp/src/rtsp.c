@@ -197,16 +197,16 @@ int find_streams(streams_struct **ppstream_head)
 
 	mysem_get(rtsp_semaphore);
 
-	if( appControlInfo.rtspInfo[screenMain].usePlaylistURL && appControlInfo.rtspInfo[screenMain].streamInfoUrl[0] != 0 )
+	if( appControlInfo.rtspInfo.usePlaylistURL && appControlInfo.rtspInfo.streamInfoUrl[0] != 0 )
 	{
-		eprintf("%s: trying URL '%s'\n", __FUNCTION__, appControlInfo.rtspInfo[screenMain].streamInfoUrl);
-		playlist_getFromURL( appControlInfo.rtspInfo[screenMain].streamInfoUrl, rtsp_urlHandler, (void*)&index );
+		eprintf("%s: trying URL '%s'\n", __FUNCTION__, appControlInfo.rtspInfo.streamInfoUrl);
+		playlist_getFromURL( appControlInfo.rtspInfo.streamInfoUrl, rtsp_urlHandler, (void*)&index );
 	} else
 	{
 		i = 0;
-		while (appControlInfo.rtspInfo[screenMain].streamInfoFiles[i] != NULL)
+		while (appControlInfo.rtspInfo.streamInfoFiles[i] != NULL)
 		{
-			sprintf(info_url, "http://%s/%s", appControlInfo.rtspInfo[screenMain].streamInfoIP, appControlInfo.rtspInfo[screenMain].streamInfoFiles[i]);
+			sprintf(info_url, "http://%s/%s", appControlInfo.rtspInfo.streamInfoIP, appControlInfo.rtspInfo.streamInfoFiles[i]);
 			eprintf("%s: trying IP '%s'\n", __FUNCTION__, info_url);
 			if( playlist_getFromURL( info_url, rtsp_urlHandler, (void*)&index ) == PLAYLIST_ERR_OK )
 				break;
@@ -221,12 +221,10 @@ int find_streams(streams_struct **ppstream_head)
 
 static int rtsp_timerEvent(void *pArg)
 {
-	int which = CHANNEL_INFO_GET_SCREEN(pArg);
-
 	dprintf("%s: Stop video (will wait for end of stream)\n", __FUNCTION__);
 
 	//rtsp_stopVideo(which);
-	rtsp_setStopTimer(which, 0);
+	rtsp_setStopTimer(screenMain, 0);
 
 	return 0;
 }
@@ -341,7 +339,7 @@ void rtsp_stopVideo(int which)
 	mysem_get(rtsp_semaphore);
 	dprintf("%s: got sem\n", __FUNCTION__);
 
-	if ( appControlInfo.rtspInfo[which].active != 0 )
+	if ( appControlInfo.rtspInfo.active != 0 )
 	{
 		rtsp_setStopTimer(which, -1);
 		rtsp_setStateCheckTimer(which, 0, 0);
@@ -353,7 +351,7 @@ void rtsp_stopVideo(int which)
 		dprintf("%s: Stop video screen %s\n", __FUNCTION__, which ? "Pip" : "Main");
 		eprintf("%s: Stop video screen %s\n", __FUNCTION__, which ? "Pip" : "Main");
 		gfx_stopVideoProvider(which, 1, 1);
-		appControlInfo.rtspInfo[which].active = 0;
+		appControlInfo.rtspInfo.active = 0;
 
 		rtspControl.enabled = 0;
 		rtspControl.startFromPos = 0;
@@ -496,9 +494,9 @@ static int get_rtsp_streams(streams_struct **ppstream_head)
 	{
 		int file;
 
-		dprintf("%s: open %s\n", __FUNCTION__, appControlInfo.rtspInfo[screenMain].streamFile);
+		dprintf("%s: open %s\n", __FUNCTION__, appControlInfo.rtspInfo.streamFile);
 
-		file = open(appControlInfo.rtspInfo[screenMain].streamFile, O_RDONLY);
+		file = open(appControlInfo.rtspInfo.streamFile, O_RDONLY);
 
 		if ( file > 0 )
 		{
@@ -592,7 +590,7 @@ int rtsp_startVideo(int which)
 		interface_playControlSetButtons( interface_playControlGetButtons()|interfacePlayControlFastForward|interfacePlayControlRewind );
 	}
 
-	appControlInfo.rtspInfo[which].active = 1;
+	appControlInfo.rtspInfo.active = 1;
 
 	interface_playControlSelect(interfacePlayControlStop);
 	interface_playControlSelect(interfacePlayControlPlay);
@@ -666,7 +664,7 @@ int rtsp_startNextChannel(int direction, void* pArg)
 			{
 				first = stream_ptr;
 			}
-			if ( strcmp(stream_info.ip, appControlInfo.rtspInfo[screenMain].streamIP) == 0 && strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
+			if ( strcmp(stream_info.ip, appControlInfo.rtspInfo.streamIP) == 0 && strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
 			{
 				if (direction == 0)
 				{
@@ -733,9 +731,8 @@ static int rtsp_displayStreamMenu(void* pArg)
 			sprintf(channelEntry, "%d: %s", streamNumber+1, stream_ptr->name ? stream_ptr->name : stream_ptr->stream);
 			
 			interface_addMenuEntryCustom((interfaceMenu_t*)&rtspStreamMenu, interfaceMenuEntryText, channelEntry, strlen(channelEntry)+1, 1, rtsp_stream_change, NULL, NULL, rtsp_menuEntryDisplay, CHANNEL_INFO_SET(which, streamNumber), thumbnail_vod);
-			//menuInfra_setEntry(&rtspStreamMenu, position++, menuEntryText, channelEntry, rtsp_stream_change, CHANNEL_INFO_SET(which, stream_ptr->index));
 			//dprintf("%s: Compare current %s\n", __FUNCTION__, channelEntry);
-			if ( strcmp(stream_info.ip, appControlInfo.rtspInfo[screenMain].streamIP) == 0 && strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
+			if ( strcmp(stream_info.ip, appControlInfo.rtspInfo.streamIP) == 0 && strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
 			{
 				interface_setSelectedItem((interfaceMenu_t*)&rtspStreamMenu, streamNumber);
 			}
@@ -751,10 +748,6 @@ static int rtsp_displayStreamMenu(void* pArg)
 		str = _T("NO_MOVIES");
 		interface_addMenuEntryDisabled((interfaceMenu_t*)&rtspStreamMenu, str, thumbnail_info);
 	}
-/*
-	menuInfra_setSelected(&rtspStreamMenu, selected);
-	menuInfra_display(&rtspStreamMenu);
-*/
 
 	interface_hideLoadingAnimation();
 
@@ -806,7 +799,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		rtsp_startNextChannel(0, pArg);
 	} else if ( button == interfacePlayControlSetPosition )
 	{
-		if ( !appControlInfo.rtspInfo[which].active )
+		if ( !appControlInfo.rtspInfo.active )
 		{
 			position					=	interface_playControlSliderGetPosition();
 			rtspControl.startFromPos	=	1;
@@ -844,7 +837,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		return 0;
 	} else if ( button == interfacePlayControlPlay )
 	{
-		if ( !appControlInfo.rtspInfo[which].active )
+		if ( !appControlInfo.rtspInfo.active )
 		{
 			appControlInfo.playbackInfo.scale = 1.0;
 			rtsp_startVideo(which);
@@ -861,12 +854,12 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 	} else if ( button == interfacePlayControlStop )
 	{
-		if ( appControlInfo.rtspInfo[which].active )
+		if ( appControlInfo.rtspInfo.active )
 		{
 			void *show_menu = NULL;
 			switch (appControlInfo.playbackInfo.playlistMode)
 			{
-				case playlistModeIPTV: show_menu = (void*)&rtpStreamMenu[screenMain]; break;
+				case playlistModeIPTV: show_menu = (void*)&rtpStreamMenu; break;
 				case playlistModeFavorites: show_menu = (void*)&playlistMenu; break;
 #ifdef ENABLE_DLNA
 				case playlistModeDLNA: show_menu = (void*)&BrowseServersMenu; break;
@@ -888,7 +881,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 	} else if ( button == interfacePlayControlPause )
 	{
-		if ( appControlInfo.rtspInfo[which].active )
+		if ( appControlInfo.rtspInfo.active )
 		{
 			if (gfx_videoProviderIsPaused(screenMain))
 			{
@@ -905,7 +898,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 	} else if ( button == interfacePlayControlFastForward )
 	{
-		if ( !appControlInfo.rtspInfo[which].active )
+		if ( !appControlInfo.rtspInfo.active )
 		{
 			rtsp_startVideo(which);
 			//appControlInfo.playbackInfo.scale = 2.0;
@@ -941,7 +934,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 	} else if ( button == interfacePlayControlRewind )
 	{
-		if ( !appControlInfo.rtspInfo[which].active )
+		if ( !appControlInfo.rtspInfo.active )
 		{
 			rtsp_startVideo(which);
 			//appControlInfo.playbackInfo.scale = 2.0;
@@ -996,7 +989,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		return 1;
 	}
 
-	if ( res != 0 && appControlInfo.rtspInfo[which].active )
+	if ( res != 0 && appControlInfo.rtspInfo.active )
 	{
 		void *show_menu;
 		switch (appControlInfo.playbackInfo.playlistMode)
@@ -1080,9 +1073,9 @@ static int rtsp_stream_start(void* pArg)
 
 	dprintf("%s: stream check\n", __FUNCTION__);
 
-	//printf("play: show menu %d, active %d\n", interfaceInfo.showMenu, appControlInfo.rtspInfo[which].active);
+	//printf("play: show menu %d, active %d\n", interfaceInfo.showMenu, appControlInfo.rtspInfo.active);
 
-	if ( appControlInfo.rtspInfo[which].active == 0 )
+	if ( appControlInfo.rtspInfo.active == 0 )
 	{
 
 		eprintf("%s: starting video\n", __FUNCTION__);
@@ -1093,7 +1086,7 @@ static int rtsp_stream_start(void* pArg)
 
 		eprintf("%s: started video\n", __FUNCTION__);
 
-		//if ( appControlInfo.rtspInfo[which].active != 0 )
+		//if ( appControlInfo.rtspInfo.active != 0 )
 		rtsp_setupPlayControl(pArg);
 		/*else
 		{
@@ -1112,7 +1105,7 @@ static int rtsp_stream_start(void* pArg)
 
 	eprintf("%s: done\n", __FUNCTION__);
 
-	return appControlInfo.rtspInfo[which].active != 0 ? 0 : -1;
+	return appControlInfo.rtspInfo.active != 0 ? 0 : -1;
 }
 
 static streams_struct * get_stream(unsigned int index)
@@ -1135,7 +1128,7 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_removeEvent(rtsp_stream_start, pArg);
 
-	if ( appControlInfo.rtspInfo[which].active != 0 )
+	if ( appControlInfo.rtspInfo.active != 0 )
 	{
 		/*interface_playControlDisable(1);
 		stream_info.streamname[0] = 0;*/
@@ -1181,8 +1174,8 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 
 		//dprintf("%s: stream_ptr->stream %s\n", __FUNCTION__, stream_ptr->stream);
 
-		stream_info.port = appControlInfo.rtspInfo[which].RTSPPort;
-		strcpy(stream_info.ip, appControlInfo.rtspInfo[which].streamIP);
+		stream_info.port = appControlInfo.rtspInfo.RTSPPort;
+		strcpy(stream_info.ip, appControlInfo.rtspInfo.streamIP);
 		strcpy(stream_info.streamname, stream_ptr->stream);
 		appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 		stream_info.custom_url = 0;
@@ -1428,7 +1421,7 @@ static int rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 				return 0;
 			}
 
-			sprintf(URL, "rtsp://%s:%d/%s", appControlInfo.rtspInfo[screenMain].streamIP, appControlInfo.rtspInfo[screenMain].RTSPPort, stream_ptr->stream);
+			sprintf(URL, "rtsp://%s:%d/%s", appControlInfo.rtspInfo.streamIP, appControlInfo.rtspInfo.RTSPPort, stream_ptr->stream);
 			if( cmd->command == interfaceCommandYellow )
 			{
 				eprintf("RTSP: Add to Playlist '%s'\n",URL);
@@ -1502,7 +1495,7 @@ static int rtsp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int
 					x = rect->x+interfaceInfo.paddingSize+/*INTERFACE_ARROW_SIZE +*/ pListMenu->baseMenu.thumbnailWidth/2;
 					y = rect->y+pListMenu->baseMenu.thumbnailHeight/2;
 					index = CHANNEL_INFO_GET_CHANNEL(pListMenu->baseMenu.menuEntry[i].pArg);
-					if( appControlInfo.rtspInfo[screenMain].usePlaylistURL == 0 || //pListMenu->baseMenu.menuEntry[i].thumbnail != thumbnail_multicast ||
+					if( appControlInfo.rtspInfo.usePlaylistURL == 0 || //pListMenu->baseMenu.menuEntry[i].thumbnail != thumbnail_multicast ||
 						(stream_ptr = get_stream(index)) == NULL ||
 					    stream_ptr->thumb == NULL || stream_ptr->thumb[0] == 0 ||
 					    0 != interface_drawImage(DRAWING_SURFACE, stream_ptr->thumb, x, y, pMenu->thumbnailWidth, pMenu->thumbnailHeight, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0)

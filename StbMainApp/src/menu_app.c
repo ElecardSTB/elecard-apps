@@ -135,7 +135,6 @@ static int menu_confirmShutdown(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 	{
 		gfx_stopVideoProviders(screenMain);
-		gfx_stopVideoProviders(screenPip);
 		system("poweroff");
 		//keepCommandLoopAlive = 0;
 		return 0;

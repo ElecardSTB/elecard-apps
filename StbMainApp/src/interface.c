@@ -5568,7 +5568,7 @@ static void interface_displayPlayControl()
 				rect.y = interfacePlayControl.positionY+(interfacePlayControl.visibleFlag ? 0 : interfacePlayControl.height)-interfaceInfo.paddingSize-interfaceInfo.borderWidth-rect.h*2-1;
 				rect.w = interfaceInfo.clientWidth-interfaceInfo.borderWidth*2;
 
-				if (appControlInfo.rtspInfo[screenMain].active || appControlInfo.rtspInfo[screenPip].active || (gfx_getVideoProviderCaps(screenMain) & DFBCAPS_LENGTH_IN_SEC)) // playing RTSP or BitBand
+				if (appControlInfo.rtspInfo.active || (gfx_getVideoProviderCaps(screenMain) & DFBCAPS_LENGTH_IN_SEC)) // playing RTSP or BitBand
 				{
 					sprintf(stime, "%02d:%02d:%02d", interfacePlayControl.sliderPos/3600, (interfacePlayControl.sliderPos%3600)/60, interfacePlayControl.sliderPos%60);
 					gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x, rect.y-4, stime, 0, 1);
@@ -6003,10 +6003,10 @@ void interface_playControlSetup(playControlCallback pCallback, void *pArg, inter
 
 	interfacePlayControl.enabledButtons = buttons;
 #ifdef ENABLE_PVR
-	dprintf("%s: dvb active = %d pvrActive = %d\n", __FUNCTION__,appControlInfo.dvbInfo[screenMain].active, pvr_getActive());
+	dprintf("%s: dvb active = %d pvrActive = %d\n", __FUNCTION__,appControlInfo.dvbInfo.active, pvr_getActive());
 	if ( pvr_getActive()
 #ifdef ENABLE_DVB
-		|| appControlInfo.dvbInfo[screenMain].active
+		|| appControlInfo.dvbInfo.active
 #endif
 	  )
 	{
@@ -6336,7 +6336,7 @@ void interface_playControlRefresh(int redraw)
 #ifdef ENABLE_PVR
 	if ( pvr_getActive()
 #ifdef ENABLE_DVB
-		|| appControlInfo.dvbInfo[screenMain].active
+		|| appControlInfo.dvbInfo.active
 #endif
 	  )
 	{

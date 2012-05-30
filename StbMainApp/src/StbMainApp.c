@@ -385,24 +385,24 @@ static void parse_commandLine(int argc, char *argv[])
 	{
 		if ( strcmp(argv[i], "-stream_info_url") == 0 )
 		{
-			strcpy(appControlInfo.rtspInfo[0].streamInfoIP, argv[i+1]);
+			strcpy(appControlInfo.rtspInfo.streamInfoIP, argv[i+1]);
 			i++;
 		} else if ( strcmp(argv[i], "-stream_url") == 0 )
 		{
-			strcpy(appControlInfo.rtspInfo[0].streamIP, argv[i+1]);
+			strcpy(appControlInfo.rtspInfo.streamIP, argv[i+1]);
 			i++;
 		} else if ( strcmp(argv[i], "-rtsp_port") == 0 )
 		{
-			appControlInfo.rtspInfo[0].RTSPPort = atoi(argv[i+1]);
+			appControlInfo.rtspInfo.RTSPPort = atoi(argv[i+1]);
 			i++;
 		} else if ( strcmp(argv[i], "-stream_info_file") == 0 )
 		{
 			strcpy(infoFiles[0], argv[i+1]);
-			appControlInfo.rtspInfo[0].streamInfoFiles = (char**)infoFiles;
+			appControlInfo.rtspInfo.streamInfoFiles = (char**)infoFiles;
 			i++;
 		} else if ( strcmp(argv[i], "-stream_file") == 0 )
 		{
-			strcpy(appControlInfo.rtspInfo[0].streamFile, argv[i+1]);
+			strcpy(appControlInfo.rtspInfo.streamFile, argv[i+1]);
 			i++;
 		} else if ( !strcmp(argv[i], "-i2s1") )
 		{
@@ -1351,7 +1351,7 @@ void *testServerThread(void *pArg)
 					sprintf(&obuf[strlen(obuf)], "Total %d Channels\r\n", dvb_getNumberOfServices());
 				} else if (strstr(ibuf, "dvbcurrent") == ibuf)
 				{
-					if (appControlInfo.dvbInfo[screenMain].active)
+					if (appControlInfo.dvbInfo.active)
 					{
 						int index = 0, item = 0;
 
@@ -1364,7 +1364,7 @@ void *testServerThread(void *pArg)
 							}
 							if (dvb_hasMedia(service))
 							{
-								if (service == offair_services[appControlInfo.dvbInfo[screenMain].channel].service)
+								if (service == offair_services[appControlInfo.dvbInfo.channel].service)
 								{
 									sprintf(obuf, "%d: %s%s\r\n", item, dvb_getServiceName(service), dvb_getScrambled(service) ? " (scrambled)" : "");
 									break;
@@ -1498,9 +1498,9 @@ void *keyThread(void *pArg)
 		{
 #ifdef ENABLE_DVB
 			case streamSourceDVB:
-				eprintf("App: Autostart %d DVB channel\n", appControlInfo.dvbInfo[screenMain].channel);
+				eprintf("App: Autostart %d DVB channel\n", appControlInfo.dvbInfo.channel);
 				res = offair_channelChange((interfaceMenu_t*)&interfaceMainMenu,
-					CHANNEL_INFO_SET(screenMain,appControlInfo.dvbInfo[screenMain].channel));
+					CHANNEL_INFO_SET(screenMain,appControlInfo.dvbInfo.channel));
 				break;
 #endif
 			case streamSourceIPTV:
@@ -1989,7 +1989,6 @@ void cleanup()
 	dprintf("%s: close video providers\n", __FUNCTION__);
 
 	gfx_stopVideoProviders(screenMain);
-	gfx_stopVideoProviders(screenPip);
 	media_slideshowStop(1);
 
 	/*

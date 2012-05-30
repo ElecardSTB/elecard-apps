@@ -108,7 +108,7 @@ typedef enum
 
 typedef struct
 {
-	char                     name[512];
+	char                     name[MAX_URL];
 	int                      active;
 	bool                     paused;    /* Is Instance paused? */
 	double                   savedPos;
@@ -180,17 +180,12 @@ static IDirectFBSurface *pgfx_videoSurface[screenOutputs] = {NULL, NULL};
 static IDirectFBDisplayLayer *pgfx_videoLayer[GFX_MAX_LAYERS_5L] = {NULL};
 
 /* The decoder for video. */
-static gfx_videoProviderInfo gfx_videoProvider[screenOutputs] = {
+static gfx_videoProviderInfo gfx_videoProvider =
 	{	.name = {0},
 #ifdef STBxx
 		.instance = NULL,
 #endif
-	},
-	{	.name = {0},
-#ifdef STBxx
-		.instance = NULL,
-#endif
-	}};
+	};
 
 /* Display screen */
 static IDirectFBScreen *pgfx_screen = NULL;
@@ -805,6 +800,13 @@ stb810_gfxImageEntry *gfx_findImageEntryByName( const char* filename )
 	return pEntry;
 }
 
+static void gfx_freeImageEntry(stb810_gfxImageEntry* pEntry)
+{
+	dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
+	pEntry->pImage->Release(pEntry->pImage);
+	FREE(pEntry->filename);
+}
+
 void gfx_releaseImageEntry( stb810_gfxImageEntry* pImageEntry )
 {
 	if (pImageEntry != NULL)
@@ -813,7 +815,7 @@ void gfx_releaseImageEntry( stb810_gfxImageEntry* pImageEntry )
 		//eprintf("%s: Freeing of image surface '%s' %dx%d\n", __FUNCTION__, pImageEntry->filename, pImageEntry->width, pImageEntry->height);
 		gfx_removeImageFromList(pImageEntry, &pgfx_ImageList);
 		gfx_addImageToList(pImageEntry, &pgfx_FreeList);
-		pImageEntry->pImage->Release(pImageEntry->pImage);
+		gfx_freeImageEntry(pImageEntry);
 	}
 }
 
@@ -918,7 +920,7 @@ static IDirectFBSurface * gfx_decodeImageInternal(const char* img_source, const 
 	pImageProvider->Release(pImageProvider);
 	
 	gfx_removeImageFromList (pEntry, &pgfx_FreeList);
-	strcpy (pEntry->filename, url);
+	helperSafeStrCpy (&pEntry->filename, url);
 	pEntry->width = width;
 	pEntry->height = height;
 	pEntry->stretch = stretchToSize;
@@ -1108,27 +1110,27 @@ int gfx_videoProviderIsActive(int videoLayer)
 {
 	return
 #ifdef STBxx
-		gfx_videoProvider[videoLayer].instance != NULL &&
+		gfx_videoProvider.instance != NULL &&
 #endif
-		(gfx_videoProvider[videoLayer].active || gfx_videoProvider[videoLayer].paused);
+		(gfx_videoProvider.active || gfx_videoProvider.paused);
 }
 
 int gfx_videoProviderIsPaused(int videoLayer)
 {
 	return
 #ifdef STBxx
-		gfx_videoProvider[videoLayer].instance != NULL &&
+		gfx_videoProvider.instance != NULL &&
 #endif
-		gfx_videoProvider[videoLayer].paused;
+		gfx_videoProvider.paused;
 }
 
 int gfx_videoProviderIsCreated(int videoLayer, const char *videoSource)
 {
 	return
 #ifdef STBxx
-		gfx_videoProvider[videoLayer].instance != NULL &&
+		gfx_videoProvider.instance != NULL &&
 #endif
-		strcmp(gfx_videoProvider[videoLayer].name, videoSource) == 0;
+		strcmp(gfx_videoProvider.name, videoSource) == 0;
 }
 
 int gfx_setSpeed(int videoLayer, double multiplier)
@@ -1136,14 +1138,14 @@ int gfx_setSpeed(int videoLayer, double multiplier)
 	int result = 1;
 
 #ifdef STB6x8x
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active)
+	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
 		mysem_get(gfx_semaphore);
 
-		if (gfx_videoProvider[videoLayer].instance->SetSpeed != NULL)
+		if (gfx_videoProvider.instance->SetSpeed != NULL)
 		{
-			DFBResult dfbResult = gfx_videoProvider[videoLayer].instance->SetSpeed (
-			                               gfx_videoProvider[videoLayer].instance, multiplier);
+			DFBResult dfbResult = gfx_videoProvider.instance->SetSpeed (
+			                               gfx_videoProvider.instance, multiplier);
 			result = (dfbResult == DFB_OK) ? 0 : 1;
 			if (result != 0)
 			{
@@ -1183,13 +1185,13 @@ DFBVideoProviderStatus gfx_getVideoProviderStatus (int videoLayer)
 {
 	DFBVideoProviderStatus result = DVSTATE_PLAY;
 #ifdef STBxx
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active)
+	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
 		mysem_get(gfx_semaphore);
 
-		if (gfx_videoProvider[videoLayer].instance->GetStatus != NULL)
+		if (gfx_videoProvider.instance->GetStatus != NULL)
 		{
-			DFBCHECK (gfx_videoProvider[videoLayer].instance->GetStatus(gfx_videoProvider[videoLayer].instance, &result));
+			DFBCHECK (gfx_videoProvider.instance->GetStatus(gfx_videoProvider.instance, &result));
 		}
 
 		mysem_release(gfx_semaphore);
@@ -1238,12 +1240,12 @@ void gfx_setVideoProviderPlaybackFlags (int videoLayer, DFBVideoProviderPlayback
 
 	appControlInfo.mediaInfo.vidProviderPlaybackMode = mode;
 #ifdef STBxx
-	if (gfx_videoProvider[videoLayer].instance /*&& gfx_videoProvider[videoLayer].active*/ )
+	if (gfx_videoProvider.instance /*&& gfx_videoProvider.active*/ )
 	{
 		mysem_get(gfx_semaphore);
-		if (gfx_videoProvider[videoLayer].instance->SetPlaybackFlags != NULL)
+		if (gfx_videoProvider.instance->SetPlaybackFlags != NULL)
 		{
-			DFBCHECK (gfx_videoProvider[videoLayer].instance->SetPlaybackFlags(gfx_videoProvider[videoLayer].instance, 
+			DFBCHECK (gfx_videoProvider.instance->SetPlaybackFlags(gfx_videoProvider.instance, 
 			                                                                  (DFBVideoProviderPlaybackFlags)mode));
 		}
 		mysem_release(gfx_semaphore);
@@ -1258,13 +1260,13 @@ int gfx_enableVideoProviderVerimatrix(int videoLayer, const char *inifile)
 	DFBEvent provEvent;
 	DFBResult dfbResult;
 
-	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	if (!gfx_videoProvider.instance) return 0;
 	
 	provEvent.clazz = DFEC_USER;
 	provEvent.user.type = userEventEnableVerimatrix;
 	provEvent.user.data = (void*)inifile;
 
-	dfbResult = gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent);
+	dfbResult = gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent);
 	return (dfbResult == DFB_OK) ? 0 : (-1);
 	if (dfbResult != DFB_OK)
 	{
@@ -1279,13 +1281,13 @@ int gfx_enableVideoProviderSecureMedia(int videoLayer)
 #ifdef STBPNX
 	DFBEvent provEvent;
 
-	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	if (!gfx_videoProvider.instance) return 0;
 	
 	provEvent.clazz = DFEC_USER;
 	provEvent.user.type = userEventEnableSecureMedia;
 	provEvent.user.data = NULL;
 
-	if (gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent) != DFB_OK)
+	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
 	{
 		return -1;
 	}
@@ -1299,17 +1301,17 @@ int gfx_resumeVideoProvider(int videoLayer)
 #ifdef STBxx
 	IDirectFBSurface * pSurface;
 
-	if (gfx_videoProvider[videoLayer].instance != NULL)
+	if (gfx_videoProvider.instance != NULL)
 	{
 		mysem_get(gfx_semaphore);
 	
 		pSurface = gfx_getSurface(videoLayer);
 
-		DFBCHECK(result = gfx_videoProvider[videoLayer].instance->PlayTo(gfx_videoProvider[videoLayer].instance, 
+		DFBCHECK(result = gfx_videoProvider.instance->PlayTo(gfx_videoProvider.instance, 
 		                                                                 pSurface, NULL, NULL, NULL) );
 
-		gfx_videoProvider[videoLayer].paused = 0;
-		gfx_videoProvider[videoLayer].active = 1;
+		gfx_videoProvider.paused = 0;
+		gfx_videoProvider.active = 1;
 
 		if ((appControlInfo.playbackInfo.audioStatus == audioMute) && (videoLayer == screenMain))
 		{
@@ -1329,10 +1331,10 @@ int gfx_resumeVideoProvider(int videoLayer)
 	if( timeout < appControlInfo.rtpMenuInfo.pidTimeout )
 		timeout = appControlInfo.rtpMenuInfo.pidTimeout;
 		
-	if (gfx_videoProvider[videoLayer].savedPos > 0){
-		cJSON *param = cJSON_CreateNumber((int)gfx_videoProvider[videoLayer].savedPos);
+	if (gfx_videoProvider.savedPos > 0){
+		cJSON *param = cJSON_CreateNumber((int)gfx_videoProvider.savedPos);
 		
-		eprintf("%s: elcmd_play, startPos = %d, timeout %2d play\n", __func__, timeout, (int)gfx_videoProvider[videoLayer].savedPos);
+		eprintf("%s: elcmd_play, startPos = %d, timeout %2d play\n", __func__, timeout, (int)gfx_videoProvider.savedPos);
 		ret = st_rpcSyncTimeout( elcmd_play, param, timeout, &type, &res );
 		
 		cJSON_Delete(param);
@@ -1354,8 +1356,8 @@ int gfx_resumeVideoProvider(int videoLayer)
 		result = -1;
 		goto finished;
 	}
-	gfx_videoProvider[videoLayer].active = 1;
-	gfx_videoProvider[videoLayer].paused = 0;
+	gfx_videoProvider.active = 1;
+	gfx_videoProvider.paused = 0;
 finished:
 	cJSON_Delete(res);
 #endif
@@ -1409,7 +1411,7 @@ float getHttpVideoLength (const char * videoSource)
 #ifdef STSDK
 void gfx_setStartPosition (int videoLayer, long posInSec)
 {	
-	gfx_videoProvider[videoLayer].savedPos = (double)posInSec;
+	gfx_videoProvider.savedPos = (double)posInSec;
 	return;
 }
 #endif
@@ -1417,8 +1419,8 @@ void gfx_setStartPosition (int videoLayer, long posInSec)
 int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, char* options)
 {
 	int result = 0;
-	/// assert( strlen(videoSource) < sizeof(gfx_videoProvider[videoLayer].name) );
-	dprintf("gfx: Video provider required is %s - current is %s\n", videoSource, gfx_videoProvider[videoLayer].name);
+
+	dprintf("gfx: Video provider required is %s - current is %s\n", videoSource, gfx_videoProvider.name);
 #ifdef STBxx
 	IDirectFBSurface * pSurface;
 
@@ -1429,18 +1431,18 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 #else
 	pSurface = NULL;
 #endif
-	if ( strcmp(videoSource, gfx_videoProvider[videoLayer].name) || force )
+	if ( strcmp(videoSource, gfx_videoProvider.name) || force )
 	{
 		int err;
-		if (gfx_videoProvider[videoLayer].instance)
+		if (gfx_videoProvider.instance)
 		{
 
 			eprintf("gfx: Stopping previous video provider\n");
-			gfx_videoProvider[videoLayer].instance->Stop(gfx_videoProvider[videoLayer].instance);
+			gfx_videoProvider.instance->Stop(gfx_videoProvider.instance);
 			eprintf("gfx: Releasing previous video provider\n");
-			gfx_videoProvider[videoLayer].instance->Release(gfx_videoProvider[videoLayer].instance);
-			gfx_videoProvider[videoLayer].instance = NULL;
-			gfx_videoProvider[videoLayer].paused = 0;
+			gfx_videoProvider.instance->Release(gfx_videoProvider.instance);
+			gfx_videoProvider.instance = NULL;
+			gfx_videoProvider.paused = 0;
 
 #ifdef STBPNX
 			/* Hide the video layer */
@@ -1449,41 +1451,45 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 		}
 		/* Create the video provider */
 		dprintf("gfx: Creating new video provider\n");
-		err = pgfx_dfb->CreateVideoProvider(pgfx_dfb, videoSource, &gfx_videoProvider[videoLayer].instance);
+		err = pgfx_dfb->CreateVideoProvider(pgfx_dfb, videoSource, &gfx_videoProvider.instance);
 		if ( err != DFB_OK )
 		{
 			eprintf("gfx: %s not supported by installed video providers!\n", videoSource);
 			result = -1;
 		}
-		strcpy(gfx_videoProvider[videoLayer].name, videoSource);
+		size_t source_len = strlen(videoSource);
+		if (source_len < sizeof(gfx_videoProvider.name))
+			memcpy(gfx_videoProvider.name, videoSource, source_len+1);
+		else
+			gfx_videoProvider.name[0] = 0;
 	}
 
-	if ( gfx_videoProvider[videoLayer].instance )
+	if ( gfx_videoProvider.instance )
 	{
 		dprintf("gfx: Displaying video %s on layer %d\n", videoSource, videoLayer);
 #ifdef STB6x8x
-		DFBCHECK(result = gfx_videoProvider[videoLayer].instance->PlayTo(gfx_videoProvider[videoLayer].instance, pSurface, NULL, NULL, options) );
+		DFBCHECK(result = gfx_videoProvider.instance->PlayTo(gfx_videoProvider.instance, pSurface, NULL, NULL, options) );
 
 		if (result != DFB_OK)
 		{
-			gfx_videoProvider[videoLayer].instance->Release(gfx_videoProvider[videoLayer].instance);
-			gfx_videoProvider[videoLayer].instance = NULL;
+			gfx_videoProvider.instance->Release(gfx_videoProvider.instance);
+			gfx_videoProvider.instance = NULL;
 			mysem_release(gfx_semaphore);
 			return -1;
 		}
 
 		if (result != DFB_OK)
 		{
-			gfx_videoProvider[videoLayer].instance->Release(gfx_videoProvider[videoLayer].instance);
-			gfx_videoProvider[videoLayer].instance = NULL;
-			gfx_videoProvider[videoLayer].paused = 0;
+			gfx_videoProvider.instance->Release(gfx_videoProvider.instance);
+			gfx_videoProvider.instance = NULL;
+			gfx_videoProvider.paused = 0;
 			mysem_release(gfx_semaphore);
 			return -1;
 		}
 
-		if (result == DFB_OK && appControlInfo.inStandby && gfx_videoProvider[videoLayer].savedPos!=0)  {
-			gfx_videoProvider[videoLayer].instance->SeekTo(gfx_videoProvider[videoLayer].instance, 
-			                                               gfx_videoProvider[videoLayer].savedPos);
+		if (result == DFB_OK && appControlInfo.inStandby && gfx_videoProvider.savedPos!=0)  {
+			gfx_videoProvider.instance->SeekTo(gfx_videoProvider.instance, 
+			                                               gfx_videoProvider.savedPos);
 		}
 #endif // STB6x8x
 #ifdef STB225
@@ -1492,21 +1498,21 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 		char *audio_mode;
 
 		/* Create DFB video provider event buffer No events enabled yet.*/
-		DFBCHECK(gfx_videoProvider[videoLayer].instance->CreateEventBuffer(gfx_videoProvider[videoLayer].instance,
-		&gfx_videoProvider[videoLayer].pEventBuffer));
+		DFBCHECK(gfx_videoProvider.instance->CreateEventBuffer(gfx_videoProvider.instance,
+		&gfx_videoProvider.pEventBuffer));
 
 		/* Create a separate events thread */
-		(void)pthread_create (&gfx_videoProvider[videoLayer].event_thread, NULL, gfx_eventThread, (void*) videoLayer);
+		(void)pthread_create (&gfx_videoProvider.event_thread, NULL, gfx_eventThread, (void*) videoLayer);
 		/* Enable the DATA_EXHAUSTED and DVPET_STARTED/STOPPED and DVPET_STREAMCHANGE and DVPET_FATALERROR and DATALOW/HIGH event. */
-		gfx_videoProvider[videoLayer].events = DVPET_DATAEXHAUSTED | 
+		gfx_videoProvider.events = DVPET_DATAEXHAUSTED | 
 		                                       DVPET_STARTED       | 
 		                                       DVPET_STOPPED       | 
 		                                       DVPET_STREAMCHANGE  | 
 		                                       DVPET_FATALERROR    | 
 		                                       DVPET_DATALOW       | 
 		                                       DVPET_DATAHIGH;
-		DFBCHECK(gfx_videoProvider[videoLayer].instance->EnableEvents(gfx_videoProvider[videoLayer].instance, 
-		                                                              gfx_videoProvider[videoLayer].events));
+		DFBCHECK(gfx_videoProvider.instance->EnableEvents(gfx_videoProvider.instance, 
+		                                                              gfx_videoProvider.events));
 
 		if (strstr(options, ":H264") != 0)
 		{
@@ -1533,22 +1539,22 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 		streamAttr.drm.valid = DFB_FALSE;
         eprintf("%s: video_mode %s audio_mode %s\n", __FUNCTION__, video_mode, audio_mode);
 
-		DFBCHECK( gfx_videoProvider[videoLayer].instance->SetStreamAttributes(gfx_videoProvider[videoLayer].instance, streamAttr) );
+		DFBCHECK( gfx_videoProvider.instance->SetStreamAttributes(gfx_videoProvider.instance, streamAttr) );
 
 		mysem_release(gfx_semaphore);
 		gfx_setVideoProviderPlaybackFlags(videoLayer, DVPLAY_LOOPING, (appControlInfo.mediaInfo.playbackMode == playback_looped));
 		mysem_get(gfx_semaphore);
 
-		DFBCHECK( gfx_videoProvider[videoLayer].instance->PlayTo(gfx_videoProvider[videoLayer].instance, pSurface, NULL, NULL, options) );
+		DFBCHECK( gfx_videoProvider.instance->PlayTo(gfx_videoProvider.instance, pSurface, NULL, NULL, options) );
 
-		if (appControlInfo.inStandby && gfx_videoProvider[videoLayer].savedPos!=0)  {
-			gfx_videoProvider[videoLayer].instance->SeekTo(gfx_videoProvider[videoLayer].instance, gfx_videoProvider[videoLayer].savedPos);
+		if (appControlInfo.inStandby && gfx_videoProvider.savedPos!=0)  {
+			gfx_videoProvider.instance->SeekTo(gfx_videoProvider.instance, gfx_videoProvider.savedPos);
 		}
 
-		gfx_videoProvider[videoLayer].videoPresent = false;
+		gfx_videoProvider.videoPresent = false;
 #endif // STB225
-		gfx_videoProvider[videoLayer].active = 1;
-		gfx_videoProvider[videoLayer].paused = 0;
+		gfx_videoProvider.active = 1;
+		gfx_videoProvider.paused = 0;
 #ifdef STBPNX
 		/* Show the video layer */
 		DFBCHECK( pDispLayer->SetOpacity(pDispLayer, 255));
@@ -1582,7 +1588,7 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 	int timeout  = RPC_SETSTREAM_TIMEOUT;
 	cJSON *param = NULL;
 
-	if ( strcmp(videoSource, gfx_videoProvider[videoLayer].name) || force )
+	if ( strcmp(videoSource, gfx_videoProvider.name) || force )
 	{
 		ret = st_rpcSync( elcmd_stop, NULL, &type, &res );
 		cJSON_Delete(res);
@@ -1594,17 +1600,17 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 		if( timeout < appControlInfo.rtpMenuInfo.pidTimeout )
 			timeout = appControlInfo.rtpMenuInfo.pidTimeout;
 
-		gfx_videoProvider[videoLayer].active  = 0;
-		gfx_videoProvider[videoLayer].paused  = 0;
-		gfx_videoProvider[videoLayer].name[0] = 0;
+		gfx_videoProvider.active  = 0;
+		gfx_videoProvider.paused  = 0;
+		gfx_videoProvider.name[0] = 0;
 
-		if (gfx_videoProvider[videoLayer].savedPos > 0){
+		if (gfx_videoProvider.savedPos > 0){
 			
 			eprintf("%s: elcmd_setstream, src = %s, posInSec = %d\n", __func__, 
-			    videoSource, (int)gfx_videoProvider[videoLayer].savedPos);
+			    videoSource, (int)gfx_videoProvider.savedPos);
 			cJSON *compositParam = cJSON_CreateArray();
 			cJSON_AddItemToArray (compositParam, cJSON_CreateString(videoSource) );
-			cJSON_AddItemToArray (compositParam, cJSON_CreateNumber((int)gfx_videoProvider[videoLayer].savedPos));
+			cJSON_AddItemToArray (compositParam, cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
 			
 			ret = st_rpcSyncTimeout( elcmd_setstream, compositParam, timeout, &type, &res );
 			
@@ -1624,7 +1630,11 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 				goto finished;
 			}
 
-			strcpy(gfx_videoProvider[videoLayer].name, videoSource);
+			size_t source_len = strlen(videoSource);
+			if (source_len < sizeof(gfx_videoProvider.name))
+				memcpy(gfx_videoProvider.name, videoSource, source_len+1);
+			else
+				gfx_videoProvider.name[0] = 0;
 		} else
 		{
 			result = -1;
@@ -1725,7 +1735,7 @@ void gfx_setupTrickMode(int videoLayer, stb810_trickModeDirection direction, stb
 		break;
 	}
 
-	gfx_videoProvider[videoLayer].instance->SetSpeed(gfx_videoProvider[videoLayer].instance,
+	gfx_videoProvider.instance->SetSpeed(gfx_videoProvider.instance,
 		dfbSpeed);
 }
 #endif
@@ -1735,9 +1745,9 @@ int gfx_isTrickModeSupported(int videoLayer)
 #ifdef STBxx
 	DFBVideoProviderCapabilities caps = 0;
 
-	if (gfx_videoProvider[videoLayer].instance != NULL && gfx_videoProvider[videoLayer].active != 0)
+	if (gfx_videoProvider.instance != NULL && gfx_videoProvider.active != 0)
 	{
-		DFBCHECK( gfx_videoProvider[videoLayer].instance->GetCapabilities(gfx_videoProvider[videoLayer].instance,
+		DFBCHECK( gfx_videoProvider.instance->GetCapabilities(gfx_videoProvider.instance,
 		                                                                  &caps) );
 		if ( (caps & DVCAPS_SPEED) )
 		{
@@ -1792,9 +1802,9 @@ static void *gfx_getDimensionsThread(void *pArg)
 		event_wait(gfxDimensionsEvent);
 #endif
 		mysem_get(gfx_semaphore);
-		if ( gfx_videoProvider[screenMain].instance && gfx_videoProvider[screenMain].active
+		if ( gfx_videoProvider.instance && gfx_videoProvider.active
 #ifdef STB225
-		  && gfx_videoProvider[screenMain].videoPresent
+		  && gfx_videoProvider.videoPresent
 #endif
 		   )
 		{
@@ -1825,7 +1835,7 @@ static void *gfx_getDimensionsThread(void *pArg)
 
 			//Get the dimensions of the stream			
 			DFBSurfaceDescription videoDesc;
-			DFBCHECKLABEL(gfx_videoProvider[screenMain].instance->GetSurfaceDescription(gfx_videoProvider[screenMain].instance, &videoDesc),release_semaphore);
+			DFBCHECKLABEL(gfx_videoProvider.instance->GetSurfaceDescription(gfx_videoProvider.instance, &videoDesc),release_semaphore);
 
 			if ( ((appControlInfo.outputInfo.autoScale == videoMode_scale)
 #ifdef STB225
@@ -1902,12 +1912,12 @@ static void *gfx_getDimensionsThread(void *pArg)
 							//dprintf("%s: scale!\n", __FUNCTION__);
 
 							/* Check stream information for valid aspect ratio */
-							if ((gfx_videoProvider[screenMain].streamDescription.video.aspect > 0.99) &&
-								(gfx_videoProvider[screenMain].streamDescription.video.aspect < 1.01))
+							if ((gfx_videoProvider.streamDescription.video.aspect > 0.99) &&
+								(gfx_videoProvider.streamDescription.video.aspect < 1.01))
 								/* Not a valid aspect ratio - assume 16:9 */
 								streamAspectRatio = ASPECT_RATIO_16x9;
 							else
-								streamAspectRatio = gfx_videoProvider[screenMain].streamDescription.video.aspect;
+								streamAspectRatio = gfx_videoProvider.streamDescription.video.aspect;
 
 							if (appControlInfo.outputInfo.aspectRatio == aspectRatio_4x3)
 								screenAspectRatio = ASPECT_RATIO_4x3;
@@ -2225,9 +2235,9 @@ void gfx_getVideoPlaybackSize(int *width, int *height) {
 
 	videoDesc.flags = 0;
 
-	if (gfx_videoProvider[screenMain].instance) {
+	if (gfx_videoProvider.instance) {
 		mysem_get(gfx_semaphore);
-		gfx_videoProvider[screenMain].instance->GetSurfaceDescription(gfx_videoProvider[screenMain].instance, &videoDesc);
+		gfx_videoProvider.instance->GetSurfaceDescription(gfx_videoProvider.instance, &videoDesc);
 		if ( videoDesc.flags&(DSDESC_WIDTH | DSDESC_HEIGHT) )
 		{
 			*width  = videoDesc.width;
@@ -2340,7 +2350,7 @@ static void gfx_eventThreadTerm(void* pArg)
 {
 	int32_t videoLayer = (int32_t)pArg;
 
-	gfx_videoProvider[videoLayer].eventThreadState = STOPPED;
+	gfx_videoProvider.eventThreadState = STOPPED;
 }
 */
 static void *gfx_eventThread(void *pArg)
@@ -2350,27 +2360,27 @@ static void *gfx_eventThread(void *pArg)
 	int32_t videoLayer = (int32_t)pArg;
 
 	//exStbDemo_threadRename("EventMonitor");
-	gfx_videoProvider[videoLayer].eventThreadState = RUNNING;
+	gfx_videoProvider.eventThreadState = RUNNING;
 
 	//DBG_PRINT1(MY_DBG_UNIT, DBG_LEVEL_1, "Event Thread Active Video Layer %d\n", videoLayer);
 //	pthread_cleanup_push(gfx_eventThreadTerm, pArg);
 
 	//printf("%s: in\n", __FUNCTION__);
 
-	while(gfx_videoProvider[videoLayer].eventThreadState == RUNNING)
+	while(gfx_videoProvider.eventThreadState == RUNNING)
 	{
 		//printf("%s: running\n", __FUNCTION__);
 		// Get DFB video provider events
-		ret = gfx_videoProvider[videoLayer].pEventBuffer->WaitForEventWithTimeout(gfx_videoProvider[videoLayer].pEventBuffer, 0, 100);
+		ret = gfx_videoProvider.pEventBuffer->WaitForEventWithTimeout(gfx_videoProvider.pEventBuffer, 0, 100);
 		if(ret == DFB_OK)
 		{
 			/* Check to see if a command has been received */
-			if (gfx_videoProvider[videoLayer].pEventBuffer->HasEvent(gfx_videoProvider[videoLayer].pEventBuffer) == DFB_OK)
+			if (gfx_videoProvider.pEventBuffer->HasEvent(gfx_videoProvider.pEventBuffer) == DFB_OK)
 			{
 				//printf("%s: got event\n", __FUNCTION__);
 dprintf("%s[%d]:  Has event\n",__FILE__,__LINE__);
 				/* Now get the event (remove it from queue. */
-				ret = gfx_videoProvider[videoLayer].pEventBuffer->GetEvent(gfx_videoProvider[videoLayer].pEventBuffer, &eventsInfo);
+				ret = gfx_videoProvider.pEventBuffer->GetEvent(gfx_videoProvider.pEventBuffer, &eventsInfo);
 				if(ret == DFB_OK)
 				{
 dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, eventsInfo.videoprovider.type);
@@ -2379,13 +2389,13 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 					{
 						(void)printf("gfx: Got event - DVPET_DATAEXHAUSTED from %s for VideoProvider for file: '%s'\n",
 							eventsInfo.videoprovider.data_type == DVPEDST_AUDIO ? "AUDIO":"VIDEO",
-							gfx_videoProvider[videoLayer].name);
+							gfx_videoProvider.name);
 						/* What we do when we get a DATA EXHAUSTED message depends on whether we have Audio & video or just one of them.*/
-						if (gfx_videoProvider[videoLayer].streamDescription.caps == (DVSCAPS_AUDIO | DVSCAPS_VIDEO))
+						if (gfx_videoProvider.streamDescription.caps == (DVSCAPS_AUDIO | DVSCAPS_VIDEO))
 						{
 							/* If we are the ASF or TS device we do something.*/
-							if ((!strcmp(gfx_videoProvider[videoLayer].name, OUTPUT_DEVICE_ASF)) ||
-								(!strcmp(gfx_videoProvider[videoLayer].name, DEMUX_DEVICE_TS)))
+							if ((!strcmp(gfx_videoProvider.name, OUTPUT_DEVICE_ASF)) ||
+								(!strcmp(gfx_videoProvider.name, DEMUX_DEVICE_TS)))
 							{
 								/* Is the event audio or video. */
 								if(eventsInfo.videoprovider.data_type == DVPEDST_VIDEO)
@@ -2396,7 +2406,7 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 								{
 									appControlInfo.mediaInfo.endOfAudioDataReported = true;
 								}
-								if (!gfx_videoProvider[videoLayer].paused)
+								if (!gfx_videoProvider.paused)
 								{
 									/* Set EndOfStream based on audio AND video.*/
 									appControlInfo.mediaInfo.endOfStreamReported = (appControlInfo.mediaInfo.endOfVideoDataReported &&
@@ -2406,17 +2416,17 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 							}
 						}
 						/* Only Video*/
-						else if (gfx_videoProvider[videoLayer].streamDescription.caps == (DVSCAPS_VIDEO))
+						else if (gfx_videoProvider.streamDescription.caps == (DVSCAPS_VIDEO))
 						{
 							/* Video Only ES should send DVPET_STOPPED when it has finished.  But ASF/TS files
 							will send DATA_EXHAUSTED when they have finished.*/
-							if ((!strcmp(gfx_videoProvider[videoLayer].name, OUTPUT_DEVICE_ASF)) ||
-								(!strcmp(gfx_videoProvider[videoLayer].name, DEMUX_DEVICE_TS)))
+							if ((!strcmp(gfx_videoProvider.name, OUTPUT_DEVICE_ASF)) ||
+								(!strcmp(gfx_videoProvider.name, DEMUX_DEVICE_TS)))
 							{
 								/* This stream has Video only so we only care about Video data_type events. */
 								if(eventsInfo.videoprovider.data_type == DVPEDST_VIDEO)
 								{
-									if (!gfx_videoProvider[videoLayer].paused)
+									if (!gfx_videoProvider.paused)
 									{
 										appControlInfo.mediaInfo.endOfVideoDataReported = true;
 										appControlInfo.mediaInfo.endOfStreamReported = true;
@@ -2429,13 +2439,13 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 						{
 							/* Audio Only ES should send DVPET_STOPPED when it has finished.  But ASF/TS files
 							will send DATA_EXHAUSTED when they have finished.*/
-							if ((!strcmp(gfx_videoProvider[videoLayer].name, OUTPUT_DEVICE_ASF)) ||
-								(!strcmp(gfx_videoProvider[videoLayer].name, DEMUX_DEVICE_TS)))
+							if ((!strcmp(gfx_videoProvider.name, OUTPUT_DEVICE_ASF)) ||
+								(!strcmp(gfx_videoProvider.name, DEMUX_DEVICE_TS)))
 							{
 								/* This stream has audio only so we only care about audio data_type events. */
 								if(eventsInfo.videoprovider.data_type == DVPEDST_AUDIO)
 								{
-									if (!gfx_videoProvider[videoLayer].paused)
+									if (!gfx_videoProvider.paused)
 									{
 										appControlInfo.mediaInfo.endOfAudioDataReported = true;
 										appControlInfo.mediaInfo.endOfStreamReported = true;
@@ -2445,7 +2455,7 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 							}
 						}
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_DATAEXHAUSTED++;
+						gfx_videoProvider.stats.DVPET_DATAEXHAUSTED++;
 					}
 					else
 #endif
@@ -2453,9 +2463,9 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 					{
 						(void)printf("gfx: Got event - DVPET_STARTED from %s for VideoProvider for file: '%s'\n",
 						eventsInfo.videoprovider.data_type == DVPEDST_AUDIO ? "AUDIO":"VIDEO",
-						gfx_videoProvider[videoLayer].name);
+						gfx_videoProvider.name);
 
-						if (gfx_videoProvider[videoLayer].streamDescription.caps == (DVSCAPS_AUDIO | DVSCAPS_VIDEO))
+						if (gfx_videoProvider.streamDescription.caps == (DVSCAPS_AUDIO | DVSCAPS_VIDEO))
 						{
 							/* we have both so we should stay in state buffering until we have start both.*/
 							if(eventsInfo.videoprovider.data_type == DVPEDST_VIDEO)
@@ -2490,22 +2500,22 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 							int32_t screenWidth;
 							int32_t screenHeight;
 
-							if (!gfx_videoProvider[videoLayer].paused)
+							if (!gfx_videoProvider.paused)
 							{
 								gfx_getDestinationRectangle(&screenWidth, &screenHeight);
 								
 								gfx_setSourceRectangle (gfx_getMainVideoLayer(), 
 								                       0, 0,
-								                       gfx_videoProvider[videoLayer].streamDescription.video.width,
-								                       gfx_videoProvider[videoLayer].streamDescription.video.height, 
+								                       gfx_videoProvider.streamDescription.video.width,
+								                       gfx_videoProvider.streamDescription.video.height, 
 								                       0);
 									
 								gfx_setDestinationRectangle (gfx_getMainVideoLayer(), 
 								                            0, 0, screenWidth, screenHeight, 0);
 
 								printf("%s[%d]:  %dx%d\n", __FILE__, __LINE__, 
-								       gfx_videoProvider[videoLayer].streamDescription.video.width, 
-								       gfx_videoProvider[videoLayer].streamDescription.video.height);
+								       gfx_videoProvider.streamDescription.video.width, 
+								       gfx_videoProvider.streamDescription.video.height);
 								printf("%s[%d]:  %dx%d\n", __FILE__, __LINE__, screenWidth, screenHeight);
 
 								(void)event_send(gfxDimensionsEvent);
@@ -2515,29 +2525,29 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 								pDispLayer = gfx_getLayer (videoLayer ? gfx_getPipVideoLayer() : gfx_getMainVideoLayer());
 								DFBCHECK (pDispLayer->SetOpacity(pDispLayer, 255));
 							}
-							gfx_videoProvider[videoLayer].videoPresent = true;
+							gfx_videoProvider.videoPresent = true;
 						}
-						gfx_videoProvider[videoLayer].paused = false;
+						gfx_videoProvider.paused = false;
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_STARTED++;
+						gfx_videoProvider.stats.DVPET_STARTED++;
 					}
 					else if (eventsInfo.videoprovider.type & DVPET_STOPPED)
 					{
 						(void)printf("gfx: Got event - DVPET_STOPPED from %s for VideoProvider for file: '%s'\n",
 						             eventsInfo.videoprovider.data_type == DVPEDST_AUDIO ? "AUDIO":"VIDEO",
-						             gfx_videoProvider[videoLayer].name);
+						             gfx_videoProvider.name);
 
 						/* Video-only and Audio-only ES streams send a STOPPED event when the feeding thread has exited and
 						the renderer has run out of data.*/
-						if (!gfx_videoProvider[videoLayer].paused)
+						if (!gfx_videoProvider.paused)
 						{
-							if (gfx_videoProvider[videoLayer].streamDescription.caps == (DVSCAPS_VIDEO))
+							if (gfx_videoProvider.streamDescription.caps == (DVSCAPS_VIDEO))
 							{
 								appControlInfo.mediaInfo.endOfVideoDataReported = true;
 								appControlInfo.mediaInfo.endOfStreamReported = true;
 								appControlInfo.mediaInfo.endOfStreamCountdown = 5;
 							}
-							if (gfx_videoProvider[videoLayer].streamDescription.caps == (DVSCAPS_AUDIO))
+							if (gfx_videoProvider.streamDescription.caps == (DVSCAPS_AUDIO))
 							{
 								appControlInfo.mediaInfo.endOfAudioDataReported = true;
 								appControlInfo.mediaInfo.endOfStreamReported = true;
@@ -2545,47 +2555,47 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 							}
 						}
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_STOPPED++;
+						gfx_videoProvider.stats.DVPET_STOPPED++;
 					}
 					else if (eventsInfo.videoprovider.type & DVPET_STREAMCHANGE)
 					{
 						/* Using this event means we have upto date stream information.*/
 						//DBG_PRINT0(MY_DBG_UNIT, DBG_LEVEL_1, "Stream Description has changed getting update.\n");
-						ret = gfx_videoProvider[videoLayer].instance->GetStreamDescription(gfx_videoProvider[videoLayer].instance,
-						                                                                  &gfx_videoProvider[videoLayer].streamDescription);
+						ret = gfx_videoProvider.instance->GetStreamDescription(gfx_videoProvider.instance,
+						                                                                  &gfx_videoProvider.streamDescription);
 
 						/* Print Stream Details.*/
-						(void)printf("gfx: Stream Name:               %s\n", gfx_videoProvider[videoLayer].name);
-						if ((gfx_videoProvider[videoLayer].streamDescription.caps & DVSCAPS_VIDEO) == (DVSCAPS_VIDEO))
+						(void)printf("gfx: Stream Name:               %s\n", gfx_videoProvider.name);
+						if ((gfx_videoProvider.streamDescription.caps & DVSCAPS_VIDEO) == (DVSCAPS_VIDEO))
 						{
 							(void)printf("Stream Video Type:         %s\n"
 							             "Stream width:              %d\n"
 							             "Stream height:             %d\n"
 							             "Stream Framerate:          %f\n"
 							             "Aspect Ratio:              %f\n",
-							             gfx_videoProvider[videoLayer].streamDescription.video.encoding,
-							             gfx_videoProvider[videoLayer].streamDescription.video.width,
-							             gfx_videoProvider[videoLayer].streamDescription.video.height,
-							             gfx_videoProvider[videoLayer].streamDescription.video.framerate,
-							             gfx_videoProvider[videoLayer].streamDescription.video.aspect);
+							             gfx_videoProvider.streamDescription.video.encoding,
+							             gfx_videoProvider.streamDescription.video.width,
+							             gfx_videoProvider.streamDescription.video.height,
+							             gfx_videoProvider.streamDescription.video.framerate,
+							             gfx_videoProvider.streamDescription.video.aspect);
 							             
 							/* Force the display to be re-scaled */
 							(void)event_send(gfxDimensionsEvent);
 						}
-						if ((gfx_videoProvider[videoLayer].streamDescription.caps & DVSCAPS_AUDIO) == (DVSCAPS_AUDIO))
+						if ((gfx_videoProvider.streamDescription.caps & DVSCAPS_AUDIO) == (DVSCAPS_AUDIO))
 						{
 							(void)printf("Stream Audio Type:         %s\n"
 							             "Stream Audio Bitrate:      %d\n"
 							             "Stream Audio Num Channels: %d\n"
 							             "Stream Audio Sample Rate:  %d\n",
-							              gfx_videoProvider[videoLayer].streamDescription.audio.encoding,
-							              gfx_videoProvider[videoLayer].streamDescription.audio.bitrate,
-							              gfx_videoProvider[videoLayer].streamDescription.audio.channels,
-							              gfx_videoProvider[videoLayer].streamDescription.audio.samplerate);
+							              gfx_videoProvider.streamDescription.audio.encoding,
+							              gfx_videoProvider.streamDescription.audio.bitrate,
+							              gfx_videoProvider.streamDescription.audio.channels,
+							              gfx_videoProvider.streamDescription.audio.samplerate);
 
 						}
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_STREAMCHANGE++;
+						gfx_videoProvider.stats.DVPET_STREAMCHANGE++;
 					}
 					else if (eventsInfo.videoprovider.type & DVPET_FATALERROR)
 					{
@@ -2598,17 +2608,17 @@ dprintf("%s[%d]:  eventsInfo.videoprovider.type=%d\n", __FILE__, __LINE__, event
 							(void)printf("gfx: Fatal Error in Audio Subsystem.  Suggest exiting and restarting :-).\n");
 						}
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_FATALERROR++;
+						gfx_videoProvider.stats.DVPET_FATALERROR++;
 					}
 					else if (eventsInfo.videoprovider.type & DVPET_DATALOW)
 					{
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_DATALOW++;
+						gfx_videoProvider.stats.DVPET_DATALOW++;
 					}
 					else if (eventsInfo.videoprovider.type & DVPET_DATAHIGH)
 					{
 						/* Collect stats.*/
-						gfx_videoProvider[videoLayer].stats.DVPET_DATAHIGH++;
+						gfx_videoProvider.stats.DVPET_DATAHIGH++;
 					}
 					else
 					{
@@ -2677,43 +2687,43 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 	}
 #endif
 #ifdef STBxx
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active )
+	if (gfx_videoProvider.instance && gfx_videoProvider.active )
 	{
 		mysem_get(gfx_semaphore);
 
-		eprintf("gfx: Stopping current video provider (%s)\n", gfx_videoProvider[videoLayer].name);
+		eprintf("gfx: Stopping current video provider (%s)\n", gfx_videoProvider.name);
 		dprintf("gfx: Stopping current video provider\n");
 		if (appControlInfo.inStandby)
 		{
-			gfx_videoProvider[videoLayer].instance->GetPos(gfx_videoProvider[videoLayer].instance, 
-			                                              &gfx_videoProvider[videoLayer].savedPos);
+			gfx_videoProvider.instance->GetPos(gfx_videoProvider.instance, 
+			                                              &gfx_videoProvider.savedPos);
 		}
 		else 
 		{
-			gfx_videoProvider[videoLayer].savedPos = 0;
+			gfx_videoProvider.savedPos = 0;
 		}
 		
-		gfx_videoProvider[videoLayer].instance->Stop(gfx_videoProvider[videoLayer].instance);
-		gfx_videoProvider[videoLayer].active = 0;
-		gfx_videoProvider[videoLayer].paused = 1;
+		gfx_videoProvider.instance->Stop(gfx_videoProvider.instance);
+		gfx_videoProvider.active = 0;
+		gfx_videoProvider.paused = 1;
 
 #ifdef STB225
 		/* Disable Events */
-		gfx_videoProvider[videoLayer].instance->DisableEvents(gfx_videoProvider[videoLayer].instance, DVPET_ALL);
+		gfx_videoProvider.instance->DisableEvents(gfx_videoProvider.instance, DVPET_ALL);
 
 		/* Stop the event thread.
 		 * pthread_cancel will cause a blocked read() or write() to exit.
 		 * pthread_join will wait for this to occur, ensuring synchronisation. */
-		if (gfx_videoProvider[videoLayer].eventThreadState == RUNNING)
+		if (gfx_videoProvider.eventThreadState == RUNNING)
 		{
 			//DBG_PRINT0(MY_DBG_UNIT, DBG_LEVEL_1, "Waiting for event thread to exit.\n");
 			/* Set Flag for thread to exit then join and wait...*/
-			gfx_videoProvider[videoLayer].eventThreadState = STOP_REQUESTED;
-			(void)pthread_join(gfx_videoProvider[videoLayer].event_thread, NULL);
+			gfx_videoProvider.eventThreadState = STOP_REQUESTED;
+			(void)pthread_join(gfx_videoProvider.event_thread, NULL);
 		}
 
 		/* Clear stats.*/
-		(void)memset(&gfx_videoProvider[videoLayer].stats, 0, sizeof(DFBEventBufferStats));
+		(void)memset(&gfx_videoProvider.stats, 0, sizeof(DFBEventBufferStats));
 #endif
 
 		if (videoLayer == screenMain && appControlInfo.playbackInfo.audioStatus == audioMain)
@@ -2726,14 +2736,14 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 
 	if (force)
 	{
-		if (gfx_videoProvider[videoLayer].instance)
+		if (gfx_videoProvider.instance)
 		{
 			eprintf("gfx: Releasing current video provider\n");
-			gfx_videoProvider[videoLayer].instance->Release(gfx_videoProvider[videoLayer].instance);
-			gfx_videoProvider[videoLayer].instance = NULL;
-			gfx_videoProvider[videoLayer].paused = 0;
+			gfx_videoProvider.instance->Release(gfx_videoProvider.instance);
+			gfx_videoProvider.instance = NULL;
+			gfx_videoProvider.paused = 0;
 		}
-		strcpy(gfx_videoProvider[videoLayer].name, "");
+		gfx_videoProvider.name[0] = 0;
 	}
 #endif // STBxx
 #ifdef STSDK
@@ -2746,8 +2756,8 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 	{
 		if (strcmp(res->valuestring, "ok") == 0)
 		{
-			gfx_videoProvider[videoLayer].paused = !force;
-			gfx_videoProvider[videoLayer].active = 0;
+			gfx_videoProvider.paused = !force;
+			gfx_videoProvider.active = 0;
 		} 
 		else 
 		{
@@ -2758,7 +2768,7 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 	
 	if (force == GFX_STOP)
 	{
-		strcpy(gfx_videoProvider[videoLayer].name, "");
+		gfx_videoProvider.name[0] = 0;
 	}
 #endif
 	eprintf ("gfx: Done with video provider\n");
@@ -2773,19 +2783,19 @@ void gfx_stopVideoProviders (int which)
 	}
 
 	/* Stop any exisiting rtp video display */
-	if (appControlInfo.rtpInfo[which].active)
+	if (appControlInfo.rtpInfo.active)
 	{
 		rtp_stopVideo(which);
 	}
 
 	/* Stop any exisiting rtsp video display */
-	if (appControlInfo.rtspInfo[which].active)
+	if (appControlInfo.rtspInfo.active)
 	{
 		rtsp_stopVideo(which);
 	}
 
 #ifdef ENABLE_DVB
-	if (appControlInfo.dvbInfo[which].active)
+	if (appControlInfo.dvbInfo.active)
 	{
 		/* Stop any DVB playback */
 		offair_stopVideo(which, 1);
@@ -2814,9 +2824,9 @@ double gfx_getVideoProviderPosition(int videoLayer)
 #ifdef STBxx
 	mysem_get(gfx_semaphore);
 	
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active)
+	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
-		if (gfx_videoProvider[videoLayer].instance->GetPos(gfx_videoProvider[videoLayer].instance, &position) != DFB_OK)
+		if (gfx_videoProvider.instance->GetPos(gfx_videoProvider.instance, &position) != DFB_OK)
 		{
 			/* Failed to get the current position - just return the end of the file! */
 			mysem_release(gfx_semaphore);
@@ -2848,10 +2858,10 @@ double gfx_getVideoProviderLength (int videoLayer)
 	double length = 1;
 #ifdef STBxx
 	mysem_get(gfx_semaphore);
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active)
+	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
 		double offset;
-		if (gfx_videoProvider[videoLayer].instance->GetLength(gfx_videoProvider[videoLayer].instance, &offset) == DFB_OK)
+		if (gfx_videoProvider.instance->GetLength(gfx_videoProvider.instance, &offset) == DFB_OK)
 		{
 			length = offset;
 		}
@@ -2928,11 +2938,11 @@ void gfx_setVideoProviderPosition (int videoLayer, long position)
 {
 #ifdef STBxx
 	mysem_get(gfx_semaphore);
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active)
+	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
 		dprintf("gfx: Setting video provider position: %ld seconds\n", position);
 		eprintf("gfx: Setting video provider position: %ld seconds\n", position);
-		gfx_videoProvider[videoLayer].instance->SeekTo(gfx_videoProvider[videoLayer].instance, (double)position);
+		gfx_videoProvider.instance->SeekTo(gfx_videoProvider.instance, (double)position);
 	}
 	mysem_release(gfx_semaphore);
 #endif
@@ -2960,10 +2970,10 @@ stb810_gfxStreamTypes_t gfx_getVideoProviderStreamType(int videoLayer)
 	stb810_gfxStreamTypes_t streamType = stb810_gfxStreamTypesUnknown;
 #ifdef STBxx
 	mysem_get(gfx_semaphore);
-	if (gfx_videoProvider[videoLayer].instance && gfx_videoProvider[videoLayer].active)
+	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
 		DFBStreamDescription streamDesc;
-		if (gfx_videoProvider[videoLayer].instance->GetStreamDescription(gfx_videoProvider[videoLayer].instance, &streamDesc) == DFB_OK)
+		if (gfx_videoProvider.instance->GetStreamDescription(gfx_videoProvider.instance, &streamDesc) == DFB_OK)
 		{
 			if (strcmp(streamDesc.video.encoding,"WMT") == 0)
 			{
@@ -3011,7 +3021,7 @@ DFBStreamCapabilities gfx_getVideoProviderCaps(int videoLayer)
 	if (gfx_videoProviderIsActive(videoLayer))
 	{
 		DFBStreamDescription streamDesc;
-		if (gfx_videoProvider[videoLayer].instance->GetStreamDescription(gfx_videoProvider[videoLayer].instance, &streamDesc) == DFB_OK)
+		if (gfx_videoProvider.instance->GetStreamDescription(gfx_videoProvider.instance, &streamDesc) == DFB_OK)
 		{
 			streamCaps = streamDesc.caps;
 		}
@@ -3694,10 +3704,7 @@ void gfx_init (int argc, char* argv[])
 	/* The description of the screen. */
 	DFBScreenDescription screenDesc;
 
-	for (i = 0; i < screenOutputs; i++ )
-	{
-		(void)memset(&gfx_videoProvider[i], 0, sizeof(gfx_videoProviderInfo));
-	}
+	(void)memset(&gfx_videoProvider, 0, sizeof(gfx_videoProviderInfo));
 	/* Initialise the free image list */
 	for (i = 0; i < GFX_IMAGE_TABLE_SIZE; i++)
 	{
@@ -4064,8 +4071,7 @@ void gfx_clearImageList()
 	while (pEntry)
 	{
 		stb810_gfxImageEntry* pNext;
-		dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
-		pEntry->pImage->Release(pEntry->pImage);
+		gfx_freeImageEntry(pEntry);
 		pNext = pEntry->pNext;
 		gfx_removeImageFromList(pEntry, &pgfx_ImageList);
 		gfx_addImageToList(pEntry, &pgfx_FreeList);
@@ -4095,7 +4101,7 @@ void gfx_clearImageListExcept(char ** names, int count)
 			}
 		}
 		if (!skip) {
-			pEntry->pImage->Release(pEntry->pImage);
+			gfx_freeImageEntry(pEntry);
 			pNext = pEntry->pNext;
 			gfx_removeImageFromList(pEntry, &pgfx_ImageList);
 			gfx_addImageToList(pEntry, &pgfx_FreeList);
@@ -4108,7 +4114,6 @@ void gfx_clearImageListExcept(char ** names, int count)
 void gfx_terminate(void)
 {
 	int i;
-	stb810_gfxImageEntry* pEntry;
 
 	gfx_formatChange();
 
@@ -4172,17 +4177,6 @@ void gfx_terminate(void)
 #endif
 
 	gfx_clearImageList();
-	/*pEntry = pgfx_ImageList;
-	while (pEntry)
-	{
-		stb810_gfxImageEntry* pNext;
-		dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
-		pEntry->pImage->Release(pEntry->pImage);
-		pNext = pEntry->pNext;
-		gfx_removeImageFromList(pEntry, &pgfx_ImageList);
-		gfx_addImageToList(pEntry, &pgfx_FreeList);
-		pEntry = pNext;
-	}*/
 
 	/* Release the super interface. */
 	dprintf("gfx: Releasing DirectFB Interface...\n");
@@ -4217,56 +4211,53 @@ static void gfx_formatChange ()
 		media_stopPlayback();
 	}
 	/* Stop any exisiting rtp video display */
-	if (appControlInfo.rtpInfo[screenMain].active)
+	if (appControlInfo.rtpInfo.active)
 	{
 		rtp_stopVideo(screenMain);
 	}
 	/* Stop any exisiting rtp video display */
-	if (appControlInfo.rtspInfo[screenMain].active)
+	if (appControlInfo.rtspInfo.active)
 	{
 		rtsp_stopVideo(screenMain);
 	}
 #ifdef ENABLE_DVB
 	/*Stop off_air playback*/
-	if (appControlInfo.dvbInfo[screenMain].active)
+	if (appControlInfo.dvbInfo.active)
 	{
 		/* Stop any DVB playback on Main*/
 		offair_stopVideo(screenMain, 1);
 	}
-	if (appControlInfo.dvbInfo[screenPip].active)
-	{
-		/* Stop any DVB playback on the Pip*/
-		offair_stopVideo(screenPip, 1);
-	}
 #endif
 	/*Now shutdown all DirectFB stuff*/
-	for (i = screenMain; i < screenOutputs; i++)
 	{
 #ifdef STBxx
 		/* Deal with video providers */
-		if (gfx_videoProvider[i].instance)
+		if (gfx_videoProvider.instance)
 		{
 			dprintf("gfx: Stopping/Releasing video provider %d...\n", i);
-			if (gfx_videoProvider[i].active)
+			if (gfx_videoProvider.active)
 			{
 #ifdef STBPNX
 				IDirectFBDisplayLayer* pDispLayer;
 #endif
-				gfx_videoProvider[i].instance->Stop (gfx_videoProvider[i].instance);
+				gfx_videoProvider.instance->Stop (gfx_videoProvider.instance);
 
 #ifdef STBPNX
 				/* Hide the video layer */
-				pDispLayer = gfx_getLayer (i ? gfx_getPipVideoLayer() : gfx_getMainVideoLayer());
+				pDispLayer = gfx_getLayer (gfx_getMainVideoLayer());
 				DFBCHECK( pDispLayer->SetOpacity(pDispLayer, 0));
 #endif
-				gfx_videoProvider[i].active = 0;
+				gfx_videoProvider.active = 0;
 			}
-			gfx_videoProvider[i].instance->Release (gfx_videoProvider[i].instance);
-			strcpy (gfx_videoProvider[i].name, "");
-			gfx_videoProvider[i].instance = NULL;
-			gfx_videoProvider[i].paused = 0;
+			gfx_videoProvider.instance->Release (gfx_videoProvider.instance);
+			gfx_videoProvider.name[0] = 0;
+			gfx_videoProvider.instance = NULL;
+			gfx_videoProvider.paused = 0;
 		}
 #endif // STBxx
+	}
+	for (i = 0; i < screenOutputs; i++)
+	{
 		/* Deal with surfaces */
 		if (pgfx_videoSurface[i])
 		{
@@ -4293,13 +4284,13 @@ int gfx_getVideoProviderAudioCount (int videoLayer)
 #ifdef STBPNX
 	DFBEvent provEvent;
 
-	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	if (!gfx_videoProvider.instance) return 0;
 
 	provEvent.clazz = DFEC_USER;
 	provEvent.user.type = userEventGetAudioCount;
 	provEvent.user.data = &audioCount;
 
-	if (gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent) != DFB_OK)
+	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
 	{
 		return -1;
 	}
@@ -4314,13 +4305,13 @@ int gfx_getVideoProviderAudioStream (int videoLayer)
 #ifdef STBPNX
 	DFBEvent provEvent;
 
-	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	if (!gfx_videoProvider.instance) return 0;
 
 	provEvent.clazz = DFEC_USER;
 	provEvent.user.type = userEventGetAudio;
 	provEvent.user.data = &audioStream;
 
-	if (gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent) != DFB_OK)
+	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
 	{
 		return -1;
 	}
@@ -4334,13 +4325,13 @@ int gfx_setVideoProviderAudioStream (int videoLayer, int audioStream)
 #ifdef STBPNX
 	DFBEvent provEvent;
 
-	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	if (!gfx_videoProvider.instance) return 0;
 	
 	provEvent.clazz = DFEC_USER;
 	provEvent.user.type = userEventSetAudio;
 	provEvent.user.data = &audioStream;
 
-	if (gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent) != DFB_OK)
+	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
 	{
 		return -1;
 	}
@@ -4354,13 +4345,13 @@ int gfx_setVideoProviderLive(int videoLayer)
 	DFBEvent provEvent;
 	int compatibility = httpServerCompatLiveStreaming;
 
-	if (!gfx_videoProvider[videoLayer].instance) return 0;
+	if (!gfx_videoProvider.instance) return 0;
 	
 	provEvent.clazz = DFEC_USER;
 	provEvent.user.type = userEventSetCompatibility;
 	provEvent.user.data = &compatibility;
 
-	if (gfx_videoProvider[videoLayer].instance->SendEvent(gfx_videoProvider[videoLayer].instance, &provEvent) != DFB_OK)
+	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
 	{
 		return -1;
 	}
