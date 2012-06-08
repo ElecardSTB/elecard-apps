@@ -24,11 +24,8 @@ PROGRAM = StbMainApp
 # Common variables
 # -----------------------------------------------------------------------------
 
-TEST_MODE ?= 0
-ENABLE_SCARDS ?= 0
-ENABLE_VOD ?= 0
-ENABLE_VERIMATRIX ?= 0
-ENABLE_SECUREMEDIA ?= 0
+# Platform overrides
+ifeq ($(ARCH),mips)
 ifeq ($(_TMBSL),_stb225)
 STAGINGDIR = $(BUILDROOT)/staging
 
@@ -37,30 +34,37 @@ ENABLE_XWORKS := 0
 ENABLE_DLNA := 0
 else
 ENABLE_LAN ?= 1
-ifneq ($(STAPISDK_VERSION),)
-ARCH= sh4
-CROSS_COMPILE = sh4-linux-
-CC  = $(CROSS_COMPILE)gcc
-CXX = $(CROSS_COMPILE)g++
-AR  = $(CROSS_COMPILE)ar
-
-ENABLE_WIFI ?= 1
-ENABLE_PVR ?= 0
-ENABLE_XWORKS := 0
-ENABLE_DLNA := 0
-ENABLE_VIDIMAX ?= 0
-ENABLE_HDDESIGN ?= 0
-else
 ENABLE_PVR ?= 1
 ENABLE_XWORKS ?= 1
 ENABLE_DLNA ?= 1
-ENABLE_VIDIMAX ?= 0
+endif
+endif
+
+ifneq ($(STAPISDK_VERSION),)
+ARCH= sh4
+
+ENABLE_LAN ?= 1
+ENABLE_WIFI ?= 1
+ENABLE_XWORKS := 0
+ENABLE_DLNA := 0
+ENABLE_HDDESIGN ?= 0
+else
 ENABLE_HDDESIGN := 0
 endif
-endif
+
+# Default settings
+TEST_MODE ?= 0
+ENABLE_VOD ?= 1
+ENABLE_VERIMATRIX ?= 0
+ENABLE_SECUREMEDIA ?= 0
+ENABLE_PVR ?= 0
+ENABLE_XWORKS ?= 0
+ENABLE_DLNA ?= 0
+ENABLE_VIDIMAX ?= 0
 ENABLE_EXPAT ?= 0
 ENABLE_PPP ?= 0
 ENABLE_WIFI ?= 0
+ENABLE_SCARDS ?= 0
 ENABLE_REGPLAT ?= 0
 PROVIDER_PROFILES ?= 0
 ENABLE_PASSWORD ?= 1
@@ -447,6 +451,16 @@ endif
 endif
 
 ifeq ($(ARCH),arm)
+ifneq ($(UEMD),)
+LOCAL_CFLAGS += -DSTBuemd
+
+CC  = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
+AR  = $(CROSS_COMPILE)ar
+LOCAL_LDFLAGS += --sysroot=$(STAGINGDIR)
+endif
+
+ifneq ($(STBTI),)
 COMPS_DIR=../../comps
 
 LOCAL_CFLAGS += -DNull=NULL \
@@ -454,6 +468,7 @@ LOCAL_CFLAGS += -DNull=NULL \
 	-DSTBxx \
 	-DSTBTI \
 	-I$(COMPS_DIR)/phStbDFBVideoProviderCommon/inc
+endif
 # ARCH == arm
 endif
 
@@ -469,6 +484,11 @@ LOCAL_CFLAGS  += \
 
 LOCAL_LDFLAGS += --sysroot=$(STAGINGDIR) -lelcdrpc
 DFB_VERSION = -1.4
+
+CROSS_COMPILE=sh4-linux-
+CC  = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
+AR  = $(CROSS_COMPILE)ar
 
 ifdef CONFIG_UNTAR_ROOTFS_FOR_NFS
 INSTALL_EXTRA += copy_nfs

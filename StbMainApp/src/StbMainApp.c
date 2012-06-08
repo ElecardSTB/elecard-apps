@@ -127,6 +127,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /** Temp file for text processing */
 #define INFO_TEMP_FILE "/tmp/info.txt"
 
+//#define kprintf dprintf
+#ifndef kprintf
+#define kprintf(x...)
+#endif
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -1586,7 +1591,7 @@ void *keyThread(void *pArg)
 				}
 			}
 
-			dprintf("%s: got event, age %d\n", __FUNCTION__, timediff);
+			kprintf("%s: got event, age %d\n", __FUNCTION__, timediff);
 
 			//dprintf("%s: dev_id %d\n", __FUNCTION__, event.input.device_id);
 
@@ -1628,11 +1633,11 @@ void *keyThread(void *pArg)
 				curcmd.source = event.input.device_id == DIDID_ANY ? DID_KEYBOARD : event.input.device_id;
 				//curcmd.repeat = 0;
 
-				dprintf("%s: event %d\n", __FUNCTION__, cmd);
+				kprintf("%s: event %d\n", __FUNCTION__, cmd);
 
 				timediff = (currentpress.tv_sec-lastpress.tv_sec)*1000000+(currentpress.tv_usec-lastpress.tv_usec);
 
-				dprintf("%s: timediff %d\n", __FUNCTION__, timediff);
+				kprintf("%s: timediff %d\n", __FUNCTION__, timediff);
 
 				if (cmd == lastcmd && timediff<REPEAT_TIMEOUT*2)
 				{
@@ -1680,7 +1685,7 @@ void *keyThread(void *pArg)
 				lastsym = event.input.key_symbol;
 				lastcmd = cmd;
 
-				dprintf("%s: ---> Char: %d, Command %d\n", __FUNCTION__, event.input.key_symbol, cmd);
+				kprintf("%s: ---> Char: %d, Command %d\n", __FUNCTION__, event.input.key_symbol, cmd);
 
 				interface_processCommand(&curcmd);
 			} else if ( (event.input.device_id == DID_KEYBOARD || event.input.device_id == DIDID_ANY /* 0 is keyboard */) && event.clazz == DFEC_INPUT && event.input.type == DIET_KEYRELEASE )

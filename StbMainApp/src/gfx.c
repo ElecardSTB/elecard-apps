@@ -195,7 +195,7 @@ static pmysem_t  gfx_semaphore;
 
 static pthread_mutex_t flipMutex;
 
-#ifdef STBPNX
+#ifdef STBxx
 /* Current screen display rectangles */
 static int gfx_destinationLocation[GFX_MAX_LAYERS_5L][4] = {
 	{ -1, -1, -1, -1},
@@ -228,7 +228,7 @@ static void *gfx_eventThread(void *pArg);
 
 pmysem_t  gfxDimensionsEvent;
 #endif // STB225
-#endif // STBPNX
+#endif // STBxx
 
 #ifdef STBTI
 #define NUM_ATTR_BUFFERS (2)
@@ -331,7 +331,7 @@ int gfx_getNumberLayers()
 	return ggfx_NumLayers;
 }
 
-#ifdef STBPNX
+#ifdef STBxx
 static IDirectFBSurface * gfx_getSurface(int which)
 {
 	if ( pgfx_videoSurface[which]==NULL )
@@ -3042,7 +3042,6 @@ inline int gfx_getVideoProviderHasVideo (int videoLayer)
 }
 
 #ifdef STBTI
-
 void flipAttrBuffers()
 {
 	struct fb_var_screeninfo varInfo;
@@ -4002,7 +4001,7 @@ void gfx_init (int argc, char* argv[])
 
 	dprintf("gfx: mmap successfull. %d buffers, gfx_attributeBuffer.size=%d \n", NUM_ATTR_BUFFERS , gfx_attributeBuffer.size);
 
-finish_attr_init:
+finish_attr_init:;
 #endif // STBTI
 #ifdef STSDK
 	gfx_layerMapping.fb_layerID = 0;
