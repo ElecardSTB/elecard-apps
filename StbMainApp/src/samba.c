@@ -637,8 +637,7 @@ static int samba_mountShare(const char *machine, const char *share, const char *
 #ifdef STBPNX
 		// automount config file
 		fprintf( f, "%s;-fstype=cifs,ro,username=%s,password=%s :%s\n", mountPoint, username, passwd, share_addr );
-#endif
-#ifdef STSDK
+#else
 		// manual mount command
 		fprintf( f, "%s;-t cifs -o rw,username=%s,password=%s %s\n", mountPoint, username, passwd, share_addr );
 #endif

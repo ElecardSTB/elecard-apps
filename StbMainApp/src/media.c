@@ -2401,7 +2401,7 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
 		if (isRoot)
 		{
 			FILE *f;
-#ifdef STSDK
+#ifndef STBPNX
 			char mount_cmd[PATH_MAX];
 #endif
 
@@ -2420,14 +2420,14 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
 					if( str != NULL )
 					{
 						*str++ = 0;
-#ifdef STSDK
+#ifndef STBPNX
 						unsigned char *str_end;
 						for( str_end = (unsigned char*)&str[strlen(str)-1]; str_end > (unsigned char*)str && *str_end <= ' '; *str_end--=0 );
 						snprintf(mount_cmd, sizeof(mount_cmd), "mount %s %s%s", str, sambaRoot, showPath);
 #endif
 						sprintf(str, "%s%s", sambaRoot, showPath);
 						time_t start = time(NULL);
-#ifdef STSDK
+#ifndef STBPNX
 						if( !helperCheckDirectoryExsists( str ) )
 						{
 							mkdir(str, 0777);
