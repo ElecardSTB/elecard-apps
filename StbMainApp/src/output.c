@@ -4483,13 +4483,12 @@ int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("PPP"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&PPPSubMenu, settings_network);
 #endif
 #ifdef ENABLE_LAN
+#ifndef ENABLE_WIFI
 	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceLAN));
 	if( helperCheckDirectoryExsists(temp) )
+#endif
 	{
 		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, "LAN", (menuActionFunction)menuDefaultActionShowMenu, (void*)&LANSubMenu, settings_network);
-	} else
-	{
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&NetworkSubMenu, "LAN", settings_network);
 	}
 #endif
 #ifdef ENABLE_WIFI
