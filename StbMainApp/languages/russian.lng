@@ -336,6 +336,7 @@ QUIZ=Анкета клиента
 RADIO=Радио
 RANDOM=В случайном порядке
 REALM=Realm
+RECONNECT=Переподключиться
 RECORD_DATE=Дата
 RECORD_TIME=Время записи
 RECORDED_FILTER_SETUP=Настройка фильтра файлов
