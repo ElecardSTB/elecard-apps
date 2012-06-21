@@ -372,7 +372,11 @@ typedef struct __stb810_mediaInfo
 	int                  currentFile;
 	mediaType            typeIndex; // filter used in USB menu
 	int                  maxFile;
+#ifdef STBPNX
+	int                (*fileSorting)(const void*, const void*);
+#else
 	int                (*fileSorting)(const struct dirent **, const struct dirent **);
+#endif
 #ifdef STB225
 	int32_t              endOfStreamCountdown;
 	int                  endOfFileReported;

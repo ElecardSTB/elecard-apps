@@ -155,8 +155,12 @@ int media_select_usb(const struct dirent * de);
 /* like strcmp but compare sequences of digits numerically */
 int strnaturalcmp(const char *s1, const char *s2);
 
+#ifndef STBPNX
 int naturalsort (const struct dirent **e1,
                  const struct dirent **e2);
+#else
+int naturalsort (const void *v1, const void *v2);
+#endif
 
 #ifdef __cplusplus
 }
