@@ -211,20 +211,24 @@ static int output_fillWANMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_fillPPPMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
 #endif
+
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static int output_fillLANMenu (interfaceMenu_t *pMenu, void* pArg);
 #ifdef STBPNX
 static int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg);
 #endif
 #endif
+
 #ifdef ENABLE_WIFI
+static int output_readWirelessSettings(void);
 static int output_fillWifiMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #ifdef USE_WPA_SUPPLICANT
 static int output_readWpaSupplicantConf(const char *filename);
 static int output_writeWpaSupplicantConf(const char *filename);
 #endif
-#endif
+#endif // ENABLE_WIFI
+
 #ifdef ENABLE_IPTV
 static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg);
@@ -1150,6 +1154,26 @@ static int output_toggleAuthMode(interfaceMenu_t *pMenu, void* pArg)
 
 int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 {
+#ifdef STSDK
+	char buf[MENU_ENTRY_INFO_LENGTH];
+
+	if (wifiInfo.key[0])
+	{
+		switch (wifiInfo.auth)
+		{
+			case wifiAuthOpen:
+			case wifiAuthCount:
+				break;
+			case wifiAuthWEP:
+				setParam("/var/etc/ifcfg-wlan0", "LAST_WEP", wifiInfo.key);
+				break;
+			case wifiAuthWPAPSK:
+			case wifiAuthWPA2PSK:
+				setParam("/var/etc/ifcfg-wlan0", "LAST_PSK", wifiInfo.key);
+				break;
+		}
+	}
+#endif
 	wifiInfo.auth = (outputWifiAuth_t)pArg;
 
 #ifdef STBPNX
@@ -1176,14 +1200,34 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 			return 1;
 	}
 
-	if( setParam(path, "AUTH", value) != 0 && bDisplayedWarning == 0)
+	if (setParam(path, "AUTH", value) != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 #endif
 #ifdef STSDK
-	if( output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
+	buf[0] = 0;
+	switch (wifiInfo.auth)
+	{
+		case wifiAuthOpen:
+		case wifiAuthCount:
+			break;
+		case wifiAuthWEP:
+			getParam("/var/etc/ifcfg-wlan0", "LAST_WEP", "0102030405", buf);
+			break;
+		case wifiAuthWPAPSK:
+		case wifiAuthWPA2PSK:
+			getParam("/var/etc/ifcfg-wlan0", "LAST_PSK", "0102030405", buf);
+			break;
+	}
+	if (buf[0])
+		strncpy(wifiInfo.key, buf, sizeof(wifiInfo.key));
+
+	if (wifiInfo.auth > wifiAuthOpen && wifiInfo.key[0] == 0)
+		strcpy(wifiInfo.key, "0102030405");
+
+	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -1356,7 +1400,7 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif
 #ifdef STSDK
-	if( wifiInfo.wanMode )
+	if (wifiInfo.wanMode)
 	{
 		wifiInfo.mode = wifiModeManaged;
 	} else {
@@ -1366,7 +1410,9 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 	}
 	wifiInfo.wanChanged = 1;
 
-	if( output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
+	output_readWirelessSettings();
+
+	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -1877,11 +1923,16 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 			eprintf("%s: unknown iface %d\n", __FUNCTION__, i);
 	}
 #endif // STBPNX
+
 #ifdef STSDK
 #ifdef ENABLE_WIFI
-	if( ifaceWireless == GET_NUMBER(pArg) && networkInfo.lanMode != lanBridge && wifiInfo.wanChanged == 0 )
+	if (ifaceWireless == GET_NUMBER(pArg) &&
+	    networkInfo.lanMode != lanBridge &&
+	    wifiInfo.wanChanged == 0)
 	{
 		system("ifdown wlan0");
+		system("killall -9 wpa_supplicant");
+		system("rm -rf /var/run/wpa_supplicant/wlan0");
 		system("ifup wlan0");
 	} else
 #endif
@@ -4996,21 +5047,14 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 	exists = 1; // no check
 #endif
 	interface_clearMenuEntries((interfaceMenu_t*)&WifiSubMenu);
-#ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
 
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-	getParam(path, "WAN_MODE", "0", temp);
-	wifiInfo.wanMode = strtol( temp, NULL, 10 );
-#endif
+	output_readWirelessSettings();
+
 	if (wifiInfo.wanMode || exists)
 	{
 		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN" );
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiWAN, SET_NUMBER(i), thumbnail_configure);
-#ifdef USE_WPA_SUPPLICANT
-		if (wifiInfo.wanMode)
-			output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
-#endif
+		
 	} else
 	{
 		sprintf(buf, "%s: %s", iface_name, _T("OFF") );
@@ -5019,44 +5063,21 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			WifiSubMenu.baseMenu.selectedItem = MENU_ITEM_BACK;
 	}
 
-	if( exists )
+	if (exists)
 	{
 #ifdef STBPNX
-		getParam(path, "MODE", "ad-hoc", temp);
-		if( strcmp(temp, "managed") == 0 )
-		{
-			wifiInfo.mode = wifiModeManaged;
-			str = "Managed";
-		}
-		/*else if( strcmp(temp, "master") == 0 )
-		{
-			wifiInfo.mode = wifiModeMaster;
-			str = "AP";
-		}*/
-		else
-		{
-			wifiInfo.mode = wifiModeAdHoc;
-			str = "Ad-Hoc";
-		}
-		sprintf(buf, "%s %s: %s", iface_name, _T("MODE"), str);
+		char temp[MENU_ENTRY_INFO_LENGTH];
+		char path[MAX_CONFIG_PATH];
+
+		sprintf(buf, "%s %s: %s", iface_name, _T("MODE"), wifiInfo.mode == wifiModeAdHoc ? "Ad-Hoc" : "Managed");
 		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleWifiMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
-		getParam(path, "BOOTPROTO", "static", temp);
-		if (strcmp("dhcp+dns", temp) == 0)
-		{
-			strcpy(temp, _T("ADDR_MODE_DHCP"));
-			wifiInfo.dhcp = 1;
-		} else
-		{
-			strcpy(temp, _T("ADDR_MODE_STATIC"));
-			wifiInfo.dhcp = 0;
-		}
-		sprintf(buf, "%s %s: %s", iface_name, _T("ADDR_MODE"), temp);
+		sprintf(buf, "%s %s: %s", iface_name, _T("ADDR_MODE"), wifiInfo.dhcp ? _T("ADDR_MODE_DHCP") : _T("ADDR_MODE_STATIC"));
 		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
-		if( wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0 )
+		if (wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0)
 		{
 			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
 			sprintf(buf, "%s %s: %s", iface_name, _T("IP_ADDRESS"), temp);
@@ -5077,9 +5098,6 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleDNSIP, SET_NUMBER(i), thumbnail_configure);
 			}
 		}
-		getParam(path, "ESSID", _T("NOT_AVAILABLE_SHORT"), temp);
-		strncpy(wifiInfo.essid, temp, sizeof(wifiInfo.essid));
-		wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
 #endif // STBPNX
 #ifdef STSDK
 		sprintf(buf, "%s %s", iface_name, _T("IP_ADDRESS"));
@@ -5089,36 +5107,10 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		sprintf(buf, "%s %s: %s", iface_name, _T("ESSID"), wifiInfo.essid);
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleESSID, SET_NUMBER(i), thumbnail_enterurl);
 
-#ifdef STBPNX
-		getParam(path, "CHANNEL", "1", temp);
-		wifiInfo.currentChannel = strtol( temp, NULL, 10 );
-#endif
-
-#ifdef STBPNX
-		wifiInfo.auth       = wifiAuthOpen;
-		wifiInfo.encryption = wifiEncTKIP;
-
-		getParam(path, "AUTH", "SHARED", temp);
-		if( strcasecmp( temp, "WPAPSK" ) == 0 )
-			wifiInfo.auth = wifiAuthWPAPSK;
-		else if( strcasecmp( temp, "WPA2PSK" ) == 0 )
-			wifiInfo.auth = wifiAuthWPA2PSK;
-
-		getParam(path, "ENCRYPTION", "WEP", temp);
-		if( strcasecmp( temp, "WEP" ) == 0 )
-			wifiInfo.auth = wifiAuthWEP;
-		else if ( strcasecmp( temp, "AES" ) == 0 )
-			wifiInfo.encryption = wifiEncAES;
-
-		getParam(path, "KEY", "", temp);
-		memcpy( wifiInfo.key, temp, sizeof(wifiInfo.key)-1 );
-		wifiInfo.key[sizeof(wifiInfo.key)-1] = 0;
-#endif // STBPNX
-
 		sprintf(buf, "iwlist %s channel > %s", helperEthDevice(i), INFO_TEMP_FILE);
 		system(buf);
 		FILE* f = fopen( INFO_TEMP_FILE, "r" );
-		if( f )
+		if (f)
 		{
 			char *ptr;
 			while( fgets(buf, sizeof(buf), f ) != NULL )
@@ -5159,7 +5151,7 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			fclose(f);
 		} else
 			eprintf("%s: failed to open %s\n", __FUNCTION__, INFO_TEMP_FILE);
-		if( !wifiInfo.wanMode && wifiInfo.channelCount > 0 )
+		if (!wifiInfo.wanMode && wifiInfo.channelCount > 0)
 		{
 			sprintf(buf, "%s %s: %d", iface_name, _T("CHANNEL_NUMBER"), wifiInfo.currentChannel);
 			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiChannel, SET_NUMBER(i), thumbnail_configure);
@@ -5187,21 +5179,109 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	switch( cmd->command )
+	if (cmd->command == interfaceCommandBlue)
 	{
-		case interfaceCommandBlue:
-			if( wifiInfo.wanMode )
-			{
-				interface_menuActionShowMenu( pMenu, &WirelessMenu );
-				return 0;
-			}
-			// fall through
-		default:
-			break;
+		interface_menuActionShowMenu( pMenu, &WirelessMenu );
+		return 0;
 	}
 	return 1;
 }
+
+int output_readWirelessSettings(void)
+{
+	char buf[BUFFER_SIZE];
+
+#ifdef STBPNX
+	char path[MAX_CONFIG_PATH];
+
+	wifiInfo.auth       = wifiAuthOpen;
+	wifiInfo.encryption = wifiEncTKIP;
+
+	sprintf(path, "/config/ifcfg-%s", helperEthDevice(ifaceWireless));
+	getParam(path, "WAN_MODE", "0", buf);
+	wifiInfo.wanMode = strtol( buf, NULL, 10 );
+	
+	getParam(path, "MODE", "ad-hoc", buf);
+	wifiInfo.mode = strcmp(buf, "managed") == 0 ? wifiModeManaged : wifiModeAdHoc;
+
+	getParam(path, "BOOTPROTO", "static", buf);
+	wifiInfo.dhcp = strcmp("dhcp+dns", buf) == 0;
+
+	getParam(path, "ESSID", _T("NOT_AVAILABLE_SHORT"), buf);
+	strncpy(wifiInfo.essid, buf, sizeof(wifiInfo.essid));
+	wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
+
+	getParam(path, "CHANNEL", "1", buf);
+	wifiInfo.currentChannel = strtol( buf, NULL, 10 );
+
+	getParam(path, "AUTH", "SHARED", buf);
+	if (strcasecmp( buf, "WPAPSK"  ) == 0)
+		wifiInfo.auth = wifiAuthWPAPSK;
+	else
+	if (strcasecmp( buf, "WPA2PSK" ) == 0)
+		wifiInfo.auth = wifiAuthWPA2PSK;
+
+	getParam(path, "ENCRYPTION", "WEP", buf);
+	if (strcasecmp( buf, "WEP" ) == 0)
+		wifiInfo.auth = wifiAuthWEP;
+	else
+	if (strcasecmp( buf, "AES" ) == 0)
+		wifiInfo.encryption = wifiEncAES;
+
+	getParam(path, "KEY", "", buf);
+	memcpy( wifiInfo.key, buf, sizeof(wifiInfo.key)-1 );
+	wifiInfo.key[sizeof(wifiInfo.key)-1] = 0;
+// STBPNX
+#else
+	wifiInfo.auth = wifiAuthWPA2PSK;
+	wifiInfo.encryption = wifiEncAES;
+
+#ifdef USE_WPA_SUPPLICANT
+	if (wifiInfo.wanMode)
+	{
+		output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
+	} else
 #endif
+	{
+		wifiInfo.mode = wifiModeMaster;
+		getParam( STB_HOSTAPD_CONF, "ssid", "STB830", buf);
+		strncpy( wifiInfo.essid, buf, sizeof(wifiInfo.essid) );
+		wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
+		getParam( STB_HOSTAPD_CONF, "channel", "1", buf );
+		wifiInfo.currentChannel = strtol(buf, NULL, 10);
+
+		getParam( STB_HOSTAPD_CONF, "wep_key0", "", buf );
+		if (buf[0] != 0)
+		{
+			wifiInfo.auth = wifiAuthWEP;
+		} else
+		{
+			getParam( STB_HOSTAPD_CONF, "wpa_passphrase", "", buf );
+			if (buf[0] != 0)
+				wifiInfo.auth = wifiAuthWPAPSK;
+			else
+				wifiInfo.auth = wifiAuthOpen;
+		}
+		strncpy( wifiInfo.key, buf, sizeof(wifiInfo.key) );
+		wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
+		if (wifiInfo.auth > wifiAuthWEP)
+		{
+			getParam( STB_HOSTAPD_CONF, "wpa_pairwise", "", buf );
+			if (strstr( buf, "CCMP" ))
+			{
+				wifiInfo.auth = wifiAuthWPA2PSK;
+				wifiInfo.encryption = wifiEncAES;
+			} else
+			{
+				wifiInfo.auth = wifiAuthWPAPSK;
+				wifiInfo.encryption = wifiEncTKIP;
+			}
+		}
+	}
+#endif // !STBPNX
+	return 0;
+}
+#endif // ENABLE_WIFI
 
 #if (defined ENABLE_IPTV) && (defined ENABLE_XWORKS)
 static int output_togglexWorks(interfaceMenu_t *pMenu, void* pArg)
@@ -5947,15 +6027,19 @@ int output_checkProfile(void)
 int output_readWpaSupplicantConf( const char *filename )
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
+	
+
+	getParam( filename, "ap_scan", "1", buf );
+	wifiInfo.mode = strtol(buf,NULL,10) == 2 ? wifiModeAdHoc : wifiModeManaged;
 	getParam( filename, "ssid", "\"" DEFAULT_ESSID "\"", buf );
 	strncpy( wifiInfo.essid, &buf[1], sizeof(wifiInfo.essid) );
 	wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
-	if( wifiInfo.essid[0] )
+	if (wifiInfo.essid[0])
 		wifiInfo.essid[strlen(wifiInfo.essid)-1]=0;
 	getParam( filename, "psk", "\"\"", buf );
 	strncpy( wifiInfo.key, &buf[1], sizeof(wifiInfo.key) );
 	wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
-	if( wifiInfo.key[0] )
+	if (wifiInfo.key[0])
 		wifiInfo.key[strlen(wifiInfo.key)-1]=0;
 	else
 		wifiInfo.auth = wifiAuthOpen;
@@ -6162,51 +6246,6 @@ int output_readInterfacesFile(void)
 		networkInfo.lan.mask.s_addr = 0x00ffffff;
 	if( networkInfo.lan.ip.s_addr == 0 )
 		networkInfo.lan.ip.s_addr = 0x016fa8c0; // 192.168.111.1
-
-#ifdef ENABLE_WIFI
-	wifiInfo.auth = wifiAuthWPA2PSK;
-	wifiInfo.encryption = wifiEncAES;
-
-	if (wifiInfo.wanMode)
-	{
-		output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
-	} else
-	{
-		getParam( STB_HOSTAPD_CONF, "ssid", "STB830", buf);
-		strncpy( wifiInfo.essid, buf, sizeof(wifiInfo.essid) );
-		wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
-		getParam( STB_HOSTAPD_CONF, "channel", "1", buf );
-		wifiInfo.currentChannel = strtol(buf, NULL, 10);
-
-		getParam( STB_HOSTAPD_CONF, "wep_key0", "", buf );
-		if (buf[0] != 0)
-		{
-			wifiInfo.auth = wifiAuthWEP;
-		} else
-		{
-			getParam( STB_HOSTAPD_CONF, "wpa_passphrase", "", buf );
-			if (buf[0] != 0)
-				wifiInfo.auth = wifiAuthWPAPSK;
-			else
-				wifiInfo.auth = wifiAuthOpen;
-		}
-		strncpy( wifiInfo.key, buf, sizeof(wifiInfo.key) );
-		wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
-		if (wifiInfo.auth > wifiAuthWEP)
-		{
-			getParam( STB_HOSTAPD_CONF, "wpa_pairwise", "", buf );
-			if (strstr( buf, "CCMP" ))
-			{
-				wifiInfo.auth = wifiAuthWPA2PSK;
-				wifiInfo.encryption = wifiEncAES;
-			} else
-			{
-				wifiInfo.auth = wifiAuthWPAPSK;
-				wifiInfo.encryption = wifiEncTKIP;
-			}
-		}
-	}
-#endif // ENABLE_WIFI
 	return 0;
 }
 
@@ -6375,9 +6414,9 @@ int output_writeInterfacesFile(void)
 		snprintf(ch, sizeof(ch), "%d", wifiInfo.currentChannel);
 		ch[3]=0;
 		setParam( STB_HOSTAPD_CONF, "channel", ch );
-		if( wifiInfo.auth <= wifiAuthWEP )
+		if (wifiInfo.auth <= wifiAuthWEP)
 		{
-			if( wifiInfo.auth == wifiAuthOpen )
+			if (wifiInfo.auth == wifiAuthOpen)
 				setParam( STB_HOSTAPD_CONF, "wep_key0", NULL );
 			else
 				setParam( STB_HOSTAPD_CONF, "wep_key0", wifiInfo.key );
