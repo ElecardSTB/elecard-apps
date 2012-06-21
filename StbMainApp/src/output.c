@@ -211,9 +211,11 @@ static int output_fillWANMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_fillPPPMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
 #endif
-#ifdef ENABLE_LAN
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static int output_fillLANMenu (interfaceMenu_t *pMenu, void* pArg);
+#ifdef STBPNX
 static int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg);
+#endif
 #endif
 #ifdef ENABLE_WIFI
 static int output_fillWifiMenu (interfaceMenu_t *pMenu, void* pArg);
@@ -261,7 +263,7 @@ static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #endif
-#ifdef ENABLE_LAN
+#if (defined STBPNX) && (defined ENABLE_LAN)
 static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
 #endif
@@ -315,7 +317,7 @@ static interfaceListMenu_t WANSubMenu;
 #ifdef ENABLE_PPP
 static interfaceListMenu_t PPPSubMenu;
 #endif
-#ifdef ENABLE_LAN
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static interfaceListMenu_t LANSubMenu;
 static interfaceListMenu_t GatewaySubMenu;
 #endif
@@ -347,10 +349,8 @@ static outputWifiInfo_t wifiInfo;
 static interfaceEditEntry_t TimeEntry;
 static interfaceEditEntry_t DateEntry;
 
-#ifdef ENABLE_LAN
-#ifdef STBPNX
+#if (defined ENABLE_LAN) && (defined STBPNX)
 static gatewayMode_t output_gatewayMode = gatewayModeOff;
-#endif
 #endif
 
 static int bDisplayedWarning = 0;
@@ -1591,7 +1591,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	switch( i )
 	{
 		case ifaceWAN: output_fillWANMenu(pMenu, SET_NUMBER(type)); break;
-#ifdef ENABLE_LAN
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 		case ifaceLAN: output_fillLANMenu(pMenu, SET_NUMBER(type)); break;
 #endif
 #ifdef ENABLE_WIFI
@@ -1640,6 +1640,7 @@ static int output_toggleNetmask(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef ENABLE_LAN
+#ifdef STBPNX
 char *output_BWField(int field, void* pArg)
 {
 	if( field == 0 )
@@ -1674,7 +1675,6 @@ char *output_MACField(int field, void* pArg)
 	return ptr;
 }
 
-#ifdef STBPNX
 static int output_changeBW(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ivalue;
@@ -1720,7 +1720,6 @@ static int output_toggleGatewayBW(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
-#endif // STBPNX
 
 static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
@@ -1813,6 +1812,7 @@ static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg)
 	interface_showConfirmationBox(_T("GATEWAY_MODE_CONFIRM"), thumbnail_question, output_confirmGatewayMode, pArg);
 	return 0;
 }
+#endif // STBPNX
 #endif // ENABLE_LAN
 
 static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
@@ -2340,7 +2340,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 	switch( i )
 	{
 		case ifaceWAN: output_fillWANMenu(pMenu, SET_NUMBER(i)); break;
-#ifdef ENABLE_LAN
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 		case ifaceLAN: output_fillLANMenu(pMenu, SET_NUMBER(i)); break;
 #endif
 #ifdef ENABLE_WIFI
@@ -4482,15 +4482,20 @@ int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_PPP
 	interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("PPP"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&PPPSubMenu, settings_network);
 #endif
-#ifdef ENABLE_LAN
-#ifndef ENABLE_WIFI
-	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceLAN));
-	if( helperCheckDirectoryExsists(temp) )
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+	int hasLan = helperCheckDirectoryExsists("/sys/class/net/eth1");
+#ifdef ENABLE_WIFI
+	if (!hasLan )
+	{
+		sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWireless));
+		hasLan = helperCheckDirectoryExsists(temp);
+	}
 #endif
+	if ( hasLan )
 	{
 		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, "LAN", (menuActionFunction)menuDefaultActionShowMenu, (void*)&LANSubMenu, settings_network);
 	}
-#endif
+#endif // ENABLE_LAN || ENABLE_WIFI
 #ifdef ENABLE_WIFI
 #if !(defined STB225)
 	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWireless));
@@ -4895,13 +4900,12 @@ static int output_fillPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_PPP
 
-#ifdef ENABLE_LAN
-static int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char path[MAX_CONFIG_PATH];
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char temp[MENU_ENTRY_INFO_LENGTH];
-	char *str;
 
 	const int i = ifaceLAN;
 	sprintf(path, "/sys/class/net/%s", helperEthDevice(i));
@@ -4932,6 +4936,7 @@ static int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef STBPNX
 		if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
 		{
+			char *str;
 			switch( output_gatewayMode )
 			{
 				case gatewayModeNAT:    str = _T("GATEWAY_NAT_ONLY"); break;
@@ -4949,7 +4954,11 @@ static int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 			}
 		}
 #endif
-#ifdef STSDK
+#if 0
+// TODO: There currently no plans to support ST devices with two ethernet interfaces
+//#ifdef STSDK
+	{
+		char *str;
 		switch( networkInfo.lanMode )
 		{
 			case lanBridge:     str = _T("GATEWAY_BRIDGE"); break;
@@ -4960,6 +4969,7 @@ static int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 		}
 		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), str);
 		interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_fillGatewayMenu, (void*)0, thumbnail_configure);
+	}
 #endif
 		return 0;
 	}
@@ -5415,6 +5425,7 @@ static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef ENABLE_LAN
+#ifdef STBPNX
 int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_clearMenuEntries((interfaceMenu_t*)&GatewaySubMenu);
@@ -5434,7 +5445,10 @@ int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 		                       (void*)mode,  mode == output_gatewayMode ? radiobtn_filled : radiobtn_empty);
 	}
 #endif
-#ifdef STSDK
+
+#if 0
+// TODO: There currently no plans to support ST devices with two ethernet interfaces
+//#ifdef STSDK
 	lanMode_t mode;
 	for( mode = 0; mode < lanModeCount; mode++)
 	{
@@ -5457,7 +5471,8 @@ int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
-#endif
+#endif // STBPNX
+#endif // ENABLE_LAN
 
 int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -5642,7 +5657,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&PPPSubMenu, _T("PPP"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_fillPPPMenu, output_leavePPPMenu, SET_NUMBER(ifaceWAN));
 #endif
-#ifdef ENABLE_LAN
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_fillLANMenu, NULL, SET_NUMBER(ifaceLAN));
 
