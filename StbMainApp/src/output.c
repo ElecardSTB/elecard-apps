@@ -1003,7 +1003,7 @@ int setParam(const char *path, const char *param, const char *value)
 				if (value != NULL)
 				{
 					fprintf(fdo, "%s=%s\n", param, value);
-				} else
+				} else if (!found)
 				{
 					fprintf(fdo, "#%s=\n", param);
 				}
