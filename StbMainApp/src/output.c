@@ -2718,15 +2718,24 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
+static char *get_HZprefix(tunerFormat tuner)
+{
+	if(dvb_getType(tuner) == FE_QPSK) //if dvb-s, use MHz
+		return _T("MHZ");
+	else
+		return _T("KHZ");
+}
+
 static int output_toggleDvbRange(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	int id = GET_NUMBER(pArg);
+	char *HZ_prefix = get_HZprefix(offair_getTuner());
 
 	switch (id)
 	{
-		case 0: sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"), _T("KHZ")); break;
-		case 1: sprintf(buf, "%s, %s: ", _T("DVB_HIGH_FREQ"), _T("KHZ")); break;
+		case 0: sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"), HZ_prefix); break;
+		case 1: sprintf(buf, "%s, %s: ", _T("DVB_HIGH_FREQ"), HZ_prefix); break;
 		case 2: sprintf(buf, "%s, %s: ", _T("DVB_STEP_FREQ"), _T("KHZ")); break;
 		case 3: sprintf(buf, "%s, %s: ", _T("DVB_SYMBOL_RATE"), _T("KHZ")); break;
 		default: return -1;
@@ -2741,7 +2750,12 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
-	stb810_dvbfeInfo *fe;
+	stb810_dvbfeInfo	*fe;
+	tunerFormat			tuner;
+	char				*HZ_prefix;
+
+	tuner = offair_getTuner();
+	HZ_prefix = get_HZprefix(tuner);
 
 	interface_clearMenuEntries((interfaceMenu_t*)&DVBSubMenu);
 
@@ -2749,7 +2763,7 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 		return interface_menuActionShowMenu(pMenu, (void*)&DVBSubMenu);
 
 #ifdef STSDK
-	if( offair_getTuner() < VMSP_COUNT ) {
+	if( tuner < VMSP_COUNT ) {
 #endif
 
 	sprintf(buf, PROFILE_LOCATIONS_PATH "/%s", appControlInfo.offairInfo.profileLocation);
@@ -2830,10 +2844,10 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 		interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
 	}
 
-	sprintf(buf, "%s: %ld %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, _T("KHZ"));
+	sprintf(buf, "%s: %ld %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, HZ_prefix);
 	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)0, thumbnail_configure);
 
-	sprintf(buf, "%s: %ld %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, _T("KHZ"));
+	sprintf(buf, "%s: %ld %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, HZ_prefix);
 	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)1, thumbnail_configure);
 
 #ifdef STSDK

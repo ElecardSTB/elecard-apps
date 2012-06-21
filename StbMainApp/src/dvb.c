@@ -1293,8 +1293,12 @@ int dvb_readServicesFromDump(char* filename)
 int dvb_getType(tunerFormat tuner)
 {
 #ifdef STSDK
-	if (appControlInfo.tunerInfo[tuner].status == tunerNotPresent)
-		return st_getDvbTunerType(-1 /* current tuner */);
+	if((tuner >= VMSP_COUNT) || (appControlInfo.tunerInfo[tuner].status == tunerNotPresent)) {
+//	if (appControlInfo.tunerInfo[tuner].status == tunerNotPresent) {
+		int i = st_getDvbTunerType(-1 /* current tuner */);
+//		int i = st_getDvbTunerType(tuner - VMSP_COUNT);
+		return i;
+	}
 #endif
 	return (gFE_type);
 }
