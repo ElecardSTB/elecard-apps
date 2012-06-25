@@ -92,6 +92,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PPP_CHAP_SECRETS_FILE       "/var/etc/ppp/chap-secrets"
 #define TIMEZONE_FILE               "/var/etc/localtime"
 #define NTP_CONFIG_FILE             "/var/etc/ntpd"
+#define WAN_CONFIG_FILE             "/var/etc/ifcfg-wan"
+#define LAN_CONFIG_FILE             "/var/etc/ifcfg-lan"
+#define WLAN_CONFIG_FILE            "/var/etc/ifcfg-wlan0"
 #endif
 
 #define TEMP_CONFIG_FILE            "/var/tmp/cfg.tmp"
@@ -140,31 +143,6 @@ typedef struct
 } pppInfo_t;
 #endif
 
-#ifdef ENABLE_WIFI
-
-//#define USE_WPA_SUPPLICANT
-
-#include <iwlib.h>
-
-typedef struct
-{
-	int wanMode;
-#ifdef STSDK
-	int wanChanged;
-#endif
-#ifdef STBPNX
-	int dhcp;
-#endif
-	int channelCount;
-	int currentChannel;
-	outputWifiMode_t       mode;
-	outputWifiAuth_t       auth;
-	outputWifiEncryption_t encryption;
-	char essid[IW_ESSID_MAX_SIZE];
-	char key[IW_ENCODING_TOKEN_MAX+1];
-} outputWifiInfo_t;
-#endif
-
 #ifdef STSDK
 
 #define USE_WPA_SUPPLICANT
@@ -195,6 +173,30 @@ typedef struct
 	lanMode_t         lanMode;
 } outputNetworkInfo_t;
 #endif // STSDK
+
+#ifdef ENABLE_WIFI
+
+//#define USE_WPA_SUPPLICANT
+
+#include <iwlib.h>
+
+typedef struct
+{
+	int wanMode;
+#ifdef STSDK
+	int wanChanged;
+	outputNfaceInfo_t wlan;
+#endif
+	int dhcp;
+	int channelCount;
+	int currentChannel;
+	outputWifiMode_t       mode;
+	outputWifiAuth_t       auth;
+	outputWifiEncryption_t encryption;
+	char essid[IW_ESSID_MAX_SIZE];
+	char key[IW_ENCODING_TOKEN_MAX+1];
+} outputWifiInfo_t;
+#endif
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -1000,14 +1002,17 @@ int setParam(const char *path, const char *param, const char *value)
 				(buf[0] == '#' && strncasecmp(param, &buf[1], strlen(param)) == 0))
 			{
 				//dprintf("%s: line matched param %s\n", __FUNCTION__, param);
-				if (value != NULL)
+				if (!found)
 				{
-					fprintf(fdo, "%s=%s\n", param, value);
-				} else if (!found)
-				{
-					fprintf(fdo, "#%s=\n", param);
+					if (value != NULL)
+					{
+						fprintf(fdo, "%s=%s\n", param, value);
+					} else
+					{
+						fprintf(fdo, "#%s=\n", param);
+					}
+					found = 1;
 				}
-				found = 1;
 			} else
 			{
 				fwrite(buf, strlen(buf), 1, fdo);
@@ -1165,11 +1170,11 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 			case wifiAuthCount:
 				break;
 			case wifiAuthWEP:
-				setParam("/var/etc/ifcfg-wlan0", "LAST_WEP", wifiInfo.key);
+				setParam(WLAN_CONFIG_FILE, "LAST_WEP", wifiInfo.key);
 				break;
 			case wifiAuthWPAPSK:
 			case wifiAuthWPA2PSK:
-				setParam("/var/etc/ifcfg-wlan0", "LAST_PSK", wifiInfo.key);
+				setParam(WLAN_CONFIG_FILE, "LAST_PSK", wifiInfo.key);
 				break;
 		}
 	}
@@ -1214,11 +1219,11 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 		case wifiAuthCount:
 			break;
 		case wifiAuthWEP:
-			getParam("/var/etc/ifcfg-wlan0", "LAST_WEP", "0102030405", buf);
+			getParam(WLAN_CONFIG_FILE, "LAST_WEP", "0102030405", buf);
 			break;
 		case wifiAuthWPAPSK:
 		case wifiAuthWPA2PSK:
-			getParam("/var/etc/ifcfg-wlan0", "LAST_PSK", "0102030405", buf);
+			getParam(WLAN_CONFIG_FILE, "LAST_PSK", "0102030405", buf);
 			break;
 	}
 	if (buf[0])
@@ -1270,7 +1275,7 @@ int output_changeWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif
 #ifdef STSDK
-	if( output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
+	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -1459,7 +1464,7 @@ int output_changeWifiMode(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif
 #ifdef STSDK
-	if( output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
+	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -1627,7 +1632,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 	if( i == ifaceLAN && networkInfo.lanMode == lanDhcpServer )
 		output_writeDhcpConfig();
-	if( output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
+	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
@@ -1835,6 +1840,9 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 #endif
 #endif // STBPNX
 #ifdef STSDK
+#ifdef ENABLE_PPP
+		system("/etc/init.d/S65ppp stop");
+#endif
 		system("/etc/init.d/S40network stop");
 		output_writeInterfacesFile();
 		if( networkInfo.lanMode == lanDhcpServer )
@@ -1842,6 +1850,9 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		else
 			unlink(STB_DHCPD_CONF);
 		system("/etc/init.d/S40network start");
+#ifdef ENABLE_PPP
+		system("/etc/init.d/S65ppp start");
+#endif
 #endif
 
 		output_fillGatewayMenu(pMenu, (void*)0);
@@ -1930,16 +1941,30 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 	    networkInfo.lanMode != lanBridge &&
 	    wifiInfo.wanChanged == 0)
 	{
+#ifdef ENABLE_PPP
+		if (wifiInfo.wanMode)
+			system("/etc/init.d/S65ppp stop");
+#endif
 		system("ifdown wlan0");
-		system("killall -9 wpa_supplicant");
-		system("rm -rf /var/run/wpa_supplicant/wlan0");
+		system("ifcfg config > " NETWORK_INTERFACES_FILE);
 		system("ifup wlan0");
+#ifdef ENABLE_PPP
+		if (wifiInfo.wanMode)
+			system("/etc/init.d/S65ppp start");
+#endif
 	} else
 #endif
 	{
+#ifdef ENABLE_PPP
+	system("/etc/init.d/S65ppp stop");
+#endif
 	system("/etc/init.d/S40network stop");
+	system("ifcfg config > " NETWORK_INTERFACES_FILE);
 	sleep(1);
 	system("/etc/init.d/S40network start");
+#ifdef ENABLE_PPP
+	system("/etc/init.d/S65ppp start");
+#endif
 #ifdef ENABLE_WIFI
 	wifiInfo.wanChanged = 0;
 #endif
@@ -2367,7 +2392,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 	output_changeIP(pMenu, value, OUTPUT_INFO_SET( optionMode,i));
 #endif
 #ifdef STSDK
-	switch( i )
+	switch (i)
 	{
 		case ifaceWAN:
 			networkInfo.wanDhcp = !networkInfo.wanDhcp;
@@ -2383,12 +2408,12 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 			return 0;
 	}
 
-	if( 0 != output_writeInterfacesFile() )
+	if (0 != output_writeInterfacesFile())
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 #endif
 
 
-	switch( i )
+	switch (i)
 	{
 		case ifaceWAN: output_fillWANMenu(pMenu, SET_NUMBER(i)); break;
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
@@ -4995,8 +5020,8 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 	char temp[MENU_ENTRY_INFO_LENGTH];
 
 	const int i = ifaceLAN;
-	sprintf(path, "/sys/class/net/%s", helperEthDevice(i));
-	if( helperCheckDirectoryExsists(path) )
+//	sprintf(path, "/sys/class/net/%s", helperEthDevice(i));
+//	if( helperCheckDirectoryExsists(path) )
 	{
 		interface_clearMenuEntries((interfaceMenu_t*)&LANSubMenu);
 		if( !output_isBridge() )
@@ -5021,6 +5046,7 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 		interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_toggleReset, SET_NUMBER(i), settings_renew);
 
 #ifdef STBPNX
+#ifdef ENABLE_LAN
 		if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
 		{
 			char *str;
@@ -5040,7 +5066,8 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 				interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_toggleGatewayBW, (void*)0, thumbnail_configure);
 			}
 		}
-#endif
+#endif // ENABLE_LAN
+#endif // STBPNX
 #if 0
 // TODO: There currently no plans to support ST devices with two ethernet interfaces
 //#ifdef STSDK
@@ -6109,336 +6136,142 @@ int output_writeWpaSupplicantConf( const char *filename )
 #endif //ENABLE_WIFI && USE_WPA_SUPPLICANT
 
 #ifdef STSDK
-#define MIDTOKEN " \t"
-#define ENDTOKEN " \t\r\n"
 int output_readInterfacesFile(void)
 {
-	int iface = -1; // loopback
-	char buf[BUFFER_SIZE];
-	char *ptr, *arg;
+	char buf[MENU_ENTRY_INFO_LENGTH];
 	struct in_addr addr;
-	FILE *f;
 
-	f = fopen( STB_RESOLV_CONF, "r" );
-	if( f )
-	{
-		while( fgets(buf, sizeof(buf), f) != NULL )
-		{
-			if( (ptr = strstr( buf, "nameserver " )) != NULL )
-			{
-				ptr += 11;
-				inet_aton(ptr, &networkInfo.dns);
-				break;
-			}
-		}
-		fclose(f);
-		f = NULL;
-	}
+	// WAN
+	getParam(WAN_CONFIG_FILE, "BOOTPROTO", "dhcp", buf);
+	networkInfo.wanDhcp = strcasecmp(buf, "static");
 
-	f = fopen(NETWORK_INTERFACES_FILE, "r");
-	if(!f)
-	{
-		eprintf("%s: failed to open file: %s\n", __FUNCTION__, strerror(errno));
-		return -1;
-	}
+	getParam(WAN_CONFIG_FILE, "IPADDR", "0.0.0.0", buf);
+	inet_aton(buf, &addr);
+	networkInfo.wan.ip = addr;
 
-	while( fgets(buf, sizeof(buf), f) != NULL )
-	{
-		if( buf[0] == '#' )
-		{
-			// hack so we know beforehead that we are using bridge config
-			if( strstr(buf, "bridge") != 0 )
-			{
-				eprintf("%s: using bridge mode\n", __func__);
-				networkInfo.lanMode = lanBridge;
-			}
-			continue;
-		}
-		if( strncasecmp(buf, "iface ", 6) == 0 ) // iface setting
-		{
-			ptr = strtok(&buf[6], MIDTOKEN);
-			if(!ptr)
-				continue;
-			if(strcmp(ptr, "lo") == 0)
-			{
-				iface = -1;
-				continue;
-			} else
-			if(strcmp(ptr, "eth0") == 0)
-				iface = ifaceWAN;
-			else
-			if(strcmp(ptr, "eth1") == 0)
-				iface = ifaceLAN;
-			else
-			if(strcmp(ptr,"br0") == 0)
-				iface = networkInfo.lanMode == lanBridge ? ifaceWAN : ifaceLAN;
-			else
-#ifdef ENABLE_WIFI
-			if(strcmp(ptr,"wlan0") == 0)
-				iface = ifaceWireless;
-			else
+	getParam(WAN_CONFIG_FILE, "NETMASK", "255.255.255.0", buf);
+	inet_aton(buf, &addr);
+	networkInfo.wan.mask = addr;
+
+	getParam(WAN_CONFIG_FILE, "DEFAULT_GATEWAY", "0.0.0.0", buf);
+	inet_aton(buf, &addr);
+	networkInfo.wan.gw = addr;
+
+	// LAN
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+	getParam(LAN_CONFIG_FILE, "MODE", "NAT", buf );
+	if (strcasecmp(buf, "BRIDGE") == 0)
+		networkInfo.lanMode = lanBridge;
+	else
+		networkInfo.lanMode = lanDhcpServer;
+	getParam(LAN_CONFIG_FILE, "IPADDR", "0.0.0.0", buf);
+	inet_aton(buf, &addr);
+	networkInfo.lan.ip = addr;
 #endif
-			{
-				dprintf("%s: unknown interface %s\n", __FUNCTION__, ptr);
-				continue;
-			}
-			ptr = strtok(NULL, MIDTOKEN); // "inet"
-			ptr = strtok(NULL, ENDTOKEN);
-			if(!ptr)
-			{
-				dprintf("%s: undefined mode for %s\n", __FUNCTION__, helperEthDevice(iface));
-				continue;
-			}
-			switch( iface )
-			{
-				case ifaceWAN:
-					if( strcmp(ptr, "dhcp") == 0 )
-						networkInfo.wanDhcp = 1;
-					break;
-				case ifaceLAN:
-					if( strcmp(ptr, "static") == 0 )
-					{
-						if( helperFileExists(STB_DHCPD_CONF) )
-							networkInfo.lanMode = lanDhcpServer;
-						else
-							networkInfo.lanMode = lanStatic;
-					} else if(strcmp(ptr, "dhcp") == 0)
-						networkInfo.lanMode = lanDhcpClient;
-					// else networkInfo.lanMode = lanBridge;
-					eprintf("%s: set lan mode to %d\n", __func__, networkInfo.lanMode);
-					break;
 #ifdef ENABLE_WIFI
-				case ifaceWireless:
-					if( strcmp(ptr, "manual") == 0 )
-					{
-						wifiInfo.wanMode = 0;
-						wifiInfo.mode = wifiModeMaster;
-					} else
-					{
-						wifiInfo.wanMode = 1;
-						iface = ifaceWAN;
-						networkInfo.wanDhcp = strcmp(ptr, "static");
-					}
-					break;
-#endif // ENABLE_WIFI
-				default:; // ignore
-			}
+	getParam(WLAN_CONFIG_FILE, "WAN_MODE", "0", buf);
+	wifiInfo.wanMode = atol(buf);
+	getParam(WLAN_CONFIG_FILE, "BOOTPROTO", "0", buf);
+	wifiInfo.dhcp = strcasecmp(buf, "static");
+	getParam(WLAN_CONFIG_FILE, "IPADDR", "0.0.0.0", buf);
+	inet_aton(buf, &addr);
+	wifiInfo.wlan.ip = addr;
+
+	getParam(WLAN_CONFIG_FILE, "NETMASK", "255.255.255.0", buf);
+	inet_aton(buf, &addr);
+	wifiInfo.wlan.mask = addr;
+
+	getParam(WLAN_CONFIG_FILE, "DEFAULT_GATEWAY", "0.0.0.0", buf);
+	inet_aton(buf, &addr);
+	wifiInfo.wlan.gw = addr;
+
+		wifiInfo.auth = wifiAuthWPA2PSK;
+	wifiInfo.encryption = wifiEncAES;
+
+	if (wifiInfo.wanMode)
+	{
+		output_readWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
+	} else
+	{
+		getParam( STB_HOSTAPD_CONF, "ssid", "STB830", buf);
+		strncpy( wifiInfo.essid, buf, sizeof(wifiInfo.essid) );
+		wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
+		getParam( STB_HOSTAPD_CONF, "channel", "1", buf );
+		wifiInfo.currentChannel = strtol(buf, NULL, 10);
+
+		getParam( STB_HOSTAPD_CONF, "wep_key0", "", buf );
+		if (buf[0] != 0)
+		{
+			wifiInfo.auth = wifiAuthWEP;
 		} else
-		if( buf[0] == ' ' ) // option
 		{
-			ptr = strtok(buf,  MIDTOKEN);
-			if( ptr == NULL )
-				continue;
-			arg = strtok(NULL, ENDTOKEN);
-			if( arg == NULL )
-				continue;
-			if( strcasecmp(ptr, "address") == 0 )
-			{
-				inet_aton(arg, &addr);
-				switch( iface )
-				{
-					case ifaceWAN: networkInfo.wan.ip = addr; break;
-					case ifaceLAN: networkInfo.lan.ip = addr; break;
-					default:;
-				}
-			} else
-			if( strcasecmp(ptr, "netmask") == 0 )
-			{
-				inet_aton(arg, &addr);
-				switch( iface )
-				{
-					case ifaceWAN: networkInfo.wan.mask = addr; break;
-					case ifaceLAN: networkInfo.lan.mask = addr; break;
-					default:;
-				}
-			} else
-			if( strcasecmp(ptr, "gateway") == 0 )
-			{
-				inet_aton(arg, &addr);
-				switch( iface )
-				{
-					case ifaceWAN: networkInfo.wan.gw = addr; break;
-					case ifaceLAN: networkInfo.lan.gw = addr; break;
-					default:;
-				}
-			}
-#ifdef ENABLE_WIFI
-			if( iface == ifaceWireless && networkInfo.lanMode == lanBridge &&
-			    strcmp( ptr, "pre-up" ) == 0 &&
-			    strcmp( arg, "wpa_supplicant" ) == 0 )
-			{
-				wifiInfo.wanMode = 1;
-				wifiInfo.mode = wifiModeManaged;
-			}
-#endif
+			getParam( STB_HOSTAPD_CONF, "wpa_passphrase", "", buf );
+			if (buf[0] != 0)
+				wifiInfo.auth = wifiAuthWPAPSK;
+			else
+				wifiInfo.auth = wifiAuthOpen;
 		}
-		// ignore other lines
+		strncpy( wifiInfo.key, buf, sizeof(wifiInfo.key) );
+		wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
+		if (wifiInfo.auth > wifiAuthWEP)
+		{
+			getParam( STB_HOSTAPD_CONF, "wpa_pairwise", "", buf );
+			if (strstr( buf, "CCMP" ))
+			{
+				wifiInfo.auth = wifiAuthWPA2PSK;
+				wifiInfo.encryption = wifiEncAES;
+			} else
+			{
+				wifiInfo.auth = wifiAuthWPAPSK;
+				wifiInfo.encryption = wifiEncTKIP;
+			}
+		}
 	}
-	fclose(f);
+#endif
 
-	if( networkInfo.wan.mask.s_addr == 0 )
+	if (networkInfo.wan.mask.s_addr == 0)
 		networkInfo.wan.mask.s_addr = 0x00ffffff;
-	if( networkInfo.lan.mask.s_addr == 0 )
+	if (networkInfo.lan.mask.s_addr == 0)
 		networkInfo.lan.mask.s_addr = 0x00ffffff;
-	if( networkInfo.lan.ip.s_addr == 0 )
+#ifdef ENABLE_WIFI
+	if (  wifiInfo.wlan.mask.s_addr == 0)
+		  wifiInfo.wlan.mask.s_addr = 0x00ffffff;
+#endif
+	if (networkInfo.lan.ip.s_addr == 0)
 		networkInfo.lan.ip.s_addr = 0x016fa8c0; // 192.168.111.1
 	return 0;
 }
 
 int output_writeInterfacesFile(void)
 {
-	FILE *f = fopen(NETWORK_INTERFACES_FILE, "w");
-	if(!f)
-	{
-		eprintf("%s: failed to open file: %s\n", __FUNCTION__, strerror(errno));
-		return -1;
-	}
-
-	if( networkInfo.wan.mask.s_addr == 0 )
+	setParam(WAN_CONFIG_FILE, "BOOTPROTO", networkInfo.wanDhcp ? "dhcp" : "static");
+	if (networkInfo.wan.ip.s_addr != 0)
+		setParam(WAN_CONFIG_FILE, "IPADDR", inet_ntoa(networkInfo.wan.ip));
+	if (networkInfo.wan.mask.s_addr == 0)
 		networkInfo.wan.mask.s_addr = 0x00ffffff;
-	if( networkInfo.lan.mask.s_addr == 0 )
+	setParam(WAN_CONFIG_FILE, "NETMASK", inet_ntoa(networkInfo.wan.mask));
+	if (networkInfo.wan.gw.s_addr != 0)
+		setParam(WAN_CONFIG_FILE, "DEFAULT_GATEWAY", inet_ntoa(networkInfo.wan.gw));
+
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+	setParam(LAN_CONFIG_FILE, "MODE", networkInfo.lanMode == lanBridge ? "BRIDGE" : "NAT" );
+	setParam(LAN_CONFIG_FILE, "IPADDR", inet_ntoa(networkInfo.lan.ip));
+	if (networkInfo.lan.mask.s_addr == 0)
 		networkInfo.lan.mask.s_addr = 0x00ffffff;
-
-	if( networkInfo.lanMode == lanBridge )
-	{
-		fprintf(f, "# bridge\n\n"); // we always should know beforehead that we're using WAN-LAN bridge
-	}
-
-	fprintf(f, "auto lo\n");
-	fprintf(f, "iface lo inet loopback\n\n");
-
-#ifdef ENABLE_WIFI
-	if( wifiInfo.wanMode )
-	{
-		if ( networkInfo.lanMode == lanBridge)
-			fprintf(f, "iface wlan0 inet manual\n");
-		else
-		{
-			fprintf(f, "auto wlan0\n");
-			if( networkInfo.wanDhcp )
-				fprintf(f, "iface wlan0 inet dhcp\n");
-			else
-				fprintf(f, "iface wlan0 inet static\n");
-			fprintf(f, "  address %s\n", inet_ntoa(networkInfo.wan.ip));
-			fprintf(f, "  netmask %s\n", inet_ntoa(networkInfo.wan.mask));
-			if( networkInfo.wan.gw.s_addr != 0 )
-				fprintf(f, "  gateway %s\n", inet_ntoa(networkInfo.wan.gw));
-		}
-
-		fprintf(f, "  pre-up wpa_supplicant -Dnl80211 -iwlan0 -c %s -B", STB_WPA_SUPPLICANT_CONF);
-		if ( networkInfo.lanMode == lanBridge )
-			fprintf(f, " -b br0");
-		fprintf(f, "\n");
-	} else
-	{
-		fprintf(f, "iface wlan0 inet manual\n");
-		fprintf(f, "  pre-up hostapd %s -B\n", STB_HOSTAPD_CONF);
-	}
-	fprintf(f, "  post-down kill `cat /var/run/udhcpc.wlan0.pid` 2>/dev/null || true\n");
-	fprintf(f, "  post-down killall hostapd 2>/dev/null || true\n");
-	fprintf(f, "  post-down killall wpa_supplicant 2>/dev/null || true\n");
-	fprintf(f, "  post-down rm -rf %s || true\n", STB_WPA_SUPPLICANT_CTRL_DIR);
-	fprintf(f, "  post-down ifconfig wlan0 down 0\n");
-	fprintf(f, "\n");
+	//setParam(WAN_CONFIG_FILE, "NETMASK", inet_ntoa(networkInfo.lan.mask));
 #endif
 
-	if( networkInfo.lanMode == lanBridge
 #ifdef ENABLE_WIFI
-	    || wifiInfo.wanMode
-#endif
-	)
-	{
-		fprintf(f, "iface eth0 inet manual\n");
-	} else
-	{
-		fprintf(f, "auto eth0\n");
-		fprintf(f, "iface eth0 inet %s\n", networkInfo.wanDhcp ? "dhcp" : "static");
-	}
+	setParam(WLAN_CONFIG_FILE, "WAN_MODE", wifiInfo.wanMode ? "1" : "0");
+	setParam(WAN_CONFIG_FILE, "BOOTPROTO", wifiInfo.dhcp ? "dhcp" : "static");
+	if (wifiInfo.wlan.ip.s_addr != 0)
+		setParam(WAN_CONFIG_FILE, "IPADDR", inet_ntoa(wifiInfo.wlan.ip));
+	if (wifiInfo.wlan.mask.s_addr == 0)
+		wifiInfo.wlan.mask.s_addr = 0x00ffffff;
+	setParam(WAN_CONFIG_FILE, "NETMASK", inet_ntoa(wifiInfo.wlan.mask));
+	if (wifiInfo.wlan.gw.s_addr != 0)
+		setParam(WAN_CONFIG_FILE, "DEFAULT_GATEWAY", inet_ntoa(wifiInfo.wlan.gw));
 
-#ifdef ENABLE_WIFI
-	if( wifiInfo.wanMode == 0 && networkInfo.lanMode != lanBridge )
-#endif
-	{
-	fprintf(f, "  address %s\n", inet_ntoa(networkInfo.wan.ip));
-	fprintf(f, "  netmask %s\n", inet_ntoa(networkInfo.wan.mask));
-	if( networkInfo.wan.gw.s_addr != 0 )
-		fprintf(f, "  gateway %s\n", inet_ntoa(networkInfo.wan.gw));
-	if( networkInfo.wanDhcp == 0 )
-		fprintf(f, "  broadcast +\n");
-	}
-	fprintf(f, "\n");
-
-	if( networkInfo.lanMode == lanBridge
-#ifdef ENABLE_WIFI
-		&& wifiInfo.wanMode == 0
-#endif
-	)
-	{
-		fprintf(f, "iface eth1 inet manual\n");
-		fprintf(f, "  address %s\n", inet_ntoa(networkInfo.lan.ip));
-		fprintf(f, "  netmask %s\n", inet_ntoa(networkInfo.lan.mask));
-		if( networkInfo.lan.gw.s_addr != 0 )
-			fprintf(f, "  gateway %s\n", inet_ntoa(networkInfo.lan.gw));
-		fprintf(f, "\n");
-	}
-
-	outputNfaceInfo_t *br = networkInfo.lanMode == lanBridge ? &networkInfo.wan : &networkInfo.lan;
-	fprintf(f, "auto br0\n");
-	fprintf(f, "iface br0 inet %s\n", networkInfo.lanMode == lanBridge ?
-		(networkInfo.wanDhcp ? "dhcp" : "static") :
-		(networkInfo.lanMode == lanDhcpClient ? "dhcp" : "static"));
-	if( br->ip.s_addr != 0 )
-		fprintf(f, "  address %s\n", inet_ntoa(br->ip));
-	if( br->mask.s_addr != 0 )
-		fprintf(f, "  netmask %s\n", inet_ntoa(br->mask));
-	if( br->gw.s_addr != 0 )
-		fprintf(f, "  gateway %s\n", inet_ntoa(br->gw));
-	if( networkInfo.lanMode != lanDhcpClient )
-		fprintf(f, "  broadcast +\n");
-	if( networkInfo.lanMode == lanDhcpServer || networkInfo.lanMode == lanStatic )
-	{
-		struct in_addr subnet;
-		subnet.s_addr = networkInfo.lan.ip.s_addr & 0x00ffffff;
-		const char *wan = "eth0";
-#ifdef ENABLE_WIFI
-		if( wifiInfo.wanMode )
-			wan = "wlan0";
-#endif
-		fprintf(f, "  pre-up iptables -t nat -A POSTROUTING -s %s/24 -o %s -j MASQUERADE\n", inet_ntoa(subnet), wan);
-	}
-	if( networkInfo.lanMode == lanBridge
-#ifdef ENABLE_WIFI
-		|| wifiInfo.wanMode
-#endif
-	)
-	{
-		fprintf(f, "  pre-up ifconfig eth0 up\n");
-		// adding eth0 to bridge breaks nfs
-		fprintf(f, "  pre-up cat /proc/cmdline | grep /dev/nfs >/dev/null || brctl addif br0 eth0\n");
-	}
-	if(helperCheckDirectoryExsists("/sys/class/net/eth1"))
-	{
-		fprintf(f, "  pre-up ifconfig eth1 up\n");
-		fprintf(f, "  pre-up brctl addif br0 eth1\n");
-	}
-#ifdef ENABLE_WIFI
-	if( wifiInfo.wanMode && networkInfo.lanMode == lanBridge )
-		fprintf(f, "  pre-up brctl addif br0 wlan0 || true\n");
-	fprintf(f, "  pre-up ifup %s || true\n", helperEthDevice(ifaceWireless));
-#endif
-	if(helperCheckDirectoryExsists("/sys/class/net/eth1"))
-		fprintf(f, "  post-down brctl delif br0 eth1\n");
-	// ensure WAN is leaving bridge in any mode
-	fprintf(f, "  post-down brctl delif br0 eth0 || true\n");
-#ifdef ENABLE_WIFI
-	if( wifiInfo.wanMode && networkInfo.lanMode == lanBridge )
-		fprintf(f, "  post-down brctl delif br0 wlan0 || true\n");
-	fprintf(f, "  post-down ifdown %s || true\n", helperEthDevice(ifaceWireless));
-#endif
-
-	fclose(f);
-
-#ifdef ENABLE_WIFI
 	if (wifiInfo.wanMode)
 	{
 		return output_writeWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
@@ -6450,6 +6283,12 @@ int output_writeInterfacesFile(void)
 		snprintf(ch, sizeof(ch), "%d", wifiInfo.currentChannel);
 		ch[3]=0;
 		setParam( STB_HOSTAPD_CONF, "channel", ch );
+#ifdef ENABLE_LAN
+		if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
+			setParam( STB_HOSTAPD_CONF, "bridge", "br0");
+		else
+#endif
+		setParam( STB_HOSTAPD_CONF, "bridge", NULL);
 		if (wifiInfo.auth <= wifiAuthWEP)
 		{
 			if (wifiInfo.auth == wifiAuthOpen)
