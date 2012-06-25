@@ -225,6 +225,9 @@ static int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_readWirelessSettings(void);
 static int output_fillWifiMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
+#ifdef STSDK
+static int output_setHostapdChannel(int channel);
+#endif
 #ifdef USE_WPA_SUPPLICANT
 static int output_readWpaSupplicantConf(const char *filename);
 static int output_writeWpaSupplicantConf(const char *filename);
@@ -1112,18 +1115,19 @@ static int output_changeWifiChannel(interfaceMenu_t *pMenu, char *value, void* p
 	char path[MAX_CONFIG_PATH];
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-	if( setParam(path, "CHANNEL", value) != 0 && bDisplayedWarning == 0)
+	if (setParam(path, "CHANNEL", value) != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 #endif // STBPNX
 #ifdef STSDK
-	if( setParam(STB_HOSTAPD_CONF, "channel", value) != 0 && bDisplayedWarning == 0)
+	if (output_setHostapdChannel(atol(value)) != 0 && bDisplayedWarning == 0)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
+	
 #endif // STSDK
 
 	output_fillWifiMenu(pMenu, 0);
@@ -5344,6 +5348,39 @@ int output_readWirelessSettings(void)
 #endif // !STBPNX
 	return 0;
 }
+
+#ifdef STSDK
+int output_setHostapdChannel(int channel)
+{
+	if (channel < 1 || channel > 14)
+		return -1;
+
+	int res = 0;
+	char value[MENU_ENTRY_INFO_LENGTH];
+
+	snprintf(value, sizeof(value), "%d", channel);
+	res = setParam(STB_HOSTAPD_CONF, "channel", value);
+	if (res == 0)
+	{
+		char *ht40;
+
+		getParam(STB_HOSTAPD_CONF, "ht_capab", "", value);
+		if (value[0] == 0)
+			getParam(SYSTEM_CONFIG_DIR "/defaults/hostapd.conf", "ht_capab", "", value);
+
+		ht40 = strstr(value, "[HT40");
+		if (ht40 && (ht40[5] == '-' || ht40[5] == '+'))
+		{
+			ht40[5] = channel < 8 ? '+' : '-';
+		} else
+		{
+			snprintf(value, sizeof(value), "[HT40%c][SHORT-GI-20][SHORT-GI-40]", channel < 8 ? '+' : '-');
+		}
+	}
+
+	return res;
+}
+#endif // STSDK
 #endif // ENABLE_WIFI
 
 #if (defined ENABLE_IPTV) && (defined ENABLE_XWORKS)
@@ -6278,11 +6315,8 @@ int output_writeInterfacesFile(void)
 	}
 	else
 	{
-		char ch[4];
 		setParam( STB_HOSTAPD_CONF, "ssid", wifiInfo.essid );
-		snprintf(ch, sizeof(ch), "%d", wifiInfo.currentChannel);
-		ch[3]=0;
-		setParam( STB_HOSTAPD_CONF, "channel", ch );
+		output_setHostapdChannel(wifiInfo.currentChannel);
 #ifdef ENABLE_LAN
 		if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
 			setParam( STB_HOSTAPD_CONF, "bridge", "br0");
