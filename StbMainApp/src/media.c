@@ -1035,6 +1035,13 @@ static int media_onStop()
 	return 0;
 }
 
+void media_notifyHlsReady()
+{
+	interface_hideLoading();
+	interface_displayMenu(1);
+	return;
+}
+
 int media_check_status(void *pArg)
 {
 	DFBVideoProviderStatus status;
@@ -1074,6 +1081,9 @@ int media_check_status(void *pArg)
 #endif
 			media_onStop();
 			break;
+		case DVSTATE_BUFFERING:
+			//eprintf ("%s: DVSTATE_BUFFERING\n", __FUNCTION__);
+			break;
 #ifdef STBPNX
 		case DVSTATE_STOP_REWIND:
 			appControlInfo.playbackInfo.scale = 1.0;
@@ -1086,7 +1096,6 @@ int media_check_status(void *pArg)
 			ret_val	=	gfx_getPosition(&length_stream,&position_stream);
 
 			//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
-
 			if((ret_val == 0)&&(position_stream < length_stream))
 			{
 				interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
@@ -1727,7 +1736,14 @@ int media_startPlayback()
 		interface_disableBackground();
 		interface_showMenu(0, 0);
 		interface_hideLoadingAnimation();
+
+#ifdef STBxx
+		if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL){
+			interface_hideLoading();
+		}
+#else
 		interface_hideLoading();
+#endif
 
 		media_failedMedia[0] = 0;
 //SergA: wait some time for starting video provider
@@ -1790,12 +1806,19 @@ int media_startPlayback()
 		ret_val	=	gfx_getPosition(&length_stream,&position_stream);
 		if(ret_val == 0)
 		{
-			//dprintf("%s: start from pos %f\n", __FUNCTION__, position_stream);
+#ifdef STBxx
+			if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL){
+				interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
+			}
+#else
 			interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);	
+#endif
+			//dprintf("%s: start from pos %f\n", __FUNCTION__, position_stream);
+			//interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);	
 #ifndef STSDK			
 			// for HLS only
 #ifdef ENABLE_VIDIMAX	
-			if (!appControlInfo.vidimaxInfo.active)					
+			if (!appControlInfo.vidimaxInfo.active)
 #endif	
 				if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") != NULL){
 					eprintf ("%s: .m3u8 started! setting position = %d...\n", __FUNCTION__, position_stream);
@@ -1804,11 +1827,18 @@ int media_startPlayback()
 #endif // STSDK
 		}else
 		{
-			interface_playControlSlider(0, 0, 0);			
+#ifdef STBxx
+			if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL){
+				interface_playControlSlider(0, 0, 0);
+			}
+#else
+			interface_playControlSlider(0, 0, 0);
+#endif
+			//interface_playControlSlider(0, 0, 0);
 #ifndef STSDK
 			// for HLS only
 #ifdef ENABLE_VIDIMAX	
-			if (!appControlInfo.vidimaxInfo.active)					
+			if (!appControlInfo.vidimaxInfo.active)
 #endif	
 			if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") != NULL){
 				eprintf ("%s: .m3u8 started! setting position = 0...\n", __FUNCTION__);
@@ -2585,7 +2615,6 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif // ENABLE_SAMBA
 	interface_setMenuLogo((interfaceMenu_t*)&BrowseFilesMenu, file_icon, -1, 0, 0, 0);
 	interface_setSelectedItem((interfaceMenu_t *)&BrowseFilesMenu, selectedItem);
-
 	interface_hideLoading();
 
 	return 0;

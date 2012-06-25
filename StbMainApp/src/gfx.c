@@ -1774,6 +1774,7 @@ static void *gfx_getDimensionsThread(void *pArg)
 	static int currentWidth = 0;
 	static int currentHeight = 0;
 #endif
+	unsigned char notifyHls = 0;
 
 	pthread_cleanup_push(gfx_ThreadTerm, pArg);
 
@@ -1961,6 +1962,7 @@ static void *gfx_getDimensionsThread(void *pArg)
 #ifdef ENABLE_VIDIMAX
 				notifyVidimax = 1;
 #endif
+				notifyHls ++;
 				currentWidth = width;
 				currentHeight = height;
 			}
@@ -2041,13 +2043,19 @@ static void *gfx_getDimensionsThread(void *pArg)
 		}
 		release_semaphore:
 		mysem_release(gfx_semaphore);
-		
-#ifdef ENABLE_VIDIMAX	
+
+		if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") && (notifyHls == 2))
+		{
+			media_notifyHlsReady();
+			notifyHls = 0;
+		}
+
+#ifdef ENABLE_VIDIMAX
 		if (notifyVidimax && appControlInfo.vidimaxInfo.active)
 		{	
 			vidimax_notifyVideoSize(new_x, new_y, width, height);
 		}
-#endif					
+#endif
 	};
 
 	pthread_cleanup_pop(1);
