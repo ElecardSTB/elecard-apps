@@ -115,6 +115,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /** Timeout in microseconds after which events are considered outdated and ignored */
 #define OUTDATE_TIMEOUT  (50000)
 
+/** Timeout in minutes, during which the user will be warned of broadcasting playback stop */
+#define AUTOSTOP_WARNING_TIMEOUT  (5)
+
 #define ADD_HANDLER(key, command) case key: cmd = command; dprintf("%s: Got command: %s\n", __FUNCTION__, #command); break;
 #define ADD_FP_HANDLER(key, command) case key: cmd = command; event->input.device_id = DID_FRONTPANEL; dprintf("%s: Got command (FP): %s\n", __FUNCTION__, #command); break;
 #define ADD_FALLTHROUGH(key) case key:
@@ -1475,6 +1478,18 @@ void *testServerThread(void *pArg)
 }
 #endif // #ifdef ENABLE_TEST_SERVER
 
+static int getActiveMedia(){
+
+	if (appControlInfo.rtpInfo.active != 0)
+		return mediaProtoRTP;
+	if (appControlInfo.rtspInfo.active != 0)
+		return mediaProtoRTSP;
+	if (appControlInfo.mediaInfo.active != 0 && appControlInfo.mediaInfo.bHttp != 0)
+		return mediaProtoHTTP;
+
+	return -1;
+}
+
 void *keyThread(void *pArg)
 {
 	IDirectFBEventBuffer *eventBuffer = (IDirectFBEventBuffer*)pArg;
@@ -1572,7 +1587,37 @@ void *keyThread(void *pArg)
 		result = eventBuffer->HasEvent(eventBuffer);
 		if (result == DFB_BUFFEREMPTY)
 		{
-			continue;
+			if (appControlInfo.playbackInfo.autoStop > 0)
+			{
+				int active_media = getActiveMedia();
+
+				if (active_media < 0)
+					continue;
+				else
+				{
+					gettimeofday(&currenttime, NULL);
+					int timeout = currenttime.tv_sec-event.input.timestamp.tv_sec;
+
+					if (timeout >= (appControlInfo.playbackInfo.autoStop-AUTOSTOP_WARNING_TIMEOUT)*60
+					&& timeout < appControlInfo.playbackInfo.autoStop*60)
+					{
+						char msg[MENU_ENTRY_INFO_LENGTH];
+						snprintf(msg,sizeof(msg), "%s\n%d %s\n%s", _T("PLAYBACK_STOP_MESSAGE"),AUTOSTOP_WARNING_TIMEOUT, _T("MINUTE_SHORT"), _T("PLAYBACK_TO_CANCEL"));
+						interface_showMessageBox(msg, thumbnail_warning, 0);
+						continue;
+					}
+					else if (timeout >= appControlInfo.playbackInfo.autoStop*60)
+					{
+						gfx_stopVideoProviders(screenMain);
+						eprintf("App: Autostop broadcasting playback - timeout over %d min\n", appControlInfo.playbackInfo.autoStop);
+						interface_hideMessageBox();
+						interface_showMenu(1, 1);
+					}
+					else
+						continue;
+				}
+			} else
+				continue;
 		}
 		if (result  == DFB_OK )
 		{
