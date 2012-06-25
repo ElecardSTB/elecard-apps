@@ -322,6 +322,10 @@ int loadAppSettings()
 		{
 			//dprintf("%s: Auto play in menu %d\n", __FUNCTION__, appControlInfo.playbackInfo.bResumeAfterStart);
 		}
+		else if (sscanf(buf, "AUTOSTOP=%d", &appControlInfo.playbackInfo.autoStop) == 1)
+		{
+			//dprintf("%s: Stop broadcasting %d\n", __FUNCTION__, appControlInfo.playbackInfo.autoStop);
+		}
 		else if (sscanf(buf, "RESUMEAFTERSTART=%d", &appControlInfo.playbackInfo.bResumeAfterStart) == 1)
 		{
 			//dprintf("%s: Resume after start %d\n", __FUNCTION__, appControlInfo.playbackInfo.bResumeAfterStart);
@@ -623,6 +627,7 @@ set_overrides:
 	appControlInfo.soundInfo.volumeLevel = 100;
 
 	appControlInfo.playbackInfo.bAutoPlay = 0;
+	appControlInfo.playbackInfo.autoStop = 0;
 	appControlInfo.playbackInfo.bResumeAfterStart = 0;
 
 	system("cp -f /channels.conf " CHANNEL_FILE_NAME);
@@ -735,6 +740,7 @@ int saveAppSettings()
 	fprintf(fd, "LASTMESSAGE=%ld\n",              appControlInfo.messagesInfo.lastWatched);
 #endif
 	fprintf(fd, "AUTOPLAY=%d\n",                  appControlInfo.playbackInfo.bAutoPlay);
+	fprintf(fd, "AUTOSTOP=%d\n",                  appControlInfo.playbackInfo.autoStop);
 	fprintf(fd, "RESUMEAFTERSTART=%d\n",          appControlInfo.playbackInfo.bResumeAfterStart);
 	if( dontUpdateSource == 0 && playlistModeFavorites == appControlInfo.playbackInfo.playlistMode )
 		fprintf(fd, "LASTSOURCE=%s\n", streamSourceNames[streamSourceFavorites] );
@@ -947,6 +953,7 @@ void appInfo_init(void)
 
 	appControlInfo.playbackInfo.playlistMode      = playlistModeNone;
 	appControlInfo.playbackInfo.bAutoPlay         = 1;
+	appControlInfo.playbackInfo.autoStop          = 0;
 	appControlInfo.playbackInfo.bResumeAfterStart = 0;
 	appControlInfo.playbackInfo.streamSource      = streamSourceNone;
 	appControlInfo.playbackInfo.audioStatus       = audioMute;

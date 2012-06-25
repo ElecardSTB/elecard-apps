@@ -259,6 +259,7 @@ static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleFileSorting(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleHighlightColor(interfaceMenu_t* pMenu, void* pArg);
 static int output_togglePlayControlTimeout(interfaceMenu_t* pMenu, void* pArg);
+static int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg);
 static int output_togglePlayControlShowOnStart(interfaceMenu_t* pMenu, void* pArg);
 #ifdef ENABLE_VOIP
 static int output_toggleVoipIndication(interfaceMenu_t* pMenu, void* pArg);
@@ -5439,6 +5440,31 @@ static int output_restartxWorks(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_XWORKS
 
+int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg)
+{
+	static const time_t timeouts[] = { 0, 10, 15, 30, 45, 60 };
+	static const int    timeouts_count = sizeof(timeouts)/sizeof(timeouts[0]);
+	int i;
+	for ( i = 0; i < timeouts_count; i++ )
+		if ( timeouts[i] >= appControlInfo.playbackInfo.autoStop )
+			break;
+	if ( i >= timeouts_count )
+		appControlInfo.playbackInfo.autoStop = timeouts[0];
+	else
+		appControlInfo.playbackInfo.autoStop = timeouts[ (i+1)%timeouts_count ];
+
+	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
+	{
+		bDisplayedWarning = 1;
+		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	}
+
+	output_fillInterfaceMenu(pMenu, pArg);
+	interface_displayMenu(1);
+
+	return 0;
+}
+
 #ifdef ENABLE_IPTV
 int output_toggleIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -5695,6 +5721,8 @@ int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
 	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
+	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYBACK_STOP_TIMEOUT"), appControlInfo.playbackInfo.autoStop, _T("MINUTE_SHORT"));
+	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleAutoStopTimeout, NULL, settings_interface);
 
 	interface_menuActionShowMenu(pMenu, (void*)&InterfaceMenu);
 	interface_displayMenu(1);

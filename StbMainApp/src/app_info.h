@@ -648,6 +648,7 @@ typedef struct __stb810_playbackInfo
 	stb810_playlistMode  playlistMode;
 	int                  bAutoPlay;
 	int                  bResumeAfterStart;
+	int                  autoStop;
 	float                scale;
 	int                  channel;
 	char                 description[MENU_ENTRY_INFO_LENGTH];
