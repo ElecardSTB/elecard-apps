@@ -5376,6 +5376,7 @@ int output_setHostapdChannel(int channel)
 		{
 			snprintf(value, sizeof(value), "[HT40%c][SHORT-GI-20][SHORT-GI-40]", channel < 8 ? '+' : '-');
 		}
+		setParam(STB_HOSTAPD_CONF, "ht_capab", value);
 	}
 
 	return res;
