@@ -65,6 +65,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <time.h>
 #include <sys/wait.h>
 
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -3700,6 +3701,96 @@ long get_info_progress()
 	return info_progress;
 }
 
+static void show_ip(stb810_networkInterface_t i, const char *iface_name, char *info_text)
+{
+	char temp[256];
+	struct ifreq ifr;
+	int fd;
+
+#ifdef ENABLE_PPP
+	if (i != ifacePPP)
+#endif
+	{
+		snprintf(temp, sizeof(temp), "/sys/class/net/%s/address", helperEthDevice(i));
+		fd = open(temp, O_RDONLY);
+		if (fd > 0)
+		{
+			ssize_t len = read(fd, temp, sizeof(temp)-1)-1;
+			close(fd);
+			if (len<0) len = 0;
+			temp[len]=0;
+
+			sprintf(info_text, "%s %s: ", iface_name, _T("MAC_ADDRESS"));
+			strcat(info_text, temp);
+			strcat(info_text, "\n");
+		} else
+		{
+			sprintf(temp, "%s %s: %s\n", iface_name, _T("MAC_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
+			strcat(info_text, temp);
+		}
+	}
+
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd < 0)
+	{
+		snprintf(temp, sizeof(temp), "%s %s: %s\n%s %s: %s\n",
+			iface_name, _T("IP_ADDRESS"), _T("NOT_AVAILABLE_SHORT"),
+			iface_name, _T("NETMASK"),    _T("NOT_AVAILABLE_SHORT"));
+		strcat(info_text, temp);
+		return;
+	}
+
+	/* I want to get an IPv4 IP address */
+	ifr.ifr_addr.sa_family = AF_INET;
+	/* I want IP address attached to "eth0" */
+	strncpy(ifr.ifr_name, helperEthDevice(i), IFNAMSIZ-1);
+	if (ioctl(fd, SIOCGIFADDR, &ifr) < 0)
+	{
+		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("IP_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
+	} else
+	{
+		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("IP_ADDRESS"), inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+	}
+	strcat(info_text, temp);
+
+#ifdef ENABLE_PPP
+	if (i != ifacePPP) // PPP netmask is 255.255.255.255
+#endif
+	{
+	if (ioctl(fd, SIOCGIFNETMASK, &ifr) < 0)
+	{
+		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("NETMASK"), _T("NOT_AVAILABLE_SHORT"));
+	} else
+	{
+		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("NETMASK"), inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+	}
+	strcat(info_text, temp);
+	}
+
+	close(fd);
+}
+
+#ifdef ENABLE_WIFI
+static void show_wireless(const char *iface_name, char *info_text)
+{
+	char temp[MENU_ENTRY_INFO_LENGTH];
+
+	sprintf(temp, "%s ESSID: %s\n", iface_name, wifiInfo.essid);
+	strcat(info_text, temp);
+	sprintf(temp, "%s %s: %s\n", iface_name, _T("MODE"), wireless_mode_print( wifiInfo.mode ));
+	strcat(info_text, temp);
+	if (!wifiInfo.wanMode)
+	{
+		sprintf(temp, "%s %s: %d\n", iface_name, _T("CHANNEL_NUMBER"), wifiInfo.currentChannel );
+		strcat(info_text, temp);
+		sprintf(temp, "%s %s: %s\n", iface_name, _T("AUTHENTICATION"), wireless_auth_print( wifiInfo.auth ));
+		strcat(info_text, temp);
+		sprintf(temp, "%s %s: %s\n", iface_name, _T("ENCRYPTION"), wireless_encr_print( wifiInfo.encryption ));
+		strcat(info_text, temp);
+	}
+}
+#endif
+
 int show_info(interfaceMenu_t* pMenu, void* pArg)
 {
 	char buf[256];
@@ -3832,16 +3923,57 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 
 	if (helperParseLine(INFO_TEMP_FILE, "date -R", "", buf, '\r'))
 	{
-  	sprintf(temp, "%s: %s\n",_T("CURRENT_TIME"), buf);
+		sprintf(temp, "%s: %s\n\n",_T("CURRENT_TIME"), buf);
 	} else
 	{
-		sprintf(temp, "%s: %s\n",_T("CURRENT_TIME"), _T("NOT_AVAILABLE_SHORT"));
+		sprintf(temp, "%s: %s\n\n",_T("CURRENT_TIME"), _T("NOT_AVAILABLE_SHORT"));
 	}
 	strcat(info_text, temp);
 
 	info_progress++;
 	interface_displayMenu(1);
 
+#ifndef STBPNX
+#ifdef ENABLE_WIFI
+	if (wifiInfo.wanMode)
+	{
+		i = ifaceWireless;
+		iface_name = _T("WIRELESS");
+
+		show_wireless(iface_name, &info_text[strlen(info_text)]);
+	} else
+#endif
+	{
+		i = ifaceWAN;
+		iface_name = "WAN";
+	}
+
+	show_ip(i, iface_name, &info_text[strlen(info_text)]);
+#ifdef ENABLE_PPP
+	i = ifacePPP;
+	sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
+	if (helperCheckDirectoryExsists(temp))
+	{
+		show_ip(i, "PPP", &info_text[strlen(info_text)]);
+	}
+#endif
+	strcat(info_text, "\n");
+#ifdef ENABLE_WIFI
+	if (!wifiInfo.wanMode)
+	{
+		i = ifaceWireless;
+		sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
+		if (helperCheckDirectoryExsists(temp))
+		{
+			iface_name = _T("WIRELESS");
+			show_wireless(iface_name, &info_text[strlen(info_text)]);
+			show_ip(i, iface_name, &info_text[strlen(info_text)]);
+			strcat(info_text, "\n");
+		}
+	}
+#endif
+#else
+	// STBPNX
 	for (i=0;;i++)
 	{
 		eprintf("%s: checking %s\n", __FUNCTION__, helperEthDevice(i));
@@ -3851,18 +3983,10 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 			switch( i )
 			{
 				case ifaceWAN:
-#if (defined STSDK) && (defined ENABLE_WIFI)
-					if( wifiInfo.wanMode && networkInfo.lanMode != lanBridge )
-						continue;
-#endif
 					iface_name = output_isBridge() ? _T("GATEWAY_BRIDGE") : "WAN";
 					break;
 #ifdef ENABLE_LAN
 				case ifaceLAN:
-#ifdef STSDK
-					if( output_isBridge() )
-						continue;
-#endif
 					iface_name = "LAN"; break;
 #endif
 #ifdef ENABLE_PPP
@@ -3870,24 +3994,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 #endif
 #ifdef ENABLE_WIFI
 				case ifaceWireless: iface_name = _T("WIRELESS");
-					strcat(info_text, "\n");
-					sprintf(temp, "%s ESSID: %s\n", iface_name, wifiInfo.essid);
-					strcat(info_text, temp);
-					sprintf(temp, "%s %s: %s\n", iface_name, _T("MODE"), wireless_mode_print( wifiInfo.mode ));
-					strcat(info_text, temp);
-					if( !wifiInfo.wanMode )
-					{
-						sprintf(temp, "%s %s: %d\n", iface_name, _T("CHANNEL_NUMBER"), wifiInfo.currentChannel );
-						strcat(info_text, temp);
-						sprintf(temp, "%s %s: %s\n", iface_name, _T("AUTHENTICATION"), wireless_auth_print( wifiInfo.auth ));
-						strcat(info_text, temp);
-						sprintf(temp, "%s %s: %s\n", iface_name, _T("ENCRYPTION"), wireless_encr_print( wifiInfo.encryption ));
-						strcat(info_text, temp);
-					}
-#ifdef STSDK
-					if( wifiInfo.wanMode == 0 || networkInfo.lanMode == lanBridge ) // wifi is in bridge with eth1
-						continue;
-#endif
+					show_wireless(iface_name, &info_text[strlen(info_text)])
 					break;
 #endif
 				default:
@@ -3895,61 +4002,25 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 					iface_name = "";
 			}
 			strcat(info_text, "\n");
-			sprintf(temp, "ifconfig %s | grep HWaddr", helperEthDevice(i));
-			if (helperParseLine(INFO_TEMP_FILE, temp, "HWaddr ", buf, ' '))			 // eth0      Link encap:Ethernet  HWaddr 76:60:37:02:24:02
-			{
-				sprintf(temp, "%s %s: ", iface_name, _T("MAC_ADDRESS"));
-				strcat(info_text, temp);
-				strcat(info_text, buf);
-				strcat(info_text, "\n");
-			} else
-			{
-				sprintf(temp, "%s %s: %s\n", iface_name, _T("MAC_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
-				strcat(info_text, temp);
-			}
 
-			sprintf(temp, "ifconfig %s | grep \"inet addr\"", helperEthDevice(i));
-			if (helperParseLine(INFO_TEMP_FILE, temp, "inet addr:", buf, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-			{
-				sprintf(temp, "%s %s: ", iface_name, _T("IP_ADDRESS"));
-				strcat(info_text, temp);
-				strcat(info_text, buf);
-				strcat(info_text, "\n");
-			} else {
-				sprintf(temp, "%s %s: %s\n", iface_name, _T("IP_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
-				strcat(info_text, temp);
-			}
-
-			sprintf(temp, "ifconfig %s | grep \"Mask:\"", helperEthDevice(i));
-			if (helperParseLine(INFO_TEMP_FILE, temp, "Mask:", buf, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-			{
-				sprintf(temp, "%s %s: ", iface_name, _T("NETMASK"));
-				strcat(info_text, temp);
-				strcat(info_text, buf);
-				strcat(info_text, "\n");
-			} else {
-				sprintf(temp, "%s %s: %s\n", iface_name, _T("NETMASK"), _T("NOT_AVAILABLE_SHORT"));
-				strcat(info_text, temp);
-			}
-
-			sprintf(temp, "route -n | grep -e \"0\\.0\\.0\\.0 .* 0\\.0\\.0\\.0 *UG .* %s\"", helperEthDevice(i));
-			if (helperParseLine(INFO_TEMP_FILE, temp, "0.0.0.0", buf, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-			{
-				sprintf(temp, "%s %s: ", iface_name, _T("GATEWAY"));
-				strcat(info_text, temp);
-				strcat(info_text, buf);
-				strcat(info_text, "\n");
-			}
-			/* else {
-				sprintf(temp, "%s %s: %s\n", iface_name, _T("GATEWAY"), _T("NOT_AVAILABLE_SHORT"));
-				strcat(info_text, temp);
-			} */
+			show_ip(i, iface_name, &info_text[strlen(info_text)]);
 		} else
 		{
 			break;
 		}
 	}
-	strcat(info_text, "\n");
+#endif // STBPNX
+	if (helperParseLine(INFO_TEMP_FILE, "route -n | grep -e \"0\\.0\\.0\\.0 .* 0\\.0\\.0\\.0 *UG .*\"", "0.0.0.0", buf, ' '))
+	{
+		sprintf(temp, "%s: ", _T("GATEWAY"));
+		strcat(info_text, temp);
+		strcat(info_text, buf);
+		strcat(info_text, "\n");
+	}
+	/* else {
+		sprintf(temp, "%s %s: %s\n", iface_name, _T("GATEWAY"), _T("NOT_AVAILABLE_SHORT"));
+		strcat(info_text, temp);
+	} */
 	i = -1;
 	fd = open( "/etc/resolv.conf", O_RDONLY );
 	if( fd > 0 )
@@ -5020,7 +5091,6 @@ static int output_fillPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 {
-	char path[MAX_CONFIG_PATH];
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char temp[MENU_ENTRY_INFO_LENGTH];
 
@@ -5032,6 +5102,7 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 		if( !output_isBridge() )
 		{
 #ifdef STBPNX
+			char path[MAX_CONFIG_PATH];
 			sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
 			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
