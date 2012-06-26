@@ -279,6 +279,10 @@ ifneq ($(INTERFACE_WALLPAPER_IMAGE),)
 	LOCAL_CFLAGS += -DINTERFACE_WALLPAPER_IMAGE=\"$(INTERFACE_WALLPAPER_IMAGE)\"
 endif
 
+ifeq ($(ENABLE_PLAYLIST_HTTP_HEADER),1)
+	LOCAL_CFLAGS += -DENABLE_PLAYLIST_HTTP_HEADER=$(ENABLE_PLAYLIST_HTTP_HEADER)
+endif
+
 # -----------------------------------------------------------------------------
 # File layout
 # -----------------------------------------------------------------------------

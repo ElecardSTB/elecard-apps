@@ -2155,7 +2155,7 @@ char* providerCommonGetStbSerial(void)
 		{
 			fread( buf, 1, sizeof(buf), f );
 			fclose(f);
-			if( sscanf( buf, "SYSID: %X, SERNO: %X, VER: %*", &sysid.IDFull, &serial.SerialFull ) == 2 )
+			if( sscanf( buf, "SYSID: %X, SERNO: %X", &sysid.IDFull, &serial.SerialFull ) == 2 )
 				get_composite_serial(sysid, serial, buf);
 			else
 				buf[0] = 0;
@@ -2221,7 +2221,6 @@ static int rtp_getProgramInfo(int channel, int offset, rtpInfoType_t type)
 	curl_easy_setopt(hnd, CURLOPT_TIMEOUT, 15);
 	curl_easy_setopt(hnd, CURLOPT_PROXY, "");
 #ifdef ENABLE_PLAYLIST_HTTP_HEADER
-	curl_easy_setopt(hnd, CURLOPT_HEADER,         1L);
 	if(headers != NULL)
 		curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, headers);
 #endif
