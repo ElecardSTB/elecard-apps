@@ -56,6 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "voip.h"
 #include "messages.h"
 #include "Stb225.h"
+#include "wpa_ctrl.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -69,6 +70,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <net/if.h>
 
 #include <fcntl.h>
 
@@ -196,6 +198,7 @@ typedef struct
 	outputWifiEncryption_t encryption;
 	char essid[IW_ESSID_MAX_SIZE];
 	char key[IW_ENCODING_TOKEN_MAX+1];
+	int showAdvanced;
 } outputWifiInfo_t;
 #endif
 
@@ -226,6 +229,7 @@ static int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_readWirelessSettings(void);
 static int output_fillWifiMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
+static int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pArg);
 #ifdef STSDK
 static int output_setHostapdChannel(int channel);
 #endif
@@ -1603,6 +1607,9 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	{
 		case ifaceWAN: nface = &networkInfo.wan; break;
 		case ifaceLAN: nface = &networkInfo.lan; break;
+#ifdef ENABLE_WIFI
+		case ifaceWireless: nface = &wifiInfo.wlan; break;
+#endif
 		default:
 			eprintf("%s: unsupported iface %d\n", __FUNCTION__, i );
 			return -1;
@@ -1636,7 +1643,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 			eprintf("%s: unsupported type %d\n", __FUNCTION__, type );
 			return -1;
 	}
-	if( i == ifaceLAN && networkInfo.lanMode == lanDhcpServer )
+	if (i == ifaceLAN && networkInfo.lanMode == lanDhcpServer)
 		output_writeDhcpConfig();
 	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
@@ -1645,14 +1652,14 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 #endif
 
-	switch( i )
+	switch (i)
 	{
 		case ifaceWAN: output_fillWANMenu(pMenu, SET_NUMBER(type)); break;
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 		case ifaceLAN: output_fillLANMenu(pMenu, SET_NUMBER(type)); break;
 #endif
 #ifdef ENABLE_WIFI
-		case ifaceWireless: output_fillWifiMenu(pMenu, SET_NUMBER(type)); break;
+		case ifaceWireless: output_fillWifiMenu(pMenu, 0); break;
 #endif
 	}
 	interface_displayMenu(1);
@@ -2426,7 +2433,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 		case ifaceLAN: output_fillLANMenu(pMenu, SET_NUMBER(i)); break;
 #endif
 #ifdef ENABLE_WIFI
-		case ifaceWireless: output_fillWifiMenu(pMenu, SET_NUMBER(i)); break;
+		case ifaceWireless: output_fillWifiMenu(pMenu, 0); break;
 #endif
 	}
 	interface_displayMenu(1);
@@ -3994,7 +4001,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 #endif
 #ifdef ENABLE_WIFI
 				case ifaceWireless: iface_name = _T("WIRELESS");
-					show_wireless(iface_name, &info_text[strlen(info_text)])
+					show_wireless(iface_name, &info_text[strlen(info_text)]);
 					break;
 #endif
 				default:
@@ -5191,49 +5198,110 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	if (wifiInfo.wanMode || exists)
 	{
-		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN" );
+		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN");
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiWAN, SET_NUMBER(i), thumbnail_configure);
 		
 	} else
 	{
-		sprintf(buf, "%s: %s", iface_name, _T("OFF") );
+		sprintf(buf, "%s: %s", iface_name, _T("OFF"));
 		interface_addMenuEntryDisabled((interfaceMenu_t*)&WifiSubMenu, buf, thumbnail_no);
 		if (WifiSubMenu.baseMenu.selectedItem >= 0)
 			WifiSubMenu.baseMenu.selectedItem = MENU_ITEM_BACK;
 	}
 
-	if (exists)
+	if (!exists)
+		return 0;
+
+	if (wifiInfo.wanMode)
+	{
+		interface_addMenuEntry(pMenu, _T("WIRELESS_LIST"), (menuActionFunction)menuDefaultActionShowMenu, &WirelessMenu, thumbnail_search);
+
+		char *state = NULL;
+		struct wpa_ctrl *ctrl = wpa_ctrl_open(STB_WPA_SUPPLICANT_CTRL_DIR "/wlan0");
+		if (ctrl)
+		{
+			size_t reply_len = sizeof(temp);
+
+			if (wpa_ctrl_request(ctrl, "STATUS", 6, temp, &reply_len, NULL) == 0)
+			{
+				temp[reply_len]=0;
+				state = strstr(temp, "wpa_state=");
+				if (state)
+				{
+					state += 10;
+					char *newline = strchr(state, '\n');
+					if (newline)
+						*newline=0;
+				}
+			} else
+				eprintf("%s: failed to get status: %s\n", __FUNCTION__, strerror(errno));
+			wpa_ctrl_close(ctrl);
+		} else
+		{
+			eprintf("%s: failed to connect to wpa_supplicant: %s\n", __FUNCTION__, strerror(errno));
+		}
+
+		if (state && strcasecmp(state, "COMPLETED") == 0)
+		{
+			snprintf(temp, sizeof(temp), "%s %s", _T("CONNECTED_TO"), wifiInfo.essid);
+			interface_addMenuEntryDisabled(pMenu, temp, thumbnail_info);
+		} else
+		{
+			snprintf(temp, sizeof(temp), "%s %s", _T("CONNECTING_TO"), wifiInfo.essid);
+			interface_addMenuEntryDisabled(pMenu, temp, thumbnail_question);
+		}
+	} else
+	{
+		sprintf(buf, "%s: %s", _T("ESSID"), wifiInfo.essid);
+		interface_addMenuEntry(pMenu, buf, output_toggleESSID, SET_NUMBER(i), thumbnail_enterurl);
+
+		if (wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount)
+		{
+			sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.key );
+			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiKey, NULL, thumbnail_enterurl);
+		}
+	}
+
+	interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("NET_RESET"), output_toggleReset, SET_NUMBER(i), settings_renew);
+
+	if (!wifiInfo.showAdvanced)
+	{
+		interface_addMenuEntry(pMenu, _T("SHOW_ADVANCED"), output_wifiToggleAdvanced, NULL, thumbnail_configure);
+		return 0;
+	}
+
+	// Advanced settings
 	{
 #ifdef STBPNX
 		char temp[MENU_ENTRY_INFO_LENGTH];
 		char path[MAX_CONFIG_PATH];
 
-		sprintf(buf, "%s %s: %s", iface_name, _T("MODE"), wifiInfo.mode == wifiModeAdHoc ? "Ad-Hoc" : "Managed");
+		sprintf(buf, "%s: %s", _T("MODE"), wifiInfo.mode == wifiModeAdHoc ? "Ad-Hoc" : "Managed");
 		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleWifiMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
-		sprintf(buf, "%s %s: %s", iface_name, _T("ADDR_MODE"), wifiInfo.dhcp ? _T("ADDR_MODE_DHCP") : _T("ADDR_MODE_STATIC"));
+		sprintf(buf, "%s: %s", _T("ADDR_MODE"), wifiInfo.dhcp ? _T("ADDR_MODE_DHCP") : _T("ADDR_MODE_STATIC"));
 		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
 		if (wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0)
 		{
 			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
-			sprintf(buf, "%s %s: %s", iface_name, _T("IP_ADDRESS"), temp);
+			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
 			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleIP, SET_NUMBER(i), thumbnail_configure);
 
 			getParam(path, "NETMASK", _T("NOT_AVAILABLE_SHORT"), temp);
-			sprintf(buf, "%s %s: %s", iface_name, _T("NETMASK"), temp);
+			sprintf(buf, "%s: %s", _T("NETMASK"), temp);
 			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleNetmask, SET_NUMBER(i), thumbnail_configure);
 			
-			if( wifiInfo.wanMode )
+			if ( wifiInfo.wanMode )
 			{
 				getParam(path, "DEFAULT_GATEWAY", _T("NOT_AVAILABLE_SHORT"), temp);
-				sprintf(buf, "%s %s: %s", iface_name, _T("GATEWAY"), temp);
+				sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
 				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleGw, SET_NUMBER(i), thumbnail_configure);
 
 				getParam(path, "NAMESERVERS", _T("NOT_AVAILABLE_SHORT"), temp);
-				sprintf(buf, "%s %s: %s", iface_name, _T("DNS_SERVER"), temp);
+				sprintf(buf, "%s: %s", _T("DNS_SERVER"), temp);
 				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleDNSIP, SET_NUMBER(i), thumbnail_configure);
 			}
 		}
@@ -5243,9 +5311,19 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		interface_addMenuEntry(_M &WifiSubMenu, buf, (menuActionFunction)menuDefaultActionShowMenu,
 			(void*)((wifiInfo.wanMode || networkInfo.lanMode == lanBridge) ? &WANSubMenu : &LANSubMenu), settings_network);
 #endif // STSDK
-		sprintf(buf, "%s %s: %s", iface_name, _T("ESSID"), wifiInfo.essid);
-		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleESSID, SET_NUMBER(i), thumbnail_enterurl);
 
+		if (wifiInfo.wanMode)
+		{
+			sprintf(buf, "%s: %s", _T("ESSID"), wifiInfo.essid);
+			interface_addMenuEntry(pMenu, buf, output_toggleESSID, SET_NUMBER(i), thumbnail_enterurl);
+
+			if (wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount)
+			{
+				sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.key );
+				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiKey, NULL, thumbnail_enterurl);
+			}
+		} else
+		{
 		sprintf(buf, "iwlist %s channel > %s", helperEthDevice(i), INFO_TEMP_FILE);
 		system(buf);
 		FILE* f = fopen( INFO_TEMP_FILE, "r" );
@@ -5290,28 +5368,23 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			fclose(f);
 		} else
 			eprintf("%s: failed to open %s\n", __FUNCTION__, INFO_TEMP_FILE);
-		if (!wifiInfo.wanMode && wifiInfo.channelCount > 0)
+		if (wifiInfo.channelCount > 0)
 		{
-			sprintf(buf, "%s %s: %d", iface_name, _T("CHANNEL_NUMBER"), wifiInfo.currentChannel);
+			sprintf(buf, "%s: %d", _T("CHANNEL_NUMBER"), wifiInfo.currentChannel);
 			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiChannel, SET_NUMBER(i), thumbnail_configure);
 		}
+		}
 
-		sprintf(buf, "%s %s: %s", iface_name, _T("AUTHENTICATION"), wireless_auth_print( wifiInfo.auth ));
+		sprintf(buf, "%s: %s", _T("AUTHENTICATION"), wireless_auth_print( wifiInfo.auth ));
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleAuthMode, SET_NUMBER(i), thumbnail_configure);
 		if( wifiInfo.auth == wifiAuthWPAPSK || wifiInfo.auth == wifiAuthWPA2PSK )
 		{
-			sprintf(buf, "%s %s: %s", iface_name, _T("ENCRYPTION"), wireless_encr_print( wifiInfo.encryption ));
+			sprintf(buf, "%s: %s", _T("ENCRYPTION"), wireless_encr_print( wifiInfo.encryption ));
 			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiEncryption, SET_NUMBER(i), thumbnail_configure);
 		}
-		if( wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount )
-		{
-			sprintf(buf, "%s %s: %s", iface_name, _T("PASSWORD"), wifiInfo.key );
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiKey, NULL, thumbnail_enterurl);
-		}
-
-		sprintf(buf, "%s: %s", iface_name, _T("NET_RESET"));
-		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleReset, SET_NUMBER(i), settings_renew);
 	}
+
+	interface_addMenuEntry(pMenu, _T("HIDE_ADVANCED"), output_wifiToggleAdvanced, NULL, thumbnail_configure);
 
 	return 0;
 }
@@ -5324,6 +5397,16 @@ static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 		return 0;
 	}
 	return 1;
+}
+
+int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
+{
+	wifiInfo.showAdvanced = !wifiInfo.showAdvanced;
+	if (!wifiInfo.showAdvanced)
+		interface_setSelectedItem(pMenu, 4); // jump to toggle advanced entry
+	output_fillWifiMenu(pMenu, NULL);
+	interface_displayMenu(1);
+	return 0;
 }
 
 int output_readWirelessSettings(void)
@@ -5884,6 +5967,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #ifdef ENABLE_WIFI
 	wifiInfo.channelCount   = 0;
 	wifiInfo.currentChannel = 1;
+	wifiInfo.showAdvanced   = 0;
 #endif
 
 #ifdef STSDK
