@@ -1421,6 +1421,9 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 	if (tuner >= VMSP_COUNT)
 	{
+#if 0
+		// FIXME: Avit DVB-C tuner has problems with range scanning
+
 		cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber( tuner-VMSP_COUNT ) );
 		cJSON_AddItemToObject(params, "start", cJSON_CreateNumber(  low_freq/KHZ ) );
 		cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( high_freq/KHZ ) );
@@ -1435,7 +1438,39 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 			eprintf("%s: scan failed\n", __FUNCTION__ );
 			return -1;
 		}
+#else
+		result = NULL;
+		params = cJSON_CreateObject();
+		cJSON *p_freq = cJSON_CreateNumber(0);
 
+		cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber( tuner-VMSP_COUNT ) );
+		cJSON_AddItemToObject(params, "frequency", p_freq);
+		st_setTuneParams(tuner-VMSP_COUNT, params);
+
+		for (frequency = low_freq; frequency <= high_freq; frequency += freq_step)
+		{
+			p_freq->valueint = frequency/KHZ;
+			p_freq->valuedouble = p_freq->valueint;
+			dprintf("DVB: Check main freq: %lu\n", frequency);
+			if (pFunction != NULL && pFunction(frequency, dvb_getNumberOfServices(), tuner, 0, 0) == -1)
+			{
+				dprintf("DVB: BREAK: pFunction(frequency, serviceCount, tuner) == -1\n");
+				break;
+			}
+			res = st_rpcSyncTimeout(elcmd_dvbtune, params, 3, &type, &result );
+			if (result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0)
+			{
+				cJSON_Delete(result);
+				result = NULL;
+				dprintf("DVB: Found something on %lu, search channels\n!", frequency);
+				res = st_rpcSyncTimeout(elcmd_dvbscan, NULL, 15, &type, &result );
+				dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
+			}
+			cJSON_Delete(result);
+			result = NULL;
+		}
+		cJSON_Delete(params);
+#endif
 		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 
 		return 0;
