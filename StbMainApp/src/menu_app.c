@@ -61,6 +61,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef SHOW_CARD_MENU
 #include "../third_party/smartcards/card.h"
 #endif
+#ifdef ENABLE_TELETES
+#include "../third_party/teletes/teletes.h"
+#endif
 
 #include <unistd.h>
 #include <string.h>
@@ -199,6 +202,11 @@ void menu_buildMainMenu()
 		interface_addMenuEntry((interfaceMenu_t*)&interfaceMainMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&DVBTMenu, thumbnail_dvb);
 	}
 #endif // #ifdef ENABLE_DVB
+#ifdef ENABLE_TELETES
+	teletes_buildMenu((interfaceMenu_t*)&interfaceMainMenu);
+	str = _T("CAMERAS");
+	interface_addMenuEntry((interfaceMenu_t*)&interfaceMainMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &teletesMediaMenu, thumbnail_tvinfo);
+#endif
 #ifdef ENABLE_IPTV
 	rtp_buildMenu((interfaceMenu_t*)&interfaceMainMenu);
 	str = _T("TV_CHANNELS");
@@ -483,6 +491,9 @@ void menu_init()
 
 void menu_cleanup()
 {
+#ifdef ENABLE_TELETES
+	teletes_cleanupMenu();
+#endif
 	rtp_cleanupMenu();
 	rtsp_cleanupMenu();
 	rutube_cleanupMenu();

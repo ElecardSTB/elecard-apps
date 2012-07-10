@@ -361,6 +361,12 @@ int loadAppSettings()
 		{
 			//dprintf("%s: rtp playlist url %s\n", __FUNCTION__, appControlInfo.rtpMenuInfo.playlist);
 		}
+#ifdef ENABLE_TELETES
+		else if (sscanf(buf, "TELETESPLAYLIST=%[^\r\n]", appControlInfo.rtpMenuInfo.teletesPlaylist) == 1)
+		{
+			//dprintf("%s: teletes playlist url %s\n", __FUNCTION__, appControlInfo.rtpMenuInfo.teletesPlaylist);
+		}
+#endif
 		else if (sscanf(buf, "RTPEPG=%[^\r\n]", appControlInfo.rtpMenuInfo.epg) == 1)
 		{
 			//dprintf("%s: rtp EPG url %s\n", __FUNCTION__, appControlInfo.rtpMenuInfo.epg);
@@ -753,6 +759,9 @@ int saveAppSettings()
 	fprintf(fd, "LASTTHUMBNAIL=%s\n",             thumbnail);
 	fprintf(fd, "RTPUSEPLAYLIST=%d\n",            appControlInfo.rtpMenuInfo.usePlaylistURL);
 	fprintf(fd, "RTPPLAYLIST=%s\n",               appControlInfo.rtpMenuInfo.playlist);
+#ifdef ENABLE_TELETES
+	fprintf(fd, "TELETESPLAYLIST=%s\n",           appControlInfo.rtpMenuInfo.teletesPlaylist);
+#endif
 	fprintf(fd, "RTPEPG=%s\n",                    appControlInfo.rtpMenuInfo.epg);
 	fprintf(fd, "RTPPIDTIMEOUT=%ld\n",            appControlInfo.rtpMenuInfo.pidTimeout);
 	fprintf(fd, "LANGUAGE=%s\n",                  l10n_currentLanguage);

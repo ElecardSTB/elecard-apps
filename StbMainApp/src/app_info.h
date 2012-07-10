@@ -108,6 +108,9 @@ typedef enum
 	playlistModeIPTV,
 	playlistModeYoutube,
 	playlistModeRutube,
+#ifdef ENABLE_TELETES
+	playlistModeTeletes,
+#endif
 } stb810_playlistMode;
 
 typedef enum
@@ -302,6 +305,9 @@ typedef struct __stb810_rtpMenuInfo
 	char                 playlist[MAX_URL];
 	char                 epg[MAX_URL];
 	time_t               pidTimeout;
+#ifdef ENABLE_TELETES
+	char                 teletesPlaylist[MAX_URL];
+#endif
 } stb810_rtpMenuInfo;
 
 typedef struct __stb810_rtspInfo

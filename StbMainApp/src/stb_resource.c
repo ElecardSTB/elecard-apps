@@ -316,7 +316,11 @@ char *resource_thumbnailsBig[] = {
 	NULL,//IMAGE_DIR "thumbnail_sound_disabled.png",
 	NULL,//IMAGE_DIR "thumbnail_sound.png",
 	NULL,//IMAGE_DIR "thumbnail_turnaround.png",
+#ifdef  ENABLE_TELETES
+	IMAGE_DIR "teletes_playlist.png",
+#else
 	NULL,//IMAGE_DIR "thumbnail_tvinfo.png",
+#endif
 	NULL,//IMAGE_DIR "thumbnail_tvstandard.png",
 	IMAGE_DIR "big_usb.png",
 	NULL,//IMAGE_DIR "thumbnail_usb_audio.png",

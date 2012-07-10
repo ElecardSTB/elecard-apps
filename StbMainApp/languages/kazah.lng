@@ -508,3 +508,4 @@ LISTING_MEDIA=Получение списка файлов...
 3D_FACTOR_FLAG=Use factor instead of content
 3D_OFFSET_FLAG=Use offset instead of content
 3D_MONITOR=Switch output in 3D mode
+CAMERAS=Cameras

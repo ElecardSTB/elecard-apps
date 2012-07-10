@@ -69,6 +69,8 @@ ENABLE_SCARDS ?= 0
 ENABLE_REGPLAT ?= 0
 PROVIDER_PROFILES ?= 0
 ENABLE_PASSWORD ?= 1
+#TELETES a.k.a. OFTMedia
+ENABLE_TELETES ?= 0
 
 TEST_SERVER ?= 1
 
@@ -238,6 +240,12 @@ ifeq ($(ENABLE_REGPLAT),1)
 	LOCAL_CFLAGS += -DENABLE_REGPLAT=$(ENABLE_REGPLAT)
 	LOCAL_LDFLAGS += -Lsrc -lregplat -ldl
 	INSTALL_EXTRA += copy_regplat
+endif
+
+ifeq ($(ENABLE_TELETES),1)
+	OBJECTS += src/libteletes.a
+	LOCAL_CFLAGS += -DENABLE_TELETES=$(ENABLE_TELETES)
+	INSTALL_EXTRA += copy_teletes
 endif
 
 ifeq ($(ENABLE_VIDIMAX),1)
@@ -567,6 +575,24 @@ copy_regplat:
 	-$(Q)install -m0644 third_party/regplat/resources/images/*.png $(DATA_DIR)/images/
 	-$(Q)install -m0644 third_party/regplat/resources/images/*.jpg $(DATA_DIR)/images/
 endif
+
+
+ifeq ($(ENABLE_TELETES),1)
+src/libteletes.a: third_party/teletes/$(ARCH)/libteletes.a
+	cp third_party/teletes/$(ARCH)/libteletes.a src/libteletes.a
+
+TELETES_SOURCES=$(wildcard third_party/teletes/*.c)
+TELETES_OBJECTS=$(patsubst %.c,%.o,$(TELETES_SOURCES)) $(patsubst %.cpp,%.o,$(TELETES_CPPSRCS))
+
+third_party/teletes/$(ARCH)/libteletes.a: $(TELETES_OBJECTS) $(wildcard third_party/teletes/*.h)
+	$(Q)mkdir -p third_party/teletes/$(ARCH)
+	$(AR) rcs third_party/teletes/$(ARCH)/libteletes.a $(TELETES_OBJECTS)
+copy_teletes:
+	@echo 'INSTALL third_party/teletes/resources/images -> $(DATA_DIR)/images'
+	-$(Q)install -m0644 third_party/teletes/resources/images/*.png $(DATA_DIR)/images/
+	-$(Q)install -m0644 third_party/teletes/resources/images/*.jpg $(DATA_DIR)/images/
+endif
+
 
 ifeq ($(ENABLE_VIDIMAX),1)
 src/libvidimax.a: third_party/vidimax/$(ARCH)/libvidimax.a

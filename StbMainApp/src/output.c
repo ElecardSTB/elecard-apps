@@ -125,7 +125,10 @@ typedef enum
 {
 	optionRtpEpg,
 	optionRtpPlaylist,
-	optionVodPlaylist
+	optionVodPlaylist,
+#ifdef ENABLE_TELETES
+	optionTeletesPlaylist,
+#endif
 } outputUrlOption;
 
 typedef enum
@@ -2073,6 +2076,10 @@ static char* output_getOption(outputUrlOption option)
 		case optionRtpPlaylist:
 			return appControlInfo.rtpMenuInfo.playlist;
 #endif
+#ifdef ENABLE_TELETES
+		case optionTeletesPlaylist:
+			return appControlInfo.rtpMenuInfo.teletesPlaylist;
+#endif
 #ifdef ENABLE_VOD
 		case optionVodPlaylist:
 			return appControlInfo.rtspInfo.streamInfoUrl;
@@ -2145,6 +2152,12 @@ static int output_changeURL(interfaceMenu_t *pMenu, char *value, void* pArg)
 #ifdef ENABLE_VOD
 			case optionVodPlaylist:
 				output_fillVODMenu(pMenu, NULL);
+#endif
+#ifdef ENABLE_TELETES
+			case optionTeletesPlaylist:
+				teletes_cleanupMenu();
+				output_fillIPTVMenu(pMenu, NULL);
+				break;
 #endif
 			default:;
 		}
@@ -2247,6 +2260,9 @@ static int output_toggleURL(interfaceMenu_t *pMenu, void* pArg)
 	switch( (outputUrlOption)pArg )
 	{
 		case optionRtpEpg:      str = _T("ENTER_IPTV_EPG_ADDRESS");  break;
+#ifdef ENABLE_TELETES
+		case optionTeletesPlaylist: // fall through
+#endif
 		case optionRtpPlaylist: str = _T("ENTER_IPTV_LIST_ADDRESS"); break;
 		case optionVodPlaylist: str = _T("ENTER_VOD_LIST_ADDRESS");  break;
 	}
@@ -5712,6 +5728,10 @@ static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif
 #ifdef ENABLE_PROVIDER_PROFILES
 	interface_addMenuEntry( (interfaceMenu_t*)&IPTVSubMenu, _T("PROFILE"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&ProfileMenu, thumbnail_account );
+#endif
+#ifdef ENABLE_TELETES
+	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", "Teletes playlist", appControlInfo.rtpMenuInfo.teletesPlaylist[0] != 0 ? appControlInfo.rtpMenuInfo.teletesPlaylist : _T("NONE"));
+	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, 1, output_toggleURL, NULL, NULL, NULL, (void*)optionTeletesPlaylist, thumbnail_enterurl);
 #endif
 
 	return 0;

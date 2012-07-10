@@ -73,6 +73,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /** @def ENABLE_DVB Enable DVB functions
  */
+
 #define ENABLE_DVB
 
 /** @def ENABLE_IPTV Enable IPTV menu and features
@@ -95,6 +96,41 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 //#define ENABLE_PVR
 
+/** @def ENABLE_WEB_SERVICES Enable Web services
+ */
+#define ENABLE_WEB_SERVICES
+
+/** @def HIDE_EXTRA_FUNCTIONS Remove development/extra functions from menu
+ */
+#define HIDE_EXTRA_FUNCTIONS
+
+/** @def ENABLE_VIDIMAX Enable VidiMax menu, done in makefile
+ */
+//#define ENABLE_VIDIMAX 1
+
+/** @def ENABLE_LAN Enable LAN if STB has second network interface (defined in build scripts)
+ */
+//#define ENABLE_LAN
+
+/** @def ENABLE_REGPLAT Enable RegPlat support (defined in Makefile)
+ */
+//#define ENABLE_REGPLAT
+
+/** @def ENABLE_WIFI Enable wifi support (defined in Makefile)
+ */
+//#define ENABLE_WIFI
+
+
+#ifdef ENABLE_TELETES
+
+#undef ENABLE_WEB_SERVICES
+#undef ENABLE_DVB
+#define ENABLE_IPTV
+#define ENABLE_VOD
+
+#endif
+
+
 #ifdef ENABLE_DVB
 	/** @def ENABLE_TELETEXT Enable DVB Teletext
 	 */
@@ -108,10 +144,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	 */
 	//#define ENABLE_STATS
 #endif
-
-/** @def ENABLE_WEB_SERVICES Enable Web services
- */
-#define ENABLE_WEB_SERVICES
 
 #ifdef  ENABLE_WEB_SERVICES
 #if (defined STB82) || (defined STSDK)
@@ -145,26 +177,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	 */
 	#define ENABLE_RUTUBE
 #endif
-
-/** @def HIDE_EXTRA_FUNCTIONS Remove development/extra functions from menu
- */
-#define HIDE_EXTRA_FUNCTIONS
-
-/** @def ENABLE_VIDIMAX Enable VidiMax menu, done in makefile
- */
-//#define ENABLE_VIDIMAX 1
-
-/** @def ENABLE_LAN Enable LAN if STB has second network interface (defined in build scripts)
- */
-//#define ENABLE_LAN
-
-/** @def ENABLE_REGPLAT Enable RegPlat support (defined in Makefile)
- */
-//#define ENABLE_REGPLAT
-
-/** @def ENABLE_WIFI Enable wifi support (defined in Makefile)
- */
-//#define ENABLE_WIFI
 
 /*************************************
  * STB820/810 only features

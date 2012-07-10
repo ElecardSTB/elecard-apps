@@ -53,6 +53,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "m3u.h"
 #include "xmlconfig.h"
 #include "pvr.h"
+#ifdef ENABLE_TELETES
+#include "../third_party/teletes/teletes.h"
+#endif
 
 // NETLib
 #include <service.h>
@@ -981,6 +984,12 @@ int rtp_startNextChannel(int direction, void* pArg)
 		playlist_setLastUrl(appControlInfo.rtpMenuInfo.lastUrl);
 		return playlist_startNextChannel(direction,SET_NUMBER(-1));
 	}
+#ifdef ENABLE_TELETES
+	if(appControlInfo.playbackInfo.playlistMode == playlistModeTeletes)
+	{
+		return teletes_startNextChannel(direction, NULL);
+	}
+#endif
 
 	mysem_get(rtp_semaphore);
 
@@ -1325,7 +1334,11 @@ static void rtp_setupPlayControl(void *pArg)
 		else
 			appControlInfo.playbackInfo.thumbnail[0] = 0;
 	}
-	if ( CHANNEL_CUSTOM != streamNumber || rtp.stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
+	if ( CHANNEL_CUSTOM != streamNumber || rtp.stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites
+#ifdef ENABLE_TELETES
+	     || appControlInfo.playbackInfo.playlistMode == playlistModeTeletes
+#endif
+	)
 	{
 		buttons|= interfacePlayControlPrevious|interfacePlayControlNext;
 	}
@@ -1353,6 +1366,10 @@ static void rtp_setupPlayControl(void *pArg)
 	if ( CHANNEL_CUSTOM != streamNumber || rtp.stream_info.custom_url == 0 || appControlInfo.playbackInfo.playlistMode == playlistModeFavorites)
 		interface_playControlSetChannelCallbacks(rtp_startNextChannel,
 			appControlInfo.playbackInfo.playlistMode == playlistModeFavorites ? playlist_setChannel : (appControlInfo.rtpMenuInfo.usePlaylistURL != 0 ? rtp_setChannel : NULL));
+#ifdef ENABLE_TELETES
+	if( appControlInfo.playbackInfo.playlistMode == playlistModeTeletes )
+		interface_playControlSetChannelCallbacks(teletes_startNextChannel, NULL );
+#endif
 	if( appControlInfo.playbackInfo.channel >= 0 )
 		interface_channelNumberShow(appControlInfo.playbackInfo.channel);
 #ifdef ENABLE_MULTI_VIEW

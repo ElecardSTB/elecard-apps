@@ -53,6 +53,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "dlna.h"
 #include "youtube.h"
 #include "rutube.h"
+#ifdef ENABLE_TELETES
+#include "../third_party/teletes/teletes.h"
+#endif
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h"
 #endif
@@ -773,6 +776,10 @@ int media_startNextChannel(int direction, void* pArg)
 #else
 			return 1;
 #endif
+#ifdef ENABLE_TELETES
+		case playlistModeTeletes:
+			return teletes_startNextChannel(direction, pArg);
+#endif
 	}
 	if( appControlInfo.mediaInfo.bHttp )
 	{
@@ -955,6 +962,9 @@ static void media_setupPlayControl(void* pArg)
 			case playlistModeFavorites:
 			case playlistModeYoutube:
 			case playlistModeRutube:
+#ifdef ENABLE_TELETES
+			case playlistModeTeletes:
+#endif
 				buttons |= interfacePlayControlPrevious|interfacePlayControlNext|interfacePlayControlMode;
 				break;
 		}
