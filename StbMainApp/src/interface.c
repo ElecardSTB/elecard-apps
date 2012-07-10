@@ -5563,9 +5563,8 @@ static void interface_displayPlayControl()
 			tprintf("\n");
 		}
 
-		if ( !interfaceInfo.showMenu && (interfacePlayControl.visibleFlag || interfacePlayControl.alwaysShowSlider) )
-		{
-			if (interfacePlayControl.sliderEnd > 0 && (signed)interfacePlayControl.sliderStart >= 0)
+		if ( !interfaceInfo.showMenu && (interfacePlayControl.visibleFlag || interfacePlayControl.alwaysShowSlider) &&
+			interfacePlayControl.sliderEnd > 0)
 			{
 				float value;
 				DFBRectangle rect;
@@ -5622,8 +5621,8 @@ static void interface_displayPlayControl()
 				}
 
 				interface_addEvent(interface_playControlSliderEvent, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
-			}
-		}
+			} else
+				interface_removeEvent(interface_playControlSliderEvent, NULL);
 
 		if ( interfacePlayControl.showState )
 		{
@@ -5653,7 +5652,7 @@ int interface_playControlSliderEvent(void* pArg)
 	int		ret_val;
 
 	ret_val	=	gfx_getPosition(&length_stream,&position_stream);
-		
+
 	//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
 
 	if((ret_val == 0)&&(position_stream < length_stream))
