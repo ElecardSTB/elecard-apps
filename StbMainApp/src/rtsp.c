@@ -83,7 +83,6 @@ static void rtsp_setStopTimer(int which, int length);
 static void rtsp_setStateCheckTimer(int which, int bEnable, int bRunNow);
 
 static int  rtsp_startNextChannel(int direction, void* pArg);
-static int  rtsp_getPosition(double *plength,double *pposition);
 
 static streams_struct *add_stream(streams_struct **ppstream_head, char *stream, int index);
 static int  rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
@@ -289,7 +288,7 @@ static int rtsp_stateTimerEvent(void *pArg)
 		default:
 			if (!gfx_videoProviderIsPaused(screenMain))
 			{
-				ret_val	=	rtsp_getPosition(&length_stream,&position_stream);
+				ret_val	=	gfx_getPosition(&length_stream,&position_stream);
 				//eprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
 				if((ret_val == 0)&&(position_stream <= length_stream))
 				{
@@ -597,17 +596,16 @@ int rtsp_startVideo(int which)
 
 	rtspControl.enabled = 1;
 
-	ret = rtsp_getPosition(&length_stream,&position_stream);
+	ret = gfx_getPosition(&length_stream,&position_stream);
 	if(ret == 0)
 	{
 		//dprintf("%s: start from pos %f\n", __FUNCTION__, position_stream);
-		if(rtspControl.startFromPos == 0)
-			interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-		rtsp_setStateCheckTimer(screenMain, 1, 0);
+		interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
 	}else
 	{
 		interface_playControlSlider(0, 0, 0);
 	}
+	rtsp_setStateCheckTimer(screenMain, 1, 0);
 
 	interface_displayMenu(1);
 	//rtsp_fillMenu();
@@ -756,40 +754,14 @@ static int rtsp_displayStreamMenu(void* pArg)
 	return 0;
 }
 
-int rtsp_getPosition(double *plength,double *pposition)
-{
-	double length;
-	double position;
-
-	length = gfx_getVideoProviderLength(screenMain);
-	dprintf("%s: -- length = %f \n", __FUNCTION__, length);
-	if (length<2)
-		return -1;
-
-	position = gfx_getVideoProviderPosition(screenMain);
-	dprintf("%s: -- position = %f \n", __FUNCTION__, position);
-	if (position>length)
-		return length;
-
-	*plength				=	length;
-	*pposition				=	position;
-	rtspControl.end		=	length;
-	rtspControl.start	=	position;
-
-	return 0;
-}
-
 static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 {
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
 	//int streamNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	int res = 0;
 	char url[MAX_URL];
-	int ret_val;
-	double position = 0.0, length_stream = 0.0;
 
-	dprintf("%s: in\n", __FUNCTION__);
-	eprintf("%s: in\n", __FUNCTION__);
+	dprintf("%s: in %d\n", __FUNCTION__, button);
 
 	if ( button == interfacePlayControlPrevious )
 	{
@@ -799,6 +771,7 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		rtsp_startNextChannel(0, pArg);
 	} else if ( button == interfacePlayControlSetPosition )
 	{
+		double position = 0.0;
 		if ( !appControlInfo.rtspInfo.active )
 		{
 			position					=	interface_playControlSliderGetPosition();
@@ -806,12 +779,6 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 			appControlInfo.playbackInfo.scale = 1.0;
 			rtsp_startVideo(which);
 			gfx_setVideoProviderPosition(screenMain,position);
-			ret_val	=	rtsp_getPosition(&length_stream,&position);
-			//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
-			if((ret_val == 0)&&(position <= length_stream))
-			{
-				interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position);
-			}
 			rtspControl.startFromPos	=	0;
 		} else
 		{

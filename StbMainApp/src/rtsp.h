@@ -74,8 +74,6 @@ typedef struct
 
 // dgk
 struct rtsp_control_t {
-	double start;
-	double end;
 	float scale;
 	char stopFlag;
 	char exitFlag;

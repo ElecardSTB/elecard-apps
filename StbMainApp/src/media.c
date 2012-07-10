@@ -162,7 +162,6 @@ static int  media_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 static int  media_settingsKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 
 int         media_startNextChannel(int direction, void* pArg);
-static void media_setStateCheckTimer(int which, int bEnable, int bRunNow);
 static int  media_browseFolderMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  media_upFolderMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  media_toggleMediaType(interfaceMenu_t *pMenu, void* pArg);
@@ -1050,10 +1049,6 @@ void media_notifyHlsReady()
 int media_check_status(void *pArg)
 {
 	DFBVideoProviderStatus status;
-	double 	length_stream;
-	double 	position_stream;
-	int		ret_val;
-
 
 	status = gfx_getVideoProviderStatus(screenMain);
 
@@ -1098,21 +1093,20 @@ int media_check_status(void *pArg)
 			// fall through
 #endif
 		default:
-			ret_val	=	gfx_getPosition(&length_stream,&position_stream);
+#ifdef STBPNX
+			if(!appControlInfo.mediaInfo.paused)
+			{
+				double 	length_stream;
+				double 	position_stream;
+				int ret_val	=	gfx_getPosition(&length_stream,&position_stream);
 
-			//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
-			if((ret_val == 0)&&(position_stream < length_stream))
-			{
-				interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-			}
-			else if( ret_val == 0 )
-			{
-				if(!appControlInfo.mediaInfo.paused)
+				//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
+				if((ret_val == 0)&&(position_stream >= length_stream))
 				{
 					media_onStop();
 				}
 			}
-			
+#endif
 			if( interfaceInfo.notifyText[0] != 0 && appControlInfo.playbackInfo.scale == 1.0 )
 			{
 				interface_notifyText(NULL, 1);
@@ -1999,88 +1993,6 @@ void media_buildMediaMenu(interfaceMenu_t *pParent)
 
 	mysem_create(&media_semaphore);
 	mysem_create(&slideshow_semaphore);
-}
-
-static int media_stateTimerEvent(void *pArg)
-{
-	int which = CHANNEL_INFO_GET_SCREEN(GET_NUMBER(pArg));
-	double 	length_stream;
-	double 	position_stream;
-	int		ret_val;
-
-	if (gfx_getVideoProviderStatus(which) == DVSTATE_FINISHED)
-	{
-		interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 3000);
-		interface_playControlSlider(0,0,0);
-		switch(appControlInfo.mediaInfo.playbackMode)
-		{
-		case playback_sequential:
-			media_startNextChannel(0,NULL);
-			break;
-		default:
-			media_stopPlayback();
-			break;
-		}
-	} else
-	{
-		ret_val	=	gfx_getPosition(&length_stream,&position_stream);
-		
-		//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
-
-		if((ret_val == 0)&&(position_stream < length_stream))
-		{
-			interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-		}
-		else if( ret_val == 0 )
-		{
-			if(!appControlInfo.mediaInfo.paused)
-			{
-				switch(appControlInfo.mediaInfo.playbackMode)
-				{
-				case playback_sequential:
-					media_startNextChannel(0,NULL);
-					break;
-				case playback_looped:
-					media_stopPlayback();
-					media_startPlayback();
-					break;
-				default:
-					eprintf ("%s: media_stopPlayback...\n", __FUNCTION__);
-					media_stopPlayback();
-					break;
-				}
-			}
-		}
-		media_setStateCheckTimer(which, 1, 0);
-		if( interfaceInfo.notifyText[0] != 0 && appControlInfo.playbackInfo.scale == 1.0 )
-		{
-			interface_notifyText(NULL, 1);
-		}
-	}
-
-	return 0;
-}
-
-static void media_setStateCheckTimer(int which, int bEnable, int bRunNow)
-{
-	dprintf("%s: %s state timer\n", __FUNCTION__, bEnable ? "set" : "unset");
-
-	if (bEnable)
-	{
-		if (bRunNow)
-		{
-			//dprintf("%s: Update slider\n", __FUNCTION__);
-			media_stateTimerEvent(CHANNEL_INFO_SET(which, 0));
-		}
-		interface_addEvent(media_stateTimerEvent, CHANNEL_INFO_SET(which, 0), 1000, 1);
-	} else
-	{
-		interface_removeEvent(media_stateTimerEvent, CHANNEL_INFO_SET(which, 0));
-		if( interfaceInfo.notifyText[0] != 0 && appControlInfo.playbackInfo.scale == 1.0)
-		{
-			interface_notifyText(NULL, 1);
-		}
-	}
 }
 
 /* File browser */

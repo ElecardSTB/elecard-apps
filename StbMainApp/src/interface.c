@@ -104,6 +104,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define INTERFACE_CHANNEL_CONTROL_TIMEOUT (2000)
 
+#define INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT (1000)
+
 //#define INTERFACE_DRAW_ARROW
 
 /***********************************************
@@ -162,6 +164,8 @@ static void interface_animateMenu(int flipFB, int animate);
 static int  interface_animationFrameEvent(void *pArg);
 
 static void interface_displayPlayControl();
+
+static int  interface_playControlSliderEvent(void *pArg);
 
 static inline void interface_displayPlayState();
 
@@ -5616,6 +5620,8 @@ static void interface_displayPlayControl()
 					// Green cursor INTERFACE_HIGHLIGHT_BORDER_RED, INTERFACE_HIGHLIGHT_BORDER_GREEN, INTERFACE_HIGHLIGHT_BORDER_BLUE
 					gfx_drawRectangle(DRAWING_SURFACE, 231, 120, 23, INTERFACE_HIGHLIGHT_BORDER_ALPHA, rect.x+rect.w*value, rect.y-rect.h, interfaceInfo.borderWidth*2, rect.h+rect.h*2);
 				}
+
+				interface_addEvent(interface_playControlSliderEvent, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
 			}
 		}
 
@@ -5638,6 +5644,26 @@ static void interface_displayPlayControl()
 	}
 
 	interface_slideshowControlDisplay();
+}
+
+int interface_playControlSliderEvent(void* pArg)
+{
+	double 	length_stream;
+	double 	position_stream;
+	int		ret_val;
+
+	ret_val	=	gfx_getPosition(&length_stream,&position_stream);
+		
+	//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
+
+	if((ret_val == 0)&&(position_stream < length_stream))
+	{
+		interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
+		interface_displayMenu(1);
+	}
+	interface_addEvent(interface_playControlSliderEvent, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
+
+	return 0;
 }
 
 #define DRAW_SSHOW_BUTTON(btnid, num)	row = interfaceSlideshowControl.highlightedButton == btnid; \
@@ -6366,6 +6392,7 @@ void interface_playControlHide(int redraw)
 {
 	interfacePlayControl.visibleFlag = 0;
 	interfaceSlideshowControl.visibleFlag = 0;
+	interface_removeEvent(interface_playControlSliderEvent, NULL);
 	interface_removeEvent(interface_playControlSetVisible, (void*)0);
 	if ( redraw )
 	{
