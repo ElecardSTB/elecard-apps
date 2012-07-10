@@ -167,6 +167,11 @@ static int  media_browseFolderMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  media_upFolderMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  media_toggleMediaType(interfaceMenu_t *pMenu, void* pArg);
 static int  media_toggleSlideshowMode(interfaceMenu_t *pMenu, void* pArg);
+#ifndef STBPNX
+static void media_slideshowReleaseImage(void);
+#else
+static inline void media_slideshowReleaseImage(void) {}
+#endif
 
 static void media_freeBrowseInfo();
 
@@ -1205,7 +1210,13 @@ int media_slideshowStart()
 		interfaceSlideshowControl.highlightedButton = slideshowButton;
 
 		appControlInfo.slideshowInfo.state = appControlInfo.slideshowInfo.defaultState;
+#ifdef STBPNX
 		if(gfx_decode_and_render_Image(appControlInfo.slideshowInfo.filename) != 0)
+#else
+		IDirectFBSurface *pImage = gfx_decodeImage(appControlInfo.slideshowInfo.filename,
+			interfaceInfo.screenWidth, interfaceInfo.screenHeight, 0);
+		if (!pImage)
+#endif
 		{
 			interface_showMessageBox(_T("ERR_PLAY_FILE"), thumbnail_usb_image, 3000);
 			failedDir = rindex(media_failedImage,'/');
@@ -1223,7 +1234,10 @@ int media_slideshowStart()
 		{
 			goto failure;
 		}
-		gfx_showImage(screenPip); //actually show picture
+#ifdef STBPNX
+		//actually show picture
+		gfx_showImage(screenPip);
+#endif
 		if( appControlInfo.slideshowInfo.state > slideshowImage )
 		{
 			interface_addEvent(media_slideshowEvent, NULL, appControlInfo.slideshowInfo.timeout, 1);
@@ -1363,6 +1377,17 @@ static int media_slideshowEvent(void *pArg)
 	return result;
 }
 
+#ifndef STBPNX
+void media_slideshowReleaseImage(void)
+{
+	stb810_gfxImageEntry *entry = gfx_findImageEntryByName(appControlInfo.slideshowInfo.filename);
+	if (entry)
+		gfx_releaseImageEntry(entry);
+	else
+		eprintf("%s: warning: failed to release image entry for %s\n", __FUNCTION__, appControlInfo.slideshowInfo.filename);
+}
+#endif
+
 int  media_slideshowNext(int direction)
 {
 	int             indexChange = (direction?-1:1);
@@ -1437,6 +1462,7 @@ int  media_slideshowNext(int direction)
 
 	if (new_index >= 0)
 	{
+		media_slideshowReleaseImage();
 		strcpy(&delimeter[1],imageDirEntries[new_index]->d_name);
 	}
 
@@ -1458,7 +1484,10 @@ int media_slideshowStop(int disable)
 	gfx_waitForProviders();
 	mysem_get(slideshow_semaphore);
 	interface_removeEvent(media_slideshowEvent, NULL);
+#ifdef STBPNX
 	gfx_hideImage(screenPip);
+#endif
+	media_slideshowReleaseImage();
 	mysem_release(slideshow_semaphore);
 	interfaceSlideshowControl.enabled = disable ? 0 : helperFileExists(appControlInfo.slideshowInfo.filename);
 	interface_disableBackground();

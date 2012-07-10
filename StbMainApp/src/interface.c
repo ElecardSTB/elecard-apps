@@ -1803,6 +1803,15 @@ void interface_displayBackground()
 		}
 	}
 #endif // !STB225 && !STSDK
+#ifndef STBPNX
+	if (appControlInfo.slideshowInfo.state != slideshowDisabled)
+	{
+		interface_drawImage(DRAWING_SURFACE, appControlInfo.slideshowInfo.filename,
+		                    interfaceInfo.screenWidth/2, interfaceInfo.screenHeight/2,
+		                    interfaceInfo.screenWidth,   interfaceInfo.screenHeight,
+		                    0, NULL, DSBLIT_NOFX, interfaceAlignCenter|interfaceAlignMiddle, NULL, NULL);
+	}
+#endif
 }
 
 
