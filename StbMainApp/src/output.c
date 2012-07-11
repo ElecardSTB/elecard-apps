@@ -6504,14 +6504,14 @@ int output_writeInterfacesFile(void)
 
 #ifdef ENABLE_WIFI
 	setParam(WLAN_CONFIG_FILE, "WAN_MODE", wifiInfo.wanMode ? "1" : "0");
-	setParam(WAN_CONFIG_FILE, "BOOTPROTO", wifiInfo.dhcp ? "dhcp" : "static");
+	setParam(WLAN_CONFIG_FILE, "BOOTPROTO", wifiInfo.dhcp ? "dhcp" : "static");
 	if (wifiInfo.wlan.ip.s_addr != 0)
-		setParam(WAN_CONFIG_FILE, "IPADDR", inet_ntoa(wifiInfo.wlan.ip));
+		setParam(WLAN_CONFIG_FILE, "IPADDR", inet_ntoa(wifiInfo.wlan.ip));
 	if (wifiInfo.wlan.mask.s_addr == 0)
 		wifiInfo.wlan.mask.s_addr = 0x00ffffff;
-	setParam(WAN_CONFIG_FILE, "NETMASK", inet_ntoa(wifiInfo.wlan.mask));
+	setParam(WLAN_CONFIG_FILE, "NETMASK", inet_ntoa(wifiInfo.wlan.mask));
 	if (wifiInfo.wlan.gw.s_addr != 0)
-		setParam(WAN_CONFIG_FILE, "DEFAULT_GATEWAY", inet_ntoa(wifiInfo.wlan.gw));
+		setParam(WLAN_CONFIG_FILE, "DEFAULT_GATEWAY", inet_ntoa(wifiInfo.wlan.gw));
 
 	if (wifiInfo.wanMode)
 	{
