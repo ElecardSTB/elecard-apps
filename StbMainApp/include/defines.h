@@ -194,6 +194,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#define ENABLE_VOIP_CONFERENCE
 #endif
 
+
 /** @def ENABLE_PASSWORD Enable password protection of settings (defined in Makefile)
  */
 //#define ENABLE_PASSWORD
@@ -229,6 +230,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //#define ENABLE_PROVIDER_PROFILES
 
 #endif // STB82
+
+
+#ifdef ENABLE_TVMYWAY
+
+#undef ENABLE_RUTUBE
+#undef ENABLE_DVB
+#undef ENABLE_VOIP
+#define ENABLE_PLAYLIST_HTTP_HEADER
+
+#endif //TVMYWAY
 
 /* Other common options */
 
