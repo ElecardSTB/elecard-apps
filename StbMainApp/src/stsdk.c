@@ -54,7 +54,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define RPC_POOL_SIZE (32)
 
 //#define RPC_POOL_TRACE
-//#define RPC_TRACE "/var/log/mainapp_rpc.log"
+//#define RPC_TRACE eprintf
+#ifndef RPC_TRACE
+#define RPC_TRACE(x...)
+#endif
+//#define RPC_DUMP "/var/log/mainapp_rpc.log"
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -135,7 +139,7 @@ static const struct { fe_modulation_t value; const char *name; } modulation_name
 #endif
 static rpcPool_t pool;
 
-#ifdef RPC_TRACE
+#ifdef RPC_DUMP
 static int st_rpc_fd = -1;
 #endif
 
@@ -157,8 +161,8 @@ int st_init(void)
 
 	memset(&pool, 0, sizeof(pool));
 
-#ifdef RPC_TRACE
-	st_rpc_fd = open(RPC_TRACE, O_CREAT|O_WRONLY);
+#ifdef RPC_DUMP
+	st_rpc_fd = open(RPC_DUMP, O_CREAT|O_WRONLY);
 	if (st_rpc_fd < 0)
 		exit(110);
 #endif
@@ -226,7 +230,7 @@ void st_terminate(void )
 		pool.thread = 0;
 	}
 	client_destroy(&pool.socket);
-#ifdef RPC_TRACE
+#ifdef RPC_DUMP
 	close(st_rpc_fd);
 	st_rpc_fd = -1;
 #endif
@@ -290,7 +294,8 @@ int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, voi
 	pool.waiting[i].msg  = msg;
 	dprintf("%s[%2d]: -> %s\n", __FUNCTION__, i, msg);
 #endif
-#ifdef RPC_TRACE
+	RPC_TRACE("st: -> %s\n", msg);
+#ifdef RPC_DUMP
 	write(st_rpc_fd, msg, strlen(msg));
 	write(st_rpc_fd, "\n", 1);
 #endif
@@ -308,6 +313,23 @@ int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, voi
 	free(msg);
 #endif
 	return res;
+}
+
+void st_cancelAsync(int index, int execute)
+{
+	if (index < 0 || index >= RPC_POOL_SIZE)
+	{
+		eprintf("%s: index %d is out of range!\n", __FUNCTION__, index);
+		return;
+	}
+#ifdef RPC_POOL_TRACE
+	dprintf("%s[%2d]: cancel %s\n", __FUNCTION__, index, pool.waiting[index].msg);
+#endif
+	if (execute && pool.waiting[index].callback)
+	{
+		pool.waiting[index].callback(elcdRpcInvalid, NULL, pool.waiting[index].pArg);
+	}
+	st_poolFreeAt(index);
 }
 
 void st_syncCallback(elcdRpcType_t type, cJSON *result, void* pArg)
@@ -402,6 +424,7 @@ static void* st_poolThread(void* pArg)
 			continue;
 		}
 
+		RPC_TRACE("st: <- %s\n", buf);
 		msg = cJSON_Parse( buf );
 		if( !msg )
 		{
