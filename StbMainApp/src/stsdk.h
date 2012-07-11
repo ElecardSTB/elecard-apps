@@ -90,6 +90,12 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout, elcdRpcT
  */
 int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, void *pArg);
 
+/** Cancel queued asynchronous call.
+ * 
+ * @param[in] execute Call queued callback with type == invalid, empty result and saved pArg
+ */
+void st_cancelAsync(int index, int execute);
+
 #ifdef ENABLE_DVB
 int st_getDvbTuner(void);
 void st_setTuneParams(int tuner, cJSON *params);
