@@ -163,10 +163,10 @@ typedef struct
 } outputNfaceInfo_t;
 
 typedef enum {
-	lanStatic = 0,
-	lanDhcpServer,
-	lanDhcpClient,
+	lanDhcpServer = 0,
 	lanBridge,
+	lanDhcpClient,
+	lanStatic,
 	lanModeCount
 } lanMode_t;
 
