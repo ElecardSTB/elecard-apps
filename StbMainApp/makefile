@@ -524,12 +524,12 @@ H_FILES += $(wildcard src/*.h)
 
 LOCAL_CXXFLAGS += $(LOCAL_CFLAGS)
 
-all: $(OBJECTS) $(PROGRAM) install $(INSTALL_EXTRA)
+all: $(OBJECTS) $(PROGRAM) install
 
 $(PROGRAM): $(OBJECTS) $(DEPENDS_EXTRA)
 	$(CXX) -o $(PROGRAM) $(OBJECTS) $(LOCAL_LDFLAGS)
 
-install: $(PROGRAM)
+install: $(PROGRAM) $(INSTALL_EXTRA)
 	$(Q)mkdir -p $(INSTALL_DIR) $(DATA_DIR) $(DEFAULTS_DIR)
 	$(Q)install -m0755 $(PROGRAM) $(INSTALL_DIR)
 
