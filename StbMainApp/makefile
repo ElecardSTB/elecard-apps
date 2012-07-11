@@ -89,7 +89,7 @@ ifeq ($(REVISION),)
 REVISION := $(shell svnversion .)
 endif
 
-COMPILE_TIME := $(shell date)
+COMPILE_TIME ?= $(shell date)
 
 RELEASE_TYPE ?= Custom
 

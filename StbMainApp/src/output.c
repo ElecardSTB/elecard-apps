@@ -3935,8 +3935,12 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	interface_displayMenu(1);
 #endif // STB82
 
-#endif // STBxx
 	sprintf(temp, "%s: %s\n%s: %s\n%s: %s\n", _T("APP_RELEASE"), RELEASE_TYPE, _T("APP_VERSION"), REVISION, _T("COMPILE_TIME"), COMPILE_TIME);
+#endif // STBxx
+
+#ifdef STSDK
+	sprintf(temp, "%s: %s\n%s: %s\n", _T("APP_RELEASE"), RELEASE_TYPE, _T("COMPILE_TIME"), COMPILE_TIME);
+#endif
 	strcat(info_text,temp);
 
 #ifdef STB82

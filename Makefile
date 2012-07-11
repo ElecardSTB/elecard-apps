@@ -19,7 +19,7 @@ ifeq ($(CONFIG_ELECD_ENABLE),y)
 #in output.c StbMainApp.c uses RELEASE_TYPE and REVISION defines, so we should rebuild them
 	cd StbMainApp/src && rm -f libvidimax.a output.o StbMainApp.o
 	make CROSS_COMPILE=sh4-linux- BUILD_TARGET=sh4/ -C ./StbMainApp/DLNALib all
-	make CROSS_COMPILE=sh4-linux- RELEASE_TYPE="$(ROOTFSVER) built $(DATE_READABLE) @ $(HOSTNAME)" REVISION="$(ROOTFSVER_GIT)" -C ./StbMainApp all
+	make CROSS_COMPILE=sh4-linux- RELEASE_TYPE="$(REVISION) built on $(HOSTNAME)" COMPILE_TIME="$(DATE_READABLE)" -C ./StbMainApp all
 endif
 
 install-apps: build-apps
