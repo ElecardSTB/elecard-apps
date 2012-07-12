@@ -536,7 +536,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	char *fmt_url_map;
 #ifdef STBPNX
-	int supported_formats[] = { 34, 18, 0 };
+	int supported_formats[] = { 18, 34, 0 };
 #else
 	int supported_formats[] = { 37, 22, 18, 35, 34, 0 };
 #endif
