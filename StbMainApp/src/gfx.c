@@ -93,6 +93,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define FIELD_WAIT  (15000)
 #define ROUND_UP(x) ((((x)+1)/2)*2)
 
+//#define TRACE_PROVIDERS
+#ifdef  TRACE_PROVIDERS
+#define pprintf eprintf
+#else
+#define pprintf(x...)
+#endif
+
+
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
@@ -106,12 +114,23 @@ typedef enum
 }eventThreadState_t;
 #endif
 
+typedef enum
+{
+	providerNone   = 0,
+	providerActive = 1,
+	providerInit,
+} providerState_t;
+
 typedef struct
 {
 	char                     name[MAX_URL];
 	int                      active;
 	bool                     paused;    /* Is Instance paused? */
 	double                   savedPos;
+#ifdef STSDK
+	// Waiting for rpc answer: negative if none, queue index otherwise
+	int                      waiting;
+#endif
 #ifdef STBxx
 	IDirectFBVideoProvider * instance;
 #ifdef STB225
@@ -164,6 +183,12 @@ static void gfx_formatChange(void);
 static DFBEnumerationResult gfx_display_layer_callback( DFBDisplayLayerID           id,
 														DFBDisplayLayerDescription  desc,
 														void                       *arg );
+static void gfx_setVideoProviderName(const char *videoSource);
+#ifdef STSDK
+static inline float st_getTimeValue (cJSON *object, const char *value_name);
+static void gfx_videoProviderCreated(elcdRpcType_t type, cJSON *result, void* pArg);
+static void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *result, void* pArg);
+#endif
 
 /******************************************************************
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
@@ -1137,6 +1162,15 @@ int gfx_setSpeed(int videoLayer, double multiplier)
 {
 	int result = 1;
 
+#ifdef STSDK
+	if (gfx_videoProvider.active == providerInit)
+	{
+		pprintf("%s(%d): not ready\n", __FUNCTION__, videoLayer);
+		return result;
+	}
+#endif
+	pprintf("%s(%d): %.1f\n", __FUNCTION__, videoLayer, multiplier);
+
 #ifdef STB6x8x
 	if (gfx_videoProvider.instance && gfx_videoProvider.active)
 	{
@@ -1198,6 +1232,12 @@ DFBVideoProviderStatus gfx_getVideoProviderStatus (int videoLayer)
 	}
 #endif
 #ifdef STSDK
+	if (gfx_videoProvider.active == providerInit)
+	{
+		pprintf("%s(%d): not ready\n", __FUNCTION__, videoLayer);
+		return result;
+	}
+
 	elcdRpcType_t type;
 	cJSON        *res = NULL;
 	int           ret;
@@ -1219,10 +1259,10 @@ DFBVideoProviderStatus gfx_getVideoProviderStatus (int videoLayer)
 		//else if (strcmp (res->valuestring, "buffering") == 0)
 		//	result = DVSTATE_BUFFERING;
 	}
-	//dprintf ("%s: %s\n", __FUNCTION__, (result == DVSTATE_FINISHED)?"DVSTATE_FINISHED" : ((result == DVSTATE_STOP) ? "DVSTATE_STOP" : "DVSTATE_PLAY"));
-	
 	cJSON_Delete(res);
 #endif
+	pprintf("%s(%d): 0x%08x\n", __FUNCTION__, videoLayer, result);
+
 	return result;
 }
 
@@ -1298,6 +1338,7 @@ int gfx_enableVideoProviderSecureMedia(int videoLayer)
 int gfx_resumeVideoProvider(int videoLayer)
 {
 	int result = 0;
+	pprintf("%s(%d): in\n", __FUNCTION__, videoLayer);
 #ifdef STBxx
 	IDirectFBSurface * pSurface;
 
@@ -1323,43 +1364,26 @@ int gfx_resumeVideoProvider(int videoLayer)
 	}
 #endif
 #ifdef STSDK
-	elcdRpcType_t type;
-	cJSON        *res   = NULL;
-	int           ret;
-	int timeout  = RPC_SETSTREAM_TIMEOUT;
+	if (gfx_videoProvider.waiting >= 0)
+	{
+		pprintf("%s(%d): not ready\n", __FUNCTION__, videoLayer);
+		return 0;
+	}
 
-	if( timeout < appControlInfo.rtpMenuInfo.pidTimeout )
-		timeout = appControlInfo.rtpMenuInfo.pidTimeout;
+	elcdRpcType_t type;
+	cJSON        *param = NULL;
 		
 	if (gfx_videoProvider.savedPos > 0){
-		cJSON *param = cJSON_CreateNumber((int)gfx_videoProvider.savedPos);
-		
-		eprintf("%s: elcmd_play, startPos = %d, timeout %2d play\n", __func__, timeout, (int)gfx_videoProvider.savedPos);
-		ret = st_rpcSyncTimeout( elcmd_play, param, timeout, &type, &res );
-		
-		cJSON_Delete(param);
+		param = cJSON_CreateNumber((int)gfx_videoProvider.savedPos);
+		pprintf("%s: elcmd_play, startPos = %d, play\n", __func__, (int)gfx_videoProvider.savedPos);
 	}
 	else {
-		eprintf("%s: elcmd_play, timeout %2d play\n", __func__, timeout);
-		ret = st_rpcSyncTimeout( elcmd_play, NULL, timeout, &type, &res );
+		pprintf("%s: elcmd_play, play\n", __func__);
 	}
-	if( ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String )
-	{
-		if( strcmp(res->valuestring, "ok") )
-		{
-			eprintf("%s: playback failed: %s\n", __FUNCTION__, res->valuestring);
-			result = -1;
-			goto finished;
-		}
-	} else
-	{
-		result = -1;
-		goto finished;
-	}
-	gfx_videoProvider.active = 1;
-	gfx_videoProvider.paused = 0;
-finished:
-	cJSON_Delete(res);
+
+	gfx_videoProvider.waiting = st_rpcAsync( elcmd_play, param, gfx_videoProviderStarted, NULL);
+	cJSON_Delete(param);
+
 #endif
 	return result;
 }
@@ -1401,8 +1425,9 @@ float getHttpVideoLength (const char * videoSource)
 	appInfo_setCurlProxy(curl);
 	
 	res = curl_easy_perform(curl);
+	(void)res;
 
-	dprintf("%s: 0x%2x: %s. Duration = %f\n", __FUNCTION__, res, curl_easy_strerror(res), httpDuration);
+	pprintf("%s: 0x%02x: %s. Duration = %.2f\n", __FUNCTION__, res, curl_easy_strerror(res), httpDuration);
 	curl_easy_cleanup(curl);
 	return httpDuration;
 }	
@@ -1416,11 +1441,20 @@ void gfx_setStartPosition (int videoLayer, long posInSec)
 }
 #endif
 
+void gfx_setVideoProviderName(const char* videoSource)
+{
+	size_t source_len = strlen(videoSource);
+	if (source_len < sizeof(gfx_videoProvider.name))
+		memcpy(gfx_videoProvider.name, videoSource, source_len+1);
+	else
+		gfx_videoProvider.name[0] = 0;
+}
+
 int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, char* options)
 {
 	int result = 0;
 
-	dprintf("gfx: Video provider required is %s - current is %s\n", videoSource, gfx_videoProvider.name);
+	pprintf("%s(%d): %d %s (%s)\n", __FUNCTION__, videoLayer, force, videoSource, options);
 #ifdef STBxx
 	IDirectFBSurface * pSurface;
 
@@ -1431,7 +1465,7 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 #else
 	pSurface = NULL;
 #endif
-	if ( strcmp(videoSource, gfx_videoProvider.name) || force )
+	if ( force || strcmp(videoSource, gfx_videoProvider.name) )
 	{
 		int err;
 		if (gfx_videoProvider.instance)
@@ -1457,11 +1491,7 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 			eprintf("gfx: %s not supported by installed video providers!\n", videoSource);
 			result = -1;
 		}
-		size_t source_len = strlen(videoSource);
-		if (source_len < sizeof(gfx_videoProvider.name))
-			memcpy(gfx_videoProvider.name, videoSource, source_len+1);
-		else
-			gfx_videoProvider.name[0] = 0;
+		gfx_setVideoProviderName(videoSource);
 	}
 
 	if ( gfx_videoProvider.instance )
@@ -1582,86 +1612,49 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 	}
 #endif //STBxx
 #ifdef STSDK
-	elcdRpcType_t type;
-	cJSON        *res   = NULL;
-	int           ret;
-	int timeout  = RPC_SETSTREAM_TIMEOUT;
-	cJSON *param = NULL;
-
-	if ( strcmp(videoSource, gfx_videoProvider.name) || force )
+	if ( force || strcmp(videoSource, gfx_videoProvider.name) )
 	{
-		ret = st_rpcSync( elcmd_stop, NULL, &type, &res );
-		cJSON_Delete(res);
-		res = NULL;
-		ret = st_rpcSync( elcmd_closestream, NULL, &type, &res );
-		cJSON_Delete(res);
-		res = NULL;
+		gfx_stopVideoProvider(videoLayer, 1, 1);
 
-		if( timeout < appControlInfo.rtpMenuInfo.pidTimeout )
-			timeout = appControlInfo.rtpMenuInfo.pidTimeout;
-
-		gfx_videoProvider.active  = 0;
-		gfx_videoProvider.paused  = 0;
 		gfx_videoProvider.name[0] = 0;
+		gfx_videoProvider.active = providerInit;
 
-		if (gfx_videoProvider.savedPos > 0){
-			
-			eprintf("%s: elcmd_setstream, src = %s, posInSec = %d\n", __func__, 
-			    videoSource, (int)gfx_videoProvider.savedPos);
-			cJSON *compositParam = cJSON_CreateArray();
-			cJSON_AddItemToArray (compositParam, cJSON_CreateString(videoSource) );
-			cJSON_AddItemToArray (compositParam, cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
-			
-			ret = st_rpcSyncTimeout( elcmd_setstream, compositParam, timeout, &type, &res );
-			
-			cJSON_Delete(compositParam);
-		}
-		else {
-			eprintf("%s: elcmd_setstream, timeout %2d %s\n", __func__, timeout, videoSource);
-			param = cJSON_CreateString(videoSource);
-			ret = st_rpcSyncTimeout( elcmd_setstream, param, timeout, &type, &res );
-		}		
-		if( ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String )
+		cJSON *param = NULL;
+
+		if (gfx_videoProvider.savedPos > 0)
 		{
-			if( strcmp(res->valuestring, "ok") )
-			{
-				eprintf("%s: %s is not supported: %s\n", __FUNCTION__, videoSource, res->valuestring);
-				result = -1;
-				goto finished;
-			}
+			pprintf("%s: elcmd_setstream %s, posInSec = %d\n",
+			    __func__, videoSource, (int)gfx_videoProvider.savedPos);
+			param = cJSON_CreateArray();
 
-			size_t source_len = strlen(videoSource);
-			if (source_len < sizeof(gfx_videoProvider.name))
-				memcpy(gfx_videoProvider.name, videoSource, source_len+1);
-			else
-				gfx_videoProvider.name[0] = 0;
+			cJSON_AddItemToArray (param, cJSON_CreateString(videoSource) );
+			cJSON_AddItemToArray (param, cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
 		} else
 		{
-			result = -1;
-			goto finished;
+			pprintf("%s: elcmd_setstream %s\n",
+				__func__, videoSource);
+			param = cJSON_CreateString(videoSource);
 		}
-		cJSON_Delete(res);
-		res = NULL;
-	}
+		gfx_videoProvider.waiting = st_rpcAsync( elcmd_setstream, param, gfx_videoProviderCreated, NULL);
 
-	gfx_resumeVideoProvider(videoLayer);
+		if (gfx_videoProvider.waiting >= 0)
+		{
+			gfx_setVideoProviderName(videoSource);
+			
+			float len = getHttpVideoLength (gfx_videoProvider.name);
+			if( len > 0.0 )
+				eprintf ("%s: http len = %.2f\n", __FUNCTION__, len);
 
-	float len = getHttpVideoLength (videoSource);
-	if( len > 0.0 )
-		eprintf ("%s: http len = %f\n", __FUNCTION__, len);
-
-finished:
-	cJSON_Delete(res);
-	res = NULL;
-	cJSON_Delete(param);
-	param = NULL;
-
-	if( result != 0 )
+			result = 0;
+		} else
+		{
+			gfx_videoProvider.active = 0;
+		}
+		cJSON_Delete(param);
+	} else
 	{
-		ret = st_rpcSync( elcmd_stop, NULL, &type, &res );
-		cJSON_Delete(res);
+		result = gfx_resumeVideoProvider(videoLayer);
 	}
-
 #endif // STSDK
 	if ( (appControlInfo.playbackInfo.audioStatus == audioMute) && (videoLayer == screenMain) )
 	{
@@ -1673,6 +1666,89 @@ finished:
 #endif
 	return result;
 }
+
+#ifdef STSDK
+static void gfx_videoProviderGetTimes(elcdRpcType_t type, cJSON *res, void* pArg)
+{
+	gfx_videoProvider.waiting = -1;
+
+	if ( type == elcdRpcResult && res && res->type == cJSON_Object )
+	{
+		double position = st_getTimeValue(res, "current");
+		double length   = httpDuration > 0.0 ? httpDuration :
+	           st_getTimeValue(res, "total");
+		if (position < length)
+		{
+			interface_playControlSlider(0, (unsigned int)length, (unsigned int)position);
+			if (!interfaceInfo.showMenu && interface_playControlSliderIsVisible())
+			{
+				interface_displayMenu(1);
+			}
+		}
+		pprintf("%s: %.2f/%.2f\n", __FUNCTION__, position, length);
+	}
+#ifdef TRACE_PROVIDERS
+	else pprintf("%s: failed\n", __FUNCTION__);
+#endif
+	cJSON_Delete(res);
+}
+
+static int st_checkSuccess(elcdRpcType_t type, cJSON *res, const char *msg)
+{
+	if ( type != elcdRpcResult || !res || res->type != cJSON_String )
+	{
+		eprintf("%s: playback failed: %s\n", msg, res&&res->type==cJSON_String?res->valuestring:"unknown error");
+		gfx_videoProvider.active = 0;
+		return 0;
+	}
+
+	if ( strcmp(res->valuestring, "ok") )
+	{
+		eprintf("%s: playback not successfull: %s\n", msg, gfx_videoProvider.name, res->valuestring);
+		gfx_videoProvider.active = 0;
+		return 0;
+	}
+
+	return 1;
+}
+
+void gfx_videoProviderCreated(elcdRpcType_t type, cJSON *res, void* pArg)
+{
+#ifdef TRACE_PROVIDERS
+	char *res_str = cJSON_Print(res);
+	pprintf("%s: %s %s\n", __FUNCTION__, type==elcdRpcResult?"result":"error", res_str);
+	FREE(res_str);
+#endif
+	gfx_videoProvider.waiting = -1;
+
+	if (st_checkSuccess(type, res, __FUNCTION__) &&
+	    gfx_resumeVideoProvider(screenMain))
+	{
+		gfx_videoProvider.active = 0;
+	}
+
+	cJSON_Delete(res);
+}
+
+void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
+{
+#ifdef TRACE_PROVIDERS
+	char *res_str = cJSON_Print(res);
+	pprintf("%s: %s %s\n", __FUNCTION__, type==elcdRpcResult?"result":"error", res_str);
+	FREE(res_str);
+#endif
+	gfx_videoProvider.waiting = -1;
+
+	if (st_checkSuccess(type, res, __FUNCTION__))
+	{
+		gfx_videoProvider.active = 1;
+
+		gfx_videoProvider.waiting = st_rpcAsync(elcmd_times, NULL, gfx_videoProviderGetTimes, NULL);
+	}
+
+	cJSON_Delete(res);
+}
+#endif // STSDK
 
 #ifdef STB82
 void gfx_setupTrickMode(int videoLayer, stb810_trickModeDirection direction, stb810_trickModeSpeed speed)
@@ -2688,6 +2764,7 @@ void gfx_showVideoLayer (int videoLayer)
 
 void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 {
+	pprintf("%s(%d): %s %s\n", __FUNCTION__, videoLayer, force?"force":"", hideLayer?"hide":"");
 #ifdef STBPNX
 	if (hideLayer)
 	{
@@ -2700,7 +2777,6 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 		mysem_get(gfx_semaphore);
 
 		eprintf("gfx: Stopping current video provider (%s)\n", gfx_videoProvider.name);
-		dprintf("gfx: Stopping current video provider\n");
 		if (appControlInfo.inStandby)
 		{
 			gfx_videoProvider.instance->GetPos(gfx_videoProvider.instance, 
@@ -2755,6 +2831,12 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 	}
 #endif // STBxx
 #ifdef STSDK
+	if (gfx_videoProvider.waiting >= 0)
+	{
+		st_cancelAsync(gfx_videoProvider.waiting, 0);
+		gfx_videoProvider.waiting = -1;
+	}
+
 	elcdRpcType_t type;
 	cJSON        *res = NULL;
 	int           ret;
@@ -2779,7 +2861,17 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 		gfx_videoProvider.name[0] = 0;
 	}
 #endif
-	eprintf ("gfx: Done with video provider\n");
+#ifdef TRACE_PROVIDERS
+#ifdef STBPNX
+	pprintf ("%s(%d): out | active %d paused %d instance %d\n", __FUNCTION__, videoLayer,
+		gfx_videoProvider.active, gfx_videoProvider.paused, gfx_videoProvider.instance != NULL);
+#else
+	pprintf ("%s(%d): out | active %d paused %d\n", __FUNCTION__, videoLayer,
+		gfx_videoProvider.active, gfx_videoProvider.paused);
+#endif
+#else
+	eprintf ("gfx: Video provider stopped\n");
+#endif
 }
 
 void gfx_stopVideoProviders (int which)
@@ -2841,12 +2933,16 @@ double gfx_getVideoProviderPosition(int videoLayer)
 			position = gfx_getVideoProviderLength(videoLayer);
 			mysem_get(gfx_semaphore);
 		}
-		dprintf("gfx: Got video provider position: %f\n", position);
-		//eprintf("gfx: Got video provider position: %f\n", position);
 	}
 	mysem_release(gfx_semaphore);
 #endif
 #ifdef STSDK
+	if (gfx_videoProvider.active == providerInit)
+	{
+		pprintf("%s(%d): not ready\n", __FUNCTION__, videoLayer);
+		return position;
+	}
+
 	elcdRpcType_t type;
 	cJSON        *res = NULL;
 	int           ret;
@@ -2858,6 +2954,7 @@ double gfx_getVideoProviderPosition(int videoLayer)
 	}
 	cJSON_Delete(res);
 #endif
+	pprintf("%s(%d): %.2f\n", __FUNCTION__, videoLayer, position);
 	return position;
 }
 
@@ -2873,13 +2970,21 @@ double gfx_getVideoProviderLength (int videoLayer)
 		{
 			length = offset;
 		}
-		dprintf("gfx: Got video provider length: %f\n", length);
 	}
 	mysem_release(gfx_semaphore);
 #endif
 #ifdef STSDK
+	if (gfx_videoProvider.active == providerInit)
+	{
+		pprintf("%s(%d): not ready\n", __FUNCTION__, videoLayer);
+		return 0.0;
+	}
+
 	if (httpDuration > 0.0)
+	{
+		pprintf("%s(%d): http %.2f\n", __FUNCTION__, videoLayer, httpDuration);
 		return httpDuration;
+	}
 	
 	elcdRpcType_t type;
 	cJSON        *res = NULL;
@@ -2892,8 +2997,8 @@ double gfx_getVideoProviderLength (int videoLayer)
 		if (length < 1.0) length = 1.0;
 	}
 	cJSON_Delete(res);
-	//printf("gfx: Got video provider length: %f\n", length);
-#endif	
+#endif
+	pprintf("%s(%d): %.2f\n", __FUNCTION__, videoLayer, length);
 	return length;
 }
 
@@ -2904,12 +3009,14 @@ int gfx_getPosition (double *plength,double *pposition)
 
 #ifdef STBPNX
 	length = gfx_getVideoProviderLength(screenMain);
-	if (length<2)
-		return -1;
-
-	position = gfx_getVideoProviderPosition(screenMain);
 #endif
 #ifdef STSDK
+	if (gfx_videoProvider.active == providerInit)
+	{
+		pprintf("%s: not ready\n", __FUNCTION__);
+		return 0;
+	}
+
 	elcdRpcType_t type;
 	cJSON        *res = NULL;
 	int           ret;
@@ -2918,32 +3025,45 @@ int gfx_getPosition (double *plength,double *pposition)
 	if (ret == 0 && type == elcdRpcResult && res && res->type == cJSON_Object)
 	{
 		position = st_getTimeValue(res, "current");
-
-		if (httpDuration > 0.0)
-		{
-			length = httpDuration;
-		} 
-		else
-		{
-			length = st_getTimeValue(res, "total");
-		}
-	}
+		length   = httpDuration > 0.0 ? httpDuration :
+		           st_getTimeValue(res, "total");
+	} else
+		pprintf("%s: times failed\n", __FUNCTION__);
 	cJSON_Delete(res);
+#endif
 	if (length < 2.0)
+	{
+		pprintf("%s: stream length is not avaliable\n", __FUNCTION__);
 		return -1;
+	}
+#ifdef STBPNX
+	position = gfx_getVideoProviderPosition(screenMain);
 #endif
 
 	if (position>length)
+	{
+		pprintf("%s: pos %.2f > len %.2f %\n", __FUNCTION__, position, length);
 		return -1;
+	}
 
 	*plength   = length;
 	*pposition = position;
+
+	pprintf("%s: %.2f/%.2f\n", __FUNCTION__, position, length);
 
 	return 0;
 }
 
 void gfx_setVideoProviderPosition (int videoLayer, long position)
 {
+#ifdef STSDK
+	if (gfx_videoProvider.active == providerInit)
+	{
+		pprintf("%s(%d): not ready\n", __FUNCTION__, videoLayer);
+		return;
+	}
+#endif
+	pprintf("%s(%d): %ld\n", __FUNCTION__, videoLayer, position);
 #ifdef STBxx
 	mysem_get(gfx_semaphore);
 	if (gfx_videoProvider.instance && gfx_videoProvider.active)
@@ -3712,6 +3832,9 @@ void gfx_init (int argc, char* argv[])
 	DFBScreenDescription screenDesc;
 
 	(void)memset(&gfx_videoProvider, 0, sizeof(gfx_videoProviderInfo));
+#ifdef STSDK
+	gfx_videoProvider.waiting = -1;
+#endif
 	/* Initialise the free image list */
 	for (i = 0; i < GFX_IMAGE_TABLE_SIZE; i++)
 	{

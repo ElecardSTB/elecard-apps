@@ -1587,17 +1587,21 @@ int  interface_enterTextGetValue( interfaceEnterTextInfo_t *field );
  */
 int  interface_enterTextShow( interfaceEnterTextInfo_t *field, size_t bufLength, char *buf );
 
-void interface_disableBackground();
+void interface_disableBackground(void);
 
 void interface_setBackground(int r, int g, int b, int a, const char *image);
 
 void interface_playControlSlider(unsigned int start, unsigned int end, unsigned int pos);
 
-int  interface_playControlSliderIsEnabled();
+int  interface_playControlSliderIsEnabled(void);
+
+int interface_playControlSliderIsVisible(void);
 
 void interface_playControlSliderEnable(int enable);
 
-float interface_playControlSliderGetPosition();
+int  interface_playControlSliderUpdate(void *ignored);
+
+float interface_playControlSliderGetPosition(void);
 
 void interface_playControlSetInputFocus(interfaceInputFocus_t newFocus);
 

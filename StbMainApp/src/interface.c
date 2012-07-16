@@ -165,8 +165,6 @@ static int  interface_animationFrameEvent(void *pArg);
 
 static void interface_displayPlayControl();
 
-static int  interface_playControlSliderEvent(void *pArg);
-
 static inline void interface_displayPlayState();
 
 static void interface_displaySoundControl();
@@ -202,6 +200,11 @@ static int getLeftStringOverflow(char *string, int maxWidth);
 #endif
 
 static int interface_playControlSetVisible(void *pArg);
+
+static inline int PlayControlSliderIsVisible()
+{
+	return !interfaceInfo.showMenu && (interfacePlayControl.visibleFlag || interfacePlayControl.alwaysShowSlider);
+}
 
 static int interface_enterTextCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 
@@ -5563,8 +5566,7 @@ static void interface_displayPlayControl()
 			tprintf("\n");
 		}
 
-		if ( !interfaceInfo.showMenu && (interfacePlayControl.visibleFlag || interfacePlayControl.alwaysShowSlider) &&
-			interfacePlayControl.sliderEnd > 0)
+			if (PlayControlSliderIsVisible() && interfacePlayControl.sliderEnd > 0)
 			{
 				float value;
 				DFBRectangle rect;
@@ -5619,10 +5621,7 @@ static void interface_displayPlayControl()
 					// Green cursor INTERFACE_HIGHLIGHT_BORDER_RED, INTERFACE_HIGHLIGHT_BORDER_GREEN, INTERFACE_HIGHLIGHT_BORDER_BLUE
 					gfx_drawRectangle(DRAWING_SURFACE, 231, 120, 23, INTERFACE_HIGHLIGHT_BORDER_ALPHA, rect.x+rect.w*value, rect.y-rect.h, interfaceInfo.borderWidth*2, rect.h+rect.h*2);
 				}
-
-				interface_addEvent(interface_playControlSliderEvent, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
-			} else
-				interface_removeEvent(interface_playControlSliderEvent, NULL);
+			}
 
 		if ( interfacePlayControl.showState )
 		{
@@ -5645,22 +5644,24 @@ static void interface_displayPlayControl()
 	interface_slideshowControlDisplay();
 }
 
-int interface_playControlSliderEvent(void* pArg)
+int interface_playControlSliderUpdate(void* ignored)
 {
 	double 	length_stream;
 	double 	position_stream;
 	int		ret_val;
+	(void)ignored;
 
 	ret_val	=	gfx_getPosition(&length_stream,&position_stream);
-
-	//dprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
-
 	if((ret_val == 0)&&(position_stream < length_stream))
 	{
 		interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-		interface_displayMenu(1);
+
+		if (PlayControlSliderIsVisible())
+		{
+			interface_displayMenu(1);
+			interface_addEvent(interface_playControlSliderUpdate, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
+		}
 	}
-	interface_addEvent(interface_playControlSliderEvent, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
 
 	return 0;
 }
@@ -5835,6 +5836,10 @@ inline float interface_playControlSliderGetPosition()
 	return interfacePlayControl.sliderPointer;
 }
 
+int  interface_playControlSliderIsVisible(void)
+{
+	return PlayControlSliderIsVisible();
+}
 
 inline void interface_playControlSliderEnable(int enable)
 {
@@ -5995,6 +6000,8 @@ static int interface_playControlSetVisible(void *pArg)
 
 	interfacePlayControl.visibleFlag = flag;
 	interfaceSlideshowControl.visibleFlag = flag;
+	if (!flag)
+		interface_removeEvent(interface_playControlSliderUpdate, NULL);
 
 	if ( interfacePlayControl.enabled || interfaceSlideshowControl.enabled )
 	{
@@ -6140,7 +6147,7 @@ void interface_playControlSlider(unsigned int start, unsigned int end, unsigned 
 		interfacePlayControl.sliderPointer = pos;
 	}
 	mysem_release(interface_semaphore);
-	if (interfacePlayControl.visibleFlag || interfacePlayControl.alwaysShowSlider)
+	if (PlayControlSliderIsVisible())
 	{
 		interface_displayMenu(1);
 	}
@@ -6380,6 +6387,7 @@ void interface_playControlRefresh(int redraw)
 	if ( interfacePlayControl.enabled || interfaceSlideshowControl.enabled )
 	{
 		interface_addEvent(interface_playControlSetVisible, (void*)0, 1000*interfacePlayControl.showTimeout, 1);
+		interface_addEvent(interface_playControlSliderUpdate, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
 		if ( redraw )
 		{
 			interface_displayMenu(1);
@@ -6391,7 +6399,7 @@ void interface_playControlHide(int redraw)
 {
 	interfacePlayControl.visibleFlag = 0;
 	interfaceSlideshowControl.visibleFlag = 0;
-	interface_removeEvent(interface_playControlSliderEvent, NULL);
+	interface_removeEvent(interface_playControlSliderUpdate, NULL);
 	interface_removeEvent(interface_playControlSetVisible, (void*)0);
 	if ( redraw )
 	{
