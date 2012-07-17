@@ -6558,7 +6558,6 @@ int output_writeInterfacesFile(void)
 int output_writeDhcpConfig(void)
 {
 	struct in_addr subnet, range_start, range_end, mask;
-	char dns[MENU_ENTRY_INFO_LENGTH];
 
 	FILE *f = fopen(STB_DHCPD_CONF, "w");
 	if(!f)
@@ -6581,15 +6580,34 @@ int output_writeDhcpConfig(void)
 		range_start.s_addr = (networkInfo.lan.ip.s_addr & 0x00ffffff)+( 0x01    << 24);
 		range_end.s_addr   = (networkInfo.lan.ip.s_addr & 0x00ffffff)+((0x80-1) << 24);
 	}
-	helperParseLine(INFO_TEMP_FILE,"cat /etc/resolv.conf | grep nameserver | sed 's/.* \\(.*\\)/\\1/' | tr '\\n' ' '", NULL, dns, 0);
 
 	fprintf(f, "ddns-update-style none;\n");
 	fprintf(f, "default-lease-time 14400;\n");
 	fprintf(f, "subnet %s",  inet_ntoa(subnet)); fprintf(f, " netmask %s {\n", inet_ntoa(mask));
 	fprintf(f, "  range %s", inet_ntoa(range_start));        fprintf(f, " %s;\n", inet_ntoa(range_end));
 	fprintf(f, "  option routers %s;\n", inet_ntoa(networkInfo.lan.ip));
-	if( dns[0] != 0 )
-		fprintf(f, "  option domain-name-servers %s;\n", dns);
+	FILE *dns_file = fopen("/etc/resolv.conf", "r");
+	if (dns_file)
+	{
+		char buf[MENU_ENTRY_INFO_LENGTH];
+		char dns[MENU_ENTRY_INFO_LENGTH];
+		int  dns_found = 0;
+		while (fgets(buf, sizeof(buf), dns_file))
+		{
+			if (sscanf(buf, "nameserver %s", dns)==1)
+			{
+				if (!dns_found)
+					fputs("  option domain-name-servers ", f);
+				else
+					fputc(' ', f);
+				fputs(dns, f);
+				dns_found = 1;
+			}
+		}
+		fclose(dns_file);
+		if (dns_found)
+			fputs(";\n", f);
+	}
 	fprintf(f, "}\n\n");
 
 	fclose(f);
