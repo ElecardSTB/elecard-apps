@@ -275,6 +275,13 @@ static mediaBrowseType_t media_browseType = mediaBrowseTypeUSB;
 static pthread_t fadeinThread = 0;
 static int fadeinCurVol = 100;
 static int fadeinDestVol = 100;
+#define FADEIN_SPEED	5
+
+#if defined (ENABLE_VIDIMAX) || defined( STSDK )
+//disable fade in effect
+#define FADEIN_STEPS	0
+#endif
+
 static void *volume_fade_in(void *pArg);
 
 #ifdef ENABLE_AUTOPLAY
@@ -591,14 +598,14 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 			j = fadeinDestVol;
 			if (appControlInfo.soundInfo.volumeLevel > j)
 				j = appControlInfo.soundInfo.volumeLevel;
-			fadeinCurVol = fadeinDestVol = 0;
-#ifdef ENABLE_VIDIMAX
-			if (!appControlInfo.vidimaxInfo.active){
-				sound_setVolume(appControlInfo.soundInfo.volumeLevel);
-			}
+
+#ifdef 	FADEIN_STEPS
+			fadeinCurVol = fadeinDestVol = j - FADEIN_STEPS*FADEIN_SPEED;
+			if (fadeinCurVol<0) fadeinCurVol = fadeinDestVol = 0;
 #else
-			sound_setVolume(0);
-#endif			
+			fadeinCurVol = fadeinDestVol = 0;
+#endif
+			sound_setVolume(fadeinCurVol);
 		}
 
 		if (!appControlInfo.mediaInfo.active && !appControlInfo.mediaInfo.paused )
@@ -646,7 +653,12 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 
 		if (j!=-1) {
 			fadeinDestVol = j;
+#ifdef 	FADEIN_STEPS
+			fadeinCurVol = fadeinDestVol - FADEIN_STEPS*FADEIN_SPEED;
+			if (fadeinCurVol<0) fadeinCurVol = 0;
+#else
 			fadeinCurVol = 0;
+#endif
 		}
 
 		break;
@@ -1611,18 +1623,21 @@ int media_playURL(int which, const char* URL, const char *description, const cha
 }
 
 static void *volume_fade_in(void *pArg) {
+
 	while (1) {
 
-	if (fadeinCurVol>=fadeinDestVol || appControlInfo.soundInfo.muted)
-		usleep(300000);
-	else {
+	if (fadeinCurVol>=fadeinDestVol || appControlInfo.soundInfo.muted) {
+		usleep(100000);
+	} else {
 		do {
 			sound_setVolume(fadeinCurVol);
         		usleep(100000);
 			if (fadeinCurVol != appControlInfo.soundInfo.volumeLevel || appControlInfo.soundInfo.muted) {
+				fadeinDestVol = appControlInfo.soundInfo.volumeLevel;
 				break;
 			}
-			fadeinCurVol += 5;
+			fadeinCurVol += FADEIN_SPEED;
+			if (fadeinCurVol>fadeinDestVol) fadeinCurVol = fadeinDestVol;
 		} while (fadeinCurVol<fadeinDestVol);
 	        sound_setVolume(fadeinDestVol);
 		appControlInfo.soundInfo.volumeLevel = fadeinDestVol;
@@ -1646,14 +1661,13 @@ int media_startPlayback()
 		j = fadeinDestVol;
 		if (appControlInfo.soundInfo.volumeLevel > j)
 			j = appControlInfo.soundInfo.volumeLevel;
+#ifdef 	FADEIN_STEPS
+		fadeinCurVol = fadeinDestVol = j - FADEIN_STEPS*FADEIN_SPEED;
+		if (fadeinCurVol<0) fadeinCurVol = fadeinDestVol = 0;
+#else
 		fadeinCurVol = fadeinDestVol = 0;
-#ifdef ENABLE_VIDIMAX
-		if (!appControlInfo.vidimaxInfo.active){
-			sound_setVolume(appControlInfo.soundInfo.volumeLevel);
-		}
-#else		
-		sound_setVolume(0);
-#endif		
+#endif
+		sound_setVolume(fadeinCurVol);
 	}
 
 	if( appControlInfo.mediaInfo.bHttp || helperFileExists(appControlInfo.mediaInfo.filename) )
@@ -1891,20 +1905,13 @@ int media_startPlayback()
 
 		media_forceRestart = 0;
 		mysem_release(media_semaphore);
-#ifdef ENABLE_VIDIMAX
-		if (!appControlInfo.vidimaxInfo.active)
-		{
-#endif
 		if (j!=-1) {
 			fadeinDestVol = j;
-			fadeinCurVol = 0;
 			if (fadeinThread == 0) {
 				pthread_create(&fadeinThread, NULL, volume_fade_in, NULL);
+				pthread_detach(fadeinThread);
 			}
 		}
-#ifdef ENABLE_VIDIMAX
-		}
-#endif
 	} else
 	{
 		eprintf("media: Failed to play '%s'\n", fileName);
