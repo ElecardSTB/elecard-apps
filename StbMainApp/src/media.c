@@ -1054,8 +1054,10 @@ static int media_onStop()
 	case playback_looped:
 		return media_startPlayback();
 	case playback_sequential:
+	case playback_random:
 		return media_startNextChannel(0,NULL);
 	default:
+		interface_showMenu(1, 1);
 		break;
 	}
 	return 0;

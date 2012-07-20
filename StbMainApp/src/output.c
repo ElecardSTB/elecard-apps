@@ -1646,7 +1646,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 			eprintf("%s: unsupported type %d\n", __FUNCTION__, type );
 			return -1;
 	}
-	if (i == ifaceLAN && networkInfo.lanMode == lanDhcpServer)
+	if (i == ifaceLAN)
 		output_writeDhcpConfig();
 	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
 	{
@@ -1855,16 +1855,15 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		system("/usr/local/etc/init.d/S80wifi start");
 #endif
 #endif // STBPNX
+//-----------------------------------------------------------------//
 #ifdef STSDK
 #ifdef ENABLE_PPP
 		system("/etc/init.d/S65ppp stop");
 #endif
 		system("/etc/init.d/S40network stop");
 		output_writeInterfacesFile();
-		if( networkInfo.lanMode == lanDhcpServer )
-			output_writeDhcpConfig();
-		else
-			unlink(STB_DHCPD_CONF);
+		output_writeDhcpConfig();
+		system("ifcfg config > " NETWORK_INTERFACES_FILE);
 		system("/etc/init.d/S40network start");
 #ifdef ENABLE_PPP
 		system("/etc/init.d/S65ppp start");
@@ -1950,7 +1949,7 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 			eprintf("%s: unknown iface %d\n", __FUNCTION__, i);
 	}
 #endif // STBPNX
-
+//-----------------------------------------------------------------//
 #ifdef STSDK
 #ifdef ENABLE_WIFI
 	if (ifaceWireless == GET_NUMBER(pArg) &&
@@ -1962,6 +1961,7 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 			system("/etc/init.d/S65ppp stop");
 #endif
 		system("ifdown wlan0");
+		output_writeDhcpConfig();
 		system("ifcfg config > " NETWORK_INTERFACES_FILE);
 		system("ifup wlan0");
 #ifdef ENABLE_PPP
@@ -1975,6 +1975,7 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 	system("/etc/init.d/S65ppp stop");
 #endif
 	system("/etc/init.d/S40network stop");
+	output_writeDhcpConfig();
 	system("ifcfg config > " NETWORK_INTERFACES_FILE);
 	sleep(1);
 	system("/etc/init.d/S40network start");
@@ -2428,10 +2429,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 			break;
 		case ifaceLAN:
 			networkInfo.lanMode = (networkInfo.lanMode+1)%lanModeCount;
-			if( networkInfo.lanMode != lanDhcpServer )
-				unlink(STB_DHCPD_CONF);
-			else
-				output_writeDhcpConfig();
+			output_writeDhcpConfig();
 			break;
 		default:
 			return 0;
@@ -6558,6 +6556,12 @@ int output_writeInterfacesFile(void)
 int output_writeDhcpConfig(void)
 {
 	struct in_addr subnet, range_start, range_end, mask;
+
+	if (networkInfo.lanMode != lanDhcpServer)
+	{
+		unlink(STB_DHCPD_CONF);
+		return 0;
+	}
 
 	FILE *f = fopen(STB_DHCPD_CONF, "w");
 	if(!f)
