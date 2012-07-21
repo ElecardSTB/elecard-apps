@@ -114,8 +114,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define SLIDER_DEFAULT_HEIGHT                   (18)
 
+#ifdef STSDK
+#define VKEYPAD_BUTTON_HEIGHT                   (26)
+#define VKEYPAD_BUTTON_WIDTH                    (30)
+#else
 #define VKEYPAD_BUTTON_HEIGHT                   (24)
 #define VKEYPAD_BUTTON_WIDTH                    (24)
+#endif
 
 #define KEYPAD_MAX_ROWS                         (8)
 #define KEYPAD_MAX_CELLS                        (16)
@@ -211,6 +216,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define INTERFACE_BOOKMARK_GREEN                0xFF
 #define INTERFACE_BOOKMARK_BLUE                 0xFF
 #define INTERFACE_BOOKMARK_ALPHA                0xFF
+
+#define INTERFACE_VKEYBOARDKEYS_RED             0x00
+#define INTERFACE_VKEYBOARDKEYS_GREEN           0x00
+#define INTERFACE_VKEYBOARDKEYS_BLUE            0x00
 
 // green
 //#define INTERFACE_BOOKMARK_SELECTED_RED         0x60

@@ -1508,31 +1508,37 @@ void interface_displayVirtualKeypad()
 					cx = x+interfaceInfo.paddingSize*(1+cell)+VKEYPAD_BUTTON_WIDTH*cell;
 					cy = y+interfaceInfo.paddingSize*(1+row)+VKEYPAD_BUTTON_HEIGHT*row;
 					if (keypad[row][cell+1] == 0)
-					{
+					{				
 						cw = VKEYPAD_BUTTON_WIDTH*(maxKeysInRow-cell)+interfaceInfo.paddingSize*(maxKeysInRow-cell-1);
 					} else
 					{
 						cw = VKEYPAD_BUTTON_WIDTH;
 					}
-					gfx_drawRectangle(DRAWING_SURFACE,
-					                  INTERFACE_SCROLLBAR_COLOR_RED, INTERFACE_SCROLLBAR_COLOR_GREEN,
-					                  INTERFACE_SCROLLBAR_COLOR_BLUE, 0xFF, cx, cy, cw, ch);
 					if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
 					{
-						r = 0x00;
-						g = 0x00;
-						b = 0xFF;
+						r = INTERFACE_VKEYBOARDKEYS_RED;
+						g = INTERFACE_VKEYBOARDKEYS_GREEN;
+						b = INTERFACE_VKEYBOARDKEYS_BLUE;
 						a = 0xFF;
 					} else
 					{
-						r = INTERFACE_SCROLLBAR_COLOR_LT_RED;
-						g = INTERFACE_SCROLLBAR_COLOR_LT_GREEN;
-						b = INTERFACE_SCROLLBAR_COLOR_LT_BLUE;
+						r = INTERFACE_SCROLLBAR_COLOR_RED;
+						g = INTERFACE_SCROLLBAR_COLOR_GREEN;
+						b = INTERFACE_SCROLLBAR_COLOR_BLUE;
 						a = 0xFF;
 					}
+					gfx_drawRectangle(DRAWING_SURFACE,
+					                  r, g, b, 0xFF, cx, cy, cw, ch);
+#ifdef STSDK							  
 					interface_drawInnerBorder(DRAWING_SURFACE,
-					                          r, g, b, a, cx, cy, cw, ch,
+					                          INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, a, cx, cy, cw, ch,
 					                          interfaceInfo.borderWidth, interfaceBorderSideAll);
+#else					
+					if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
+					interface_drawInnerBorder(DRAWING_SURFACE,
+					                          INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE,
+								  a, cx, cy, cw, ch, interfaceInfo.borderWidth, interfaceBorderSideAll);
+#endif
 #ifdef WCHAR_SUPPORT
 					memset(buf,0,sizeof(buf));
 					if ( interfaceInfo.keypad.altLayout == ALTLAYOUT_ON && keypad_local[row][cell] != 0 )
@@ -1550,22 +1556,30 @@ void interface_displayVirtualKeypad()
 					pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rectangle, NULL);
 					if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
 					{
-						r = 0x00;
-						g = 0x00;
+						r = 0xFF;
+						g = 0xFF;
 						b = 0xFF;
 						a = 0xFF;
 					} else
 					{
-						r = INTERFACE_BOOKMARK_RED;
-						g = INTERFACE_BOOKMARK_GREEN;
-						b = INTERFACE_BOOKMARK_BLUE;
+						r = INTERFACE_VKEYBOARDKEYS_RED;
+						g = INTERFACE_VKEYBOARDKEYS_GREEN;
+						b = INTERFACE_VKEYBOARDKEYS_BLUE;
 						a = 0xFF;
 					}
+#ifdef STSDK
+					gfx_drawText(DRAWING_SURFACE, pgfx_font,
+					             r, g, b, a,
+					             cx+cw/2-(rectangle.w-rectangle.x)/2,
+					             cy+ch+ch/2+8-(rectangle.h-rectangle.y)/2,
+					             buf, 0, 0);
+#else				
 					gfx_drawText(DRAWING_SURFACE, pgfx_font,
 					             r, g, b, a,
 					             cx+cw/2-(rectangle.w-rectangle.x)/2,
 					             cy+ch+ch/2-(rectangle.h-rectangle.y)/2,
 					             buf, 0, 0);
+#endif								 
 				}
 			}
 		}
@@ -1580,25 +1594,46 @@ void interface_displayVirtualKeypad()
 			                  cx, cy, cw, ch);
 			if (interfaceInfo.keypad.row == maxRows && cell == interfaceInfo.keypad.cell)
 			{
-				r = 0x00;
-				g = 0x00;
+				r = 0xFF;
+				g = 0xFF;
 				b = 0xFF;
 				a = 0xFF;
 			} else
 			{
-				r = INTERFACE_BOOKMARK_RED;
-				g = INTERFACE_BOOKMARK_GREEN;
-				b = INTERFACE_BOOKMARK_BLUE;
+				r = INTERFACE_VKEYBOARDKEYS_RED;
+				g = INTERFACE_VKEYBOARDKEYS_GREEN;
+				b = INTERFACE_VKEYBOARDKEYS_BLUE;
 				a = 0xFF;
 			}
 			interface_drawInnerBorder(DRAWING_SURFACE,
 			                          r, g, b, a, cx, cy, cw, ch,
 			                          interfaceInfo.borderWidth, interfaceBorderSideAll);
 			pgfx_font->GetStringExtents(pgfx_font, controlButtons[cell].name, -1, &rectangle, NULL);
-			gfx_drawText(DRAWING_SURFACE,
+#ifdef STSDK
+			if (cell!=0 && cell!=controlButtonCount-1) {
+				gfx_drawText(DRAWING_SURFACE,
+						pgfx_font, 0xff, 0xff, 0xff, a,
+			            cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2+8-(rectangle.h-rectangle.y)/2,
+			            controlButtons[cell].name, 0, 0);
+			} else {
+				gfx_drawText(DRAWING_SURFACE,
+			             pgfx_font, r, g, b, a,
+			             cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2+8-(rectangle.h-rectangle.y)/2,
+			             controlButtons[cell].name, 0, 0);
+			}
+#else			
+			if (cell!=0 && cell!=controlButtonCount-1) {
+				gfx_drawText(DRAWING_SURFACE,
+				     pgfx_font, 0xff, 0xff, 0xff, a,
+			             cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2-(rectangle.h-rectangle.y)/2,
+			             controlButtons[cell].name, 0, 0);
+			} else {
+				gfx_drawText(DRAWING_SURFACE,
 			             pgfx_font, r, g, b, a,
 			             cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2-(rectangle.h-rectangle.y)/2,
 			             controlButtons[cell].name, 0, 0);
+			}
+#endif						 
 		}
 	}
 }
