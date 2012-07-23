@@ -632,9 +632,9 @@ int checkPowerOff(DFBEvent event)
 				}
 
 				interface_displayMenu(1);
+#ifdef STB82
 				system("standbyon");
 
-#ifdef STB82
 /*
 				system("/usr/lib/luddite/mmio 0x047730 0x0"); //GPIO_CLK_Q0_CTL control
 				system("/usr/lib/luddite/mmio 0x047734 0x0"); //GPIO_CLK_Q1_CTL control
@@ -693,10 +693,11 @@ int checkPowerOff(DFBEvent event)
 				phStbSystemManager_Init();
 				phStbSystemManager_SetPowerMode(1);
 */
+#endif // STB82
+#ifdef STSDK
+				system("poweroff");
 #endif
-
 				memcpy(&lastChange, &currentPress, sizeof(struct timeval));
-
 				return 1;
 
 			} else
@@ -778,7 +779,7 @@ int checkPowerOff(DFBEvent event)
 				system("/usr/lib/luddite/mmio 0x047704 0x71"); //CLK_D2D_CTL control - FIX
 				system("/usr/lib/luddite/mmio 0x047840 0x1"); //TSOUT_SERIAL_CLK0_CTL control
 */
-#endif
+#endif // STB82
 
 				interface_displayMenu(1);
 				system("standbyoff");
@@ -1496,7 +1497,6 @@ void *keyThread(void *pArg)
 	DFBInputDeviceKeySymbol lastsym;
 	int allow_repeat = 0;
 	unsigned long timediff;
-	int res_standby;
 	struct timeval lastpress, currentpress, currenttime;
 	interfaceCommand_t lastcmd;
 	interfaceCommandEvent_t curcmd;
@@ -1649,8 +1649,7 @@ void *keyThread(void *pArg)
 					break;
 				}*/
 
-				res_standby = checkPowerOff(event);
-				if(res_standby)
+				if (checkPowerOff(event))
 				{
 					//clear event
 					eventBuffer->Reset(eventBuffer);
