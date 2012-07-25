@@ -614,12 +614,11 @@ static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 	{
 		int old_height = output_getFormatHeight(output_currentFormat);
 		int new_height = output_getFormatHeight(pMenu->menuEntry[pMenu->selectedItem].info);
-		if (old_height != new_height)
-		{
+		if (old_height != new_height) {
 			// Command should be sent after framebuffer device is closed
 			helperStartApp("StbCommandClient -f /tmp/elcd.sock '{\"method\":\"initfb\",\"params\":[],\"id\": 1}'");
 		} else
-		output_fillFormatMenu();
+			output_fillFormatMenu();
 		return 0;
 	}
 
@@ -3650,9 +3649,6 @@ static void output_fillFormatMenu(void)
 	}
 #endif // STB82
 #ifdef STSDK
-	int n = 0;
-	int icon = thumbnail_channels;
-
 	elcdRpcType_t type;
 	cJSON *list = NULL;
 	int    ret;
@@ -3661,32 +3657,67 @@ static void output_fillFormatMenu(void)
 	if( ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array )
 	{
 		cJSON *mode;
-		int i;
-		for( i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++ )
-		{
-			if( mode->type != cJSON_Object )
+		cJSON *name;
+		cJSON *supported;
+		cJSON *current;
+		cJSON *native;
+		int i, j;
+		int outputFormatsCount;
+		int icon;
+		struct outputFormats_s {
+			char	*groupName;
+			int		groupNameLen;
+			cJSON	*mode;
+			char	*modeName;
+		} outputFormats[] = {
+			{"1080p",		sizeof("1080p") - 1,	NULL, NULL},
+			{"1080i",		sizeof("1080i") - 1,	NULL, NULL},
+			{"720p",		sizeof("720p") - 1,		NULL, NULL},
+			{"720x576p",	sizeof("720x576p") - 1,	NULL, NULL},
+		};
+		outputFormatsCount = sizeof(outputFormats) / sizeof(outputFormats[0]);
+		for( i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++ ) {
+			if(mode->type != cJSON_Object)
 				continue;
-			cJSON *name = cJSON_GetObjectItem( mode, "name" );
-			if( !name || name->type != cJSON_String )
+			name = cJSON_GetObjectItem( mode, "name" );
+			if(!name || (name->type != cJSON_String))
 				continue;
-			cJSON *supported = cJSON_GetObjectItem( mode, "supported" );
-			if( !supported || supported->type > cJSON_True )
+			supported = cJSON_GetObjectItem( mode, "supported" );
+			if(!supported || (supported->type != cJSON_True))
 				continue;
-			cJSON *native  = cJSON_GetObjectItem( mode, "native" );
-			cJSON *current = cJSON_GetObjectItem( mode, "current" );
-
-			if( native && native->type == cJSON_True )
-				icon = thumbnail_tvstandard;
-			else
-				icon = supported->type ? thumbnail_channels : thumbnail_not_selected;
-			if( current && current->type == cJSON_True )
-			{
-				selected = n;
+			current = cJSON_GetObjectItem(mode, "current");
+			if(current && current->type == cJSON_True) {
 				strncpy(output_currentFormat, name->valuestring, sizeof(output_currentFormat));
-				output_currentFormat[sizeof(output_currentFormat)-1]=0;
+				output_currentFormat[sizeof(output_currentFormat) - 1]=0;
 			}
-			interface_addMenuEntry((interfaceMenu_t*)&FormatMenu, name->valuestring, output_setFormat, NULL, icon);
-			n++;
+			for(j = 0; j < outputFormatsCount; j++) {
+				if(strncmp(outputFormats[j].groupName, name->valuestring, outputFormats[j].groupNameLen) == 0) {
+//					printf("%s[%d]: outputFormats[j].groupName=%s, outputFormats[j].modeName=%s, name->valuestring=%s\n",
+//							__FILE__, __LINE__, outputFormats[j].groupName, outputFormats[j].modeName, name->valuestring);
+					if((outputFormats[j].mode == NULL) || (strcmp(outputFormats[j].modeName, name->valuestring) < 0)) {
+//						printf("%s[%d]: new value, name->valuestring=%s\n", __FILE__, __LINE__, name->valuestring);
+						outputFormats[j].mode = mode;
+						outputFormats[j].modeName = name->valuestring;
+					}
+				}
+			}
+		}
+		for(j = 0; j < outputFormatsCount; j++) {
+			if(outputFormats[j].mode) {
+				mode = outputFormats[j].mode;
+				name = cJSON_GetObjectItem(mode, "name");
+				native  = cJSON_GetObjectItem(mode, "native");
+				current = cJSON_GetObjectItem(mode, "current");
+
+				if( native && native->type == cJSON_True )
+					icon = thumbnail_tvstandard;
+				else
+					icon = thumbnail_channels;
+				if(current && current->type == cJSON_True) {
+					selected = j;
+				}
+				interface_addMenuEntry((interfaceMenu_t*)&FormatMenu, name->valuestring, output_setFormat, NULL, icon);
+			}
 		}
 	} else if( type == elcdRpcError && list && list->type == cJSON_String )
 		eprintf("%s: failed to get video mode list: %s\n", list->valuestring);
