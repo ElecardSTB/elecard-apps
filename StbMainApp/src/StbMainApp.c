@@ -548,63 +548,80 @@ interfaceCommand_t parseEvent(DFBEvent *event)
 	return cmd;
 }
 
-int checkPowerOff(DFBEvent event)
+int helperIsEventValid(DFBEvent *event)
 {
-	int timediff;
-	static struct timeval firstPress = {0, 0},
-						  lastChange = {0, 0};
+	int valid = 1;
 
-	struct timeval lastPress = {0, 0},
-				   currentPress = {0, 0};
-
-	int repeat = 0;
-
-	gettimeofday(&currentPress, NULL);
-
-	if (!gIgnoreEventTimestamp)
-	{
-		timediff = (currentPress.tv_sec-event.input.timestamp.tv_sec)*1000000+(currentPress.tv_usec-event.input.timestamp.tv_usec);
-
-		if (timediff > OUTDATE_TIMEOUT)
-		{
+	if (!gIgnoreEventTimestamp) {
+		int timediff;
+		struct timeval curTime;
+		gettimeofday(&curTime, NULL);
+		timediff = (curTime.tv_sec - event->input.timestamp.tv_sec) * 1000000 + (curTime.tv_usec - event->input.timestamp.tv_usec);
+		if (timediff > OUTDATE_TIMEOUT)	{
 			dprintf("%s: ignore event, age %d\n", __FUNCTION__, timediff);
-			return 0;
+			valid = 0;
 		}
 	}
+	return valid;
+}
 
-	if (firstPress.tv_sec == 0 || lastPress.tv_sec == 0)
-	{
-		timediff = 0;
-	} else
-	{
-		timediff = (currentPress.tv_sec-lastPress.tv_sec)*1000000+(currentPress.tv_usec-lastPress.tv_usec);
-	}
-
-	if (timediff == 0 || timediff > REPEAT_TIMEOUT)
-	{
-		//dprintf("%s: reset\n, __FUNCTION__");
-		memcpy(&firstPress, &currentPress, sizeof(struct timeval));
-	} else
-	{
-		//dprintf("%s: repeat detected\n", __FUNCTION__);
-		repeat = 1;
-	}
-
-	memcpy(&lastPress, &currentPress, sizeof(struct timeval));
-
+int checkPowerOff(DFBEvent *event)
+{
 	//dprintf("%s: check power\n", __FUNCTION__);
-
-	if ( event.input.key_symbol == DIKS_POWER ) // Power/Standby button. Go to standby.
+	if(event->input.key_symbol == DIKS_POWER) // Power/Standby button. Go to standby.
 	{
+		static struct timeval	lastChange = {0, 0},
+								firstPress = {0, 0};
+		struct timeval currentPress = {0, 0};
+		int repeat = 0;
+#ifdef STSDK
+		static int isPowerReleased = 1;
+
+		gettimeofday(&currentPress, NULL);
+		if((event->input.type == DIET_KEYRELEASE) || (event->input.type == DIET_BUTTONRELEASE)) {
+			isPowerReleased = 1;
+			repeat = 0; //standby mode control on POWER release
+		} else {
+			if(isPowerReleased) {
+				memcpy(&firstPress, &currentPress, sizeof(struct timeval));
+				isPowerReleased = 0;
+			}
+			//try to check if button pressed more than 3 seconds
+			repeat = 1;
+		}
+#else
+		static struct timeval lastPress = {0, 0};
+		int timediff;
+
+		gettimeofday(&currentPress, NULL);
+		if (firstPress.tv_sec == 0 || lastPress.tv_sec == 0) {
+			timediff = 0;
+		} else {
+			timediff = (currentPress.tv_sec - lastPress.tv_sec) * 1000000 + (currentPress.tv_usec - lastPress.tv_usec);
+		}
+
+		if (timediff == 0 || timediff > REPEAT_TIMEOUT) {
+			//dprintf("%s: reset\n, __FUNCTION__");
+			memcpy(&firstPress, &currentPress, sizeof(struct timeval));
+		} else {
+			//dprintf("%s: repeat detected\n", __FUNCTION__);
+			repeat = 1;
+		}
+		memcpy(&lastPress, &currentPress, sizeof(struct timeval));
+#endif
 		//dprintf("%s: got DIKS_POWER\n", __FUNCTION__);
-		if (repeat && currentPress.tv_sec-firstPress.tv_sec >= 3)
+		if (repeat && ((currentPress.tv_sec - firstPress.tv_sec) >= 3))
 		{
 			//dprintf("%s: repeat 3 sec - halt\n", __FUNCTION__);
 			/* Standby button has been held for 3 seconds. Power off. */
-			/*interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
-			system("poweroff");*/
-		} else if (!repeat && currentPress.tv_sec - lastChange.tv_sec >= 3)
+#ifdef STSDK
+			isPowerReleased = 1; //mark it here, because system call (in test mode) can be long, so POWER release will skiped
+			interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
+			system("poweroff");
+#endif
+		} else if (!repeat && ((currentPress.tv_sec - lastChange.tv_sec) >= 3))
 		{
+			int ret = 0;
 			interfaceCommandEvent_t cmd;
 
 			//dprintf("%s: switch standby\n", __FUNCTION__);
@@ -695,11 +712,10 @@ int checkPowerOff(DFBEvent event)
 */
 #endif // STB82
 #ifdef STSDK
-				system("poweroff");
+//TODO: Implement StandBy
+//				system("poweroff");
 #endif
-				memcpy(&lastChange, &currentPress, sizeof(struct timeval));
-				return 1;
-
+				ret = 1;
 			} else
 			{
 #ifdef STB82
@@ -779,10 +795,13 @@ int checkPowerOff(DFBEvent event)
 				system("/usr/lib/luddite/mmio 0x047704 0x71"); //CLK_D2D_CTL control - FIX
 				system("/usr/lib/luddite/mmio 0x047840 0x1"); //TSOUT_SERIAL_CLK0_CTL control
 */
-#endif // STB82
-
 				interface_displayMenu(1);
 				system("standbyoff");
+#endif // STB82
+#ifdef STSDK
+//TODO: implement exit from StandBy
+				interface_displayMenu(1);
+#endif
 
 				if (inStandbyActiveVideo)
 				{
@@ -793,18 +812,17 @@ int checkPowerOff(DFBEvent event)
 
 				//dprintf("%s: return from standby\n", __FUNCTION__);
 				appControlInfo.inStandby = 0;
-
-				memcpy(&lastChange, &currentPress, sizeof(struct timeval));
-
-				if( helperCheckUpdates() )
-				{
+#ifndef STSDK
+				if(helperCheckUpdates()) {
 					interface_showConfirmationBox(_T("CONFIRM_FIRMWARE_UPDATE"), thumbnail_question, helper_confirmFirmwareUpdate, NULL);
 				}
-
-				return 2;
+#endif
+				ret = 2;
 			}
+			memcpy(&lastChange, &currentPress, sizeof(struct timeval));
+			return ret;
 		}
-	} else if ( event.input.button == 9 ) // PSU button, just do power off
+	} else if(event->input.button == 9) // PSU button, just do power off
 	{
 		system("poweroff");
 	}
@@ -822,25 +840,22 @@ interfaceCommand_t helperGetEvent(int flush)
 	IDirectFBEventBuffer *eventBuffer = appEventBuffer;
 	DFBEvent event;
 
-	if ( eventBuffer->HasEvent(eventBuffer) == DFB_OK )
-	{
+	if(eventBuffer->HasEvent(eventBuffer) == DFB_OK) {
 		eventBuffer->GetEvent(eventBuffer, &event);
-		if (flush)
-		{
+		if(flush) {
 			eventBuffer->Reset(eventBuffer);
 		}
 
-		if (checkPowerOff(event))
-		{
-			eventBuffer->Reset(eventBuffer);
-			return interfaceCommandNone;
+		if(helperIsEventValid(&event)) {
+			if(checkPowerOff(&event)) {
+				eventBuffer->Reset(eventBuffer);
+				return interfaceCommandNone;
+			}
 		}
 
-		if ( event.clazz == DFEC_INPUT && (event.input.type == DIET_KEYPRESS || event.input.type == DIET_BUTTONPRESS) )
-		{
+		if ( event.clazz == DFEC_INPUT && (event.input.type == DIET_KEYPRESS || event.input.type == DIET_BUTTONPRESS) ) {
 			return parseEvent(&event);
 		}
-
 		return interfaceCommandCount;
 	}
 
@@ -1497,7 +1512,7 @@ void *keyThread(void *pArg)
 	DFBInputDeviceKeySymbol lastsym;
 	int allow_repeat = 0;
 	unsigned long timediff;
-	struct timeval lastpress, currentpress, currenttime;
+	struct timeval lastpress, currentpress;
 	interfaceCommand_t lastcmd;
 	interfaceCommandEvent_t curcmd;
 
@@ -1595,6 +1610,7 @@ void *keyThread(void *pArg)
 					continue;
 				else
 				{
+					struct timeval currenttime;
 					gettimeofday(&currenttime, NULL);
 					int timeout = currenttime.tv_sec-event.input.timestamp.tv_sec;
 
@@ -1619,22 +1635,13 @@ void *keyThread(void *pArg)
 			} else
 				continue;
 		}
-		if (result  == DFB_OK )
+		if(result == DFB_OK)
 		{
 			eventBuffer->GetEvent(eventBuffer, &event);
 			eventBuffer->Reset(eventBuffer);
 
-			if (!gIgnoreEventTimestamp)
-			{
-				gettimeofday(&currenttime, NULL);
-				timediff = (currenttime.tv_sec-event.input.timestamp.tv_sec)*1000000+(currenttime.tv_usec-event.input.timestamp.tv_usec);
-
-				if (timediff > OUTDATE_TIMEOUT)
-				{
-					dprintf("%s: ignore event, age %d\n", __FUNCTION__, timediff);
-					continue;
-				}
-			}
+			if(!helperIsEventValid(&event))
+				continue;
 
 			kprintf("%s: got event, age %d\n", __FUNCTION__, timediff);
 
@@ -1649,8 +1656,7 @@ void *keyThread(void *pArg)
 					break;
 				}*/
 
-				if (checkPowerOff(event))
-				{
+				if(checkPowerOff(&event)) {
 					//clear event
 					eventBuffer->Reset(eventBuffer);
 					continue;
@@ -1738,6 +1744,15 @@ void *keyThread(void *pArg)
 				lastsym = 0;
 				lastcmd = 0;
 			}
+#ifdef STSDK
+			else if((event.clazz == DFEC_INPUT) && ((event.input.type == DIET_KEYRELEASE) || (event.input.type == DIET_BUTTONRELEASE))) {
+				if(checkPowerOff(&event)) {
+					//clear event
+					eventBuffer->Reset(eventBuffer);
+					continue;
+				}
+			}
+#endif
 		}
 	}
 
