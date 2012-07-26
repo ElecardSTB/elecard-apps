@@ -712,8 +712,7 @@ int checkPowerOff(DFBEvent *event)
 */
 #endif // STB82
 #ifdef STSDK
-//TODO: Implement StandBy
-//				system("poweroff");
+				system("standbyon");
 #endif
 				ret = 1;
 			} else
@@ -799,8 +798,8 @@ int checkPowerOff(DFBEvent *event)
 				system("standbyoff");
 #endif // STB82
 #ifdef STSDK
-//TODO: implement exit from StandBy
 				interface_displayMenu(1);
+				system("standbyoff");
 #endif
 
 				if (inStandbyActiveVideo)
