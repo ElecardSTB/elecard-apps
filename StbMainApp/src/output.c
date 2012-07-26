@@ -565,6 +565,42 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef STSDK
+static int helper_sendToIndicator(const char *cmd)
+{
+	char buf[256];
+//TODO: use socket client
+	snprintf(buf, 256, "StbCommandClient -f /tmp/frontpanel '%s'", cmd);
+	buf[255] = 0;
+	system(buf);
+	return 0;
+}
+
+static int helper_indicatorShowVideoFormat(const char *name)
+{
+	char buf[16] = "\0";
+	int f_width, f_height, f_framerate;
+	char f_field;
+	
+	if(strchr(name, 'x')) { //720x576p50 format
+		if(sscanf(name, "%dx%d%c%d", &f_height, &f_width, &f_field, &f_framerate) == 4) {
+			sprintf(buf, "n10 %d %d%c", f_width, f_framerate, (f_field == 'i')?'[':'p');
+		} else if(sscanf(name, "%dx%d%c", &f_height, &f_width, &f_field) == 3) {
+			sprintf(buf, "n10 %d %c", f_width, (f_field == 'i')?'[':'p');
+		}
+	} else { //1080p60 format
+		if(sscanf(name, "%d%c%d", &f_width, &f_field, &f_framerate) == 3) {
+			sprintf(buf, "n10 %d %d%c", f_width, f_framerate, (f_field == 'i')?'[':'p');
+		}
+	}
+	if(buf[0] == 0)
+		sprintf(buf, "n10 %s", name);
+
+	helper_sendToIndicator("h 400 200");
+	helper_sendToIndicator(buf);
+
+	return 0;
+}
+
 static int output_setVideoFormat(const char *name)
 {
 	elcdRpcType_t type;
@@ -579,6 +615,8 @@ static int output_setVideoFormat(const char *name)
 		{
 			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
 			ret = 1;
+		} else {
+			helper_indicatorShowVideoFormat(name);
 		}
 	} else if ( type == elcdRpcError && res && res->type == cJSON_String )
 	{
@@ -602,7 +640,10 @@ static int output_cancelFormat(void* pArg)
 static int output_getFormatHeight(const char *format)
 {
 	const char *s = strchr(format, 'x');
-	if (!s) s = format;
+	if(s)
+		s++;
+	else
+		s = format;
 	return strtol(s, NULL, 10);
 }
 
@@ -612,8 +653,13 @@ static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 
 	if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 	{
-		int old_height = output_getFormatHeight(output_currentFormat);
-		int new_height = output_getFormatHeight(pMenu->menuEntry[pMenu->selectedItem].info);
+		int old_height, new_height;
+		char *newFmt = (char *)pMenu->menuEntry[pMenu->selectedItem].pArg;
+		if(newFmt == NULL)
+			newFmt = pMenu->menuEntry[pMenu->selectedItem].info;
+		old_height = output_getFormatHeight(output_currentFormat);
+		new_height = output_getFormatHeight(newFmt);
+
 		if (old_height != new_height) {
 			// Command should be sent after framebuffer device is closed
 			helperStartApp("StbCommandClient -f /tmp/elcd.sock '{\"method\":\"initfb\",\"params\":[],\"id\": 1}'");
@@ -3587,14 +3633,42 @@ static void output_fillTimeZoneMenu(void)
 	interface_setSelectedItem((interfaceMenu_t*)&TimeZoneMenu, found);
 }
 
+int output_toggleOutputModes(void)
+{
+	int next;
+	char *selectedFormat;
+	interfaceMenu_t *pMenu = &FormatMenu;
+
+	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
+		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
+	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
+
+	next = pMenu->selectedItem + 1;
+	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
+		next = 0;
+	pMenu->selectedItem = next;
+
+	selectedFormat = pMenu->menuEntry[next].info;
+	if(pMenu->menuEntry[next].pArg)
+		selectedFormat = (char *)pMenu->menuEntry[next].pArg;
+
+	output_setVideoFormat(selectedFormat);
+//	interface_displayMenu(1);
+	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
+	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
+
+	return 0;
+}
 
 static int output_outputModesToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
 {
 	int *showAdvanced = (int *)pArg;
 	*showAdvanced = !*showAdvanced;
-	output_enterFormatMenu(pMenu, NULL);
-	interface_setSelectedItem(pMenu, interface_getMenuEntryCount(pMenu) - 1);
+	output_fillFormatMenu();
+//	if(*showAdvanced == 0)
+//		interface_setSelectedItem(pMenu, interface_getMenuEntryCount(pMenu) - 1);
 	interface_displayMenu(1);
+
 	return 0;
 }
 
@@ -3675,8 +3749,6 @@ static void output_fillFormatMenu(void)
 		cJSON *supported;
 		cJSON *current;
 		cJSON *native;
-		int i, j, n = 0;
-		int icon;
 		struct commonOutputModes_s {
 			char	*displayName;
 			char	*groupName;
@@ -3690,9 +3762,11 @@ static void output_fillFormatMenu(void)
 			{"PAL",		"720x576p",	sizeof("720x576p") - 1,	NULL, NULL},
 			{"NTSC",	"720x480p",	sizeof("720x576p") - 1,	NULL, NULL},
 		};
+		int i, j, n = 0;
+		int icon;
 		int commonOutputModesCount = sizeof(commonOutputModes) / sizeof(commonOutputModes[0]);
-		static char	modeNameCopy[sizeof(commonOutputModes) / sizeof(commonOutputModes[0])][32];
 		int hasSupportedModes = 0;
+		static char	modeNameCopy[sizeof(commonOutputModes) / sizeof(commonOutputModes[0])][32];
 		static int showAdvanced = 0;
 		
 		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
@@ -3723,6 +3797,7 @@ static void output_fillFormatMenu(void)
 				output_currentFormat[sizeof(output_currentFormat) - 1]=0;
 				selected = n;
 			}
+
 			if(!hasSupportedModes || showAdvanced) {
 				native  = cJSON_GetObjectItem( mode, "native" );
 				if( native && native->type == cJSON_True )
@@ -3737,10 +3812,7 @@ static void output_fillFormatMenu(void)
 					continue;
 				for(j = 0; j < commonOutputModesCount; j++) {
 					if(strncmp(commonOutputModes[j].groupName, name->valuestring, commonOutputModes[j].groupNameLen) == 0) {
-	//					printf("%s[%d]: commonOutputModes[j].groupName=%s, commonOutputModes[j].modeName=%s, name->valuestring=%s\n",
-	//							__FILE__, __LINE__, commonOutputModes[j].groupName, commonOutputModes[j].modeName, name->valuestring);
-						if((commonOutputModes[j].mode == NULL) || (strcmp(commonOutputModes[j].modeName, name->valuestring) < 0)) {
-	//						printf("%s[%d]: new value, name->valuestring=%s\n", __FILE__, __LINE__, name->valuestring);
+						if((commonOutputModes[j].modeName == NULL) || (strcmp(commonOutputModes[j].modeName, name->valuestring) < 0)) {
 							commonOutputModes[j].mode = mode;
 							commonOutputModes[j].modeName = name->valuestring;
 						}
@@ -3748,6 +3820,7 @@ static void output_fillFormatMenu(void)
 				}
 			}
 		}
+
 		if(hasSupportedModes) {
 			if(!showAdvanced) {
 				selected = MENU_ITEM_BACK;

@@ -136,6 +136,7 @@ int output_changeWifiMode(interfaceMenu_t *pMenu, void* pArg);
 
 #ifdef STSDK
 int output_readInterfacesFile(void);
+int output_toggleOutputModes(void);
 #endif
 
 #ifdef __cplusplus

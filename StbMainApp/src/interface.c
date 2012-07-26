@@ -3450,6 +3450,9 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		interface_displayMenu(1);
 	} else
 #endif
+	if (cmd->command == DIKS_CUSTOM0) { //VFMT
+		output_toggleOutputModes();
+	} else
 	if ( interfaceInfo.messageBox.type == interfaceMessageBoxCallback )
 	{
 		if (cmd->command == interfaceCommandYellow && cmd != &mycmd && appControlInfo.inputMode == inputModeABC)
@@ -3651,7 +3654,7 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 			break;
 			default:;
 		}
-	}	
+	}
 	else if ( interfaceInfo.showMenu )
 	{
 #ifdef ENABLE_TELETEXT
