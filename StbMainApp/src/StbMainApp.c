@@ -580,8 +580,9 @@ int checkPowerOff(DFBEvent *event)
 		gettimeofday(&currentPress, NULL);
 		if((event->input.type == DIET_KEYRELEASE) || (event->input.type == DIET_BUTTONRELEASE)) {
 			isPowerReleased = 1;
-			repeat = 0; //standby mode control on POWER release
 		} else {
+			if(appControlInfo.inStandby)
+				return 0; //dont check pressed more than 3 seconds POWER button in standby
 			if(isPowerReleased) {
 				memcpy(&firstPress, &currentPress, sizeof(struct timeval));
 				isPowerReleased = 0;
@@ -1508,7 +1509,7 @@ void *keyThread(void *pArg)
 					break;
 				}*/
 
-				if(checkPowerOff(&event)) {
+				if(checkPowerOff(&event) || appControlInfo.inStandby) {
 					//clear event
 					eventBuffer->Reset(eventBuffer);
 					continue;
@@ -1516,17 +1517,11 @@ void *keyThread(void *pArg)
 
 				memcpy(&currentpress, &event.input.timestamp, sizeof(struct timeval));
 
-				if ( event.input.button == 9) // PSU
-				{
-					continue;
-				}
-
 				dprintf("%s: Char: %d (%d) %d, '%c' ('%c') did=%d\n", __FUNCTION__, event.input.key_symbol, event.input.key_id, event.input.button, event.input.key_symbol, event.input.key_id, event.input.device_id);
 
 				interfaceCommand_t cmd = parseEvent(&event);
 
-				if (cmd == interfaceCommandCount)
-				{
+				if (cmd == interfaceCommandCount) {
 					continue;
 				}
 
@@ -1535,17 +1530,14 @@ void *keyThread(void *pArg)
 				curcmd.source = event.input.device_id == DIDID_ANY ? DID_KEYBOARD : event.input.device_id;
 				//curcmd.repeat = 0;
 
-				kprintf("%s: event %d\n", __FUNCTION__, cmd);
-
 				timediff = (currentpress.tv_sec-lastpress.tv_sec)*1000000+(currentpress.tv_usec-lastpress.tv_usec);
 
+				kprintf("%s: event %d\n", __FUNCTION__, cmd);
 				kprintf("%s: timediff %d\n", __FUNCTION__, timediff);
 
-				if (cmd == lastcmd && timediff<REPEAT_TIMEOUT*2)
-				{
+				if (cmd == lastcmd && timediff < REPEAT_TIMEOUT * 2) {
 					curcmd.repeat++;
-				} else
-				{
+				} else {
 					curcmd.repeat = 0;
 				}
 
