@@ -1456,9 +1456,14 @@ void interface_displayVirtualKeypad()
 	int x,y,w,h,cx,cy,cw,ch;
 	char buf[16];
 	int r, g, b, a;
+	int txt_y;
+	char vkeys_path[1024];
 	DFBRectangle rectangle;
-
+	const int vkey_height = (interfaceInfo.screenHeight > 720 ? VKEYPAD_HD_BUTTON_HEIGHT : VKEYPAD_BUTTON_HEIGHT);
+	const int vkey_width = (interfaceInfo.screenHeight > 720 ? VKEYPAD_HD_BUTTON_WIDTH : VKEYPAD_BUTTON_WIDTH);
 	int controlButtonCount = (int)(sizeof(controlButtons)/sizeof(button_t));
+	
+	static	char const vkeys[8][16] = {"vkey_f1.png", "vkey_f2.png", "vkey_f3.png", "vkey_f4.png", "error!!!", "error!!!", "error!!!", "error!!!"};
 
 	if (interfaceInfo.keypad.enable)
 	{
@@ -1478,67 +1483,49 @@ void interface_displayVirtualKeypad()
 		}
 		maxRows = row;
 
-		//dprintf("%s: %dx%d\n", __FUNCTION__, maxKeysInRow, maxRows);
-
-		w = VKEYPAD_BUTTON_WIDTH*maxKeysInRow+(maxKeysInRow+1)*interfaceInfo.paddingSize;
-		h = VKEYPAD_BUTTON_HEIGHT*(maxRows+1)+(maxRows+2)*interfaceInfo.paddingSize;
+		w = vkey_width*maxKeysInRow+(maxKeysInRow+1)*interfaceInfo.paddingSize;
+		h = vkey_height*(maxRows+1)+(maxRows+2)*interfaceInfo.paddingSize;
 		x = interfaceInfo.clientX+(interfaceInfo.clientWidth-w)/2;
 #ifdef ENABLE_REGPLAT
-		if (interfaceInfo.keypad.enable == 1 && interfaceInfo.currentMenu->selectedItem >= 2)
+		if (interfaceInfo.currentMenu->selectedItem >= 2)
 			y = interfaceInfo.clientY+interfaceInfo.paddingSize*2;
 		else
 #endif
-		y = interfaceInfo.clientY+interfaceInfo.clientHeight-h+VKEYPAD_BUTTON_HEIGHT+interfaceInfo.paddingSize*2;
-
+		y = interfaceInfo.clientY+interfaceInfo.clientHeight-h+vkey_height+interfaceInfo.paddingSize*2;
+		
 		gfx_drawRectangle(DRAWING_SURFACE,
-		                  INTERFACE_MESSAGE_BOX_RED, INTERFACE_MESSAGE_BOX_GREEN,
-		                  INTERFACE_MESSAGE_BOX_BLUE, 0xFF, x, y, w, h);
+		                  0x80, 0x80, 0x80, 0xFF, x, y, w, h);
 		interface_drawInnerBorder(DRAWING_SURFACE,
-		                          INTERFACE_BORDER_RED, INTERFACE_BORDER_GREEN,
-		                          INTERFACE_BORDER_BLUE, 0xFF, x, y, w, h,
+		                          0xff, 0xff, 0xff, 0xFF, x, y, w, h,
 		                          interfaceInfo.borderWidth, interfaceBorderSideAll);
-
-		ch = VKEYPAD_BUTTON_HEIGHT;
+								  
+		ch = vkey_height;
+		
+		r = g = b = 0x20;
 		for (row=0; row<maxRows; row++)
 		{
 			for (cell=0; cell<maxKeysInRow; cell++)
 			{
 				if (keypad[row][cell] != 0)
 				{
-					cx = x+interfaceInfo.paddingSize*(1+cell)+VKEYPAD_BUTTON_WIDTH*cell;
-					cy = y+interfaceInfo.paddingSize*(1+row)+VKEYPAD_BUTTON_HEIGHT*row;
+					cx = x+interfaceInfo.paddingSize*(1+cell)+vkey_width*cell;
+					cy = y+interfaceInfo.paddingSize*(1+row)+vkey_height*row;
 					if (keypad[row][cell+1] == 0)
 					{				
-						cw = VKEYPAD_BUTTON_WIDTH*(maxKeysInRow-cell)+interfaceInfo.paddingSize*(maxKeysInRow-cell-1);
+						cw = vkey_width*(maxKeysInRow-cell)+interfaceInfo.paddingSize*(maxKeysInRow-cell-1);
 					} else
 					{
-						cw = VKEYPAD_BUTTON_WIDTH;
+						cw = vkey_width;
 					}
-					if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
-					{
-						r = INTERFACE_VKEYBOARDKEYS_RED;
-						g = INTERFACE_VKEYBOARDKEYS_GREEN;
-						b = INTERFACE_VKEYBOARDKEYS_BLUE;
-						a = 0xFF;
-					} else
-					{
-						r = INTERFACE_SCROLLBAR_COLOR_RED;
-						g = INTERFACE_SCROLLBAR_COLOR_GREEN;
-						b = INTERFACE_SCROLLBAR_COLOR_BLUE;
-						a = 0xFF;
-					}
-					gfx_drawRectangle(DRAWING_SURFACE,
-					                  r, g, b, 0xFF, cx, cy, cw, ch);
-#ifdef STSDK							  
-					interface_drawInnerBorder(DRAWING_SURFACE,
-					                          INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, a, cx, cy, cw, ch,
-					                          interfaceInfo.borderWidth, interfaceBorderSideAll);
-#else					
-					if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
-					interface_drawInnerBorder(DRAWING_SURFACE,
-					                          INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE,
-								  a, cx, cy, cw, ch, interfaceInfo.borderWidth, interfaceBorderSideAll);
-#endif
+					if ((row != 4) || (cell!=10))  {
+							if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
+								 interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "vkeya.png", cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+							else interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "vkeys.png", cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+					} else {
+							if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
+								 interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "vkeyab.png", cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+							else interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "vkeysb.png", cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+					}		
 #ifdef WCHAR_SUPPORT
 					memset(buf,0,sizeof(buf));
 					if ( interfaceInfo.keypad.altLayout == ALTLAYOUT_ON && keypad_local[row][cell] != 0 )
@@ -1554,86 +1541,49 @@ void interface_displayVirtualKeypad()
 					                                                tolower(keypad[row][cell]));
 #endif
 					pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rectangle, NULL);
-					if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell)
-					{
-						r = 0xFF;
-						g = 0xFF;
-						b = 0xFF;
-						a = 0xFF;
-					} else
-					{
-						r = INTERFACE_VKEYBOARDKEYS_RED;
-						g = INTERFACE_VKEYBOARDKEYS_GREEN;
-						b = INTERFACE_VKEYBOARDKEYS_BLUE;
-						a = 0xFF;
-					}
 #ifdef STSDK
-					gfx_drawText(DRAWING_SURFACE, pgfx_font,
-					             r, g, b, a,
-					             cx+cw/2-(rectangle.w-rectangle.x)/2,
-					             cy+ch+ch/2+8-(rectangle.h-rectangle.y)/2,
-					             buf, 0, 0);
+					txt_y = cy+ch/2+31-(rectangle.h-rectangle.y)/2;
 #else				
-					gfx_drawText(DRAWING_SURFACE, pgfx_font,
-					             r, g, b, a,
-					             cx+cw/2-(rectangle.w-rectangle.x)/2,
-					             cy+ch+ch/2-(rectangle.h-rectangle.y)/2,
-					             buf, 0, 0);
+					txt_y = cy+ch/2+24-(rectangle.h-rectangle.y)/2;
 #endif								 
+					gfx_drawText(DRAWING_SURFACE, pgfx_font,
+					             r, g, b, 0xff,
+					             cx+cw/2-(rectangle.w-rectangle.x)/2,
+					             txt_y,
+					             buf, 0, 0);
 				}
 			}
-		}
-		cy = y+interfaceInfo.paddingSize*(1+maxRows)+VKEYPAD_BUTTON_HEIGHT*maxRows;
+		}		
+		cy = y+interfaceInfo.paddingSize*(1+maxRows)+vkey_height*maxRows;
 		cw = (w-interfaceInfo.paddingSize*(1+controlButtonCount))/controlButtonCount;
+
+		r = g = b =0x20;
 		for (cell=0; cell<controlButtonCount; cell++)
 		{
 			cx = x+interfaceInfo.paddingSize*(1+cell)+cw*cell;
-			gfx_drawRectangle(DRAWING_SURFACE,
-			                  controlButtons[cell].r, controlButtons[cell].g,
-			                  controlButtons[cell].b, controlButtons[cell].a,
-			                  cx, cy, cw, ch);
-			if (interfaceInfo.keypad.row == maxRows && cell == interfaceInfo.keypad.cell)
-			{
-				r = 0xFF;
-				g = 0xFF;
-				b = 0xFF;
-				a = 0xFF;
-			} else
-			{
-				r = INTERFACE_VKEYBOARDKEYS_RED;
-				g = INTERFACE_VKEYBOARDKEYS_GREEN;
-				b = INTERFACE_VKEYBOARDKEYS_BLUE;
-				a = 0xFF;
-			}
-			interface_drawInnerBorder(DRAWING_SURFACE,
-			                          r, g, b, a, cx, cy, cw, ch,
-			                          interfaceInfo.borderWidth, interfaceBorderSideAll);
+
 			pgfx_font->GetStringExtents(pgfx_font, controlButtons[cell].name, -1, &rectangle, NULL);
 #ifdef STSDK
-			if (cell!=0 && cell!=controlButtonCount-1) {
-				gfx_drawText(DRAWING_SURFACE,
-						pgfx_font, 0xff, 0xff, 0xff, a,
-			            cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2+8-(rectangle.h-rectangle.y)/2,
-			            controlButtons[cell].name, 0, 0);
+			txt_y = cy+ch/2+31-(rectangle.h-rectangle.y)/2;
+#else 
+			txt_y = cy+ch/2+24-(rectangle.h-rectangle.y)/2;
+#endif
+			if (row == interfaceInfo.keypad.row && cell == interfaceInfo.keypad.cell) {
+				interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "vkeyab.png", cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
 			} else {
-				gfx_drawText(DRAWING_SURFACE,
-			             pgfx_font, r, g, b, a,
-			             cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2+8-(rectangle.h-rectangle.y)/2,
-			             controlButtons[cell].name, 0, 0);
+				if (cell==0 || cell==controlButtonCount-1) {
+					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "vkeysb.png", cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+				} else  	{
+					strncpy(vkeys_path, IMAGE_DIR, 1024);
+					strcat(vkeys_path, vkeys[cell-1]);
+					interface_drawImage(DRAWING_SURFACE, vkeys_path , cx, cy, cw, ch, 0, NULL, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+				}
 			}
-#else			
-			if (cell!=0 && cell!=controlButtonCount-1) {
-				gfx_drawText(DRAWING_SURFACE,
-				     pgfx_font, 0xff, 0xff, 0xff, a,
-			             cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2-(rectangle.h-rectangle.y)/2,
+			gfx_drawText(DRAWING_SURFACE,
+			             pgfx_font, r, g, b, 0xff,
+			             cx+cw/2-(rectangle.w-rectangle.x)/2, txt_y,
 			             controlButtons[cell].name, 0, 0);
-			} else {
-				gfx_drawText(DRAWING_SURFACE,
-			             pgfx_font, r, g, b, a,
-			             cx+cw/2-(rectangle.w-rectangle.x)/2, cy+ch+ch/2-(rectangle.h-rectangle.y)/2,
-			             controlButtons[cell].name, 0, 0);
-			}
-#endif						 
+						 
 		}
 	}
 }
@@ -1994,10 +1944,7 @@ static void interface_animateMenu(int flipFB, int animate)
 			gfx_fb1_clear(0x7f, 0x7f, 0x7f, 0xff);
 		} else {
 			gfx_fb1_clear(0x0, 0x0, 0x0, 0x0);
-//	Kpy disable logo
-//			gfx_fb1_draw_rect(40, 40, 20, 20, 0x7f); //depth for logo
 		}
-//		usleep(10000); //trick for correct write 3dheader
 	} else {
 		gfx_fb1_clear(0x0, 0x0, 0x0, 0x0);
 	}
@@ -3205,12 +3152,17 @@ pinterfaceCommandEvent_t interface_keypadProcessCommand(pinterfaceCommandEvent_t
 			}
 			break;
 		case  interfaceCommandUp:
+			if (interfaceInfo.keypad.row==maxRows && interfaceInfo.keypad.cell == interfaceInfo.keypad.last_cell) {
+					interfaceInfo.keypad.last_cell *= 2;
+			}
 			interfaceInfo.keypad.row--;
+			interfaceInfo.keypad.cell = interfaceInfo.keypad.last_cell;
 			if (interfaceInfo.keypad.row < 0)
 			{
 				interfaceInfo.keypad.row = maxRows;
+				interfaceInfo.keypad.cell /= 2;
 				if (interfaceInfo.keypad.cell >= controlButtonCount )
-					interfaceInfo.keypad.cell = 0;
+					interfaceInfo.keypad.cell = controlButtonCount;
 				break;
 			}
 			if (keypad[interfaceInfo.keypad.row][interfaceInfo.keypad.cell] == 0)
@@ -3223,7 +3175,11 @@ pinterfaceCommandEvent_t interface_keypadProcessCommand(pinterfaceCommandEvent_t
 			}
 			break;
 		case  interfaceCommandDown:
+			if (interfaceInfo.keypad.row==maxRows && interfaceInfo.keypad.cell == interfaceInfo.keypad.last_cell) {
+					interfaceInfo.keypad.last_cell *= 2;
+			}
 			interfaceInfo.keypad.row++;
+			interfaceInfo.keypad.cell = interfaceInfo.keypad.last_cell;
 			if (interfaceInfo.keypad.row > maxRows)
 			{
 				interfaceInfo.keypad.row = 0;
@@ -3231,8 +3187,9 @@ pinterfaceCommandEvent_t interface_keypadProcessCommand(pinterfaceCommandEvent_t
 			}
 			if ( interfaceInfo.keypad.row == maxRows )
 			{
+				interfaceInfo.keypad.cell /= 2;
 				if ( interfaceInfo.keypad.cell >= controlButtonCount )
-					interfaceInfo.keypad.cell = 0;
+					interfaceInfo.keypad.cell = controlButtonCount-1;
 				break;
 			}
 			if (keypad[interfaceInfo.keypad.row][interfaceInfo.keypad.cell] == 0)
@@ -3248,37 +3205,29 @@ pinterfaceCommandEvent_t interface_keypadProcessCommand(pinterfaceCommandEvent_t
 			interfaceInfo.keypad.cell--;
 			if (interfaceInfo.keypad.cell < 0)
 			{
-				interfaceInfo.keypad.row--;
-				if (interfaceInfo.keypad.row < 0)
-				{
-					//interfaceInfo.keypad.row = 0; // Stay on the first row with digits...
-					interfaceInfo.keypad.row = maxRows;
-					interfaceInfo.keypad.cell = controlButtonCount-1;
-					break;
-				}
 				interfaceInfo.keypad.cell = 0;
-				while (keypad[interfaceInfo.keypad.row][interfaceInfo.keypad.cell+1] != 0)
-				{
-					interfaceInfo.keypad.cell++;
-				}
+				if (interfaceInfo.keypad.row == maxRows)	interfaceInfo.keypad.cell = controlButtonCount-1;
+				else 
+					while (keypad[interfaceInfo.keypad.row][interfaceInfo.keypad.cell+1] != 0)
+					{
+						interfaceInfo.keypad.cell++;
+					}
 			}
+			interfaceInfo.keypad.last_cell = interfaceInfo.keypad.cell;
 			break;
 		case interfaceCommandRight:
 			interfaceInfo.keypad.cell++;
-			if (interfaceInfo.keypad.row == maxRows)
-			{
-				if ( interfaceInfo.keypad.cell >= controlButtonCount )
-				{
-					interfaceInfo.keypad.row = 0;
+			if (interfaceInfo.keypad.row == maxRows) {
+				if (interfaceInfo.keypad.cell >= controlButtonCount)
 					interfaceInfo.keypad.cell = 0;
-				}
+				interfaceInfo.keypad.last_cell = interfaceInfo.keypad.cell;
 				break;
 			}
 			if (keypad[interfaceInfo.keypad.row][interfaceInfo.keypad.cell] == 0)
 			{
-				interfaceInfo.keypad.row++;
 				interfaceInfo.keypad.cell = 0;
 			}
+			interfaceInfo.keypad.last_cell = interfaceInfo.keypad.cell;
 			break;
 		case 8:
 		case interfaceCommandBlue:
@@ -6357,7 +6306,9 @@ void interface_showConfirmationBox(const char *text, int icon, menuConfirmFuncti
 	interfaceInfo.messageBox.pCallback = pCallback;
 	interfaceInfo.messageBox.pArg = pArg;
 	interfaceInfo.messageBox.target.x = interfaceInfo.screenWidth/2;
-	interfaceInfo.messageBox.target.y = interfaceInfo.screenHeight/2;
+	if (interfaceInfo.screenHeight<=576) 
+		interfaceInfo.messageBox.target.y = 200;
+	else	interfaceInfo.messageBox.target.y = interfaceInfo.screenHeight/2;
 	interfaceInfo.messageBox.target.w = 0;
 	interfaceInfo.messageBox.target.h = 0;
 	messageBox_setDefaultColors();
@@ -7456,7 +7407,6 @@ int interface_getText(interfaceMenu_t *pMenu, const char *description, const cha
 	int dest_index;
 	int mb_count;
 #endif
-
 	info = (interfaceEnterTextInfo_t *)dmalloc(sizeof(interfaceEnterTextInfo_t));
 
 	memset(info, 0, sizeof(interfaceEnterTextInfo_t));

@@ -114,13 +114,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define SLIDER_DEFAULT_HEIGHT                   (18)
 
-#ifdef STSDK
 #define VKEYPAD_BUTTON_HEIGHT                   (26)
-#define VKEYPAD_BUTTON_WIDTH                    (30)
-#else
-#define VKEYPAD_BUTTON_HEIGHT                   (24)
-#define VKEYPAD_BUTTON_WIDTH                    (24)
-#endif
+#define VKEYPAD_BUTTON_WIDTH                    (36)
+
+#define VKEYPAD_HD_BUTTON_HEIGHT                (48)
+#define VKEYPAD_HD_BUTTON_WIDTH                 (70)
 
 #define KEYPAD_MAX_ROWS                         (8)
 #define KEYPAD_MAX_CELLS                        (16)
@@ -824,6 +822,7 @@ typedef struct
 	int shift;
 	int row;
 	int cell;
+	int last_cell;
 #ifdef WCHAR_SUPPORT
 	int altLayout;   // -1 = disabled, 0 = default, 1 = local
 #endif
