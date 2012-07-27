@@ -1168,6 +1168,7 @@ void media_pauseOrStop(int stop)
 		interface_notifyText(NULL,0);
 		interface_playControlSlider(0, 0, 0);
 		interface_playControlSelect(interfacePlayControlStop);
+		interface_showMenu(1, 1);
 	} else
 	{
 		interface_playControlSelect(interfacePlayControlPause);

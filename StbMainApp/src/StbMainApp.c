@@ -548,63 +548,81 @@ interfaceCommand_t parseEvent(DFBEvent *event)
 	return cmd;
 }
 
-int checkPowerOff(DFBEvent event)
+int helperIsEventValid(DFBEvent *event)
 {
-	int timediff;
-	static struct timeval firstPress = {0, 0},
-						  lastChange = {0, 0};
+	int valid = 1;
 
-	struct timeval lastPress = {0, 0},
-				   currentPress = {0, 0};
-
-	int repeat = 0;
-
-	gettimeofday(&currentPress, NULL);
-
-	if (!gIgnoreEventTimestamp)
-	{
-		timediff = (currentPress.tv_sec-event.input.timestamp.tv_sec)*1000000+(currentPress.tv_usec-event.input.timestamp.tv_usec);
-
-		if (timediff > OUTDATE_TIMEOUT)
-		{
+	if (!gIgnoreEventTimestamp) {
+		int timediff;
+		struct timeval curTime;
+		gettimeofday(&curTime, NULL);
+		timediff = (curTime.tv_sec - event->input.timestamp.tv_sec) * 1000000 + (curTime.tv_usec - event->input.timestamp.tv_usec);
+		if (timediff > OUTDATE_TIMEOUT)	{
 			dprintf("%s: ignore event, age %d\n", __FUNCTION__, timediff);
-			return 0;
+			valid = 0;
 		}
 	}
+	return valid;
+}
 
-	if (firstPress.tv_sec == 0 || lastPress.tv_sec == 0)
-	{
-		timediff = 0;
-	} else
-	{
-		timediff = (currentPress.tv_sec-lastPress.tv_sec)*1000000+(currentPress.tv_usec-lastPress.tv_usec);
-	}
-
-	if (timediff == 0 || timediff > REPEAT_TIMEOUT)
-	{
-		//dprintf("%s: reset\n, __FUNCTION__");
-		memcpy(&firstPress, &currentPress, sizeof(struct timeval));
-	} else
-	{
-		//dprintf("%s: repeat detected\n", __FUNCTION__);
-		repeat = 1;
-	}
-
-	memcpy(&lastPress, &currentPress, sizeof(struct timeval));
-
+int checkPowerOff(DFBEvent *pEvent)
+{
 	//dprintf("%s: check power\n", __FUNCTION__);
-
-	if ( event.input.key_symbol == DIKS_POWER ) // Power/Standby button. Go to standby.
+	if(pEvent->input.key_symbol == DIKS_POWER) // Power/Standby button. Go to standby.
 	{
+		static struct timeval	lastChange = {0, 0},
+								firstPress = {0, 0};
+		struct timeval currentPress = {0, 0};
+		int repeat = 0;
+#ifdef STSDK
+		static int isPowerReleased = 1;
+
+		gettimeofday(&currentPress, NULL);
+		if((pEvent->input.type == DIET_KEYRELEASE) || (pEvent->input.type == DIET_BUTTONRELEASE)) {
+			isPowerReleased = 1;
+		} else {
+			if(appControlInfo.inStandby)
+				return 0; //dont check pressed more than 3 seconds POWER button in standby
+			if(isPowerReleased) {
+				memcpy(&firstPress, &currentPress, sizeof(struct timeval));
+				isPowerReleased = 0;
+			}
+			//try to check if button pressed more than 3 seconds
+			repeat = 1;
+		}
+#else
+		static struct timeval lastPress = {0, 0};
+		int timediff;
+
+		gettimeofday(&currentPress, NULL);
+		if (firstPress.tv_sec == 0 || lastPress.tv_sec == 0) {
+			timediff = 0;
+		} else {
+			timediff = (currentPress.tv_sec - lastPress.tv_sec) * 1000000 + (currentPress.tv_usec - lastPress.tv_usec);
+		}
+
+		if (timediff == 0 || timediff > REPEAT_TIMEOUT) {
+			//dprintf("%s: reset\n, __FUNCTION__");
+			memcpy(&firstPress, &currentPress, sizeof(struct timeval));
+		} else {
+			//dprintf("%s: repeat detected\n", __FUNCTION__);
+			repeat = 1;
+		}
+		memcpy(&lastPress, &currentPress, sizeof(struct timeval));
+#endif
 		//dprintf("%s: got DIKS_POWER\n", __FUNCTION__);
-		if (repeat && currentPress.tv_sec-firstPress.tv_sec >= 3)
+		if (repeat && ((currentPress.tv_sec - firstPress.tv_sec) >= 3))
 		{
 			//dprintf("%s: repeat 3 sec - halt\n", __FUNCTION__);
 			/* Standby button has been held for 3 seconds. Power off. */
-			/*interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
-			system("poweroff");*/
-		} else if (!repeat && currentPress.tv_sec - lastChange.tv_sec >= 3)
+#ifdef STSDK
+			isPowerReleased = 1; //mark it here, because system call (in test mode) can be long, so POWER release will skiped
+			interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
+			system("poweroff");
+#endif
+		} else if (!repeat && ((currentPress.tv_sec - lastChange.tv_sec) >= 3))
 		{
+			int ret = 0;
 			interfaceCommandEvent_t cmd;
 
 			//dprintf("%s: switch standby\n", __FUNCTION__);
@@ -632,160 +650,14 @@ int checkPowerOff(DFBEvent event)
 				}
 
 				interface_displayMenu(1);
-#ifdef STB82
+
 				system("standbyon");
-
-/*
-				system("/usr/lib/luddite/mmio 0x047730 0x0"); //GPIO_CLK_Q0_CTL control
-				system("/usr/lib/luddite/mmio 0x047734 0x0"); //GPIO_CLK_Q1_CTL control
-				system("/usr/lib/luddite/mmio 0x047738 0x0"); //GPIO_CLK_Q2_CTL control
-				system("/usr/lib/luddite/mmio 0x04773C 0x0"); //GPIO_CLK_Q3_CTL control
-				system("/usr/lib/luddite/mmio 0x047740 0x0"); //GPIO_CLK_Q4_CTL control
-				system("/usr/lib/luddite/mmio 0x047744 0x0"); //GPIO_CLK_Q5_CTL control
-				system("/usr/lib/luddite/mmio 0x047A00 0x0"); //CLK_QVCP1_OUT_CTL control(+)
-				system("/usr/lib/luddite/mmio 0x047A08 0x0"); //CLK_QVCP2_OUT_CTL control
-				system("/usr/lib/luddite/mmio 0x047A04 0x0"); //CLK_QVCP1_PIX_CTL control
-				system("/usr/lib/luddite/mmio 0x047A0C 0x0"); //CLK_QVCP2_PIX_CTL control
-				system("/usr/lib/luddite/mmio 0x047500 0x0"); //clk_mbs control
-				system("/usr/lib/luddite/mmio 0x047750 0x0"); //CLK_MBS2_CTL control
-				system("/usr/lib/luddite/mmio 0x047800 0x0"); //CLK_VMSP1_CTL control
-				system("/usr/lib/luddite/mmio 0x047804 0x0"); //CLK_VMSP2_CTL control
-				system("/usr/lib/luddite/mmio 0x047728 0x0"); //CLK_SMART1_CTL control
-				system("/usr/lib/luddite/mmio 0x04772C 0x0"); //CLK_SMART2_CTL control
-				system("/usr/lib/luddite/mmio 0x04720C 0x38");//MIPS DCS bus clock control to 27Mhz
-				system("/usr/lib/luddite/mmio 0x047210 0x38");//MIPS DTL bus clock control to 27Mhz
-				system("/usr/lib/luddite/mmio 0x047214 0x38");//TriMedia DCS bus clock control
-				system("/usr/lib/luddite/mmio 0x047218 0x38");//TriMedia DTL bus clock control
-				system("/usr/lib/luddite/mmio 0x047B00 0x0"); //CLK_SPDO_CTL control
-				system("/usr/lib/luddite/mmio 0x047B04 0x0"); //CLK_AI1_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B08 0x0"); //CLK_AO1_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B0C 0x0"); //CLK_AI2_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B10 0x0"); //CLK_AO2_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B18 0x0"); //CLK_AI1_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B1C 0x0"); //CLK_AO1_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B20 0x0"); //CLK_AI2_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B24 0x0"); //CLK_AO2_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B28 0x0"); //CLK_SPDI2_CTL control
-				system("/usr/lib/luddite/mmio 0x047B2C 0x0"); //CLK_SPDI_CTL control
-				system("/usr/lib/luddite/mmio 0x047B30 0x0"); //CLK_TSTAMP_CTL control
-				system("/usr/lib/luddite/mmio 0x047B34 0x0"); //CLK_TSDMA_CTL control
-				system("/usr/lib/luddite/mmio 0x047B3C 0x0"); //CLK_DVDD_CTL control
-				system("/usr/lib/luddite/mmio 0x047B44 0x0"); //CLK_VPK_CTL control
-
-				// ---------------------------------- powerdown ------------------------
-				system("/usr/lib/luddite/mmio 0x063FF4 0x80000000");
-				system("/usr/lib/luddite/mmio 0x04DFF4 0x80000000");
-				system("/usr/lib/luddite/mmio 0x17FFF4 0x80000000");//CTL12 IN Power Down
-				system("/usr/lib/luddite/mmio 0x040FF4 0x80000000");//SCIF_POWERDOWN IN Power Down
-				//system("/usr/lib/luddite/mmio 0x104FF4 0x80000000");//GPIO
-				system("/usr/lib/luddite/mmio 0x106FF4 0x80000000");//VIP1
-				system("/usr/lib/luddite/mmio 0x10DFF4 0x80000000");//QNTR
-				system("/usr/lib/luddite/mmio 0x173FF4 0x80000000");//VPK
-				system("/usr/lib/luddite/mmio 0x116FF4 0x80000000");//TSDMA
-				system("/usr/lib/luddite/mmio 0x114FF4 0x80000000");//DVI
-				system("/usr/lib/luddite/mmio 0x105FF4 0x80000000");//Mpeg2
-				system("/usr/lib/luddite/mmio 0x108FF4 0x80000000");//VLD
-				system("/usr/lib/luddite/mmio 0x4AFF4 0x80000000");//UART
-				system("/usr/lib/luddite/mmio 0x4BFF4 0x80000000");//UART2
-				system("/usr/lib/luddite/mmio 0x10CFF4 0x80000000 "); //MBS1- control
-
-
-				phStbSystemManager_Init();
-				phStbSystemManager_SetPowerMode(1);
-*/
-#endif // STB82
-#ifdef STSDK
-				system("poweroff");
-#endif
-				memcpy(&lastChange, &currentPress, sizeof(struct timeval));
-				return 1;
-
-			} else
-			{
-#ifdef STB82
-/*				system("stmclient 4");//enable leds
-
-				phStbSystemManager_SetPowerMode(0);
-
-				// ---------------------------------- powerdown - up ------------------------
-				system("/usr/lib/luddite/mmio 0x063FF4 0x0");
-				system("/usr/lib/luddite/mmio 0x04DFF4 0x0");
-				system("/usr/lib/luddite/mmio 0x17FFF4 0x0");//CTL12 IN Power Down
-				system("/usr/lib/luddite/mmio 0x040FF4 0x0");//SCIF_POWERDOWN IN Power Down
-				//system("/usr/lib/luddite/mmio 0x104FF4 0x0");//GPIO
-				system("/usr/lib/luddite/mmio 0x106FF4 0x0");//VIP1
-				system("/usr/lib/luddite/mmio 0x10DFF4 0x0");//QNTR
-				system("/usr/lib/luddite/mmio 0x173FF4 0x0");//VPK
-				system("/usr/lib/luddite/mmio 0x116FF4 0x0");//TSDMA
-				system("/usr/lib/luddite/mmio 0x114FF4 0x0");//DVI
-				system("/usr/lib/luddite/mmio 0x105FF4 0x0");//Mpeg2
-				system("/usr/lib/luddite/mmio 0x108FF4 0x0");//VLD
-				system("/usr/lib/luddite/mmio 0x4AFF4 0x0");//UART
-				system("/usr/lib/luddite/mmio 0x4BFF4 0x0");//UART2
-				system("/usr/lib/luddite/mmio 0x10CFF4 0x0"); //MBS1- control
-
-
-				system("/usr/lib/luddite/mmio 0x04720C 0x2");//MIPS DCS bus clock control to 27Mhz
-				system("/usr/lib/luddite/mmio 0x047210 0x2");//MIPS DTL bus clock control to 27Mhz
-				system("/usr/lib/luddite/mmio 0x047214 0x4");//TriMedia DCS bus clock control
-				system("/usr/lib/luddite/mmio 0x047218 0x4");//TriMedia DTL bus clock control
-				system("/usr/lib/luddite/mmio 0x047500 0x3"); //clk_mbs control
-				system("/usr/lib/luddite/mmio 0x047750 0x3"); //CLK_MBS2_CTL control
-				system("/usr/lib/luddite/mmio 0x047A00 0x3"); //CLK_QVCP1_OUT_CTL control
-				system("/usr/lib/luddite/mmio 0x047A08 0x3"); //CLK_QVCP2_OUT_CTL control
-				system("/usr/lib/luddite/mmio 0x04721C 0x1"); //Tunnel clock control
-				system("/usr/lib/luddite/mmio 0x047400 0x71"); //clk_vmpg control
-				system("/usr/lib/luddite/mmio 0x047404 0x71"); //clk_vld control
-				system("/usr/lib/luddite/mmio 0x047800 0x23"); //CLK_VMSP1_CTL control
-				system("/usr/lib/luddite/mmio 0x047804 0x23"); //CLK_VMSP2_CTL control
-				system("/usr/lib/luddite/mmio 0x047730 0x1"); //GPIO_CLK_Q0_CTL control
-				system("/usr/lib/luddite/mmio 0x047734 0x1"); //GPIO_CLK_Q1_CTL control
-				system("/usr/lib/luddite/mmio 0x047738 0x1"); //GPIO_CLK_Q2_CTL control
-				system("/usr/lib/luddite/mmio 0x04773C 0x1"); //GPIO_CLK_Q3_CTL control
-				system("/usr/lib/luddite/mmio 0x047740 0x1"); //GPIO_CLK_Q4_CTL control
-				system("/usr/lib/luddite/mmio 0x047744 0x1"); //GPIO_CLK_Q5_CTL control
-				system("/usr/lib/luddite/mmio 0x047728 0x1"); //CLK_SMART1_CTL control
-				system("/usr/lib/luddite/mmio 0x04772C 0x1"); //CLK_SMART2_CTL control
-				system("/usr/lib/luddite/mmio 0x047820 0x3"); //CLK_TS_S11_CTL control
-				system("/usr/lib/luddite/mmio 0x047824 0x1"); //CLK_TS_S12_CTL control
-				system("/usr/lib/luddite/mmio 0x047828 0x3"); //CLK_TS_S21_CTL control
-				system("/usr/lib/luddite/mmio 0x04782c 0x1"); //CLK_TS_S22_CTL control
-				system("/usr/lib/luddite/mmio 0x047830 0x3"); //CLK_TS_S31_CTL control
-				system("/usr/lib/luddite/mmio 0x047834 0x1"); //CLK_TS_S32_CTL control
-				system("/usr/lib/luddite/mmio 0x04783C 0x1"); //TSOUT_CLK0_OUT_CTL control
-				system("/usr/lib/luddite/mmio 0x047B00 0x3"); //CLK_SPDO_CTL control
-				system("/usr/lib/luddite/mmio 0x047B04 0x1"); //CLK_AI1_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B08 0x1"); //CLK_AO1_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B0C 0x1"); //CLK_AI2_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B10 0x3"); //CLK_AO2_OSCLK_CTL control
-				system("/usr/lib/luddite/mmio 0x047B18 0x1"); //CLK_AI1_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B1C 0x1"); //CLK_AO1_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B20 0x1"); //CLK_AI2_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B24 0x3"); //CLK_AO2_SCK_O_CTL control
-				system("/usr/lib/luddite/mmio 0x047B28 0x1"); //CLK_SPDI2_CTL control
-				system("/usr/lib/luddite/mmio 0x047B2C 0x1"); //CLK_SPDI_CTL control
-				system("/usr/lib/luddite/mmio 0x047B30 0x3"); //CLK_TSTAMP_CTL control
-				system("/usr/lib/luddite/mmio 0x047B34 0x1"); //CLK_TSDMA_CTL control
-				system("/usr/lib/luddite/mmio 0x047B3C 0x1"); //CLK_DVDD_CTL control
-				system("/usr/lib/luddite/mmio 0x047B44 0x71"); //CLK_VPK_CTL control
-				system("/usr/lib/luddite/mmio 0x047A04 0xB"); //CLK_QVCP1_PIX_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x047A0C 0xB"); //CLK_QVCP2_PIX_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x047A18 0x3B"); //CLK_QVCP1_PROC_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x047A1C 0x39"); //CLK_QVCP2_PROC_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x04770C 0x3"); //CLK48_CTL control
-				system("/usr/lib/luddite/mmio 0x047710 0x3"); //CLK12_CTL control
-				system("/usr/lib/luddite/mmio 0x047504 0x73"); //CLK_QTNR_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x047600 0x1"); //CLK_VIP1_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x047704 0x71"); //CLK_D2D_CTL control - FIX
-				system("/usr/lib/luddite/mmio 0x047840 0x1"); //TSOUT_SERIAL_CLK0_CTL control
-*/
-#endif // STB82
-
+				ret = 1;
+			} else {
 				interface_displayMenu(1);
 				system("standbyoff");
 
-				if (inStandbyActiveVideo)
-				{
+				if (inStandbyActiveVideo) {
 					memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
 					cmd.command = interfaceCommandPlay;
 					interface_processCommand(&cmd);
@@ -793,18 +665,17 @@ int checkPowerOff(DFBEvent event)
 
 				//dprintf("%s: return from standby\n", __FUNCTION__);
 				appControlInfo.inStandby = 0;
-
-				memcpy(&lastChange, &currentPress, sizeof(struct timeval));
-
-				if( helperCheckUpdates() )
-				{
+#ifndef STSDK
+				if(helperCheckUpdates()) {
 					interface_showConfirmationBox(_T("CONFIRM_FIRMWARE_UPDATE"), thumbnail_question, helper_confirmFirmwareUpdate, NULL);
 				}
-
-				return 2;
+#endif
+				ret = 2;
 			}
+			memcpy(&lastChange, &currentPress, sizeof(struct timeval));
+			return ret;
 		}
-	} else if ( event.input.button == 9 ) // PSU button, just do power off
+	} else if(pEvent->input.button == 9) // PSU button, just do power off
 	{
 		system("poweroff");
 	}
@@ -822,25 +693,22 @@ interfaceCommand_t helperGetEvent(int flush)
 	IDirectFBEventBuffer *eventBuffer = appEventBuffer;
 	DFBEvent event;
 
-	if ( eventBuffer->HasEvent(eventBuffer) == DFB_OK )
-	{
+	if(eventBuffer->HasEvent(eventBuffer) == DFB_OK) {
 		eventBuffer->GetEvent(eventBuffer, &event);
-		if (flush)
-		{
+		if(flush) {
 			eventBuffer->Reset(eventBuffer);
 		}
 
-		if (checkPowerOff(event))
-		{
-			eventBuffer->Reset(eventBuffer);
-			return interfaceCommandNone;
+		if(helperIsEventValid(&event)) {
+			if(checkPowerOff(&event)) {
+				eventBuffer->Reset(eventBuffer);
+				return interfaceCommandNone;
+			}
 		}
 
-		if ( event.clazz == DFEC_INPUT && (event.input.type == DIET_KEYPRESS || event.input.type == DIET_BUTTONPRESS) )
-		{
+		if ( event.clazz == DFEC_INPUT && (event.input.type == DIET_KEYPRESS || event.input.type == DIET_BUTTONPRESS) ) {
 			return parseEvent(&event);
 		}
-
 		return interfaceCommandCount;
 	}
 
@@ -1497,7 +1365,7 @@ void *keyThread(void *pArg)
 	DFBInputDeviceKeySymbol lastsym;
 	int allow_repeat = 0;
 	unsigned long timediff;
-	struct timeval lastpress, currentpress, currenttime;
+	struct timeval lastpress, currentpress;
 	interfaceCommand_t lastcmd;
 	interfaceCommandEvent_t curcmd;
 
@@ -1595,6 +1463,7 @@ void *keyThread(void *pArg)
 					continue;
 				else
 				{
+					struct timeval currenttime;
 					gettimeofday(&currenttime, NULL);
 					int timeout = currenttime.tv_sec-event.input.timestamp.tv_sec;
 
@@ -1619,22 +1488,13 @@ void *keyThread(void *pArg)
 			} else
 				continue;
 		}
-		if (result  == DFB_OK )
+		if(result == DFB_OK)
 		{
 			eventBuffer->GetEvent(eventBuffer, &event);
 			eventBuffer->Reset(eventBuffer);
 
-			if (!gIgnoreEventTimestamp)
-			{
-				gettimeofday(&currenttime, NULL);
-				timediff = (currenttime.tv_sec-event.input.timestamp.tv_sec)*1000000+(currenttime.tv_usec-event.input.timestamp.tv_usec);
-
-				if (timediff > OUTDATE_TIMEOUT)
-				{
-					dprintf("%s: ignore event, age %d\n", __FUNCTION__, timediff);
-					continue;
-				}
-			}
+			if(!helperIsEventValid(&event))
+				continue;
 
 			kprintf("%s: got event, age %d\n", __FUNCTION__, timediff);
 
@@ -1649,26 +1509,23 @@ void *keyThread(void *pArg)
 					break;
 				}*/
 
-				if (checkPowerOff(event))
-				{
+				if(checkPowerOff(&event) || appControlInfo.inStandby) {
 					//clear event
 					eventBuffer->Reset(eventBuffer);
+					continue;
+				}
+				if (event.input.key_symbol == DIKS_CUSTOM0) { //VFMT
+					output_toggleOutputModes();
 					continue;
 				}
 
 				memcpy(&currentpress, &event.input.timestamp, sizeof(struct timeval));
 
-				if ( event.input.button == 9) // PSU
-				{
-					continue;
-				}
-
 				dprintf("%s: Char: %d (%d) %d, '%c' ('%c') did=%d\n", __FUNCTION__, event.input.key_symbol, event.input.key_id, event.input.button, event.input.key_symbol, event.input.key_id, event.input.device_id);
 
 				interfaceCommand_t cmd = parseEvent(&event);
 
-				if (cmd == interfaceCommandCount)
-				{
+				if (cmd == interfaceCommandCount) {
 					continue;
 				}
 
@@ -1677,17 +1534,14 @@ void *keyThread(void *pArg)
 				curcmd.source = event.input.device_id == DIDID_ANY ? DID_KEYBOARD : event.input.device_id;
 				//curcmd.repeat = 0;
 
-				kprintf("%s: event %d\n", __FUNCTION__, cmd);
-
 				timediff = (currentpress.tv_sec-lastpress.tv_sec)*1000000+(currentpress.tv_usec-lastpress.tv_usec);
 
+				kprintf("%s: event %d\n", __FUNCTION__, cmd);
 				kprintf("%s: timediff %d\n", __FUNCTION__, timediff);
 
-				if (cmd == lastcmd && timediff<REPEAT_TIMEOUT*2)
-				{
+				if (cmd == lastcmd && timediff < REPEAT_TIMEOUT * 2) {
 					curcmd.repeat++;
-				} else
-				{
+				} else {
 					curcmd.repeat = 0;
 				}
 
@@ -1738,6 +1592,15 @@ void *keyThread(void *pArg)
 				lastsym = 0;
 				lastcmd = 0;
 			}
+#ifdef STSDK
+			else if((event.clazz == DFEC_INPUT) && ((event.input.type == DIET_KEYRELEASE) || (event.input.type == DIET_BUTTONRELEASE))) {
+				if(checkPowerOff(&event)) {
+					//clear event
+					eventBuffer->Reset(eventBuffer);
+					continue;
+				}
+			}
+#endif
 		}
 	}
 

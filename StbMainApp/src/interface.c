@@ -3600,7 +3600,7 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 			break;
 			default:;
 		}
-	}	
+	}
 	else if ( interfaceInfo.showMenu )
 	{
 #ifdef ENABLE_TELETEXT

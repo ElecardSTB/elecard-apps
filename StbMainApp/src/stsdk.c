@@ -543,4 +543,15 @@ void st_setTuneParams(int tuner, cJSON *params)
 }
 #endif // ENABLE_DVB
 
+int st_sendToIndicator(const char *cmd)
+{
+	char buf[256];
+//TODO: use socket client
+	snprintf(buf, 256, "StbCommandClient -f /tmp/frontpanel '%s'", cmd);
+	buf[255] = 0;
+	system(buf);
+	return 0;
+}
+
+
 #endif // STSDK
