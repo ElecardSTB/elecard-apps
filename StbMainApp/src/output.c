@@ -565,16 +565,6 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef STSDK
-static int helper_sendToIndicator(const char *cmd)
-{
-	char buf[256];
-//TODO: use socket client
-	snprintf(buf, 256, "StbCommandClient -f /tmp/frontpanel '%s'", cmd);
-	buf[255] = 0;
-	system(buf);
-	return 0;
-}
-
 static int helper_indicatorShowVideoFormat(const char *name)
 {
 	char buf[16] = "\0";
@@ -595,8 +585,8 @@ static int helper_indicatorShowVideoFormat(const char *name)
 	if(buf[0] == 0)
 		sprintf(buf, "n10 %s", name);
 
-	helper_sendToIndicator("h 400 200");
-	helper_sendToIndicator(buf);
+	st_sendToIndicator("h 400 200");
+	st_sendToIndicator(buf);
 
 	return 0;
 }
@@ -724,6 +714,36 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
 #endif
     return 0;
 }
+
+/**
+ * This function switch into "Output format" menu and toggle output video modes.
+ */
+int output_toggleOutputModes(void)
+{
+	int next;
+	char *selectedFormat;
+	interfaceMenu_t *pMenu = &(FormatMenu.baseMenu);
+
+	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
+		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
+	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
+
+	next = pMenu->selectedItem + 1;
+	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
+		next = 0;
+	pMenu->selectedItem = next;
+
+	selectedFormat = pMenu->menuEntry[next].info;
+	if(pMenu->menuEntry[next].pArg)
+		selectedFormat = (char *)pMenu->menuEntry[next].pArg;
+
+	output_setVideoFormat(selectedFormat);
+	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
+	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
+
+	return 0;
+}
+
 
 /**
  * This function now uses the Encoder API to set the slow blanking instead of the Output API.
@@ -3633,33 +3653,6 @@ static void output_fillTimeZoneMenu(void)
 	interface_setSelectedItem((interfaceMenu_t*)&TimeZoneMenu, found);
 }
 
-int output_toggleOutputModes(void)
-{
-	int next;
-	char *selectedFormat;
-	interfaceMenu_t *pMenu = &FormatMenu;
-
-	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
-		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
-	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
-
-	next = pMenu->selectedItem + 1;
-	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
-		next = 0;
-	pMenu->selectedItem = next;
-
-	selectedFormat = pMenu->menuEntry[next].info;
-	if(pMenu->menuEntry[next].pArg)
-		selectedFormat = (char *)pMenu->menuEntry[next].pArg;
-
-	output_setVideoFormat(selectedFormat);
-//	interface_displayMenu(1);
-	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
-	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
-
-	return 0;
-}
-
 static int output_outputModesToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
 {
 	int *showAdvanced = (int *)pArg;
@@ -3768,7 +3761,8 @@ static void output_fillFormatMenu(void)
 		int hasSupportedModes = 0;
 		static char	modeNameCopy[sizeof(commonOutputModes) / sizeof(commonOutputModes[0])][32];
 		static int showAdvanced = 0;
-		
+
+		//check if supported any mode
 		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
 			if(mode->type != cJSON_Object)
 				continue;
@@ -3782,6 +3776,7 @@ static void output_fillFormatMenu(void)
 			}
 		}
 
+		//if showes advanced settings fill menu here, else fill mediate commonOutputModes massive
 		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
 			if(mode->type != cJSON_Object)
 				continue;

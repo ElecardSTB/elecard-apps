@@ -565,10 +565,10 @@ int helperIsEventValid(DFBEvent *event)
 	return valid;
 }
 
-int checkPowerOff(DFBEvent *event)
+int checkPowerOff(DFBEvent *pEvent)
 {
 	//dprintf("%s: check power\n", __FUNCTION__);
-	if(event->input.key_symbol == DIKS_POWER) // Power/Standby button. Go to standby.
+	if(pEvent->input.key_symbol == DIKS_POWER) // Power/Standby button. Go to standby.
 	{
 		static struct timeval	lastChange = {0, 0},
 								firstPress = {0, 0};
@@ -578,7 +578,7 @@ int checkPowerOff(DFBEvent *event)
 		static int isPowerReleased = 1;
 
 		gettimeofday(&currentPress, NULL);
-		if((event->input.type == DIET_KEYRELEASE) || (event->input.type == DIET_BUTTONRELEASE)) {
+		if((pEvent->input.type == DIET_KEYRELEASE) || (pEvent->input.type == DIET_BUTTONRELEASE)) {
 			isPowerReleased = 1;
 		} else {
 			if(appControlInfo.inStandby)
@@ -675,7 +675,7 @@ int checkPowerOff(DFBEvent *event)
 			memcpy(&lastChange, &currentPress, sizeof(struct timeval));
 			return ret;
 		}
-	} else if(event->input.button == 9) // PSU button, just do power off
+	} else if(pEvent->input.button == 9) // PSU button, just do power off
 	{
 		system("poweroff");
 	}
@@ -1512,6 +1512,10 @@ void *keyThread(void *pArg)
 				if(checkPowerOff(&event) || appControlInfo.inStandby) {
 					//clear event
 					eventBuffer->Reset(eventBuffer);
+					continue;
+				}
+				if (event.input.key_symbol == DIKS_CUSTOM0) { //VFMT
+					output_toggleOutputModes();
 					continue;
 				}
 

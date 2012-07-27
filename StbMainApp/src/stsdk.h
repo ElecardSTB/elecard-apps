@@ -103,6 +103,12 @@ void st_setTuneParams(int tuner, cJSON *params);
 fe_type_t st_getDvbTunerType(int tuner);
 #endif
 
+/** Sends command to frontpanel daemon.
+ * 
+ * @param[in] cmd - command
+ */
+int st_sendToIndicator(const char *cmd);
+
 #ifdef __cplusplus
 }
 #endif
