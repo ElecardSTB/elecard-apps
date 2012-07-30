@@ -661,6 +661,35 @@ static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 	output_cancelFormat(NULL);
 	return 0;
 }
+
+/**
+ * This function switch into "Output format" menu and toggle output video modes.
+ */
+int output_toggleOutputModes(void)
+{
+	int next;
+	char *selectedFormat;
+	interfaceMenu_t *pMenu = &(FormatMenu.baseMenu);
+
+	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
+		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
+	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
+
+	next = pMenu->selectedItem + 1;
+	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
+		next = 0;
+	pMenu->selectedItem = next;
+
+	selectedFormat = pMenu->menuEntry[next].info;
+	if(pMenu->menuEntry[next].pArg)
+		selectedFormat = (char *)pMenu->menuEntry[next].pArg;
+
+	output_setVideoFormat(selectedFormat);
+	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
+	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
+
+	return 0;
+}
 #endif
 
 /**
@@ -714,36 +743,6 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
 #endif
     return 0;
 }
-
-/**
- * This function switch into "Output format" menu and toggle output video modes.
- */
-int output_toggleOutputModes(void)
-{
-	int next;
-	char *selectedFormat;
-	interfaceMenu_t *pMenu = &(FormatMenu.baseMenu);
-
-	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
-		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
-	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
-
-	next = pMenu->selectedItem + 1;
-	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
-		next = 0;
-	pMenu->selectedItem = next;
-
-	selectedFormat = pMenu->menuEntry[next].info;
-	if(pMenu->menuEntry[next].pArg)
-		selectedFormat = (char *)pMenu->menuEntry[next].pArg;
-
-	output_setVideoFormat(selectedFormat);
-	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
-	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
-
-	return 0;
-}
-
 
 /**
  * This function now uses the Encoder API to set the slow blanking instead of the Output API.

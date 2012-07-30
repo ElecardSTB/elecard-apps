@@ -1514,10 +1514,12 @@ void *keyThread(void *pArg)
 					eventBuffer->Reset(eventBuffer);
 					continue;
 				}
+#ifdef STSDK
 				if (event.input.key_symbol == DIKS_CUSTOM0) { //VFMT
 					output_toggleOutputModes();
 					continue;
 				}
+#endif
 
 				memcpy(&currentpress, &event.input.timestamp, sizeof(struct timeval));
 
