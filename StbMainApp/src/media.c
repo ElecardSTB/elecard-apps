@@ -570,7 +570,10 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 		break;
 	case interfacePlayControlStop:
 		if ( appControlInfo.mediaInfo.active || appControlInfo.mediaInfo.paused )
+		{
 			media_stopPlayback();
+			interface_showMenu(1, 1);
+		}
 		break;
 	case interfacePlayControlPause:
 		if (appControlInfo.mediaInfo.paused)
@@ -1168,7 +1171,6 @@ void media_pauseOrStop(int stop)
 		interface_notifyText(NULL,0);
 		interface_playControlSlider(0, 0, 0);
 		interface_playControlSelect(interfacePlayControlStop);
-		interface_showMenu(1, 1);
 	} else
 	{
 		interface_playControlSelect(interfacePlayControlPause);
