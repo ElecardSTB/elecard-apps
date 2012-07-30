@@ -6716,58 +6716,8 @@ int output_writeDhcpConfig(void)
 		return 0;
 	}
 
-	FILE *f = fopen(STB_DHCPD_CONF, "w");
-	if(!f)
-	{
-		eprintf("%s: failed to open file: %s\n", __FUNCTION__, strerror(errno));
-		return -1;
-	}
+	system("ifcfg dhcp > " STB_DHCPD_CONF);
 
-	if( networkInfo.lan.mask.s_addr == 0 )
-		mask.s_addr = 0x00ffffff;
-	else
-		mask = networkInfo.lan.mask;
-	subnet.s_addr = networkInfo.lan.ip.s_addr & mask.s_addr;
-	if( (networkInfo.lan.ip.s_addr & 0xff000000)  < 0x80000000 )
-	{
-		range_start.s_addr = (networkInfo.lan.ip.s_addr & 0x00ffffff)+( 0x80    << 24);
-		range_end.s_addr   = (networkInfo.lan.ip.s_addr & 0x00ffffff)+((0xff-1) << 24);
-	} else
-	{
-		range_start.s_addr = (networkInfo.lan.ip.s_addr & 0x00ffffff)+( 0x01    << 24);
-		range_end.s_addr   = (networkInfo.lan.ip.s_addr & 0x00ffffff)+((0x80-1) << 24);
-	}
-
-	fprintf(f, "ddns-update-style none;\n");
-	fprintf(f, "default-lease-time 14400;\n");
-	fprintf(f, "subnet %s",  inet_ntoa(subnet)); fprintf(f, " netmask %s {\n", inet_ntoa(mask));
-	fprintf(f, "  range %s", inet_ntoa(range_start));        fprintf(f, " %s;\n", inet_ntoa(range_end));
-	fprintf(f, "  option routers %s;\n", inet_ntoa(networkInfo.lan.ip));
-	FILE *dns_file = fopen("/etc/resolv.conf", "r");
-	if (dns_file)
-	{
-		char buf[MENU_ENTRY_INFO_LENGTH];
-		char dns[MENU_ENTRY_INFO_LENGTH];
-		int  dns_found = 0;
-		while (fgets(buf, sizeof(buf), dns_file))
-		{
-			if (sscanf(buf, "nameserver %s", dns)==1)
-			{
-				if (!dns_found)
-					fputs("  option domain-name-servers ", f);
-				else
-					fputc(' ', f);
-				fputs(dns, f);
-				dns_found = 1;
-			}
-		}
-		fclose(dns_file);
-		if (dns_found)
-			fputs(";\n", f);
-	}
-	fprintf(f, "}\n\n");
-
-	fclose(f);
 	return 0;
 }
 #endif // STSDK
