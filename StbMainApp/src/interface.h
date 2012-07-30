@@ -1660,6 +1660,8 @@ int  interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComma
 int  interface_displayCustomSlider(customSliderFunction pCallback, void *pCallbackArg,
                                    int drawBox, int cx, int cy, int cw, IDirectFBFont *pFont);
 
+int  interface_drawRoundedCorner(int x, int y, int bottom, int right);
+
 void interface_drawRoundBox(int x, int y, int w, int h);
 
 void interface_drawRoundBoxColor(int x, int y, int w, int h, int r, int g, int b, int a);

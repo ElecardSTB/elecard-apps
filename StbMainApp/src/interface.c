@@ -401,15 +401,8 @@ void interface_drawBookmark(IDirectFBSurface *pSurface, IDirectFBFont *pFont,
 	                                    INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN,
 	                                    INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
 
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-	                   tx, ty, 
-	                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-	                   0, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-	                   tx+tw-INTERFACE_ROUND_CORNER_RADIUS, ty,
-	                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-	                   0, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+	interface_drawRoundedCorner(tx, ty, 0, 0);
+	interface_drawRoundedCorner(tx+tw-INTERFACE_ROUND_CORNER_RADIUS, ty, 0, 1);
 
 	//gfx_drawRectangle(pSurface, INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA, tx+interfaceInfo.borderWidth-INTERFACE_ROUND_CORNER_RADIUS, ty+INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, ty+INTERFACE_ROUND_CORNER_RADIUS - interfaceInfo.clientY);
 	
@@ -2029,14 +2022,8 @@ static void interface_animateMenu(int flipFB, int animate)
 		DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE,
 			INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
 			INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-		                   x, y, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-		                   0, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-		                   x+w-INTERFACE_ROUND_CORNER_RADIUS, y, 
-		                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-		                   0, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+		interface_drawRoundedCorner(x, y, 0, 0);
+		interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y, 0, 1);
 
 
 		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "menu_buttons.png", 
@@ -2101,22 +2088,10 @@ static void interface_animateMenu(int flipFB, int animate)
 
 			DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, 
 				INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
-			interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-			                   x, y,
-			                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-			                   0, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-			interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-			                   x+w-INTERFACE_ROUND_CORNER_RADIUS, y,
-			                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-			                   0, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-			interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-			                   x, y+INTERFACE_ROUND_CORNER_RADIUS,
-			                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-			                   1, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-			interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-			                   x+w-INTERFACE_ROUND_CORNER_RADIUS, y+INTERFACE_ROUND_CORNER_RADIUS,
-			                   INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-			                   1, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+			interface_drawRoundedCorner(x,                                 y,                               0, 0);
+			interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y,                               0, 1);
+			interface_drawRoundedCorner(x,                                 y+INTERFACE_ROUND_CORNER_RADIUS, 1, 0);
+			interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y+INTERFACE_ROUND_CORNER_RADIUS, 1, 1);
 
 			if (interfaceInfo.currentMenu->logo >0 && interfaceInfo.currentMenu->logoX < 0)
 			{
@@ -4238,16 +4213,13 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 			INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
 			interfaceInfo.clientX+INTERFACE_ROUND_CORNER_RADIUS, interfaceInfo.clientY,
 			interfaceInfo.clientWidth-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS);
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png",
-			interfaceInfo.clientX, interfaceInfo.clientY,
-			INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS,
-			0, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+		interface_drawRoundedCorner(interfaceInfo.clientX, interfaceInfo.clientY, 0, 0);
 		// bottom left corner
 		gfx_drawRectangle(DRAWING_SURFACE, 
 			INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
 			interfaceInfo.clientX+INTERFACE_ROUND_CORNER_RADIUS, interfaceInfo.clientY+interfaceInfo.clientHeight-INTERFACE_ROUND_CORNER_RADIUS,
 			interfaceInfo.clientWidth-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS);
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", interfaceInfo.clientX, interfaceInfo.clientY+interfaceInfo.clientHeight-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 1, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+		interface_drawRoundedCorner(interfaceInfo.clientX, interfaceInfo.clientY+interfaceInfo.clientHeight-INTERFACE_ROUND_CORNER_RADIUS, 1, 0);
 	} else {
 #ifndef ENABLE_VIDIMAX
 		gfx_drawRectangle(DRAWING_SURFACE, 
@@ -5777,9 +5749,8 @@ void interface_displayClock(int detached)
 
 		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 		DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x-INTERFACE_ROUND_CORNER_RADIUS/2, y-INTERFACE_ROUND_CORNER_RADIUS/2, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 0, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x+w-INTERFACE_ROUND_CORNER_RADIUS/2, y-INTERFACE_ROUND_CORNER_RADIUS/2, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 0, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+		interface_drawRoundedCorner(x  -INTERFACE_ROUND_CORNER_RADIUS/2, y-INTERFACE_ROUND_CORNER_RADIUS/2, 0, 0);
+		interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS/2, y-INTERFACE_ROUND_CORNER_RADIUS/2, 0, 1);
 
 	} else 
 	{
@@ -5792,9 +5763,8 @@ void interface_displayClock(int detached)
 
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 	DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x-INTERFACE_ROUND_CORNER_RADIUS/2, y+INTERFACE_CLOCK_DIGIT_HEIGHT-INTERFACE_ROUND_CORNER_RADIUS/2, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 1, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
-	
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x+w-INTERFACE_ROUND_CORNER_RADIUS/2, y+INTERFACE_CLOCK_DIGIT_HEIGHT-INTERFACE_ROUND_CORNER_RADIUS/2, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 1, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+	interface_drawRoundedCorner(x  -INTERFACE_ROUND_CORNER_RADIUS/2, y+INTERFACE_CLOCK_DIGIT_HEIGHT-INTERFACE_ROUND_CORNER_RADIUS/2, 1, 0);
+	interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS/2, y+INTERFACE_CLOCK_DIGIT_HEIGHT-INTERFACE_ROUND_CORNER_RADIUS/2, 1, 1);
 	
 	//
 	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time->tm_hour / 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
@@ -7795,6 +7765,16 @@ void interface_showPosterBox(const char *text, const char *title, int tr, int tg
 	interface_displayMenu(1);
 }
 
+int  interface_drawRoundedCorner(int x, int y, int bottom, int right)
+{
+#ifndef STSDK
+	return interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x, y, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, bottom, right, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+#else
+	// DSBLIT_BLEND_COLORALPHA don't work on ST
+	return interface_drawIcon(DRAWING_SURFACE, "/opt/elecard/share/black_circle_alpha.png", x, y, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, bottom, right, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+#endif
+}
+
 void interface_drawRoundBoxColor(int x, int y, int w, int h, int r, int g, int b, int a)
 {
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
@@ -7802,14 +7782,14 @@ void interface_drawRoundBoxColor(int x, int y, int w, int h, int r, int g, int b
 	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x-INTERFACE_ROUND_CORNER_RADIUS, y, w+INTERFACE_ROUND_CORNER_RADIUS*2, h);
 	// top left corner
 	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y-INTERFACE_ROUND_CORNER_RADIUS, w, INTERFACE_ROUND_CORNER_RADIUS);
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x-INTERFACE_ROUND_CORNER_RADIUS, y-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 0, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+	interface_drawRoundedCorner(x-INTERFACE_ROUND_CORNER_RADIUS, y-INTERFACE_ROUND_CORNER_RADIUS, 0, 0);
 	// bottom left corner
 	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y+h, w, INTERFACE_ROUND_CORNER_RADIUS);
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x-INTERFACE_ROUND_CORNER_RADIUS, y+h, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 1, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+	interface_drawRoundedCorner(x-INTERFACE_ROUND_CORNER_RADIUS, y+h, 1, 0);
 	// top right
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x+w, y-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 0, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+	interface_drawRoundedCorner(x+w, y-INTERFACE_ROUND_CORNER_RADIUS, 0, 1);
 	// bottom right
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", x+w, y+h, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 1, 1, DSBLIT_BLEND_COLORALPHA, interfaceAlignTopLeft);
+	interface_drawRoundedCorner(x+w, y+h, 1, 1);
 }
 
 void interface_drawRoundBox(int x, int y, int w, int h)
