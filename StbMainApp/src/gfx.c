@@ -1742,6 +1742,7 @@ void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
 	if (st_checkSuccess(type, res, __FUNCTION__))
 	{
 		gfx_videoProvider.active = 1;
+		gfx_videoProvider.paused = 0;
 
 		gfx_videoProvider.waiting = st_rpcAsync(elcmd_times, NULL, gfx_videoProviderGetTimes, NULL);
 	}
