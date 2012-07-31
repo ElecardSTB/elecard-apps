@@ -293,6 +293,11 @@ static gfx_videoLayerIDS gfx_layerMapping;
  * @brief Number of layers on the screen.
  */
 static int ggfx_NumLayers = 0;
+
+/**
+ * @brief Pointer to the thread that handles directfb events.
+ */
+static pthread_t event_thread;
 /*********************************************************(((((((**********
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
 ***************************************************************************/
@@ -312,6 +317,9 @@ IDirectFBFont *pgfx_smallfont = NULL;
 
 /* The root interface of DirectFB, from which all functionality is obtained. */
 IDirectFB *pgfx_dfb = NULL;
+
+/* Pointer to the DirectFB event buffer. */
+IDirectFBEventBuffer *appEventBuffer = NULL;
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
@@ -827,6 +835,8 @@ stb810_gfxImageEntry *gfx_findImageEntryByName( const char* filename )
 
 static void gfx_freeImageEntry(stb810_gfxImageEntry* pEntry)
 {
+	if(!pEntry || !pEntry->pImage)
+		return;
 	dprintf("gfx: Releasing image '%s'...\n", pEntry->filename);
 	pEntry->pImage->Release(pEntry->pImage);
 	FREE(pEntry->filename);
@@ -1370,7 +1380,7 @@ int gfx_resumeVideoProvider(int videoLayer)
 		return 0;
 	}
 
-	elcdRpcType_t type;
+//	elcdRpcType_t type;
 	cJSON        *param = NULL;
 		
 	if (gfx_videoProvider.savedPos > 0){
@@ -3028,8 +3038,9 @@ int gfx_getPosition (double *plength,double *pposition)
 		position = st_getTimeValue(res, "current");
 		length   = httpDuration > 0.0 ? httpDuration :
 		           st_getTimeValue(res, "total");
-	} else
+	} else {
 		pprintf("%s: times failed\n", __FUNCTION__);
+	}
 	cJSON_Delete(res);
 #endif
 	if (length < 2.0)
@@ -4142,7 +4153,6 @@ finish_attr_init:;
 	gfx_layerMapping.main_layerID = 0;
 	gfx_layerMapping.maxLayers = ggfx_NumLayers;
 
-	st_init();
 #endif // STSDK
 #ifdef STBxx
 	IDirectFBDisplayLayer * pDispLayer;
@@ -4302,9 +4312,6 @@ void gfx_terminate(void)
 		close(gfx_attributeBuffer.fd);
 		gfx_attributeBuffer.fd = 0;
 	}
-#endif
-#ifdef STSDK
-	st_terminate();
 #endif
 
 	gfx_clearImageList();
@@ -4494,4 +4501,24 @@ void gfx_waitForProviders()
 {
 	mysem_get(gfx_semaphore);
 	mysem_release(gfx_semaphore);
+}
+
+void gfx_startEventThread(void)
+{
+	pgfx_dfb->CreateInputEventBuffer( pgfx_dfb, DICAPS_KEYS|DICAPS_BUTTONS|DICAPS_AXES, DFB_TRUE, &appEventBuffer);
+
+	pthread_create(&event_thread, NULL, keyThread, (void*)appEventBuffer);
+//	pthread_detach(event_thread);
+}
+
+void gfx_stopEventThread(void)
+{
+	pthread_cancel(event_thread);
+	pthread_join(event_thread, NULL);
+/*printf("%s[%d]: ***\n", __FILE__, __LINE__);
+	if(appEventBuffer) {
+		appEventBuffer->Release(appEventBuffer);
+		appEventBuffer = NULL;
+	}
+printf("%s[%d]: ***\n", __FILE__, __LINE__);*/
 }

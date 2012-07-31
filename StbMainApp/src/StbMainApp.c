@@ -62,6 +62,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "dlna.h"
 #include "youtube.h"
 #include "messages.h"
+#include "stsdk.h"
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h" 
 #endif
@@ -156,7 +157,6 @@ volatile int keyThreadActive;
 
 volatile int flushEventsFlag;
 
-IDirectFBEventBuffer *appEventBuffer = NULL;
 int term;
 char startApp[PATH_MAX] = "";
 
@@ -178,26 +178,23 @@ int gIgnoreEventTimestamp = 0;
 int helperFileExists(const char* filename)
 {
 	int file;
+	int ret = 0;
 #if (defined STB225)
 	const char *filename_t = filename;
 	const char *prefix = "file://";
 	if(strncmp(filename, prefix, strlen(prefix))==0)
 		filename_t = filename + strlen(prefix);
-	file = open( filename_t, O_RDONLY);
+	file = open(filename_t, O_RDONLY);
 //printf("%s[%d]: file=%d, filename_t=%s\n", __FILE__, __LINE__, file, filename_t);
 #else
-	file = open( filename, O_RDONLY);
+	file = open(filename, O_RDONLY);
 #endif
-
-
-	if ( file < 0 )
-	{
-		return 0;
+	if(file >= 0) {
+		close(file);
+		ret = 1;
 	}
 
-	close( file );
-
-	return 1;
+	return ret;
 }
 
 
@@ -548,7 +545,7 @@ interfaceCommand_t parseEvent(DFBEvent *event)
 	return cmd;
 }
 
-int helperIsEventValid(DFBEvent *event)
+static int helperIsEventValid(DFBEvent *event)
 {
 	int valid = 1;
 
@@ -565,7 +562,7 @@ int helperIsEventValid(DFBEvent *event)
 	return valid;
 }
 
-int checkPowerOff(DFBEvent *pEvent)
+static int checkPowerOff(DFBEvent *pEvent)
 {
 	//dprintf("%s: check power\n", __FUNCTION__);
 	if(pEvent->input.key_symbol == DIKS_POWER) // Power/Standby button. Go to standby.
@@ -692,6 +689,9 @@ interfaceCommand_t helperGetEvent(int flush)
 {
 	IDirectFBEventBuffer *eventBuffer = appEventBuffer;
 	DFBEvent event;
+
+	if(eventBuffer == NULL)
+		return interfaceCommandNone;
 
 	if(eventBuffer->HasEvent(eventBuffer) == DFB_OK) {
 		eventBuffer->GetEvent(eventBuffer, &event);
@@ -1792,7 +1792,6 @@ static void setupFramebuffers(void)
 
 void initialize(int argc, char *argv[])
 {
-	pthread_t thread;
 
 	tzset();
 
@@ -1823,7 +1822,9 @@ void initialize(int argc, char *argv[])
 #endif
 
 	downloader_init();
-
+#ifdef STSDK
+	st_init();
+#endif
 	gfx_init(argc, argv);
 
 	signal(SIGINT,  signal_handler);
@@ -1848,14 +1849,11 @@ void initialize(int argc, char *argv[])
 	// Menus should already be initialized
 	signal(SIGUSR1, usr1_signal_handler);
 
-	pgfx_dfb->CreateInputEventBuffer( pgfx_dfb, DICAPS_KEYS|DICAPS_BUTTONS|DICAPS_AXES, DFB_TRUE, &appEventBuffer);
-
 #ifdef ENABLE_PVR
 	pvr_init();
 #endif
 
-	pthread_create(&thread, NULL, keyThread, (void*)appEventBuffer);
-	pthread_detach(thread);
+	gfx_startEventThread();
 
 #ifdef ENABLE_TEST_SERVER
 	pthread_create(&server_thread, NULL, testServerThread, NULL);
@@ -1898,7 +1896,7 @@ void cleanup()
 
 	dprintf("%s: release event buffer\n", __FUNCTION__);
 
-	appEventBuffer->Release(appEventBuffer);
+	gfx_stopEventThread();
 
 	dprintf("%s: close video providers\n", __FUNCTION__);
 
@@ -1930,6 +1928,9 @@ void cleanup()
 	dprintf("%s: terminate gfx\n", __FUNCTION__);
 
 	gfx_terminate();
+#ifdef STSDK
+	st_terminate();
+#endif
 
 	dprintf("%s: terminate interface\n", __FUNCTION__);
 

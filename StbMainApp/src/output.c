@@ -153,8 +153,6 @@ typedef struct
 
 #define USE_WPA_SUPPLICANT
 
-static char output_currentFormat[64] = "1080i50";
-
 typedef struct
 {
 	struct in_addr ip;
@@ -313,7 +311,6 @@ static void output_fillTimeZoneMenu(void);
 static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
 
-static int output_setVideoFormat(const char *name);
 static int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg);
 #endif
 
@@ -383,6 +380,8 @@ static pppInfo_t pppInfo;
 
 #ifdef STSDK
 static outputNetworkInfo_t networkInfo;
+static char output_currentFormat[64] = "";
+static char output_originalFormat[64] = "";
 #endif
 
 /**
@@ -565,101 +564,54 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef STSDK
-static int helper_indicatorShowVideoFormat(const char *name)
+static int output_cancelFormat(void *pArg)
 {
-	char buf[16] = "\0";
-	int f_width, f_height, f_framerate;
-	char f_field;
-	
-	if(strchr(name, 'x')) { //720x576p50 format
-		if(sscanf(name, "%dx%d%c%d", &f_height, &f_width, &f_field, &f_framerate) == 4) {
-			sprintf(buf, "n10 %d %d%c", f_width, f_framerate, (f_field == 'i')?'[':'p');
-		} else if(sscanf(name, "%dx%d%c", &f_height, &f_width, &f_field) == 3) {
-			sprintf(buf, "n10 %d %c", f_width, (f_field == 'i')?'[':'p');
-		}
-	} else { //1080p60 format
-		if(sscanf(name, "%d%c%d", &f_width, &f_field, &f_framerate) == 3) {
-			sprintf(buf, "n10 %d %d%c", f_width, f_framerate, (f_field == 'i')?'[':'p');
-		}
-	}
-	if(buf[0] == 0)
-		sprintf(buf, "n10 %s", name);
-
-	st_sendToIndicator("h 400 200");
-	st_sendToIndicator(buf);
+	interface_hideMessageBox();
+	st_changeOutputMode(output_originalFormat, output_currentFormat);
+	strcpy(output_currentFormat, output_originalFormat);
+	output_fillFormatMenu();
+	interface_displayMenu(1);
+	st_applyFormat();
 
 	return 0;
-}
-
-static int output_setVideoFormat(const char *name)
-{
-	elcdRpcType_t type;
-	cJSON *res  = NULL;
-	cJSON *mode = cJSON_CreateString(name);
-	int    ret = 1;
-
-	ret = st_rpcSync( elcmd_setvmode, mode, &type, &res );
-	if( ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String )
-	{
-		if( strcmp(res->valuestring, "ok") )
-		{
-			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
-			ret = 1;
-		} else {
-			helper_indicatorShowVideoFormat(name);
-		}
-	} else if ( type == elcdRpcError && res && res->type == cJSON_String )
-	{
-		eprintf("%s: error: %s\n", __FUNCTION__, res->valuestring);
-		ret = 1;
-	}
-	cJSON_Delete(res);
-	cJSON_Delete(mode);
-	return ret;
-}
-
-static int output_cancelFormat(void* pArg)
-{
-	int ret;
-	interface_hideMessageBox();
-	ret = output_setVideoFormat(output_currentFormat);
-	interface_displayMenu(1);
-	return ret;
-}
-
-static int output_getFormatHeight(const char *format)
-{
-	const char *s = strchr(format, 'x');
-	if(s)
-		s++;
-	else
-		s = format;
-	return strtol(s, NULL, 10);
 }
 
 static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	interface_removeEvent(output_cancelFormat, NULL);
-
-	if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
-		int old_height, new_height;
-		char *newFmt = (char *)pMenu->menuEntry[pMenu->selectedItem].pArg;
-		if(newFmt == NULL)
-			newFmt = pMenu->menuEntry[pMenu->selectedItem].info;
-		old_height = output_getFormatHeight(output_currentFormat);
-		new_height = output_getFormatHeight(newFmt);
-
-		if (old_height != new_height) {
-			// Command should be sent after framebuffer device is closed
-			helperStartApp("StbCommandClient -f /tmp/elcd.sock '{\"method\":\"initfb\",\"params\":[],\"id\": 1}'");
-		} else
-			output_fillFormatMenu();
-		return 0;
+	if ((cmd->command == interfaceCommandGreen) ||
+		(cmd->command == interfaceCommandEnter) ||
+		(cmd->command == interfaceCommandOk)) {
+		interface_hideMessageBox();
+		interface_removeEvent(output_cancelFormat, NULL);
+		st_applyFormat();
+		strcpy(output_originalFormat, output_currentFormat);
+	} else {
+		interface_addEvent(output_cancelFormat, NULL, 0, 1);
 	}
-
-	output_cancelFormat(NULL);
+	
 	return 0;
+}
+
+static int output_toggleOutputModesEvent(void *pArg)
+{
+	st_changeOutputMode(pArg, output_currentFormat);
+	strcpy(output_currentFormat, pArg);
+	interface_displayMenu(1);
+
+	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
+	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
+
+	return 0;
+}
+
+static char *output_getFormatName(interfaceMenu_t *pMenu, int itemMenu)
+{
+	char *formatName = NULL;
+	formatName = pMenu->menuEntry[itemMenu].info;
+	if(pMenu->menuEntry[itemMenu].pArg)
+		formatName = (char *)pMenu->menuEntry[itemMenu].pArg;
+
+	return formatName;
 }
 
 /**
@@ -667,26 +619,29 @@ static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
  */
 int output_toggleOutputModes(void)
 {
-	int next;
-	char *selectedFormat;
+	int next = 0;
 	interfaceMenu_t *pMenu = &(FormatMenu.baseMenu);
-
 	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
 		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
 	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
-
 	next = pMenu->selectedItem + 1;
 	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
 		next = 0;
 	pMenu->selectedItem = next;
 
-	selectedFormat = pMenu->menuEntry[next].info;
-	if(pMenu->menuEntry[next].pArg)
-		selectedFormat = (char *)pMenu->menuEntry[next].pArg;
+	interface_addEvent(output_toggleOutputModesEvent, output_getFormatName(pMenu, next), 0, 1);
+	return 0;
+}
 
-	output_setVideoFormat(selectedFormat);
-	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
-	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
+
+static int output_outputModesToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
+{
+	int *showAdvanced = (int *)pArg;
+	*showAdvanced = !*showAdvanced;
+	output_fillFormatMenu();
+//	if(*showAdvanced == 0)
+//		interface_setSelectedItem(pMenu, interface_getMenuEntryCount(pMenu) - 1);
+	interface_displayMenu(1);
 
 	return 0;
 }
@@ -731,15 +686,7 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
 	interface_displayMenu(1);
 #endif // STB82
 #ifdef STSDK
-	char *selectedFormat = pMenu->menuEntry[pMenu->selectedItem].info;
-	if(pArg)
-		selectedFormat = (char *)pArg;
-
-	if(strcmp(output_currentFormat, selectedFormat)) {
-		output_setVideoFormat(selectedFormat);
-		interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
-		interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
-	}
+	interface_addEvent(output_toggleOutputModesEvent, output_getFormatName(pMenu, pMenu->selectedItem), 0, 1);
 #endif
     return 0;
 }
@@ -3652,18 +3599,6 @@ static void output_fillTimeZoneMenu(void)
 	interface_setSelectedItem((interfaceMenu_t*)&TimeZoneMenu, found);
 }
 
-static int output_outputModesToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
-{
-	int *showAdvanced = (int *)pArg;
-	*showAdvanced = !*showAdvanced;
-	output_fillFormatMenu();
-//	if(*showAdvanced == 0)
-//		interface_setSelectedItem(pMenu, interface_getMenuEntryCount(pMenu) - 1);
-	interface_displayMenu(1);
-
-	return 0;
-}
-
 /**
  * This function now uses the Encoder description to get the supported outout formats instead of the Output API.
  */
@@ -3785,10 +3720,11 @@ static void output_fillFormatMenu(void)
 			supported = cJSON_GetObjectItem( mode, "supported" );
 			if(!supported || (supported->type > cJSON_True))
 				continue;
+			int len = sizeof(output_currentFormat);
 			current = cJSON_GetObjectItem(mode, "current");
 			if(current && current->type == cJSON_True) {
-				strncpy(output_currentFormat, name->valuestring, sizeof(output_currentFormat));
-				output_currentFormat[sizeof(output_currentFormat) - 1]=0;
+				strncpy(output_currentFormat, name->valuestring, len);
+				output_currentFormat[len - 1]=0;
 				selected = n;
 			}
 
@@ -3852,6 +3788,7 @@ static void output_fillFormatMenu(void)
 int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg)
 {
 	output_fillFormatMenu();
+	strcpy(output_originalFormat, output_currentFormat);
 	return 0;
 }
 #endif
@@ -6708,7 +6645,7 @@ int output_writeInterfacesFile(void)
 
 int output_writeDhcpConfig(void)
 {
-	struct in_addr subnet, range_start, range_end, mask;
+//	struct in_addr subnet, range_start, range_end, mask;
 
 	if (networkInfo.lanMode != lanDhcpServer)
 	{

@@ -165,6 +165,9 @@ extern IDirectFBFont *pgfx_smallfont;
 /* The root interface of DirectFB, from which all functionality is obtained. */
 extern IDirectFB *pgfx_dfb;
 
+/* The DirectFB event buffer. */
+extern IDirectFBEventBuffer *appEventBuffer;
+
 #ifdef STB225
 extern int       gfxUseScaleParams;
 extern pmysem_t  gfxDimensionsEvent;
@@ -626,6 +629,9 @@ int gfx_resumeVideoProvider(int videoLayer);
 
 /* Wait for last operation with providers to finish */
 void gfx_waitForProviders();
+
+void gfx_startEventThread(void);
+void gfx_stopEventThread(void);
 
 #if (defined STSDK)
 socketClient_t* gfx_stSocket(void);

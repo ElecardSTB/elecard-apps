@@ -103,11 +103,16 @@ void st_setTuneParams(int tuner, cJSON *params);
 fe_type_t st_getDvbTunerType(int tuner);
 #endif
 
-/** Sends command to frontpanel daemon.
+/** Changes hdmi output mode. Reinitialize framebuffer if resolution is changed.
  * 
- * @param[in] cmd - command
+ * @param[in] selectedFormat Setted output mode.
+ * @param[in] previousFormat Previous output mode. For detecting resolution change
  */
-int st_sendToIndicator(const char *cmd);
+void st_changeOutputMode(char *selectedFormat, char *previousFormat);
+
+/** Restart aplication if needed after changes hdmi output mode.
+ */
+void st_applyFormat(void);
 
 #ifdef __cplusplus
 }

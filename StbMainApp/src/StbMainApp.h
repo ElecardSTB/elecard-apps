@@ -108,6 +108,9 @@ int  helperSafeStrCpy( char** dest, const char* src );
 /** UTC equivalent for mktime() */
 time_t gmktime(struct tm *t);
 
+/** Thread function that handles directfb events  */
+void *keyThread(void *pArg);
+
 #ifdef __cplusplus
 }
 #endif

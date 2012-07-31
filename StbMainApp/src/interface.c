@@ -1834,6 +1834,7 @@ static void interface_animateMenu(int flipFB, int animate)
 
 	if (appControlInfo.inStandby) return;
 	if (interfaceInfo.cleanUpState) return;
+	if (DRAWING_SURFACE == NULL) return;
 
 	//dprintf("%s: in\n", __FUNCTION__);
 

@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <gfx.h>
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -149,6 +150,7 @@ static inline unsigned int get_id()
 {
 	return request_id+=2;
 }
+static int needRestart = 0;
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -543,15 +545,129 @@ void st_setTuneParams(int tuner, cJSON *params)
 }
 #endif // ENABLE_DVB
 
-int st_sendToIndicator(const char *cmd)
+static int stHelper_getFormatHeight(const char *format)
 {
-	char buf[256];
+	const char *s = strchr(format, 'x');
+	if(s)
+		s++;
+	else
+		s = format;
+	return strtol(s, NULL, 10);
+}
+
+static int stHelper_waitForFBdevice(const char *fb_name)
+{
+	int i;
+	int ret = -1;
+
+	for(i = 0; i < 1000; i ++) {
+		if(helperFileExists(fb_name)) {
+			ret = 0;
+			break;
+		}
+		usleep(1000);
+	}
+//	printf("%s[%d]: i=%d\n", __FILE__, __LINE__, i);
+//	if(i == 100)
+//		printf("%s[%d]: Cant open fb0!!!\n", __FILE__, __LINE__);
+	return ret;
+}
+
+static int stHelper_sendToSocket(const char *socketPath, const char *cmd)
+{
 //TODO: use socket client
-	snprintf(buf, 256, "StbCommandClient -f /tmp/frontpanel '%s'", cmd);
-	buf[255] = 0;
+	char buf[256];
+	snprintf(buf, sizeof(buf), "StbCommandClient -f %s '%s'", socketPath, cmd);
+
 	system(buf);
 	return 0;
 }
 
+static int stHelper_indicatorShowVideoFormat(const char *name)
+{
+	char buf[16] = "\0";
+	int f_width, f_height, f_framerate;
+	char f_field;
+	
+	if(strchr(name, 'x')) { //720x576p50 format
+		if(sscanf(name, "%dx%d%c%d", &f_height, &f_width, &f_field, &f_framerate) == 4) {
+			sprintf(buf, "n10 %d %d%c", f_width, f_framerate, (f_field == 'i')?'[':'p');
+		} else if(sscanf(name, "%dx%d%c", &f_height, &f_width, &f_field) == 3) {
+			sprintf(buf, "n10 %d %c", f_width, (f_field == 'i')?'[':'p');
+		}
+	} else { //1080p60 format
+		if(sscanf(name, "%d%c%d", &f_width, &f_field, &f_framerate) == 3) {
+			sprintf(buf, "n10 %d %d%c", f_width, f_framerate, (f_field == 'i')?'[':'p');
+		}
+	}
+	if(buf[0] == 0)
+		sprintf(buf, "n10 %s", name);
+
+	stHelper_sendToSocket("/tmp/frontpanel", "h 400 200");
+	stHelper_sendToSocket("/tmp/frontpanel", buf);
+
+	return 0;
+}
+
+int st_setVideoFormat(const char *name)
+{
+	elcdRpcType_t type;
+	cJSON *res  = NULL;
+	cJSON *mode = cJSON_CreateString(name);
+	int    ret = 1;
+
+	ret = st_rpcSync( elcmd_setvmode, mode, &type, &res );
+//	ret = st_rpcSyncTimeout( elcmd_setvmode, mode, 1, &type, &res );
+
+	if( ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String ) {
+		if( strcmp(res->valuestring, "ok") ) {
+			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
+			ret = 1;
+		} else {
+			stHelper_indicatorShowVideoFormat(name);
+		}
+	} else if ( type == elcdRpcError && res && res->type == cJSON_String ) {
+		eprintf("%s: error: %s\n", __FUNCTION__, res->valuestring);
+		ret = 1;
+	}
+	cJSON_Delete(res);
+	cJSON_Delete(mode);
+	return ret;
+}
+
+void st_changeOutputMode(char *selectedFormat, char *previousFormat)
+{
+	int old_height, new_height;
+	old_height = stHelper_getFormatHeight(previousFormat);
+	new_height = stHelper_getFormatHeight(selectedFormat);
+
+//printf("%s[%d]: old_height=%d, new_height=%d\n", __FILE__, __LINE__, old_height, new_height);
+	if (old_height != new_height) {
+		gfx_stopEventThread();
+		gfx_terminate();
+		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"deinitfb\",\"params\":[],\"id\": 1}");
+		st_setVideoFormat(selectedFormat);
+		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
+		stHelper_waitForFBdevice("/dev/fb0");
+		gfx_init(0, NULL);
+		gfx_startEventThread();
+		needRestart = 1;
+	} else {
+		st_setVideoFormat(selectedFormat);
+	}
+
+	return;
+}
+
+void st_applyFormat(void)
+{
+	if(needRestart) {
+//		printf("%s[%d]: ***RESTART\n", __FILE__, __LINE__);
+		needRestart = 0;
+		helperStartApp("");
+	} else {
+//		printf("%s[%d]: ***NO RESTART\n", __FILE__, __LINE__);
+	}
+}
 
 #endif // STSDK
