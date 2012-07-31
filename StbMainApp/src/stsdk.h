@@ -110,9 +110,11 @@ fe_type_t st_getDvbTunerType(int tuner);
  */
 void st_changeOutputMode(char *selectedFormat, char *previousFormat);
 
-/** Restart aplication if needed after changes hdmi output mode.
+/** Is need restart.
+ * 
+ * @return >0 if needed restart after hdmi output mode changes.
  */
-void st_applyFormat(void);
+int st_needRestart(void);
 
 #ifdef __cplusplus
 }

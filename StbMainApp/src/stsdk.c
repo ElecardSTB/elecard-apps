@@ -659,15 +659,15 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 	return;
 }
 
-void st_applyFormat(void)
+int st_needRestart(void)
 {
-	if(needRestart) {
-//		printf("%s[%d]: ***RESTART\n", __FILE__, __LINE__);
+/*	if(needRestart) {
+		printf("%s[%d]: ***RESTART\n", __FILE__, __LINE__);
 		needRestart = 0;
-		helperStartApp("");
 	} else {
-//		printf("%s[%d]: ***NO RESTART\n", __FILE__, __LINE__);
-	}
+		printf("%s[%d]: ***NO RESTART\n", __FILE__, __LINE__);
+	}*/
+	return needRestart;
 }
 
 #endif // STSDK

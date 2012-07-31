@@ -564,6 +564,14 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef STSDK
+static void output_applyFormat(void)
+{
+	if(st_needRestart()) {
+		interface_showMessageBox(_T("RESTART"), thumbnail_warning, 0);
+		helperStartApp("");
+	}	
+}
+
 static int output_cancelFormat(void *pArg)
 {
 	interface_hideMessageBox();
@@ -571,7 +579,7 @@ static int output_cancelFormat(void *pArg)
 	strcpy(output_currentFormat, output_originalFormat);
 	output_fillFormatMenu();
 	interface_displayMenu(1);
-	st_applyFormat();
+	output_applyFormat();
 
 	return 0;
 }
@@ -580,10 +588,11 @@ static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 {
 	if ((cmd->command == interfaceCommandGreen) ||
 		(cmd->command == interfaceCommandEnter) ||
-		(cmd->command == interfaceCommandOk)) {
+		(cmd->command == interfaceCommandOk))
+	{
 		interface_hideMessageBox();
 		interface_removeEvent(output_cancelFormat, NULL);
-		st_applyFormat();
+		output_applyFormat();
 		strcpy(output_originalFormat, output_currentFormat);
 	} else {
 		interface_addEvent(output_cancelFormat, NULL, 0, 1);
