@@ -1495,6 +1495,7 @@ void interface_displayVirtualKeypad()
 		ch = vkey_height;
 		
 		r = g = b = 0x20;
+		a = 0xff;
 		for (row=0; row<maxRows; row++)
 		{
 			for (cell=0; cell<maxKeysInRow; cell++)
@@ -1540,7 +1541,7 @@ void interface_displayVirtualKeypad()
 					txt_y = cy+ch/2+24-(rectangle.h-rectangle.y)/2;
 #endif								 
 					gfx_drawText(DRAWING_SURFACE, pgfx_font,
-					             r, g, b, 0xff,
+					             r, g, b, a,
 					             cx+cw/2-(rectangle.w-rectangle.x)/2,
 					             txt_y,
 					             buf, 0, 0);
@@ -1573,7 +1574,7 @@ void interface_displayVirtualKeypad()
 				}
 			}
 			gfx_drawText(DRAWING_SURFACE,
-			             pgfx_font, r, g, b, 0xff,
+			             pgfx_font, r, g, b, a,
 			             cx+cw/2-(rectangle.w-rectangle.x)/2, txt_y,
 			             controlButtons[cell].name, 0, 0);
 						 
