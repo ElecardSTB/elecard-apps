@@ -200,6 +200,7 @@ static int playlist_stream_change(interfaceMenu_t *pMenu, void* pArg)
 	dprintf("%s: %d = %s\n", __FUNCTION__,GET_NUMBER(pArg),URL);
 	if (URL != NULL)
 	{
+		interface_setSelectedItem(&playlistMenu, GET_NUMBER(pArg) + 1);
 		appControlInfo.playbackInfo.channel = GET_NUMBER(pArg) + 1;
 		if (strncasecmp(URL, URL_FILE_MEDIA, sizeof(URL_FILE_MEDIA)-1) == 0 ||
 		    strncasecmp(URL, URL_HTTP_MEDIA, sizeof(URL_HTTP_MEDIA)-1) == 0 ||

@@ -866,6 +866,7 @@ int media_startNextChannel(int direction, void* pArg)
 						interface_setSelectedItem(_M &BrowseFilesMenu, i + media_currentDirCount + 1 /* ".." */);
 						if (interfaceInfo.showMenu && interfaceInfo.currentMenu == _M &BrowseFilesMenu)
 							interface_displayMenu(1);
+						break;
 					}
 				}
 				break;
