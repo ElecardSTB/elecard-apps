@@ -1271,6 +1271,21 @@ static int rtp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 	appControlInfo.playbackInfo.streamSource = streamSourceIPTV;
 	if (CHANNEL_CUSTOM != streamNumber)
 	{
+		int i = interface_getSelectedItem(_M &rtpStreamMenu);
+		if (i < 0 ||
+		    rtpStreamMenu.baseMenu.menuEntry[i].pAction != rtp_stream_change ||
+		    rtpStreamMenu.baseMenu.menuEntry[i].pArg != pArg)
+		{
+			for (i = 0; i < rtpStreamMenu.baseMenu.menuEntryCount; i++)
+			{
+				if (rtpStreamMenu.baseMenu.menuEntry[i].pAction == rtp_stream_change &&
+				    rtpStreamMenu.baseMenu.menuEntry[i].pArg == pArg)
+				{
+					interface_setSelectedItem(_M &rtpStreamMenu, i);
+					break;
+				}
+			}
+		}
 		appControlInfo.playbackInfo.channel = streamNumber+1;
 		switch( streams.items[streamNumber].media[0].proto )
 		{
@@ -1694,10 +1709,6 @@ static void *stream_list_updater(void *pArg)
 
 static int rtp_stopCollect(interfaceMenu_t* pMenu, void *pArg)
 {
-	int which;
-
-	which = GET_NUMBER(pArg);
-
 	dprintf("%s: in\n", __FUNCTION__);
 
 	rtp.collectFlag = 0;
