@@ -292,7 +292,6 @@ static int playingStream = 0;
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
 ***************************************************************************/
 
-interfaceListMenu_t MediaMenu;
 const  char    usbRoot[] = MEDIA_ROOT;
 // current path for selected media type
 char           currentPath[PATH_MAX] = MEDIA_ROOT;
@@ -860,7 +859,15 @@ int media_startNextChannel(int direction, void* pArg)
 			lock = 0;
 			if (appControlInfo.mediaInfo.active)
 			{
-				//dprintf("%s: finish.\n", __FUNCTION__);
+				for (i = 0; i < media_currentFileCount; i++)
+				{
+					if (strcmp(media_currentFileEntries[i]->d_name, playDirEntries[new_index]->d_name) == 0)
+					{
+						interface_setSelectedItem(_M &BrowseFilesMenu, i + media_currentDirCount + 1 /* ".." */);
+						if (interfaceInfo.showMenu && interfaceInfo.currentMenu == _M &BrowseFilesMenu)
+							interface_displayMenu(1);
+					}
+				}
 				break;
 			}
 		}
@@ -1948,24 +1955,6 @@ int media_startPlayback()
 	return res;
 }
 
-#if 0
-static int media_startStopPlayback(interfaceMenu_t *pMenu, void *pArg)
-{
-	if ( appControlInfo.mediaInfo.active )
-	{
-		media_stopPlayback();
-	} else
-	{
-		media_startPlayback();
-	}
-
-	dprintf("%s: display Media playback output\n", __FUNCTION__);
-	interface_menuActionShowMenu((interfaceMenu_t *)&MediaMenu, NULL);
-
-	return 0;
-}
-#endif
-
 int media_setMode(interfaceMenu_t *pMenu, void *pArg)
 {
 	appControlInfo.mediaInfo.playbackMode++;
@@ -1979,7 +1968,6 @@ int media_setMode(interfaceMenu_t *pMenu, void *pArg)
 
 	//interface_showMenu(1, 1);
 	interface_displayMenu(1);
-	//interface_menuActionShowMenu((interfaceMenu_t *)&MediaMenu, NULL);
 
 	return 0;
 }

@@ -53,7 +53,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern const char usbRoot[];
 extern char       currentPath[];
-extern interfaceListMenu_t MediaMenu;
 
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
