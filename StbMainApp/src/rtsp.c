@@ -1109,6 +1109,8 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 	{
 		dprintf("%s: collect if needed\n", __FUNCTION__);
 
+		interface_setSelectedItem(_M &rtspStreamMenu, streamNumber);
+
 		if ( pstream_head != NULL )
 		{
 			//dprintf("%s: already have list\n", __FUNCTION__);
