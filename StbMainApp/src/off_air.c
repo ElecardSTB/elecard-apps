@@ -1947,6 +1947,17 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, offair_setChannel);
 	interface_channelNumberShow(appControlInfo.playbackInfo.channel);
 
+	int i;
+	for (i = 0; i < DVBTOutputMenu.baseMenu.menuEntryCount; i++)
+	{
+		if (DVBTOutputMenu.baseMenu.menuEntry[i].pAction == offair_channelChange &&
+		    DVBTOutputMenu.baseMenu.menuEntry[i].pArg == pArg)
+		{
+			interface_setSelectedItem(_M &DVBTOutputMenu, i);
+			break;
+		}
+	}
+
 	offair_startVideo(screenMain);
 	offair_fillDVBTMenu();
 	saveAppSettings();
