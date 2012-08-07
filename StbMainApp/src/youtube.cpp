@@ -35,6 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "youtube.h"
 
+#ifdef ENABLE_YOUTUBE
+
 #include "debug.h"
 #include "stb820.h"
 #include "app_info.h"
@@ -919,3 +921,5 @@ static int youtube_startVideoSearch(interfaceMenu_t *pMenu, char *value, void* p
 
 	return 0;
 }
+
+#endif // ENABLE_YOUTUBE

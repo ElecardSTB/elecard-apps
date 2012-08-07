@@ -33,6 +33,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES                                *
 ************************************************/
 
+#include "rutube.h"
+
+#ifdef ENABLE_RUTUBE
+
 #include "app_info.h"
 #include "debug.h"
 #include "downloader.h"
@@ -40,7 +44,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "interface.h"
 #include "l10n.h"
 #include "media.h"
-#include "rutube.h"
 #include "StbMainApp.h"
 #include "xmlconfig.h"
 #include <tinyxml.h>
@@ -732,3 +735,5 @@ static int rutube_exitMenu( interfaceMenu_t* pMenu, void *pArg )
 	eprintf("%s: exit\n", __FUNCTION__);
 	return 0;
 }
+
+#endif // ENABLE_RUTUBE

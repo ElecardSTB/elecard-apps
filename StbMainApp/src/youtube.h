@@ -35,6 +35,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES                                *
 ************************************************/
 
+#include "defines.h"
+
+#ifdef ENABLE_YOUTUBE
+
 #include "interface.h"
 
 /***********************************************
@@ -76,5 +80,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
+#endif // ENABLE_YOUTUBE
 
 #endif /* __YOUTUBE_H      Do not add any thing below this line */

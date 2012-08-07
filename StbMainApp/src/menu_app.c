@@ -496,7 +496,9 @@ void menu_cleanup()
 #endif
 	rtp_cleanupMenu();
 	rtsp_cleanupMenu();
+#ifdef ENABLE_RUTUBE
 	rutube_cleanupMenu();
+#endif
 #ifdef ENABLE_REGPLAT
 	regplat_cleanupMenu();
 #endif

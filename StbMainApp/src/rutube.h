@@ -36,6 +36,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ********************/
 
 #include "defines.h"
+
+#ifdef ENABLE_RUTUBE
+
 #include "interface.h"
 
 /*******************
@@ -98,5 +101,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
+#endif // ENABLE_RUTUBE
 
 #endif /* __RUTUBE_H      Do not add any thing below this line */
