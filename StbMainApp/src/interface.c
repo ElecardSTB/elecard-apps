@@ -5607,19 +5607,18 @@ int interface_playControlSliderUpdate(void* ignored)
 	double 	length_stream;
 	double 	position_stream;
 	int		ret_val;
+	int		visible = PlayControlSliderIsVisible();
 	(void)ignored;
 
 	ret_val	=	gfx_getPosition(&length_stream,&position_stream);
 	if((ret_val == 0)&&(position_stream < length_stream))
 	{
 		interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-
-		if (PlayControlSliderIsVisible())
-		{
+		if (visible)
 			interface_displayMenu(1);
-			interface_addEvent(interface_playControlSliderUpdate, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
-		}
 	}
+	if (interfacePlayControl.sliderEnd > 0 && visible)
+		interface_addEvent(interface_playControlSliderUpdate, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
 
 	return 0;
 }
@@ -6330,6 +6329,9 @@ void interface_showSlideshowControl()
 
 void interface_playControlRefresh(int redraw)
 {
+	if (!interfacePlayControl.visibleFlag)
+		interface_playControlSliderUpdate(NULL);
+
 	interfacePlayControl.visibleFlag = 1;
 	interfaceSlideshowControl.visibleFlag = 1;
 #ifdef ENABLE_PVR
