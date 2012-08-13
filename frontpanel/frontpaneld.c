@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/un.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -49,15 +50,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <unistd.h>
 
+
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
 
-#define LISTEN_PATH "/var/run/frontpanel" //socket
-#define BOARD_NAME_PROMSVYAZ "stb840_promSvyaz"
-#define BOARD_NAME_CH7162    "stb840_ch7162"
-#define PATH_PROMSVYAZ "/sys/devices/platform/tm1668/text"
-#define PATH_CH7162    "/sys/devices/platform/ct1628/text"
+#define LISTEN_PATH				"/var/run/frontpanel" //socket
+#define BOARD_NAME_PROMSVYAZ	"stb840_promSvyaz"
+#define BOARD_NAME_CH7162		"stb840_ch7162"
+#define PATH_PROMSVYAZ			"/sys/devices/platform/tm1668/text"
+#define PATH_CH7162				"/sys/devices/platform/ct1628/text"
+#define BRIGHTNESS_PROMSVYAZ	"/sys/devices/platform/tm1668/brightness"
+#define BRIGHTNESS_CH7162		"/sys/devices/platform/ct1628/brightness"
 #define MAX_TIMEOUT 60
 #define DELAY_TIMER_MIN 100
 #define DELAY_TIMER_MAX 5000
@@ -66,6 +70,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define TIME_INTERVAL 1, 1000
 #define TIME_STOP 0, 0
 #define BUF_SIZE 256
+#define LITTLE_INTEVAL			60000
+#define ADDITION_INTERVAL		100000
 
 /*#define DBG(x...) do {\
 { \
@@ -87,30 +93,64 @@ printf(x); \
 
 typedef enum {NONE, TIME, STATUS, NOTIFY} MessageTypes;
 typedef enum {UNKNOWN, PROMSVYAZ, CH7162} BoardTypes;
+typedef int (*ArgHandler)(char *, char *);
+struct argHandler_s {
+	char		*argName;
+	ArgHandler	handler;
+};
+
+/******************************************************************
+* STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
+*******************************************************************/
+static int ArgHandler_Time(char *input, char *output);
+static int ArgHandler_Delays(char *input, char *output);
+static int ArgHandler_Busy(char *input, char *output);
+static int ArgHandler_Notify(char *input, char *output);
+static int ArgHandler_Status(char *input, char *output);
+static int ArgHandler_Pulse(char *input, char *output);
+static int ArgHandler_Brightness(char *input, char *output);
 
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
 
-timer_t delayTimer;
-timer_t mainTimer;
+timer_t g_delayTimer;
+timer_t g_mainTimer;
 
-bool time_display = true;
-long t1 = TIME_FIRST_SLEEP_TEXT,
-	 t2 = TIME_OTHER_SLEEP_TEXT;
+bool g_time_display = true;
+long g_t1 = TIME_FIRST_SLEEP_TEXT,
+	 g_t2 = TIME_OTHER_SLEEP_TEXT;
 
-BoardTypes board = UNKNOWN;
-static const char *frontpanelPath = NULL;
+BoardTypes g_board = UNKNOWN;
+static const char *g_frontpanelPath = NULL;
+static const char *g_frontpanelBrightness = NULL;
 
-char digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
-bool colon = true;
-char time_buffer[6] = "00000\0";
-int  textLength;
-int  textOffset = 0;
-char text[BUF_SIZE] = "";
+char g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
+bool g_colon = true;
+char g_time_buffer[6] = "00000\0";
+int  g_textLength;
+int  g_textOffset = 0;
+char g_text[BUF_SIZE] = "";
+int  g_brightness = 4;
 
-MessageTypes messageType = TIME;
-int statusId = -1;
+MessageTypes g_messageType = TIME;
+int g_statusId = -1;
+struct argHandler_s handlers[] = {
+	{"time",	ArgHandler_Time},
+	{"t",		ArgHandler_Time},
+	{"delays",	ArgHandler_Delays},
+	{"d",		ArgHandler_Delays},
+	{"busy",	ArgHandler_Busy},
+	{"?",		ArgHandler_Busy},
+	{"notify",	ArgHandler_Notify},
+	{"n",		ArgHandler_Notify},
+	{"status",	ArgHandler_Status},
+	{"s",		ArgHandler_Status},
+	{"pulse",	ArgHandler_Pulse},
+	{"p",		ArgHandler_Pulse},
+	{"bright",	ArgHandler_Brightness},
+	{"b",		ArgHandler_Brightness},
+};
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
@@ -161,17 +201,17 @@ void GetCurrentTime()
 	t = time(NULL);
 	area = localtime(&t);
 
-	sprintf(time_buffer, "%02d", area->tm_hour);
-	if(time_buffer[0] == '0')
-		time_buffer[0] = ' ';
-	sprintf(time_buffer + 2, "%02d", area->tm_min);
+	sprintf(g_time_buffer, "%02d", area->tm_hour);
+	if(g_time_buffer[0] == '0')
+		g_time_buffer[0] = ' ';
+	sprintf(g_time_buffer + 2, "%02d", area->tm_min);
 
-	if(colon) {
-		if(board == PROMSVYAZ) {
-			time_buffer[1] = digitsWithColon[time_buffer[1] - '0'];
-			time_buffer[4] = 0; //promsvyaz
+	if(g_colon) {
+		if(g_board == PROMSVYAZ) {
+			g_time_buffer[1] = g_digitsWithColon[g_time_buffer[1] - '0'];
+			g_time_buffer[4] = 0; //promsvyaz
 		} else {
-			time_buffer[4] = '8'; //CH7162 board
+			g_time_buffer[4] = '8'; //CH7162 g_board
 		}
 	}
 }
@@ -179,7 +219,7 @@ void GetCurrentTime()
 void SetFrontpanelText(const char *buffer)
 {
 	FILE *f;
-	f = fopen(frontpanelPath, "w");
+	f = fopen(g_frontpanelPath, "w");
 	if(f != 0) {
 		fwrite(buffer, 5, 5, f);
 		fclose(f);
@@ -192,63 +232,68 @@ void CheckBoardType()
 	boardName = getenv("board_name");
 	if(boardName) {
 		if(strncmp(boardName, BOARD_NAME_PROMSVYAZ, sizeof(BOARD_NAME_PROMSVYAZ) - 1) == 0) {
-			board = PROMSVYAZ;
-			frontpanelPath = PATH_PROMSVYAZ;
+			g_board = PROMSVYAZ;
+			g_frontpanelPath = PATH_PROMSVYAZ;
+			g_frontpanelBrightness = BRIGHTNESS_PROMSVYAZ;
 		} else if(strncmp(boardName, BOARD_NAME_CH7162, sizeof(BOARD_NAME_CH7162) - 1) == 0) {
-			board = CH7162;
-			frontpanelPath = PATH_CH7162;
+			g_board = CH7162;
+			g_frontpanelPath = PATH_CH7162;
+			g_frontpanelBrightness = BRIGHTNESS_CH7162;
 		}
 	} else {
 		fputs("Variable board_name not setted!!!\n", stderr);
 	}
-	if(board == UNKNOWN) {
-		fputs("Unknown board\n", stderr);
+	if(g_board == UNKNOWN) {
+		fputs("Unknown g_board\n", stderr);
 		exit(1);
 	}
 }
 
 void DisplayText()
 {
-	DBG("%s: type %d text %s\n", __func__, messageType, text);
-	switch(messageType) {
+	DBG("%s: type %d g_text %s\n", __func__, g_messageType, g_text);
+	switch(g_messageType) {
 		case NOTIFY:
 		case STATUS:
-			if((text[2] == ':') && (textLength < 6) && (textLength > 2)) {
-				StopTimer(delayTimer);
-				strcpy(time_buffer, text);
-				strcpy(time_buffer + 2, time_buffer + 3);
+			if((g_text[2] == ':') && (g_textLength < 6) && (g_textLength > 2)) {
+				StopTimer(g_delayTimer);
+				strcpy(g_time_buffer, g_text);
+				strcpy(g_time_buffer + 2, g_time_buffer + 3);
 
-				if(board == PROMSVYAZ) {
-					if(time_buffer[1] >= '0' && time_buffer[1] <= '9') {
-						time_buffer[1] = digitsWithColon[time_buffer[1] - '0'];
+				if(g_board == PROMSVYAZ) {
+					if(g_time_buffer[1] >= '0' && g_time_buffer[1] <= '9') {
+						g_time_buffer[1] = g_digitsWithColon[g_time_buffer[1] - '0'];
 					}
 				} else {
 					int temp;
-					for(temp = textLength - 1; temp <= 5; temp++) {
-						time_buffer[temp] = ' ';
+					for(temp = g_textLength - 1; temp <= 5; temp++) {
+						g_time_buffer[temp] = ' ';
 					}
-					time_buffer[4] = '8';
+					g_time_buffer[4] = '8';
 				}
-				SetFrontpanelText(time_buffer);
+				SetFrontpanelText(g_time_buffer);
 			} else {
-				if(textOffset > textLength) {
-					textOffset = 0;
+				if(g_textOffset > g_textLength) {
+					g_textOffset = 0;
 				}
 
-				strncpy(time_buffer, text + textOffset, 4);
-				SetFrontpanelText(time_buffer);
+				strncpy(g_time_buffer, g_text + g_textOffset, 4);
+				SetFrontpanelText(g_time_buffer);
 
-				if(0 == textOffset) {
-					SetTimer(delayTimer, t1, t2);
+				if(g_textLength <= 4) { //dont roll the g_text if it seat in 4 indicator characters
+					StopTimer(g_delayTimer);
+				} else {
+					if(0 == g_textOffset) {
+						SetTimer(g_delayTimer, g_t1, g_t2);
+					}
+					g_textOffset++;
 				}
-
-				textOffset++;
 			}
 			break;
 		case TIME:
 			GetCurrentTime();
-			SetFrontpanelText(time_buffer);
-			colon = !colon;
+			SetFrontpanelText(g_time_buffer);
+			g_colon = !g_colon;
 			break;
 		default:
 			break;
@@ -258,12 +303,12 @@ void DisplayText()
 
 void DisplayTime()
 {
-	if(time_display) {
-		messageType = TIME;
-		SetTimer(delayTimer, TIME_INTERVAL);
+	if(g_time_display) {
+		g_messageType = TIME;
+		SetTimer(g_delayTimer, TIME_INTERVAL);
 	} else {
-		messageType = NONE;
-		StopTimer(delayTimer);
+		g_messageType = NONE;
+		StopTimer(g_delayTimer);
 		SetFrontpanelText("     ");
 	}
 }
@@ -276,8 +321,8 @@ void Quit()
 
 inline void StopMainTimer()
 {
-	textOffset = 0;
-	StopTimer(mainTimer);
+	g_textOffset = 0;
+	StopTimer(g_mainTimer);
 }
 
 void SetText(int timeout, const char *new_text)
@@ -286,43 +331,236 @@ void SetText(int timeout, const char *new_text)
 		timeout = MAX_TIMEOUT;
 	}
 
-	textOffset = 0;
-	strcpy(text, new_text);
-	textLength = strlen(text);
-	DBG("%s: '%s' (%d)\n", __func__, text, textLength);
+	g_textOffset = 0;
+	strcpy(g_text, new_text);
+	g_textLength = strlen(g_text);
+	DBG("%s: '%s' (%d)\n", __func__, g_text, g_textLength);
 
-	memset(time_buffer, 0, sizeof(time_buffer));
+	memset(g_time_buffer, 0, sizeof(g_time_buffer));
 	DisplayText();
-	SetTimer(mainTimer, timeout * 1000, 0);
+	SetTimer(g_mainTimer, timeout * 1000, 0);
 }
 
 void SetNotify(int timeout, const char *new_text)
 {
-	messageType = NOTIFY;
+	g_messageType = NOTIFY;
 
 	SetText(timeout, new_text);
 }
 
 void SetStatus(int id, int timeout, const char *new_text)
 {
-	statusId = id;
-	messageType = STATUS;
+	g_statusId = id;
+	g_messageType = STATUS;
 
 	SetText(timeout, new_text);
 }
 
+void SetBrightness(int brightness)
+{
+	FILE *f;
+	f = fopen(g_frontpanelBrightness, "w");
+	if(f != 0) {
+		fprintf(f, "%d", brightness);
+		fclose(f);
+	}
+}
+
+#define pthread_setcancelstate_my(flag) \
+	do { \
+		int err = pthread_setcancelstate(flag, NULL); \
+		if(err != 0) { \
+			errno = err; \
+			perror("pthread_setcancelstate"); \
+		} \
+	} while (0)
+
+void *PulseThread(void *arg)
+{
+	int br_prev = g_brightness;
+	(void)arg;
+
+	while(1) {
+		int i;
+
+		for(i = br_prev; i < 9; i++) {
+			pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
+			SetBrightness(i);
+			pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
+			usleep(LITTLE_INTEVAL);
+		}
+
+		for(i = 8; i >= 0; i--) {
+			pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
+			SetBrightness(i);
+			pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
+			usleep(LITTLE_INTEVAL);
+		}
+
+		br_prev = 0;
+		usleep(ADDITION_INTERVAL);
+	}
+	
+	return NULL;
+}
+
+static int ArgHandler_Time(char *input, char *output)
+{
+	(void)output;
+	g_time_display = atol(input);
+	if(g_messageType != NOTIFY && g_messageType != STATUS) {
+		DisplayTime();
+	}
+	return 0;
+}
+
+static int ArgHandler_Delays(char *input, char *output)
+{
+	(void)output;
+	g_t1 = 0;
+	g_t2 = 0;
+
+	sscanf(input, " %ld %ld", &g_t1, &g_t2);
+
+	if(g_t1 < DELAY_TIMER_MIN) {
+		g_t1 = DELAY_TIMER_MIN;
+	}
+	if(g_t2 < DELAY_TIMER_MIN) {
+		g_t2 = DELAY_TIMER_MIN;
+	}
+
+	if(g_t1 > DELAY_TIMER_MAX) {
+		g_t1 = DELAY_TIMER_MAX;
+	}
+	if(g_t2 > DELAY_TIMER_MAX) {
+		g_t2 = DELAY_TIMER_MAX;
+	}
+
+	return 0;
+}
+
+static int ArgHandler_Busy(char *input, char *output)
+{
+	int temp_time = 0;
+
+	(void)input;
+	if(g_messageType == STATUS) {
+		struct itimerspec timervals;
+		timer_gettime(g_mainTimer , &timervals);
+		temp_time = (int)timervals.it_value.tv_sec * 1000 + (int)timervals.it_value.tv_nsec / 1000000;
+	}
+	sprintf(output, "%d", temp_time);
+
+	return 1;
+}
+
+static int ArgHandler_Notify(char *input, char *output)
+{
+	int		timeout;
+	char	*text_start = NULL;
+
+	(void)output;
+	if(g_messageType == STATUS) {
+		return -1;
+	}
+
+	timeout = strtol(input, &text_start, 10);
+	if(timeout > 0) {
+		if(text_start && *text_start) {
+			text_start++;
+		} else {
+			text_start = "";
+		}
+		SetNotify(timeout, text_start);
+	} else if(timeout == 0) {
+		StopMainTimer();
+		DisplayTime();
+	}
+
+	return 0;
+}
+
+static int ArgHandler_Status(char *input, char *output)
+{
+	int		timeout;
+	int		id;
+	char	*text_start = NULL;
+
+	(void)output;
+	id = strtol(input, &text_start, 10);
+	if((id < 0) || (g_messageType == STATUS && id != g_statusId)) {
+		return -1;
+	}
+
+	timeout = MAX_TIMEOUT;
+	if(text_start && *text_start == ':') {
+		timeout = strtol(text_start + 1, &text_start, 10);
+		if(timeout < 0) {
+			return -1;
+		}
+		if(timeout == 0) {
+			StopMainTimer();
+			DisplayTime();
+			return -1;
+		}
+	}
+	if(text_start && *text_start) {
+		text_start++;
+	} else {
+		text_start = "";
+	}
+	SetStatus(id, timeout, text_start);
+
+	return 0;
+}
+
+static int ArgHandler_Pulse(char *input, char *output)
+{
+	int					enable;
+	static int			pulseStarted = 0;
+	static pthread_t	pulse_thread;
+
+	(void)output;
+	enable = strtol(input, NULL, 10);
+	if(enable) {
+		if(pulseStarted == 0) {
+			if(pthread_create(&pulse_thread, NULL, PulseThread, NULL)) {
+				perror("server: PulseThread");
+			} else {
+				pulseStarted = 1;
+			}
+		}
+	} else {
+		if(pulseStarted) {
+			pthread_cancel(pulse_thread);
+			pthread_join(pulse_thread, NULL);
+			pulseStarted = 0;
+		}
+		SetBrightness(g_brightness);
+	}
+
+	return 0;
+}
+
+static int ArgHandler_Brightness(char *input, char *output)
+{
+	int	bright;
+
+	(void)output;
+	bright = strtol(input, NULL, 10);
+	g_brightness = bright;
+	SetBrightness(bright);
+
+	return 0;
+}
 
 int MainLoop()
 {
 	struct sockaddr_un sa, ca;
+	int len, socket_id;
 
-	int len, socket_id, accept_id, ca_len;
-	int timeout, id;
-	char *text_start;
-	char buffer[BUF_SIZE];
-
-	delayTimer = CreateTimer(SIGUSR1);
-	mainTimer  = CreateTimer(SIGUSR2);
+	g_delayTimer = CreateTimer(SIGUSR1);
+	g_mainTimer  = CreateTimer(SIGUSR2);
 
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGTERM, Quit);
@@ -351,10 +589,16 @@ int MainLoop()
 		exit(1);
 	}
 
-	messageType = TIME;
-	SetTimer(delayTimer, TIME_INTERVAL);
+	g_messageType = TIME;
+	SetBrightness(g_brightness);
+	SetTimer(g_delayTimer, TIME_INTERVAL);
 
 	for(;;) {
+		int		accept_id;
+		int		ca_len;
+		unsigned int	i;
+		char	buffer[BUF_SIZE];
+
 		if((accept_id = accept(socket_id, (struct sockaddr *) &ca, (socklen_t *)&ca_len)) < 0) {
 			perror("server: accept");
 			exit(1);
@@ -368,99 +612,34 @@ int MainLoop()
 		}
 
 		DBG("%s: << '%s'\n", __func__, buffer);
-		text_start = NULL;
 
-		switch(buffer[0]) {
-			case 't':
-				time_display = atol(buffer + 1);
-				if(messageType != NOTIFY && messageType != STATUS) {
-					DisplayTime();
-				}
-				break;
-			case 'h':
-				t1 = 0;
-				t2 = 0;
+		for(i = 0; i < sizeof(handlers)/sizeof(*handlers); i++) {
+			int argLen = strlen(handlers[i].argName);
+			if(strncmp(handlers[i].argName, buffer, argLen) == 0) {
+				char ch = buffer[argLen];
+				if(	(ch == '\t') ||
+					(ch == ' ') ||
+					(ch == '\n') ||
+					(ch == '\r') ||
+					(ch == '\0') ||
+					((ch > '0') && (ch < '9')) )
+				{
+					if(handlers[i].handler) {
+//						int		ret;
+						char	reply[BUF_SIZE] = "";
 
-				sscanf(buffer + 1, " %ld %ld", &t1, &t2);
-
-				if(t1 < DELAY_TIMER_MIN) {
-					t1 = DELAY_TIMER_MIN;
-				}
-				if(t2 < DELAY_TIMER_MIN) {
-					t2 = DELAY_TIMER_MIN;
-				}
-
-				if(t1 > DELAY_TIMER_MAX) {
-					t1 = DELAY_TIMER_MAX;
-				}
-				if(t2 > DELAY_TIMER_MAX) {
-					t2 = DELAY_TIMER_MAX;
-				}
-				break;
-			case '?': {
-				char send_buffer[11] = "";
-				int temp_time = 0;
-				if(messageType == STATUS) {
-					struct itimerspec timervals;
-					timer_gettime(mainTimer , &timervals);
-					temp_time = (int)timervals.it_value.tv_sec * 1000 + (int)timervals.it_value.tv_nsec / 1000000;
-				}
-				sprintf(send_buffer, "%d", temp_time);
-				send(accept_id, send_buffer, sizeof(send_buffer), 0);
-				break;
-			}
-			case 'n':
-				if(messageType == STATUS) {
+						handlers[i].handler(buffer + argLen, reply);
+						if(reply[0]) {
+							send(accept_id, reply, strlen(reply) + 1, 0);
+						}
+					}
 					break;
 				}
-				timeout = strtol(buffer + 1, &text_start, 10);
-				if(timeout > 0) {
-					if(text_start && *text_start) {
-						text_start++;
-					} else {
-						text_start = "";
-					}
-					SetNotify(timeout, text_start);
-				} else if(timeout == 0) {
-					StopMainTimer();
-					DisplayTime();
-				}
-				break;
-			case 's':
-				id = strtol(buffer + 1, &text_start, 10);
-				do {
-					if(id < 0 ||
-							(messageType == STATUS && id != statusId)) {
-						break;
-					}
-
-					timeout = MAX_TIMEOUT;
-					statusId = id;
-					if(text_start && *text_start == ':') {
-						timeout = strtol(text_start + 1, &text_start, 10);
-						if(timeout < 0) {
-							break;
-						}
-						if(timeout == 0) {
-							StopMainTimer();
-							DisplayTime();
-							break;
-						}
-					}
-					if(text_start && *text_start) {
-						text_start++;
-					} else {
-						text_start = "";
-					}
-
-					SetStatus(id, timeout, text_start);
-				} while(0);
-				break;
-			default:
-				break;
+			}
 		}
 		close(accept_id);
 	}
+
 	return 1;
 }
 
