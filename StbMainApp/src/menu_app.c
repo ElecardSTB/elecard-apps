@@ -107,6 +107,9 @@ int open_browser(interfaceMenu_t* pMenu, void* pArg)
 		sprintf(open_link,"/usr/local/webkit/_start.sh");
 	helperStartApp(open_link);
 #endif
+#ifdef STSDK
+	helperStartApp("fancybrowser about:blank -qws -display directfb");
+#endif
 	return 0;
 }
 
