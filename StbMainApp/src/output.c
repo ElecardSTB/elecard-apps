@@ -567,7 +567,7 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 static void output_applyFormat(void)
 {
 	if(st_needRestart()) {
-		interface_showMessageBox(_T("RESTART"), thumbnail_warning, 0);
+		interface_showMessageBox(_T("RESTARTING"), thumbnail_warning, 0);
 		helperStartApp("");
 	}	
 }

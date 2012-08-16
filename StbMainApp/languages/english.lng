@@ -351,6 +351,7 @@ RESET_SETTINGS_CONFIRM=Are You Shure You Want to Reset all\nSettings to Their De
 RESET_SETTINGS=Reset All Settings
 RESOLUTION=Output Resolution
 RESTART=Restart
+RESTARTING=Restarting apllication
 RESUME_AFTER_START=Resume Playback After Start
 RUR=RUR
 SAMBA_MOUNT_ERROR=Can't Connect to Selected Share. Try with another Login and Password.
