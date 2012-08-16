@@ -89,10 +89,7 @@ FORCE_HELPER_SURFACE ?= 0
 # Common build rules
 # -----------------------------------------------------------------------------
 
-REVISION ?= $(shell git svn info . | grep Revision | sed 's/.*: *//')
-ifeq ($(REVISION),)
-REVISION := $(shell svnversion .)
-endif
+REVISION ?= $(shell git rev-parse HEAD 2>/dev/null | cut -c1-7)
 
 COMPILE_TIME ?= $(shell date)
 
