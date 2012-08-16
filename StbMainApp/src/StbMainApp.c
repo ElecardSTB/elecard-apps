@@ -100,6 +100,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/un.h>
+#include <linux/input.h>
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -562,10 +563,19 @@ static int helperIsEventValid(DFBEvent *event)
 	return valid;
 }
 
+static int PowerOff(void *pArg)
+{
+	interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
+	return system("poweroff");
+}
+
 static int checkPowerOff(DFBEvent *pEvent)
 {
+	//for STB840 PromSvyaz frontpanel POWER button
+	int isKeyboardPower = (1 && (pEvent->input.device_id == DIDID_KEYBOARD) && (pEvent->input.key_code == KEY_POWER));
 	//dprintf("%s: check power\n", __FUNCTION__);
-	if(pEvent->input.key_symbol == DIKS_POWER) // Power/Standby button. Go to standby.
+	// Power/Standby button. Go to standby.
+	if( (pEvent->input.key_symbol == DIKS_POWER) || isKeyboardPower )
 	{
 		static struct timeval	lastChange = {0, 0},
 								firstPress = {0, 0};
@@ -577,12 +587,18 @@ static int checkPowerOff(DFBEvent *pEvent)
 		gettimeofday(&currentPress, NULL);
 		if((pEvent->input.type == DIET_KEYRELEASE) || (pEvent->input.type == DIET_BUTTONRELEASE)) {
 			isPowerReleased = 1;
+			if(isKeyboardPower) {
+				interface_removeEvent(PowerOff, NULL);
+			}
 		} else {
 			if(appControlInfo.inStandby)
 				return 0; //dont check pressed more than 3 seconds POWER button in standby
 			if(isPowerReleased) {
 				memcpy(&firstPress, &currentPress, sizeof(struct timeval));
 				isPowerReleased = 0;
+				if(isKeyboardPower) {
+					interface_addEvent(PowerOff, NULL, 3000, 1);
+				}
 			}
 			//try to check if button pressed more than 3 seconds
 			repeat = 1;
@@ -614,8 +630,7 @@ static int checkPowerOff(DFBEvent *pEvent)
 			/* Standby button has been held for 3 seconds. Power off. */
 #ifdef STSDK
 			isPowerReleased = 1; //mark it here, because system call (in test mode) can be long, so POWER release will skiped
-			interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
-			system("poweroff");
+			PowerOff(NULL);
 #endif
 		} else if (!repeat && ((currentPress.tv_sec - lastChange.tv_sec) >= 3))
 		{
@@ -1552,7 +1567,7 @@ void *keyThread(void *pArg)
 					cmd >= interfaceCommand0 &&
 					cmd <= interfaceCommand9 )
 				{
-					int num = cmd-interfaceCommand0;
+					int num = cmd - interfaceCommand0;
 					static int offset = 0;
 
 					dprintf("%s: DIGIT: %d = %d repeat=%d offset=%d\n", __FUNCTION__, cmd, num, curcmd.repeat, offset);
@@ -1588,21 +1603,20 @@ void *keyThread(void *pArg)
 				kprintf("%s: ---> Char: %d, Command %d\n", __FUNCTION__, event.input.key_symbol, cmd);
 
 				interface_processCommand(&curcmd);
-			} else if ( (event.input.device_id == DID_KEYBOARD || event.input.device_id == DIDID_ANY /* 0 is keyboard */) && event.clazz == DFEC_INPUT && event.input.type == DIET_KEYRELEASE )
-			{
-				//dprintf("%s: release!\n", __FUNCTION__);
-				lastsym = 0;
-				lastcmd = 0;
-			}
+			} else if((event.clazz == DFEC_INPUT) && ((event.input.type == DIET_KEYRELEASE) || (event.input.type == DIET_BUTTONRELEASE))) {
 #ifdef STSDK
-			else if((event.clazz == DFEC_INPUT) && ((event.input.type == DIET_KEYRELEASE) || (event.input.type == DIET_BUTTONRELEASE))) {
 				if(checkPowerOff(&event)) {
 					//clear event
 					eventBuffer->Reset(eventBuffer);
 					continue;
 				}
-			}
 #endif
+				if((event.input.device_id == DID_KEYBOARD) || (event.input.device_id == DIDID_ANY)) {
+					//dprintf("%s: release!\n", __FUNCTION__);
+					lastsym = 0;
+					lastcmd = 0;
+				}
+			}
 		}
 	}
 
