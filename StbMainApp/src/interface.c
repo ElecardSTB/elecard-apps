@@ -2773,7 +2773,7 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 					switch (interfacePlayControl.highlightedButton)
 					{
 						case interfacePlayControlMode:
-							media_setMode(interfaceInfo.currentMenu,NULL);
+							media_setNextPlaybackMode();
 							break;
 #ifdef ENABLE_PVR
 						case interfacePlayControlRecord:

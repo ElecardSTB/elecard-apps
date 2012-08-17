@@ -129,7 +129,7 @@ int  media_initUSBBrowserMenu(interfaceMenu_t *pMenu, void* pArg);
 
 int  media_initSambaBrowserMenu(interfaceMenu_t *pMenu, void* pArg);
 
-int  media_setMode(interfaceMenu_t *pMenu, void *pArg);
+int  media_setNextPlaybackMode(void);
 
 /**
 *   @brief Function used to determine count of USB flash or hard disk drives (not CD drives)
@@ -146,6 +146,8 @@ void media_storagesChanged(void);
 *   @return mediaAll if extension is unknown
 */
 mediaType media_getMediaType(const char *filename);
+
+int media_setBrowseMediaType(int type);
 
 /** Callback for scandir function, used to select mounted USB storages
  */

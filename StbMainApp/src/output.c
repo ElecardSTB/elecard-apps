@@ -212,6 +212,7 @@ static int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_fillTimeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg);
+static int output_fillPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
 
 static int output_fillWANMenu (interfaceMenu_t *pMenu, void* pArg);
 #ifdef ENABLE_PPP
@@ -266,6 +267,7 @@ static int output_toggleFileSorting(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleHighlightColor(interfaceMenu_t* pMenu, void* pArg);
 static int output_togglePlayControlTimeout(interfaceMenu_t* pMenu, void* pArg);
 static int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg);
+static int output_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg);
 static int output_togglePlayControlShowOnStart(interfaceMenu_t* pMenu, void* pArg);
 #ifdef ENABLE_VOIP
 static int output_toggleVoipIndication(interfaceMenu_t* pMenu, void* pArg);
@@ -322,6 +324,7 @@ static interfaceListMenu_t FormatMenu;
 static interfaceListMenu_t BlankingMenu;
 static interfaceListMenu_t TimeZoneMenu;
 static interfaceListMenu_t InterfaceMenu;
+static interfaceListMenu_t PlaybackMenu;
 
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
@@ -876,7 +879,10 @@ static int output_toggleResumeAfterStart(interfaceMenu_t *pMenu, void* pArg)
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 
-	return output_fillInterfaceMenu(pMenu, pArg);
+	output_fillPlaybackMenu(pMenu, NULL);
+	interface_displayMenu(1);
+
+	return 0;
 }
 
 static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg)
@@ -889,7 +895,10 @@ static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg)
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 
-	return output_fillInterfaceMenu(pMenu, pArg);
+	output_fillPlaybackMenu(pMenu, NULL);
+	interface_displayMenu(1);
+
+	return 0;
 }
 
 int output_toggleFileSorting(interfaceMenu_t* pMenu, void* pArg)
@@ -5732,7 +5741,21 @@ int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg)
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
 	}
 
-	output_fillInterfaceMenu(pMenu, pArg);
+	output_fillPlaybackMenu(pMenu, pArg);
+	interface_displayMenu(1);
+
+	return 0;
+}
+
+int output_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg)
+{
+	if (media_setNextPlaybackMode() != 0 && bDisplayedWarning == 0)
+	{
+		bDisplayedWarning = 1;
+		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	}
+
+	output_fillPlaybackMenu(pMenu, pArg);
 	interface_displayMenu(1);
 
 	return 0;
@@ -5964,12 +5987,6 @@ int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&InterfaceMenu);
 
-	sprintf( buf, "%s: %s", _T("RESUME_AFTER_START"), _T( appControlInfo.playbackInfo.bResumeAfterStart ? "ON" : "OFF" ) );
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleResumeAfterStart, NULL, settings_interface);
-
-	sprintf( buf, "%s: %s", _T("AUTOPLAY"), _T( appControlInfo.playbackInfo.bAutoPlay ? "ON" : "OFF" ) );
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleAutoPlay, NULL, settings_interface);
-
 	sprintf( buf, "%s: %s", _T("FILE_SORTING"), _T( appControlInfo.mediaInfo.fileSorting == naturalsort ? "SORT_NATURAL" : "SORT_ALPHA" ));
 	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleFileSorting, NULL, settings_interface);
 
@@ -5998,11 +6015,38 @@ int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
 	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
-	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYBACK_STOP_TIMEOUT"), appControlInfo.playbackInfo.autoStop, _T("MINUTE_SHORT"));
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleAutoStopTimeout, NULL, settings_interface);
 
 	interface_menuActionShowMenu(pMenu, (void*)&InterfaceMenu);
 	interface_displayMenu(1);
+
+	return 0;
+}
+
+int output_fillPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
+{
+	char buf[MENU_ENTRY_INFO_LENGTH];
+
+	interface_clearMenuEntries(pMenu);
+
+	sprintf( buf, "%s: %s", _T("RESUME_AFTER_START"), _T( appControlInfo.playbackInfo.bResumeAfterStart ? "ON" : "OFF" ) );
+	interface_addMenuEntry(pMenu, buf, output_toggleResumeAfterStart, NULL, settings_interface);
+
+	sprintf( buf, "%s: %s", _T("AUTOPLAY"), _T( appControlInfo.playbackInfo.bAutoPlay ? "ON" : "OFF" ) );
+	interface_addMenuEntry(pMenu, buf, output_toggleAutoPlay, NULL, settings_interface);
+
+	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYBACK_STOP_TIMEOUT"), appControlInfo.playbackInfo.autoStop, _T("MINUTE_SHORT"));
+	interface_addMenuEntry(pMenu, buf, output_toggleAutoStopTimeout, NULL, settings_interface);
+
+	char *str = NULL;
+	switch (appControlInfo.mediaInfo.playbackMode)
+	{
+		case playback_looped:     str = _T("LOOPED");    break;
+		case playback_sequential: str = _T("SEQUENTAL"); break;
+		case playback_random:     str = _T("RANDOM");    break;
+		default:                  str = _T("SINGLE");
+	}
+	sprintf(buf, "%s: %s", _T("PLAYBACK_MODE"), str);
+	interface_addMenuEntry(pMenu, buf, output_togglePlaybackMode, NULL, thumbnail_turnaround);
 
 	return 0;
 }
@@ -6059,6 +6103,9 @@ void output_fillOutputMenu(void)
 
 	str = _T("INTERFACE");
 	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillInterfaceMenu, NULL, settings_interface);
+
+	str = _T("PLAYBACK");
+	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &PlaybackMenu, thumbnail_loading);
 
 #ifdef ENABLE_3D
 	str = _T("3D_SETTINGS");
@@ -6136,6 +6183,9 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, (interfaceMenu_t*)&OutputMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+
+	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, (interfaceMenu_t*)&OutputMenu,
+		interfaceListMenuIconThumbnail, output_fillPlaybackMenu, NULL, NULL);
 
 	createListMenu(&WANSubMenu, "WAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_fillWANMenu, NULL, SET_NUMBER(ifaceWAN));

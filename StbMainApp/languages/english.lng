@@ -306,6 +306,7 @@ PAYMENT_BUTTONS=Press GREEN Button to Confirm\nPress RED Button to Cancel
 PCR_TRACKING=Demuxer Model: PCR Tracking
 PIP_LAYER=Picture-in-Picture
 PLAY=Play
+PLAYBACK=Playback
 PLAYBACK_MODE=Playback Mode
 PLAYCONTROL_SHOW_TIMEOUT=Play Control Show Timeout
 PLAYCONTROL_SHOW_ON_START=Show Play Control on Playback Start

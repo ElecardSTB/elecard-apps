@@ -168,6 +168,7 @@ int         media_startNextChannel(int direction, void* pArg);
 static int  media_browseFolderMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  media_upFolderMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  media_toggleMediaType(interfaceMenu_t *pMenu, void* pArg);
+static int  media_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg);
 static int  media_toggleSlideshowMode(interfaceMenu_t *pMenu, void* pArg);
 #ifndef STBPNX
 static void media_slideshowReleaseImage(void);
@@ -1314,7 +1315,6 @@ int  media_slideshowSetMode(int mode)
 	}
 	else
 		appControlInfo.slideshowInfo.defaultState = mode;
-	saveAppSettings();
 
 	if( appControlInfo.slideshowInfo.state != slideshowDisabled )
 	{
@@ -1328,7 +1328,7 @@ int  media_slideshowSetMode(int mode)
 		}
 	}
 
-	return 0;
+	return saveAppSettings();
 }
 
 int  media_slideshowSetTimeout(int timeout)
@@ -1958,15 +1958,19 @@ int media_startPlayback()
 	return res;
 }
 
-int media_setMode(interfaceMenu_t *pMenu, void *pArg)
+int media_setNextPlaybackMode(void)
 {
 	appControlInfo.mediaInfo.playbackMode++;
 	appControlInfo.mediaInfo.playbackMode %= playback_modes;
-	saveAppSettings();
 #if (defined STB225)
-		gfx_setVideoProviderPlaybackFlags(screenMain, DVPLAY_LOOPING, (appControlInfo.mediaInfo.playbackMode==playback_looped) );
+	gfx_setVideoProviderPlaybackFlags(screenMain, DVPLAY_LOOPING, (appControlInfo.mediaInfo.playbackMode==playback_looped) );
 #endif
+	return saveAppSettings();
+}
 
+int media_togglePlaybackMode(interfaceMenu_t *pMenu, void *pArg)
+{
+	media_setNextPlaybackMode();
 	media_fillSettingsMenu(pMenu,pArg);
 
 	//interface_showMenu(1, 1);
@@ -2700,22 +2704,26 @@ static int media_upFolderMenu(interfaceMenu_t *pMenu, void* pArg)
 
 static int  media_toggleMediaType(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.mediaInfo.typeIndex++;
-	if(appControlInfo.mediaInfo.typeIndex >= mediaTypeCount)
-	{
-		appControlInfo.mediaInfo.typeIndex = mediaAll;
-	}
-	saveAppSettings();
+	media_setBrowseMediaType(-1);
 	media_fillSettingsMenu(pMenu, pArg);
 	return 0;
+}
+
+int media_setBrowseMediaType(int type)
+{
+	if (type < 0)
+		appControlInfo.mediaInfo.typeIndex++;
+	else
+		appControlInfo.mediaInfo.typeIndex = type;
+	if(appControlInfo.mediaInfo.typeIndex >= mediaTypeCount)
+		appControlInfo.mediaInfo.typeIndex = mediaAll;
+	return saveAppSettings();
 }
 
 static int  media_toggleSlideshowMode(interfaceMenu_t *pMenu, void* pArg)
 {
 	media_slideshowSetMode(-1);
-
 	media_fillSettingsMenu(pMenu, pArg);
-
 	return 0;
 }
 
@@ -2734,7 +2742,7 @@ static int  media_fillSettingsMenu(interfaceMenu_t *pMenu, void* pArg)
 		default:                  str = _T("SINGLE");
 	}
 	sprintf(buf, "%s: %s", _T("PLAYBACK_MODE"), str);
-	interface_addMenuEntry((interfaceMenu_t *)&media_settingsMenu, buf, media_setMode, NULL, thumbnail_turnaround);
+	interface_addMenuEntry((interfaceMenu_t *)&media_settingsMenu, buf, media_togglePlaybackMode, NULL, thumbnail_turnaround);
 
 	switch( appControlInfo.slideshowInfo.defaultState )
 	{
@@ -2856,7 +2864,7 @@ static int media_settingsKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEv
 	switch(cmd->command)
 	{
 		case interfaceCommandGreen:
-			media_setMode(pMenu,pArg);
+			media_togglePlaybackMode(pMenu,pArg);
 			return 0;
 		case interfaceCommandYellow:
 			media_toggleSlideshowMode(pMenu,pArg);

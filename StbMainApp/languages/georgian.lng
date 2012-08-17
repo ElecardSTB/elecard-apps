@@ -238,6 +238,7 @@ PAY_FOR_MOBILE=მობილურის ბალანსის შევს
 PCR_TRACKING=Модель демуксера: PCR
 PIP_LAYER=Картинка-в-Картинке
 PLAY=Играть
+PLAYBACK=Воспроизведение
 PLAYBACK_MODE=Режим воспроизведения
 PLAYCONTROL_SHOW_TIMEOUT=Отображать панель воспроизведения
 PLAYCONTROL_SHOW_ON_START=Отображать панель во время старта
