@@ -284,8 +284,7 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
 #endif
 
-// 3D
-#if (defined(STB225) || defined(STSDK))
+#ifdef ENABLE_3D
 static interfaceListMenu_t Video3DSubMenu;
 static int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg);
 #endif // #ifdef STB225
@@ -4561,11 +4560,9 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-
-
-#if (defined(STB225) || defined(STSDK))
+#ifdef ENABLE_3D
 static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
-	appControlInfo.outputInfo.has_3D_TV = (appControlInfo.outputInfo.has_3D_TV+1) & 1;
+	interfaceInfo.enable3d = (interfaceInfo.enable3d+1) & 1;
 
 	if (saveAppSettings() != 0 && bDisplayedWarning == 0)	{
 		bDisplayedWarning = 1;
@@ -4573,7 +4570,7 @@ static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
 	}
 
 #if defined(STB225)
-	if(interfaceInfo.mode3D==0 || appControlInfo.outputInfo.has_3D_TV==0) {
+	if(interfaceInfo.mode3D==0 || interfaceInfo.enable3d==0) {
 		Stb225ChangeDestRect("/dev/fb0", 0, 0, 1920, 1080);
 	} else	{
 		Stb225ChangeDestRect("/dev/fb0", 0, 0, 960, 1080);
@@ -4583,6 +4580,7 @@ static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
 	interface_displayMenu(1);
 	return 0;
 }
+
 static int output_toggle3DContent(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.content3d = (appControlInfo.outputInfo.content3d + 1) % 3;
 
@@ -4594,6 +4592,7 @@ static int output_toggle3DContent(interfaceMenu_t *pMenu, void* pArg) {
 	interface_displayMenu(1);
 	return 0;
 }
+
 static int output_toggle3DFormat(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.format3d = (appControlInfo.outputInfo.format3d + 1) % 3;
 
@@ -4605,6 +4604,7 @@ static int output_toggle3DFormat(interfaceMenu_t *pMenu, void* pArg) {
 	interface_displayMenu(1);
 	return 0;
 }
+
 static int output_toggleUseFactor(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.use_factor = (appControlInfo.outputInfo.use_factor + 1) % 2;
 
@@ -4616,6 +4616,7 @@ static int output_toggleUseFactor(interfaceMenu_t *pMenu, void* pArg) {
 	interface_displayMenu(1);
 	return 0;
 }
+
 static int output_toggleUseOffset(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.use_offset= (appControlInfo.outputInfo.use_offset + 1) % 2;
 
@@ -4635,6 +4636,7 @@ char *output_get3DFactor(int index, void* pArg) {
 		return temp;
 	} else	return NULL;
 }
+
 static int output_change3DFactor(interfaceMenu_t *pMenu, char *value, void* pArg) {
 	if( value != NULL && value[0] != 0)  {
 		int ivalue = atoi(value);
@@ -4647,6 +4649,7 @@ static int output_change3DFactor(interfaceMenu_t *pMenu, char *value, void* pArg
 
 	return 0;
 }
+
 char *output_get3DOffset(int index, void* pArg) {
 	if( index == 0 ) {
 		static char temp[8];
@@ -4654,6 +4657,7 @@ char *output_get3DOffset(int index, void* pArg) {
 		return temp;
 	} else	return NULL;
 }
+
 static int output_change3DOffset(interfaceMenu_t *pMenu, char *value, void* pArg) {
 	if( value != NULL && value[0] != 0)  {
 		int ivalue = atoi(value);
@@ -4674,8 +4678,6 @@ static int output_toggle3DOffset(interfaceMenu_t *pMenu, void* pArg) {
 	return interface_getText(pMenu, _T("3D_OFFSET"), "\\d{3}", output_change3DOffset, output_get3DOffset, inputModeDirect, pArg);
 }
 
-
-
 int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char *str;
@@ -4687,7 +4689,7 @@ int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 //OutputMenu
 	interface_clearMenuEntries((interfaceMenu_t*)&Video3DSubMenu);
 
-	sprintf(buf, "%s: %s", _T("3D_MONITOR"), _T( appControlInfo.outputInfo.has_3D_TV ? "ON" : "OFF" ));
+	sprintf(buf, "%s: %s", _T("3D_MONITOR"), _T( interfaceInfo.enable3d ? "ON" : "OFF" ));
 	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggle3DMonitor, NULL, thumbnail_channels);
 
 	str = chContent[appControlInfo.outputInfo.content3d];
@@ -4714,7 +4716,7 @@ int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
-#endif // #ifdef STB225
+#endif // ENABLE_3D
 
 static int output_resetTimeEdit(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -6058,7 +6060,7 @@ void output_fillOutputMenu(void)
 	str = _T("INTERFACE");
 	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillInterfaceMenu, NULL, settings_interface);
 
-#if (defined(STB225) || defined(STSDK))
+#ifdef ENABLE_3D
 	str = _T("3D_SETTINGS");
 	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fill3DMenu, NULL, thumbnail_channels);
 #endif
@@ -6101,7 +6103,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
-#if (defined(STB225) || defined(STSDK))
+#ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 #endif // #ifdef STB225

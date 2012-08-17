@@ -1801,12 +1801,11 @@ static void setupFramebuffers(void)
 		char text[256];
 
 		getParam("/etc/init.d/S35pnxcore.sh", "resolution", "1280x720x60p", text);
-		if (strstr(text, "1920x1080")!=0) {
+		if (strstr(text, "1920x1080")!=0 && interfaceInfo.enable3d) {
 			width = 1920; height = 1080;
 //printf("%s[%d]: %dx%d\n", __FILE__, __LINE__, width, height);
 			Stb225ChangeDestRect("/dev/fb1", width/2, 0, width/2, height);
 			Stb225ChangeDestRect("/dev/fb0", 0, 0, width, height);
-			interfaceInfo.enable3d = 1;
 		} /*else 
 		if (strstr(text, "1280x720")!=0) {
 			width = 1280; height = 720;

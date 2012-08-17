@@ -200,15 +200,16 @@ int loadAppSettings()
 			} else
 				appControlInfo.outputInfo.aspectRatio = aspectRatio_4x3;
 			//dprintf("%s: aspectRatio %d\n", __FUNCTION__, appControlInfo.outputInfo.aspectRatio);
-
-		} 
-		else if (sscanf(buf, "3D_MONITOR=%d", &appControlInfo.outputInfo.has_3D_TV) == 1)	{}
+		}
+#ifdef ENABLE_3D
+		else if (sscanf(buf, "3D_MONITOR=%d", &interfaceInfo.enable3d) == 1)	{}
 		else if (sscanf(buf, "3D_CONTENT=%d", &appControlInfo.outputInfo.content3d) == 1)	{}
 		else if (sscanf(buf, "3D_FORMAT=%d", &appControlInfo.outputInfo.format3d) == 1)	{}
 		else if (sscanf(buf, "3D_USE_FACTOR=%d", &appControlInfo.outputInfo.use_factor) == 1)	{}
 		else if (sscanf(buf, "3D_USE_OFFSET=%d", &appControlInfo.outputInfo.use_offset) == 1)	{}
 		else if (sscanf(buf, "3D_FACTOR=%d", &appControlInfo.outputInfo.factor) == 1)	{}
 		else if (sscanf(buf, "3D_OFFSET=%d", &appControlInfo.outputInfo.offset) == 1)	{}
+#endif
 		else if (sscanf(buf, "AUDIO_OUTPUT=%[^\r\n]", val) == 1)
 		{
 			//dprintf("%s: aout %s\n", __FUNCTION__, val);
@@ -796,16 +797,15 @@ int saveAppSettings()
 	fprintf(fd, "VOIP_EXPIRE_TIME=%d\n",          appControlInfo.voipInfo.expires);
 	fprintf(fd, "VOIP_INDICATION=%d\n",           interfaceInfo.enableVoipIndication);
 #endif
-
-
-	fprintf(fd, "3D_MONITOR=%d\n",			appControlInfo.outputInfo.has_3D_TV);
+#ifdef ENABLE_3D
+	fprintf(fd, "3D_MONITOR=%d\n",			interfaceInfo.enable3d);
 	fprintf(fd, "3D_CONTENT=%d\n",			appControlInfo.outputInfo.content3d);
 	fprintf(fd, "3D_FORMAT=%d\n",			appControlInfo.outputInfo.format3d);
 	fprintf(fd, "3D_USE_FACTOR=%d\n",		appControlInfo.outputInfo.use_factor);
 	fprintf(fd, "3D_USE_OFFSET=%d\n",		appControlInfo.outputInfo.use_offset);
 	fprintf(fd, "3D_FACTOR=%d\n",			appControlInfo.outputInfo.factor);
 	fprintf(fd, "3D_OFFSET=%d\n",			appControlInfo.outputInfo.offset);
-
+#endif
 	fclose(fd);
 	rename( SETTINGS_FILE ".tmp", SETTINGS_FILE );
 
@@ -888,14 +888,15 @@ void appInfo_init(void)
 	appControlInfo.outputInfo.format              = 0xFFFFFFFF;
 	appControlInfo.outputInfo.standart            = 0xFFFFFFFF;
 	appControlInfo.outputInfo.bScreenFiltration   = 0;
-	appControlInfo.outputInfo.has_3D_TV	      = 1;
+#ifdef ENABLE_3D
+	interfaceInfo.enable3d	                  = 0;
 	appControlInfo.outputInfo.content3d	      = 0; 
 	appControlInfo.outputInfo.format3d	      = 0;
 	appControlInfo.outputInfo.use_factor	      = 0;
 	appControlInfo.outputInfo.use_offset	      = 0;
 	appControlInfo.outputInfo.factor	      = 64;
 	appControlInfo.outputInfo.offset	      = 128;
-
+#endif
 	appControlInfo.commandInfo.loop               = 0;
 	appControlInfo.commandInfo.inputFile          = 0;
 	appControlInfo.commandInfo.outputFile         = 0;

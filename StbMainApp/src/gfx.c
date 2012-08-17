@@ -3412,7 +3412,7 @@ static void gfx_fb1_flip()
 }
 #endif // STB225
 
-#if (defined(STB225) || defined(STSDK))
+#ifdef ENABLE_3D
 //Kpy 16  it is 2 bytes for each bit of a header 
 //#define REAL_3DHEADER_LEN 32*16
 //Kpy let it be the whole line length
@@ -3614,14 +3614,14 @@ void gfx_draw_3Dheader (IDirectFBSurface *pSurface)
 	rcHeader.w = 1920;
 	rcHeader.h = 1;
 
-	if (appControlInfo.outputInfo.has_3D_TV==0 || pSurface==NULL) return;
+	if (interfaceInfo.enable3d==0 || pSurface==NULL) return;
 
 	init_3Dheader();
 #ifdef STSDK
        /* Drawing on ARGB is very slow on ST, so we use accelerated mode, ignoring source alpha */
        pSurface->SetPorterDuff (pSurface, DSPD_SRC_OVER);
 #endif
-	if(appControlInfo.outputInfo.has_3D_TV)
+	if(interfaceInfo.enable3d)
 	{
 		pSurface->Write (pSurface, &rcHeader, real3Dheader, sizeof(real3Dheader));
 	} 
@@ -3636,21 +3636,18 @@ void gfx_draw_3Dheader (IDirectFBSurface *pSurface)
 	return;
 	printf("Error occured in %s\n", __FUNCTION__);
 }
-
-#endif
+#endif // ENABLE_3D
 
 void gfx_flipSurface (IDirectFBSurface *pSurface)
 {
-#if (defined(STB225) || defined(STSDK))
+#ifdef ENABLE_3D
 
-#if (defined STB225)
-	if (interfaceInfo.enable3d)
-#endif
+	if (interfaceInfo.enable3d
 #if (defined STSDK)
-	if (appControlInfo.outputInfo.has_3D_TV &&
-		!interfaceInfo.showMenu && !interfacePlayControl.visibleFlag &&
+	&&	!interfaceInfo.showMenu && !interfacePlayControl.visibleFlag &&
 		!interfaceSlideshowControl.visibleFlag)
 #endif
+	   )
 	{
 //Kpy need to check a line on the screen at the bottom
 		if (interfaceInfo.mode3D != 0)
@@ -3669,7 +3666,7 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 //		printf("%s[%d] width=%d\n", __FILE__, __LINE__, interfaceInfo.screenWidth);
 		gfx_drawRectangle(DRAWING_SURFACE, 0x00, 0x00, 0x00, 0xff, 0, 0, interfaceInfo.screenWidth, 1); /// FIXME
 	}
-#endif
+#endif // ENABLE_3D
 	
 	/* Flip the surface to update the front buffer */
 	

@@ -473,16 +473,14 @@ typedef struct __stb810_outputInfo
 	DFBScreenEncoderConfig      encConfig[4];
 	DFBScreenEncoderDescription encDesc[4];
 
-	int                  has_3D_TV;
-// 	1 - switch on off 3d header
-//	0 - streatch or not 2D on fullscreen
-
+#ifdef ENABLE_3D
 	int                  content3d;
 	int                  format3d;
 	int                  use_factor;
 	int                  use_offset;
 	int                  factor;
 	int                  offset;
+#endif
 
 } stb810_outputInfo;
 

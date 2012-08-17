@@ -870,9 +870,11 @@ typedef struct
 	interfaceAnimation_t animation;
 
 	int eventCount;
-#if (defined(STB225) || defined(STSDK))
- 	char enable3d;
- 	char mode3D;
+#ifdef ENABLE_3D
+	int enable3d;
+	// 	1 - switch on off 3d header
+	//	0 - streatch or not 2D on fullscreen
+	int mode3D;
 	// 0 - no 3D at all
 	// 1 - 3D video and interface not in 3D
 #endif
