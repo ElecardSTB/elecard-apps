@@ -1409,6 +1409,8 @@ static int media_slideshowEvent(void *pArg)
 #ifndef STBPNX
 void media_slideshowReleaseImage(void)
 {
+	if (appControlInfo.slideshowInfo.filename[0] == 0)
+		return;
 	stb810_gfxImageEntry *entry = gfx_findImageEntryByName(appControlInfo.slideshowInfo.filename);
 	if (entry)
 		gfx_releaseImageEntry(entry);
