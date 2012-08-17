@@ -33,6 +33,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES                                *
 ************************************************/
 
+#ifdef ENABLE_GSTREAMER
+// Should be included before <directfb.h>!
+#include <gst/gst.h>
+#endif
+
 #include "StbMainApp.h"
 
 #include "debug.h"
@@ -63,6 +68,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "youtube.h"
 #include "messages.h"
 #include "stsdk.h"
+#include "gstreamer.h"
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h" 
 #endif
@@ -1842,6 +1848,10 @@ void initialize(int argc, char *argv[])
 #endif
 
 	downloader_init();
+#ifdef ENABLE_GSTREAMER
+	gst_init (&argc, &argv);
+	gstreamer_init();
+#endif
 #ifdef STSDK
 	st_init();
 #endif
@@ -1950,6 +1960,9 @@ void cleanup()
 	gfx_terminate();
 #ifdef STSDK
 	st_terminate();
+#endif
+#ifdef ENABLE_GSTREAMER
+	gstreamer_terminate();
 #endif
 
 	dprintf("%s: terminate interface\n", __FUNCTION__);

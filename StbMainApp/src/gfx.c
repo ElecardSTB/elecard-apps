@@ -48,10 +48,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "l10n.h"
 #include "downloader.h"
 #include "stsdk.h"
+#include "crc32.h"
+#include "gstreamer.h"
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h"
 #endif
-#include "crc32.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -1270,6 +1271,9 @@ DFBVideoProviderStatus gfx_getVideoProviderStatus (int videoLayer)
 		//	result = DVSTATE_BUFFERING;
 	}
 	cJSON_Delete(res);
+#endif // STSDK
+#ifdef ENABLE_GSTREAMER
+	result = gstreamer_getStatus();
 #endif
 	pprintf("%s(%d): 0x%08x\n", __FUNCTION__, videoLayer, result);
 
@@ -1394,6 +1398,9 @@ int gfx_resumeVideoProvider(int videoLayer)
 	gfx_videoProvider.waiting = st_rpcAsync( elcmd_play, param, gfx_videoProviderStarted, NULL);
 	cJSON_Delete(param);
 
+#endif
+#ifdef ENABLE_GSTREAMER
+	result = gstreamer_resume();
 #endif
 	return result;
 }
@@ -1620,13 +1627,14 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 		pDispLayer->SetColorAdjustment(pDispLayer, &adj);
 #endif // STBPNX
 	}
-#endif //STBxx
-#ifdef STSDK
+// STBxx
+#else
 	if ( force || strcmp(videoSource, gfx_videoProvider.name) )
 	{
 		gfx_stopVideoProvider(videoLayer, 1, 1);
 
 		gfx_videoProvider.name[0] = 0;
+#ifdef STSDK
 		gfx_videoProvider.active = providerInit;
 
 		cJSON *param = NULL;
@@ -1661,11 +1669,21 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 			gfx_videoProvider.active = 0;
 		}
 		cJSON_Delete(param);
+#endif // STSDK
+#ifdef ENABLE_GSTREAMER
+		result = gstreamer_play(videoSource);
+		if (result == 0)
+		{
+			gfx_setVideoProviderName(videoSource);
+			gfx_videoProvider.active = 1;
+			gfx_videoProvider.paused = 0;
+		}
+#endif
 	} else
 	{
 		result = gfx_resumeVideoProvider(videoLayer);
 	}
-#endif // STSDK
+#endif // !STBxx
 	if ( (appControlInfo.playbackInfo.audioStatus == audioMute) && (videoLayer == screenMain) )
 	{
 		appControlInfo.playbackInfo.audioStatus = audioMain;
@@ -2871,6 +2889,14 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 	{
 		gfx_videoProvider.name[0] = 0;
 	}
+#endif // STSDK
+#ifdef ENABLE_GSTREAMER
+	if (force)
+		gstreamer_stop();
+	else
+		gstreamer_pause();
+	gfx_videoProvider.paused = !force;
+	gfx_videoProvider.active = 0;
 #endif
 #ifdef TRACE_PROVIDERS
 #ifdef STBPNX

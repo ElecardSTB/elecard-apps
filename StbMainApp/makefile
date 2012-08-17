@@ -25,15 +25,15 @@ PROGRAM = StbMainApp
 # -----------------------------------------------------------------------------
 
 # Platform overrides
+# -----------------------------------------------------------------------------
 ifeq ($(ARCH),mips)
-ifeq ($(_TMBSL),_stb225)
+ifeq ($(_TMBSL),_stb225)     # --- STB225 ---
 STAGINGDIR = $(BUILDROOT)/staging
 
 ENABLE_LAN := 0
 ENABLE_XWORKS := 0
 ENABLE_DLNA := 0
-else
-# STB820
+else                         # --- STB820 ---
 ENABLE_LAN ?= 1
 ENABLE_XWORKS ?= 1
 ENABLE_DLNA ?= 1
@@ -43,8 +43,8 @@ endif
 ENABLE_BROWSER ?= 1
 endif
 
-ifneq ($(STAPISDK_VERSION),)
-ARCH= sh4
+ifneq ($(STAPISDK_VERSION),) # --- STB83x/STB84x ---
+ARCH := sh4
 
 ENABLE_LAN ?= 0
 ENABLE_WIFI ?= 1
@@ -56,7 +56,15 @@ else
 ENABLE_HDDESIGN := 0
 endif
 
+ifneq ($(UEMD),)             # --- Module ---
+ENABLE_GSTREAMER ?= 1
+endif
+ifeq ($(ARCH),)              # --- PC x86/x64 ---
+ENABLE_GSTREAMER ?= 1
+endif
+
 # Default settings
+# -----------------------------------------------------------------------------
 TEST_MODE ?= 0
 ENABLE_VOD ?= 1
 ENABLE_VERIMATRIX ?= 0
@@ -76,6 +84,7 @@ ENABLE_PASSWORD ?= 1
 ENABLE_MESSAGES ?= 0
 #TELETES a.k.a. OFTMedia
 ENABLE_TELETES ?= 0
+ENABLE_GSTREAMER ?= 0
 
 TEST_SERVER ?= 1
 
@@ -90,9 +99,7 @@ FORCE_HELPER_SURFACE ?= 0
 # -----------------------------------------------------------------------------
 
 REVISION ?= $(shell git rev-parse HEAD 2>/dev/null | cut -c1-7)
-
 COMPILE_TIME ?= $(shell date)
-
 RELEASE_TYPE ?= Custom
 
 LOCAL_CFLAGS = \
@@ -250,6 +257,11 @@ ifeq ($(ENABLE_TELETES),1)
 	INSTALL_EXTRA += copy_teletes
 endif
 
+ifeq ($(ENABLE_GSTREAMER),1)
+	LOCAL_CFLAGS  += $(shell pkg-config --cflags gstreamer-0.10) -DENABLE_GSTREAMER=$(ENABLE_GSTREAMER)
+	LOCAL_LDFLAGS += $(shell pkg-config --libs   gstreamer-0.10)
+endif
+
 ifeq ($(ENABLE_VIDIMAX),1)
 	OBJECTS += src/libvidimax.a
 	LOCAL_CFLAGS += -DENABLE_VIDIMAX=$(ENABLE_VIDIMAX)
@@ -355,27 +367,22 @@ LOCAL_CFLAGS += \
 # -----------------------------------------------------------------------------
 
 ifeq ($(ARCH),)
-
-# Host
-
+# PC x86/x64
+# -----------------------------------------------------------------------------
 LOCAL_CXXFLAGS += -fpermissive
 
 LIBCURL_CFLAGS ?= $(shell pkg-config --cflags libcurl)
 LIBCURL_LDFLAGS ?= $(shell pkg-config --libs libcurl)
 DIRECTFB_CFLAGS ?= $(shell pkg-config --cflags directfb-internal)
 DIRECTFB_LDFLAGS ?= $(shell pkg-config --libs directfb-internal)
-GLIB_CFLAGS ?= $(shell pkg-config --cflags glib-2.0)
-# GLIB_LDFLAGS ?= $(shell pkg-config --libs glib-2.0)
 
 LOCAL_CFLAGS += \
 	$(LIBCURL_CFLAGS) \
 	$(DIRECTFB_CFLAGS) \
-	$(GLIB_CFLAGS) \
 
 LOCAL_LDFLAGS += \
 	$(LIBCURL_LDFLAGS) \
 	$(DIRECTFB_LDFLAGS) \
-	$(GLIB_LDFLAGS) \
 	-lm
 
 ENABLE_VIDIMAX ?= 1
@@ -386,8 +393,8 @@ VM_NFS_SHARE = $(ROOTFS_NFS)/opt/elecard/share
 endif
 
 else
-
-# Target
+# STB
+# -----------------------------------------------------------------------------
 ifeq ($(FORCE_HELPER_SURFACE),1)
 LOCAL_CFLAGS += \
 	-DGFX_USE_HELPER_SURFACE
@@ -412,7 +419,8 @@ LOCAL_LDFLAGS += \
 	-L$(ROOTFS)/usr/lib \
 
 ifeq ($(ARCH),mips)
-
+# STB820
+# -----------------------------------------------------------------------------
 LOCAL_CFLAGS += \
 	-I$(_phStbAnalogBackend_DIR)/inc \
 	-I$(_phStbGpio_DIR)/inc \
@@ -431,7 +439,8 @@ LOCAL_LDFLAGS += -lstdc++ -lasound
 LIBS += phStbEvent
 
 ifeq ($(_TMBSL),_stb225)
-
+# STB225
+# -----------------------------------------------------------------------------
 LOCAL_CFLAGS += \
 	-DSTBxx \
 	-DSTBPNX \
@@ -478,12 +487,18 @@ endif
 
 ifeq ($(ARCH),arm)
 ifneq ($(UEMD),)
-LOCAL_CFLAGS += -DSTBuemd
+# Module
+# -----------------------------------------------------------------------------
+LOCAL_CFLAGS += \
+	-DSTBuemd \
+	--sysroot=$(STAGINGDIR) \
 
 CC  = $(CROSS_COMPILE)gcc
 CXX = $(CROSS_COMPILE)g++
 AR  = $(CROSS_COMPILE)ar
-LOCAL_LDFLAGS += --sysroot=$(STAGINGDIR)
+LOCAL_LDFLAGS += \
+	--sysroot=$(STAGINGDIR) \
+
 endif
 
 ifneq ($(STBTI),)
@@ -499,6 +514,8 @@ endif
 endif
 
 ifneq ($(STAPISDK_VERSION),)
+# STB83x / STB84x
+# -----------------------------------------------------------------------------
 -include $(BUILDROOT)/.prjconfig
 
 LOCAL_CFLAGS  += \

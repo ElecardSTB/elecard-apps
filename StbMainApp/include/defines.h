@@ -130,7 +130,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #endif
 
-
 #ifdef ENABLE_DVB
 	/** @def ENABLE_TELETEXT Enable DVB Teletext
 	 */
@@ -146,18 +145,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #ifdef  ENABLE_WEB_SERVICES
-#if (defined STB82) || (defined STSDK)
+
 	/** @def ENABLE_SAMBA Enable Samba menu and features
 	 */
 	#define ENABLE_SAMBA
-#endif // STB82 || STSDK
+
 	/*
 	 * STB820/810 only Web services
 	 */
 #if (defined STB82)
-	/** @def ENABLE_BROWSER Enable Browser menu
+	/** @def ENABLE_BROWSER Enable Browser menu (defined in Makefile)
 	 */
-	#define ENABLE_BROWSER
+	//#define ENABLE_BROWSER
 
 	/** @def ENABLE_DLNA Enable DLNA DMP (do it in makefile!)
 	 */
