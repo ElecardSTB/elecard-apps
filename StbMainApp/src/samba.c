@@ -693,7 +693,7 @@ int samba_unmountShare(const char *mountPoint)
 	if( mountPointNameLength == 0 )
 		return 1;
 
-#ifdef STSDK
+#ifndef STBPNX
 	snprintf(buf, sizeof(buf), "%s%s", sambaRoot, mountPoint);
 	umount(buf);
 	rmdir(buf);
