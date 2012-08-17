@@ -571,11 +571,17 @@ static int PowerOff(void *pArg)
 
 static int checkPowerOff(DFBEvent *pEvent)
 {
+#ifdef STSDK
 	//for STB840 PromSvyaz frontpanel POWER button
-	int isKeyboardPower = (1 && (pEvent->input.device_id == DIDID_KEYBOARD) && (pEvent->input.key_code == KEY_POWER));
+	int isFrontpanelPower = (pEvent->input.device_id == DIDID_KEYBOARD) && (pEvent->input.key_code == KEY_POWER);
+#endif
 	//dprintf("%s: check power\n", __FUNCTION__);
 	// Power/Standby button. Go to standby.
-	if( (pEvent->input.key_symbol == DIKS_POWER) || isKeyboardPower )
+	if( (pEvent->input.key_symbol == DIKS_POWER)
+#ifdef STSDK
+		|| isFrontpanelPower
+#endif
+	  )
 	{
 		static struct timeval	lastChange = {0, 0},
 								firstPress = {0, 0};
@@ -587,7 +593,7 @@ static int checkPowerOff(DFBEvent *pEvent)
 		gettimeofday(&currentPress, NULL);
 		if((pEvent->input.type == DIET_KEYRELEASE) || (pEvent->input.type == DIET_BUTTONRELEASE)) {
 			isPowerReleased = 1;
-			if(isKeyboardPower) {
+			if(isFrontpanelPower) {
 				interface_removeEvent(PowerOff, NULL);
 			}
 		} else {
@@ -596,7 +602,7 @@ static int checkPowerOff(DFBEvent *pEvent)
 			if(isPowerReleased) {
 				memcpy(&firstPress, &currentPress, sizeof(struct timeval));
 				isPowerReleased = 0;
-				if(isKeyboardPower) {
+				if(isFrontpanelPower) {
 					interface_addEvent(PowerOff, NULL, 3000, 1);
 				}
 			}
