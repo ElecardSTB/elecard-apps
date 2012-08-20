@@ -268,6 +268,7 @@ static int output_toggleHighlightColor(interfaceMenu_t* pMenu, void* pArg);
 static int output_togglePlayControlTimeout(interfaceMenu_t* pMenu, void* pArg);
 static int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg);
 static int output_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleVolumeFadein(interfaceMenu_t *pMenu, void* pArg);
 static int output_togglePlayControlShowOnStart(interfaceMenu_t* pMenu, void* pArg);
 #ifdef ENABLE_VOIP
 static int output_toggleVoipIndication(interfaceMenu_t* pMenu, void* pArg);
@@ -5761,6 +5762,21 @@ int output_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
+int output_toggleVolumeFadein(interfaceMenu_t *pMenu, void* pArg)
+{
+	appControlInfo.soundInfo.fadeinVolume = !appControlInfo.soundInfo.fadeinVolume;
+	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
+	{
+		bDisplayedWarning = 1;
+		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	}
+
+	output_fillPlaybackMenu(pMenu, pArg);
+	interface_displayMenu(1);
+
+	return 0;
+}
+
 #ifdef ENABLE_IPTV
 int output_toggleIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -6036,6 +6052,9 @@ int output_fillPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 
 	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYBACK_STOP_TIMEOUT"), appControlInfo.playbackInfo.autoStop, _T("MINUTE_SHORT"));
 	interface_addMenuEntry(pMenu, buf, output_toggleAutoStopTimeout, NULL, settings_interface);
+
+	snprintf(buf, sizeof(buf), "%s: %s", _T("FADEIN_VOLUME"), _T( appControlInfo.soundInfo.fadeinVolume ? "ON" : "OFF" ));
+	interface_addMenuEntry(pMenu, buf, output_toggleVolumeFadein, NULL, settings_interface);
 
 	char *str = NULL;
 	switch (appControlInfo.mediaInfo.playbackMode)

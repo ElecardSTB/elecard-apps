@@ -208,6 +208,7 @@ ERR_VERIMATRIX_INIT= Verimatrix баптандыру іске аспады
 ERR_VIDEO_PROVIDER=Бейне – декодерді жіберу іске аспады
 ERR_VOIP_REGISTER= VoIP серверіне \nтіркеу іске аспады 
 ERR_WRONG_PASSWORD=Паролі дұрыс емес!
+FADEIN_VOLUME=Приглушать звук на старте
 FAIL=Қате 
 FAVORITES=Таңдаулы
 FEATURE_FILM=Көркем фильм

@@ -59,12 +59,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define SOUND_VOLUME_STEPS (25)
 
+#define FADEIN_SPEED	5
+
+#if defined (ENABLE_VIDIMAX) || defined( STSDK )
+//disable fade in effect
+#define FADEIN_STEPS	0
+#endif
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
 
 static int  sound_callback(interfaceSoundControlAction_t action, void *pArg);
 static long sound_getVolume(void);
+static void *fadeinThread(void *notused);
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -78,6 +86,13 @@ static snd_mixer_t *handle;
 static long min = 0;
 static long max = 100;
 
+static struct {
+	int saved_volume;
+	int final;
+	int current;
+	pthread_t thread;
+} fadein;
+
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
@@ -86,6 +101,8 @@ static long max = 100;
 
 int sound_init(void)
 {
+	memset(&fadein, 0, sizeof(fadein));
+	fadein.saved_volume  = -1;
 #ifdef STBPNX
 	int err;
 	snd_mixer_selem_id_t *sid;
@@ -224,6 +241,12 @@ int sound_term(void )
 #ifdef STBPNX
 	snd_mixer_close(handle);
 #endif
+	if (fadein.thread) {
+		pthread_cancel(fadein.thread);
+		dprintf("%s: waiting fadein thread\n", __func__);
+		pthread_join(fadein.thread, NULL);
+		fadein.thread = 0;
+	}
 	return 0;
 }
 
@@ -329,4 +352,71 @@ int sound_restart(void)
 	dprintf("%s: Restarting sound system.\n", __FUNCTION__);
 	sound_term();
 	return sound_init();
+}
+
+void sound_fadeInit(void)
+{
+	if (appControlInfo.soundInfo.muted) {
+		fadein.saved_volume = -1;
+	} else {
+		if (fadein.saved_volume < 0)
+		fadein.saved_volume = appControlInfo.soundInfo.volumeLevel;
+#ifdef 	FADEIN_STEPS
+		fadein.current = fadein.final = fadein.saved_volume - FADEIN_STEPS*FADEIN_SPEED;
+		if (fadein.current<0)
+#endif
+		fadein.current = fadein.final = 0;
+		sound_setVolume(fadein.current);
+	}
+}
+
+void sound_fadein(void)
+{
+	if (!appControlInfo.soundInfo.fadeinVolume) {
+		sound_restoreVolume();
+		return;
+	}
+	if (fadein.saved_volume != -1) {
+		fadein.final = fadein.saved_volume;
+		fadein.saved_volume = -1;
+		if (fadein.thread == 0)
+			pthread_create(&fadein.thread, NULL, fadeinThread, NULL);
+	}
+}
+
+void sound_restoreVolume(void)
+{
+	if (fadein.saved_volume != -1) {
+		sound_setVolume(fadein.saved_volume);
+		fadein.saved_volume = -1;
+		fadein.final = 0;
+		fadein.current = 0;
+	}
+}
+
+void *fadeinThread(void *notused) {
+	while (1) {
+		if (fadein.current>=fadein.final || appControlInfo.soundInfo.muted) {
+			usleep(100000);
+			pthread_testcancel();
+		} else {
+			dprintf("%s: fade volume from %d to %d\n", __func__, fadein.current, fadein.final);
+			do {
+				pthread_testcancel();
+				sound_setVolume(fadein.current);
+				usleep(100000);
+				pthread_testcancel();
+				if (fadein.current != appControlInfo.soundInfo.volumeLevel || appControlInfo.soundInfo.muted) {
+					// Volume changed during fadein, aborting
+					fadein.final = appControlInfo.soundInfo.volumeLevel;
+					break;
+				}
+				fadein.current += FADEIN_SPEED;
+				if (fadein.current>fadein.final) fadein.current = fadein.final;
+			} while (fadein.current<fadein.final);
+			sound_setVolume(fadein.final);
+			fadein.final = 0;
+		}
+	}
+	return NULL;
 }

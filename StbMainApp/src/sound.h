@@ -57,6 +57,16 @@ int sound_init(void);
 
 int sound_term(void);
 
+// Save current volume, mute sound and prepare for future fade-in or volume restore
+void sound_fadeInit(void);
+
+// Perform fade-in up to volume saved by fadeInit
+// If volume fade is disabled, restores volume
+void sound_fadein(void);
+
+// Restore volume saved by fadeInit, don't do fade
+void sound_restoreVolume(void);
+
 /**
 *   @brief Function used to reinitialize sound system
 *

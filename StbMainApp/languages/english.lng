@@ -197,6 +197,7 @@ ERR_VERIMATRIX_INIT=Failed to Initialize Verimatrix
 ERR_VIDEO_PROVIDER=Failed to Start Video Provider
 ERR_VOIP_REGISTER=VoIP Server Registration Failed
 ERR_WRONG_PASSWORD=Wrong Password!
+FADEIN_VOLUME=Fade in volume on start
 FAIL=Fail
 FAVORITES=Favorites
 FEATURE_FILM=Feature Film

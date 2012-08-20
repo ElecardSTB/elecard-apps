@@ -419,6 +419,7 @@ typedef struct __stb810_slideshowInfo
 /* Sound information */
 typedef struct __stb810_soundInfo
 {
+	int                  fadeinVolume; // on playback start
 	int                  muted;
 	int                  volumeLevel;
 	int                  rcaOutput;

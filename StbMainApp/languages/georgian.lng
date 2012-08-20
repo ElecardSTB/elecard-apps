@@ -150,6 +150,7 @@ ERR_STREAM_UNAVAILABLE=Не удается получить данные
 ERR_VERIMATRIX_DECRYPT=Ошибка при декриптовании данных Verimatrix
 ERR_VERIMATRIX_INIT=Не удалось инициализировать Verimatrix
 ERR_VIDEO_PROVIDER=ვერ გავუშვი  ვიდეოდეკოდერი
+FADEIN_VOLUME=Приглушать звук на старте
 FAIL=შეცდომა
 FAVORITES=რჩეული
 FEATURE_FILM=მხატვრული ფილმი

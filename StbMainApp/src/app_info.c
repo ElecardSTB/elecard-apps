@@ -224,6 +224,7 @@ int loadAppSettings()
 		{
 			//dprintf("%s: volume level %d\n", __FUNCTION__, appControlInfo.soundInfo.volumeLevel);
 		}
+		else if (sscanf(buf, "FADEIN_VOLUME=%d", &appControlInfo.soundInfo.fadeinVolume) == 1) {}
 #ifdef ENABLE_DVB
 		else if (sscanf(buf, "DVBCINVERSION=%d", &appControlInfo.dvbcInfo.fe.inversion) == 1)
 		{
@@ -714,6 +715,7 @@ int saveAppSettings()
 		}
 	fprintf(fd, "ASPECTRATIO=%s\n",               appControlInfo.outputInfo.aspectRatio == aspectRatio_16x9 ? "16:9" : "4:3");
 	fprintf(fd, "VOLUME=%d\n",                    appControlInfo.soundInfo.volumeLevel);
+	fprintf(fd, "FADEIN_VOLUME=%d\n",               appControlInfo.soundInfo.fadeinVolume);
 #ifdef ENABLE_DVB
 	fprintf(fd, "TUNERSPEED=%d\n",                appControlInfo.dvbCommonInfo.adapterSpeed);
 	fprintf(fd, "EXTENDEDSCAN=%d\n",              appControlInfo.dvbCommonInfo.extendedScan);

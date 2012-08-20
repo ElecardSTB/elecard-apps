@@ -200,6 +200,7 @@ ERR_VERIMATRIX_INIT=Не удалось инициализировать Verimat
 ERR_VIDEO_PROVIDER=Не удалось запустить видео-декодер
 ERR_VOIP_REGISTER=Не удалось зарегистрироваться\nна VoIP сервере
 ERR_WRONG_PASSWORD=Неверный пароль!
+FADEIN_VOLUME=Приглушать звук на старте
 FAIL=Ошибка
 FAVORITES=Избранное
 FEATURE_FILM=Художественный фильм

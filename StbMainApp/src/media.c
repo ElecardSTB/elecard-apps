@@ -272,19 +272,6 @@ static char    media_failedMedia[PATH_MAX] = { 0 };
 
 static mediaBrowseType_t media_browseType = mediaBrowseTypeUSB;
 
-// sound volume fade-in effect
-static pthread_t fadeinThread = 0;
-static int fadeinCurVol = 100;
-static int fadeinDestVol = 100;
-#define FADEIN_SPEED	5
-
-#if defined (ENABLE_VIDIMAX) || defined( STSDK )
-//disable fade in effect
-#define FADEIN_STEPS	0
-#endif
-
-static void *volume_fade_in(void *pArg);
-
 #ifdef ENABLE_AUTOPLAY
 static int playingStream = 0;
 #endif
@@ -428,7 +415,6 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 	double position,length_stream;
 	int ret_val;
 	char URL[MAX_URL], *str, *description;
-	int j;
 
 	//dprintf("%s: in\n", __FUNCTION__);
 
@@ -596,21 +582,7 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 		break;
 	case interfacePlayControlSetPosition:
-		if (appControlInfo.soundInfo.muted) j =-1;
-		else {
-			j = fadeinDestVol;
-			if (appControlInfo.soundInfo.volumeLevel > j)
-				j = appControlInfo.soundInfo.volumeLevel;
-
-#ifdef 	FADEIN_STEPS
-			fadeinCurVol = fadeinDestVol = j - FADEIN_STEPS*FADEIN_SPEED;
-			if (fadeinCurVol<0) fadeinCurVol = fadeinDestVol = 0;
-#else
-			fadeinCurVol = fadeinDestVol = 0;
-#endif
-			sound_setVolume(fadeinCurVol);
-		}
-
+		sound_fadeInit();
 		if (!appControlInfo.mediaInfo.active && !appControlInfo.mediaInfo.paused )
 		{
 			position					=	interface_playControlSliderGetPosition();
@@ -653,17 +625,7 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 				interface_playControlSelect(appControlInfo.playbackInfo.scale > 0.0 ? interfacePlayControlFastForward : interfacePlayControlRewind);
 			}
 		}
-
-		if (j!=-1) {
-			fadeinDestVol = j;
-#ifdef 	FADEIN_STEPS
-			fadeinCurVol = fadeinDestVol - FADEIN_STEPS*FADEIN_SPEED;
-			if (fadeinCurVol<0) fadeinCurVol = 0;
-#else
-			fadeinCurVol = 0;
-#endif
-		}
-
+		sound_fadein();
 		break;
 	case interfacePlayControlInfo:
 		interface_playControlSliderEnable(!interface_playControlSliderIsEnabled());
@@ -1637,31 +1599,6 @@ int media_playURL(int which, const char* URL, const char *description, const cha
 	}
 }
 
-static void *volume_fade_in(void *pArg) {
-
-	while (1) {
-
-	if (fadeinCurVol>=fadeinDestVol || appControlInfo.soundInfo.muted) {
-		usleep(100000);
-	} else {
-		do {
-			sound_setVolume(fadeinCurVol);
-        		usleep(100000);
-			if (fadeinCurVol != appControlInfo.soundInfo.volumeLevel || appControlInfo.soundInfo.muted) {
-				fadeinDestVol = appControlInfo.soundInfo.volumeLevel;
-				break;
-			}
-			fadeinCurVol += FADEIN_SPEED;
-			if (fadeinCurVol>fadeinDestVol) fadeinCurVol = fadeinDestVol;
-		} while (fadeinCurVol<fadeinDestVol);
-	        sound_setVolume(fadeinDestVol);
-		appControlInfo.soundInfo.volumeLevel = fadeinDestVol;
-		fadeinDestVol = 0;
-	}
-	}
-	return NULL;
-}
-
 //static int media_startPlayback()
 int media_startPlayback()
 {
@@ -1670,20 +1607,7 @@ int media_startPlayback()
 	char altPath[PATH_MAX];
 	char *fileName, *failedDir;
 
-	int j;
-	if (appControlInfo.soundInfo.muted) j =-1;
-	else {
-		j = fadeinDestVol;
-		if (appControlInfo.soundInfo.volumeLevel > j)
-			j = appControlInfo.soundInfo.volumeLevel;
-#ifdef 	FADEIN_STEPS
-		fadeinCurVol = fadeinDestVol = j - FADEIN_STEPS*FADEIN_SPEED;
-		if (fadeinCurVol<0) fadeinCurVol = fadeinDestVol = 0;
-#else
-		fadeinCurVol = fadeinDestVol = 0;
-#endif
-		sound_setVolume(fadeinCurVol);
-	}
+	sound_fadeInit();
 
 	if( appControlInfo.mediaInfo.bHttp || helperFileExists(appControlInfo.mediaInfo.filename) )
 	{
@@ -1723,7 +1647,7 @@ int media_startPlayback()
 			eprintf("media: File '%s' not found\n", appControlInfo.mediaInfo.filename);
 			interface_showMessageBox(_T("ERR_FILE_NOT_FOUND"), thumbnail_error, 3000);
 			interface_hideLoading();
-			if (j!=-1) sound_setVolume(j);
+			sound_restoreVolume();
 			return 1;
 		}
 	}
@@ -1920,13 +1844,7 @@ int media_startPlayback()
 
 		media_forceRestart = 0;
 		mysem_release(media_semaphore);
-		if (j!=-1) {
-			fadeinDestVol = j;
-			if (fadeinThread == 0) {
-				pthread_create(&fadeinThread, NULL, volume_fade_in, NULL);
-				pthread_detach(fadeinThread);
-			}
-		}
+		sound_fadein();
 	} else
 	{
 		eprintf("media: Failed to play '%s'\n", fileName);
@@ -1945,12 +1863,12 @@ int media_startPlayback()
 				strcpy(media_failedMedia,appControlInfo.mediaInfo.filename);
 			} else if(strcmp(media_failedMedia,appControlInfo.mediaInfo.filename) == 0)
 			{
-				if (j!=-1) sound_setVolume(j);
+				sound_restoreVolume();
 				return 1;
 			}
 			res = media_startNextChannel(0,NULL);
 		}
-		if (j!=-1) sound_setVolume(j);
+		sound_restoreVolume();
 	}
 
 	dprintf("%s: finished %d\n", __FUNCTION__, res);	
