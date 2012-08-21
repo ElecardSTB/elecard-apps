@@ -310,6 +310,8 @@ static void output_fillBlankingMenu(void);
 static void output_fillTimeZoneMenu(void);
 
 #ifdef STSDK
+static int output_fillUpdateMenu(interfaceMenu_t *pMenu, void* notused);
+
 static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
 
@@ -382,6 +384,7 @@ static pppInfo_t pppInfo;
 #endif
 
 #ifdef STSDK
+static interfaceListMenu_t UpdateMenu;
 static outputNetworkInfo_t networkInfo;
 static char output_currentFormat[64] = "";
 static char output_originalFormat[64] = "";
@@ -4728,6 +4731,80 @@ int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_3D
 
+#ifdef STSDK
+void output_onUpdate(int found)
+{
+	if (interfaceInfo.currentMenu == _M &UpdateMenu) {
+		output_fillUpdateMenu(_M &UpdateMenu, NULL);
+		if (interfaceInfo.messageBox.type == interfaceMessageBoxNone)
+			interface_showMessageBox(_T(found ? "UPDATE_FOUND" : "UPDATE_NOT_FOUND"), thumbnail_info, 3000);
+	}
+}
+
+static int output_updateCheck(interfaceMenu_t *pMenu, void* notused) {
+	system("killall -HUP updaterDaemon");
+	return 0;
+}
+
+static int output_updateCheckNetwork(interfaceMenu_t *pMenu, void* on) {
+	int res;
+	if (on)
+		res = system("hwconfigManager s -1 UPNET 1 &>/dev/null");
+	else
+		res = system("hwconfigManager f -1 UPNET   &>/dev/null");
+	if (WIFEXITED(res) != 1 || WEXITSTATUS(res) != 0)
+		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	else {
+		output_fillUpdateMenu(pMenu, NULL);
+		interface_displayMenu(1);
+	}
+	return 0;
+}
+
+static int output_rebootAndUpdate(interfaceMenu_t *pMenu, void* notused) {
+	system("hwconfigManager s -1 UPFOUND 1 2>/dev/null");
+	system("reboot");
+	return 0;
+}
+
+int output_fillUpdateMenu(interfaceMenu_t *pMenu, void* notused)
+{
+	char buf[MENU_ENTRY_INFO_LENGTH];
+
+	pMenu = _M &UpdateMenu;
+	interface_clearMenuEntries(pMenu);
+
+	FILE *p;
+	int found = 0;
+	int network_check = 0;
+	p = popen("hwconfigManager h -1 UPFOUND 2>/dev/null | head -1 | cut -c8-", "r");
+	if (p) {
+		buf[0] = 0;
+		fgets(buf, sizeof(buf), p);
+		pclose(p);
+		found = atoi(buf);
+	}
+	p = popen("hwconfigManager h -1 UPNET   2>/dev/null | head -1 | cut -c8-", "r");
+	if (p) {
+		buf[0] = 0;
+		fgets(buf, sizeof(buf), p);
+		pclose(p);
+		network_check = atoi(buf);
+	}
+
+	interface_addMenuEntry(pMenu, _T("UPDATE_CHECK"), output_updateCheck, NULL, thumbnail_configure);
+
+	snprintf(buf, sizeof(buf), "%s: %s", _T("UPDATE_CHECK_NETWORK"), _T(network_check ? "ON" : "OFF"));
+	interface_addMenuEntry(pMenu, buf, output_updateCheckNetwork, SET_NUMBER(!network_check), thumbnail_configure);
+
+	interface_addMenuEntry(pMenu, _T("UPDATE_ON_REBOOT"), output_rebootAndUpdate, NULL, thumbnail_configure);
+
+	interface_addMenuEntryDisabled(pMenu, _T(found ? "UPDATE_FOUND" : "UPDATE_NOT_FOUND"), thumbnail_info);
+
+	return 0;
+}
+#endif // STSDK
+
 static int output_resetTimeEdit(interfaceMenu_t *pMenu, void* pArg)
 {
 	interfaceEditEntry_t *pEditEntry = (interfaceEditEntry_t *)pArg;
@@ -6131,6 +6208,11 @@ void output_fillOutputMenu(void)
 	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fill3DMenu, NULL, thumbnail_channels);
 #endif
 
+#ifdef STSDK
+	str = _T("UPDATES");
+	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &UpdateMenu, thumbnail_configure);
+#endif
+
 	str = _T("RESET_SETTINGS");
 #ifndef ENABLE_PASSWORD
 	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_resetSettings, NULL, thumbnail_warning);
@@ -6242,6 +6324,11 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #endif
 	createListMenu(&WebSubMenu, _T("INTERNET_BROWSING"), thumbnail_internet, NULL, (interfaceMenu_t*)&NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_fillWebMenu, NULL, NULL);
+
+#ifdef STSDK
+	createListMenu(&UpdateMenu, _T("UPDATES"), thumbnail_configure, NULL, (interfaceMenu_t*)&OutputMenu,
+		interfaceListMenuIconThumbnail, output_fillUpdateMenu, NULL, NULL);
+#endif
 
 #ifdef ENABLE_MESSAGES
 	messages_buildMenu((interfaceMenu_t*)&OutputMenu);

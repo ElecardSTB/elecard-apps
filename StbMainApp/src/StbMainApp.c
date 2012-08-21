@@ -1347,6 +1347,14 @@ void *testServerThread(void *pArg)
 #endif
 				}
 #endif // ENABLE_MESSAGES
+#ifdef STSDK
+				else if (strncmp(ibuf, "has_update", 10) == 0) {
+					output_onUpdate(1);
+				}
+				else if (strncmp(ibuf, "no_update", 9) == 0) {
+					output_onUpdate(0);
+				}
+#endif
 				else
 				{
 #ifdef TEST_SERVER_INET
