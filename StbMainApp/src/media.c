@@ -1629,7 +1629,7 @@ int media_startPlayback()
 			{
 				interface_showMessageBox(_T("ERR_FILE_NOT_FOUND"), thumbnail_error, 3000);
 				interface_hideLoading();
-				if (j!=-1) sound_setVolume(j);
+				sound_restoreVolume();
 				return 1;
 			}
 		}
