@@ -3645,7 +3645,7 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 	if (interfaceInfo.enable3d
 #if (defined STSDK)
 	&&	!interfaceInfo.showMenu && !interfacePlayControl.visibleFlag &&
-		!interfaceSlideshowControl.visibleFlag)
+		!interfaceSlideshowControl.visibleFlag
 #endif
 	   )
 	{
