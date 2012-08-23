@@ -1386,7 +1386,7 @@ int gfx_resumeVideoProvider(int videoLayer)
 
 //	elcdRpcType_t type;
 	cJSON        *param = NULL;
-		
+
 	if (gfx_videoProvider.savedPos > 0){
 		param = cJSON_CreateNumber((int)gfx_videoProvider.savedPos);
 		pprintf("%s: elcmd_play, startPos = %d, play\n", __func__, (int)gfx_videoProvider.savedPos);
@@ -1396,6 +1396,8 @@ int gfx_resumeVideoProvider(int videoLayer)
 	}
 
 	gfx_videoProvider.waiting = st_rpcAsync( elcmd_play, param, gfx_videoProviderStarted, NULL);
+	if (gfx_videoProvider.waiting >= 0)
+		gfx_videoProvider.active = providerInit;
 	cJSON_Delete(param);
 
 #endif
@@ -1766,6 +1768,7 @@ void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
 	FREE(res_str);
 #endif
 	gfx_videoProvider.waiting = -1;
+	gfx_videoProvider.active  = 0;
 
 	if (st_checkSuccess(type, res, __FUNCTION__))
 	{
@@ -3032,6 +3035,9 @@ double gfx_getVideoProviderLength (int videoLayer)
 	{
 		length = st_getTimeValue(res, "total");
 		if (length < 1.0) length = 1.0;
+	}
+	else {
+		length = 0.0;
 	}
 	cJSON_Delete(res);
 #endif
