@@ -35,6 +35,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES    *
 ********************/
 
+#include "defines.h"
+
+#ifdef ENABLE_SMIL
+
 #include "interface.h"
 
 #include <unistd.h>
@@ -51,5 +55,7 @@ int smil_enterURL(interfaceMenu_t *pMenu, void* pArg);
 #ifdef __cplusplus
 }
 #endif
+
+#endif // ENABLE_SMIL
 
 #endif /* __SMIL_H      Do not add any thing below this line */

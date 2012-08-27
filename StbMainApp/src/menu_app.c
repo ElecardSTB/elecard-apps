@@ -291,8 +291,10 @@ void menu_buildMainMenu()
 #endif // #ifndef HIDE_EXTRA_FUNCTIONS
 		
 #endif // #ifdef ENABLE_BROWSER
-	//str = _T("RTMP");
-	//interface_addMenuEntry((interfaceMenu_t *)&WebServicesMenu, str, smil_enterURL, (void*)-1, thumbnail_add_url);
+#ifdef ENABLE_SMIL
+		str = _T("RTMP");
+		interface_addMenuEntry((interfaceMenu_t *)&WebServicesMenu, str, smil_enterURL, (void*)-1, thumbnail_add_url);
+#endif
 	}
 #endif // #ifdef ENABLE_WEB_SERVICES
 

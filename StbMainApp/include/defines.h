@@ -256,6 +256,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 //#define ENABLE_SECUREMEDIA
 
+//#define ENABLE_SMIL
+
 /** @def WCHAR_SUPPORT Enable localized input support
  */
 #define WCHAR_SUPPORT

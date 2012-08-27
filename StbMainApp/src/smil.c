@@ -35,6 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "smil.h"
 
+#ifdef ENABLE_SMIL
+
 #include "defines.h"
 #include "debug.h"
 #include "interface.h"
@@ -177,3 +179,5 @@ static int smil_inputURL(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	return ret;
 }
+
+#endif // ENABLE_SMIL
