@@ -596,6 +596,8 @@ int rtsp_startVideo(int which)
 
 	rtspControl.enabled = 1;
 
+#ifdef STBPNX
+	/// FIXME: should be done by gfx_startVideoProvider
 	ret = gfx_getPosition(&length_stream,&position_stream);
 	if(ret == 0)
 	{
@@ -605,6 +607,7 @@ int rtsp_startVideo(int which)
 	{
 		interface_playControlSlider(0, 0, 0);
 	}
+#endif
 	rtsp_setStateCheckTimer(screenMain, 1, 0);
 
 	interface_displayMenu(1);
