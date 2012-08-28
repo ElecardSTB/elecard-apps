@@ -206,7 +206,15 @@ static void wizard_cleanup(int finished);
 #ifdef ENABLE_DVB
 static interfaceListMenu_t EPGMenu;
 
-static __u32 offair_currentFrequency, offair_currentFrequencyNumber, offair_currentFrequencyNumberMax;
+static struct {
+	struct {
+		__u32 frequency;
+		struct {
+			__u32 index;
+			__u32 count;
+		} nit;
+	} scan;
+} dvb;
 
 /* offair_indeces used to display sorted list of channels */
 static int  offair_indeces[MAX_MEMORIZED_SERVICES];
@@ -301,12 +309,12 @@ tunerFormat offair_getTuner(void)
 
 static long offair_getFrequency(void *pArg)
 {
-    return offair_currentFrequency;
+    return dvb.scan.frequency;
 }
 
-static long offair_getFrequencyNumber(void *pArg)
+static long offair_getFrequencyIndex(void *pArg)
 {
-    return offair_currentFrequencyNumber;
+    return dvb.scan.nit.index;
 }
 
 void offair_setFrequency(long value, void *pArg)
@@ -324,7 +332,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, & freq_step);
 
-	sprintf(installationString, _T("FOUND_CHANNELS"), offair_currentFrequency, numChannels);
+	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvb_getType(tuner) == FE_QPSK ? _T("MHZ") : _T("KHZ"), numChannels);
 	// in this moment semaphore is busy
 	for ( i = numChannels-1; i > numChannels-4; i-- )
 	{
@@ -340,34 +348,34 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 		strcat(installationString, "...");
 	}
 
-	//dprintf("%s: '%s', min %d, max %d, step %d, freq %d\n", __FUNCTION__, installationString, low_freq, high_freq, freq_step, offair_currentFrequency);
+	//dprintf("%s: '%s', min %d, max %d, step %d, freq %d\n", __FUNCTION__, installationString, low_freq, high_freq, freq_step, dvb.scan.frequency_khz);
 
 	interface_sliderSetText(installationString);
-	if (offair_currentFrequencyNumberMax == 0)
+	if (dvb.scan.nit.count == 0)
 	{
-		interface_sliderSetMinValue(low_freq);
-		interface_sliderSetMaxValue(high_freq);
+		interface_sliderSetMinValue(low_freq/1000);
+		interface_sliderSetMaxValue(high_freq/1000);
 		interface_sliderSetCallbacks(offair_getFrequency, offair_setFrequency, NULL);
 	} else
 	{
 		interface_sliderSetMinValue(0);
-		interface_sliderSetMaxValue(offair_currentFrequencyNumberMax);
-		interface_sliderSetCallbacks(offair_getFrequencyNumber, offair_setFrequency, NULL);
+		interface_sliderSetMaxValue(dvb.scan.nit.count);
+		interface_sliderSetCallbacks(offair_getFrequencyIndex, offair_setFrequency, NULL);
 	}
 	interface_sliderSetDivisions(100);
 	interface_sliderShow(1, 1);
 }
 
-static int offair_updateDisplay(long frequency, int channelCount, tunerFormat tuner, long frequencyNumber, long frequencyMax)
+static int offair_updateDisplay(long frequency, int channelCount, tunerFormat tuner, long frequencyIndex, long frequencyCount)
 {
 	interfaceCommand_t cmd;
 
 	dprintf("%s: in\n", __FUNCTION__);
 
 	//dprintf("%s: freq: %d\n", __FUNCTION__, frequency);
-	offair_currentFrequency = frequency;
-	offair_currentFrequencyNumber = frequencyNumber;
-	offair_currentFrequencyNumberMax = frequencyMax;
+	dvb.scan.frequency = frequency/1000;
+	dvb.scan.nit.index = frequencyIndex;
+	dvb.scan.nit.count = frequencyCount;
 	offair_buildInstallSlider(channelCount, tuner);
 	//interface_displayMenu(1);
 
@@ -631,7 +639,7 @@ static char* offair_getLastFrequency(int field, void* pArg)
 	if (field != 0)
 		return NULL;
 	static char frequency[10];
-	snprintf(frequency, sizeof(frequency), "%u", offair_currentFrequency/KHZ);
+	snprintf(frequency, sizeof(frequency), "%u", dvb.scan.frequency/KHZ);
 	return frequency;
 }
 
@@ -643,10 +651,10 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 	__u32 freq_step = FREQUENCY_STEP_KHZ*KHZ;
 	tunerFormat tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
-	if (offair_currentFrequency < low_freq || offair_currentFrequency > high_freq)
-		offair_currentFrequency = low_freq;
+	if (dvb.scan.frequency < low_freq || dvb.scan.frequency > high_freq)
+		dvb.scan.frequency = low_freq;
 
-	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"), low_freq / KHZ, high_freq / KHZ, dvb_getType(0) == FE_QPSK ? _T("MHZ") : _T("KHZ"));
+	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"), low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == FE_QPSK ? _T("MHZ") : _T("KHZ"));
 	interface_getText(pMenu, buf, "\\d{6}", offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
 	return 0;
 }
