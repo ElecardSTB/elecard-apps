@@ -3932,10 +3932,13 @@ void gfx_init (int argc, char* argv[])
 	/* Create the font interface for the built in fixed font. */
 	fontDesc.flags = DFDESC_HEIGHT;
 
-	if (strcmp(_T("FONT_HEIGHT"), "FONT_HEIGHT") != 0 && atoi(_T("FONT_HEIGHT")) > 0)
-	{
-		globalFontHeight = atoi(_T("FONT_HEIGHT"));
+	switch (surfaceDesc.width) {
+		case  720: globalFontHeight = 18; break;
+		case 1280: globalFontHeight = 22; break;
+		default:   globalFontHeight = 24; break;
 	}
+	globalSmallFontHeight = globalFontHeight - 2;
+
 	fontDesc.height = globalFontHeight;
 	//DFBCHECK( pgfx_dfb->CreateFont(pgfx_dfb, NULL, &fontDesc, &pgfx_font) );
 	if (strcmp(_T("FONT"), "FONT") != 0)
@@ -3950,14 +3953,10 @@ void gfx_init (int argc, char* argv[])
 	strcpy(buf, globalFontDir);
 	strcat(buf, globalFont);
 
-	eprintf ("%s: Selected FONT %s\n", __FUNCTION__, buf);
+	eprintf ("%s: Selected font %s (size %d and %d)\n", __FUNCTION__, buf, globalFontHeight, globalSmallFontHeight);
 	
 	DFBCHECK (pgfx_dfb->CreateFont(pgfx_dfb, buf, &fontDesc, &pgfx_font));
 
-	if (strcmp(_T("FONT_SMALL_HEIGHT"), "FONT_SMALL_HEIGHT") != 0 && atoi(_T("FONT_SMALL_HEIGHT")) > 0)
-	{
-		globalSmallFontHeight = atoi(_T("FONT_SMALL_HEIGHT"));
-	}
 	fontDesc.height = globalSmallFontHeight;
 	if (strcmp(_T("FONT_SMALL"), "FONT_SMALL") != 0)
 	{
