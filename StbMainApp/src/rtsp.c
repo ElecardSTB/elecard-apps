@@ -213,6 +213,7 @@ int find_streams(streams_struct **ppstream_head)
 		}
 	}
 
+	dprintf("%s: release sem\n", __FUNCTION__);
 	mysem_release(rtsp_semaphore);
 
 	return index == 0 ? -1 : 0;
@@ -363,6 +364,7 @@ void rtsp_stopVideo(int which)
 		//rtsp_fillMenu();
 	}
 
+	dprintf("%s: release sem\n", __FUNCTION__);
 	mysem_release(rtsp_semaphore);
 }
 
@@ -520,12 +522,11 @@ int rtsp_startVideo(int which)
 	char qualifier[64];
 	char pipeString[256];
 	char *str;
-	double length_stream = 0.0;
-	double position_stream = 0.0;
 
 	interface_showLoadingAnimation();
 
 	mysem_get(rtsp_semaphore);
+	dprintf("%s: got sem\n", __FUNCTION__);
 
 	media_slideshowStop(1);
 
@@ -571,8 +572,6 @@ int rtsp_startVideo(int which)
 	}
 #endif
 
-	rtsp_setStateCheckTimer(which, 1, 1);
-
 	if(!gfx_getVideoProviderHasVideo(screenMain))
 	{
 		if(appControlInfo.slideshowInfo.state == slideshowDisabled)
@@ -597,6 +596,8 @@ int rtsp_startVideo(int which)
 	rtspControl.enabled = 1;
 
 #ifdef STBPNX
+	double length_stream = 0.0;
+	double position_stream = 0.0;
 	/// FIXME: should be done by gfx_startVideoProvider
 	ret = gfx_getPosition(&length_stream,&position_stream);
 	if(ret == 0)
