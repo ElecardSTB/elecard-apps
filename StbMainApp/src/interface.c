@@ -5628,7 +5628,7 @@ static void interface_displayPlayControl()
 					gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x, rect.y-4, stime, 0, 1);
 
 					sprintf(stime, "%02d:%02d:%02d", interfacePlayControl.sliderEnd/3600, (interfacePlayControl.sliderEnd%3600)/60, interfacePlayControl.sliderEnd%60);
-					gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+rect.w-73, rect.y-4, stime, 0, 1);
+					gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+rect.w-interfacePlayControl.sliderTimeWidth, rect.y-4, stime, 0, 1);
 				}
 				// Green slider highlight
 				/*if (interfaceInfo.inputFocus == inputFocusSlider)
@@ -6625,6 +6625,7 @@ void interface_init()
 
 	interface_playControlReset();
 	interfacePlayControl.activeButton = interfacePlayControlStop;
+	DFBCHECK(pgfx_font->GetStringWidth(pgfx_font, "44:44:44", -1, &interfacePlayControl.sliderTimeWidth));
 
 	interfaceSlideshowControl.enabled = 0;
 	interfaceSlideshowControl.highlightedButton = interfacePlayControlMode;

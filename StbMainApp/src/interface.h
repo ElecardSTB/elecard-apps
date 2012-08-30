@@ -704,6 +704,7 @@ typedef struct
 	unsigned int sliderEnd;
 	unsigned int sliderPos;
 	unsigned int sliderPointer;
+	int sliderTimeWidth;
 	int alwaysShowSlider; // when set to 1, slider is visible even when play control is not
 } interfacePlayControl_t;
 
