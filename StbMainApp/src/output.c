@@ -4792,12 +4792,12 @@ int output_fillUpdateMenu(interfaceMenu_t *pMenu, void* notused)
 		network_check = atoi(buf);
 	}
 
-	interface_addMenuEntry(pMenu, _T("UPDATE_CHECK"), output_updateCheck, NULL, thumbnail_configure);
+	interface_addMenuEntry(pMenu, _T("UPDATE_CHECK"), output_updateCheck, NULL, settings_update_now);
 
 	snprintf(buf, sizeof(buf), "%s: %s", _T("UPDATE_CHECK_NETWORK"), _T(network_check ? "ON" : "OFF"));
-	interface_addMenuEntry(pMenu, buf, output_updateCheckNetwork, SET_NUMBER(!network_check), thumbnail_configure);
+	interface_addMenuEntry(pMenu, buf, output_updateCheckNetwork, SET_NUMBER(!network_check), settings_updates);
 
-	interface_addMenuEntry(pMenu, _T("UPDATE_ON_REBOOT"), output_rebootAndUpdate, NULL, thumbnail_configure);
+	interface_addMenuEntry(pMenu, _T("UPDATE_ON_REBOOT"), output_rebootAndUpdate, NULL, settings_update_on_boot);
 
 	interface_addMenuEntryDisabled(pMenu, _T(found ? "UPDATE_FOUND" : "UPDATE_NOT_FOUND"), thumbnail_info);
 
@@ -6210,7 +6210,7 @@ void output_fillOutputMenu(void)
 
 #ifdef STSDK
 	str = _T("UPDATES");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &UpdateMenu, thumbnail_configure);
+	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &UpdateMenu, settings_updates);
 #endif
 
 	str = _T("RESET_SETTINGS");
@@ -6326,7 +6326,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_fillWebMenu, NULL, NULL);
 
 #ifdef STSDK
-	createListMenu(&UpdateMenu, _T("UPDATES"), thumbnail_configure, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&UpdateMenu, _T("UPDATES"), settings_updates, NULL, (interfaceMenu_t*)&OutputMenu,
 		interfaceListMenuIconThumbnail, output_fillUpdateMenu, NULL, NULL);
 #endif
 
