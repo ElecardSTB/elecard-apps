@@ -396,16 +396,18 @@ typedef enum
 	interfaceCommandBlue =                       DIKS_F4,
 	interfaceCommandChannelUp =                  DIKS_CHANNEL_UP,
 	interfaceCommandChannelDown =                DIKS_CHANNEL_DOWN,
-//	interfaceCommandServices =                   'i',
+	interfaceCommandInfo =                       DIKS_INFO,
 	interfaceCommandServices =                   DIKS_OPTION,
 	interfaceCommandFavorites =                  DIKS_FAVORITES,
 	interfaceCommandTV =                         DIKS_TV,
+	interfaceCommandUsb =                        DIKS_TAPE,
 	interfaceCommandPhone =                      DIKS_PHONE,
 	interfaceCommandWeb =                        DIKS_INTERNET,
 	interfaceCommandPageUp =                     DIKS_PAGE_UP,
 	interfaceCommandPageDown =                   DIKS_PAGE_DOWN,
 	interfaceCommandRefresh =                    DIKS_RESTART,
 	interfaceCommandMic =                        DIKS_AUX,
+	interfaceCommandSearch =                     DIKS_CUSTOM1,
 
 	interfaceCommandCount
 } interfaceCommand_t;
