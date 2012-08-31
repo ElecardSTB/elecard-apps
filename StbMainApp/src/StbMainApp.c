@@ -502,6 +502,7 @@ interfaceCommand_t parseEvent(DFBEvent *event)
 #if (defined STBPNX)
 			ADD_HANDLER(DIKS_INFO, interfaceCommandServices)
 			ADD_HANDLER(DIKS_FAVORITES, interfaceCommandWeb)
+			ADD_HANDLER(DIKS_AUX, interfaceCommandTeletext)
 #endif
 			ADD_HANDLER(DIKS_RED, interfaceCommandRed)
 			ADD_HANDLER(DIKS_GREEN, interfaceCommandGreen)

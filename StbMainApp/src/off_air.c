@@ -1342,7 +1342,7 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 #ifdef ENABLE_TELETEXT
 	if(appControlInfo.teletextInfo.exists)
 	{
-		if(cmd->command == interfaceCommandMic)
+		if(cmd->command == interfaceCommandTeletext)
 		{
 			if(interfaceInfo.teletext.show == 0)
 				interfaceInfo.teletext.show = 1;
