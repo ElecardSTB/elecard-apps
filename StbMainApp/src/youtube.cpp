@@ -759,6 +759,9 @@ static int youtube_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 {
 	// assert (pMenu == _M &YoutubeMenu);
 
+	if (cmd->command == interfaceCommandSearch)
+		return youtube_videoSearch(pMenu, SET_NUMBER(YOUTUBE_NEW_SEARCH));
+
 	int selectedIndex = interface_getSelectedItem(pMenu);
 	if (selectedIndex > 0 && pMenu->menuEntry[selectedIndex].pAction == youtube_streamChange)
 	{
@@ -768,6 +771,7 @@ static int youtube_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 
 		switch (cmd->command)
 		{
+			case interfaceCommandInfo:
 			case interfaceCommandGreen:
 				snprintf(url, sizeof(url), "http://www.youtube.com/watch?v=%s", youtubeInfo.videos[videoIndex].video_id);
 				eprintf("Youtube: Stream %02d: '%s'\n", videoIndex, url);

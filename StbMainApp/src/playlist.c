@@ -606,6 +606,7 @@ int playlist_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 			sprintf(URL, "%s\n\n%s", _T("CONFIRM_PLAYLIST_DELETE"), playlist_getURL(GET_NUMBER(pArg)));
 			interface_showConfirmationBox(URL, thumbnail_question, playlist_deleteCallback, pArg);
 			return 0;
+		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			// info
 			str = playlist_getURL(GET_NUMBER(pArg));

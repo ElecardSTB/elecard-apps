@@ -2065,6 +2065,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 	{
 		case interfaceCommandBlue:
 #ifdef ENABLE_EPG
+		case interfaceCommandEpg:
 			if( appControlInfo.rtpMenuInfo.epg[0] != 0 )
 				rtp_initEpgMenu( pMenu, pArg );
 			else
@@ -2078,6 +2079,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 			eprintf("RTP: Add to playlist '%s'\n",URL);
 			playlist_addUrl(URL, streams.items[streamNumber].session_name);
 			return 0;
+		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			rtp_getURL(URL,which,streamNumber);
 			eprintf("RTP: Stream %03d: '%s'\n", streamNumber, URL);
@@ -2561,6 +2563,7 @@ static int rtp_shortInfoProcessCommand(pinterfaceCommandEvent_t cmd, void* pArg)
 					interface_showMenu(1, 1);
 					return 0;
 				case interfaceCommandBlue:
+				case interfaceCommandEpg:
 					if( appControlInfo.rtpMenuInfo.epg[0] != 0 )
 					{
 						if( rtp_getProgramInfo( channelNumber, program_offset, rtpInfoTypeFull ) == 0 )

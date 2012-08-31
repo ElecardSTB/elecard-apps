@@ -662,6 +662,7 @@ static int samba_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cm
 		case interfaceCommandYellow:
 			samba_enterLogin(pMenu, NULL);
 			return 0;
+		case interfaceCommandSearch:
 		case interfaceCommandBlue:
 			interface_getText(pMenu, _T("ENTER_WORKSTATION_ADDR"), "\\w+", samba_manualBrowse, samba_getMachine, inputModeABC, NULL);
 			return 0;

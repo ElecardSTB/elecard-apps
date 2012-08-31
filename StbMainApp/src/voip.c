@@ -1021,6 +1021,7 @@ static int voip_addressBookKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommand
 					interface_displayMenu(1);
 				}
 				return 0;
+			case interfaceCommandInfo:
 			case interfaceCommandGreen:
 				// info
 				voip_showEntryInfo( pMenu, pArg );
@@ -1076,6 +1077,7 @@ static int voip_callsKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_
 					interface_displayMenu(1);
 				}
 				return 0;
+			case interfaceCommandInfo:
 			case interfaceCommandGreen:
 				// info
 				voip_showEntryInfo( pMenu, pArg );

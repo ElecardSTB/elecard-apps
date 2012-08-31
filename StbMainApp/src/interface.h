@@ -408,6 +408,7 @@ typedef enum
 	interfaceCommandRefresh =                    DIKS_RESTART,
 	interfaceCommandMic =                        DIKS_AUX,
 	interfaceCommandSearch =                     DIKS_CUSTOM1,
+	interfaceCommandEpg =                        DIKS_EPG,
 
 	interfaceCommandCount
 } interfaceCommand_t;

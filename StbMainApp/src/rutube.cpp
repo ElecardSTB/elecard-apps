@@ -567,18 +567,18 @@ static int rutube_playMovie( interfaceMenu_t* pMenu, void *pArg  )
 
 static int movie_infoCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	int selectedIndex = MoviesMenu.baseMenu.selectedItem;
-	rutube_asset_t *asset;
+	if (cmd->command == interfaceCommandSearch)
+		return rutube_videoSearch(pMenu, NULL);
 
-	char info[RUTUBE_INFO_BUFFER_SIZE];
-	if (selectedIndex >= 0 && cmd->command == interfaceCommandGreen)
+	int selectedIndex = MoviesMenu.baseMenu.selectedItem;
+	if (selectedIndex < 0)
+		return 1;
+
+	if (cmd->command == interfaceCommandGreen ||
+	    cmd->command == interfaceCommandInfo)
 	{
-		asset = (rutube_asset_t *)MoviesMenu.baseMenu.menuEntry[selectedIndex].pArg;
-		if(asset !=NULL)
-			sprintf(info, asset->description);
-		else
-			sprintf(info, _T("ERR_NO_DATA"));
-		interface_showMessageBox(info, 0, 0);
+		rutube_asset_t *asset = (rutube_asset_t *)MoviesMenu.baseMenu.menuEntry[selectedIndex].pArg;
+		interface_showMessageBox(asset != NULL ? asset->description : _T("ERR_NO_DATA"), 0, 0);
 		return 0;
 	}
 	return 1;

@@ -1399,7 +1399,8 @@ static int rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 			{
 				eprintf("RTSP: Add to Playlist '%s'\n",URL);
 				playlist_addUrl(URL, stream_ptr->name ? stream_ptr->name : stream_ptr->stream);
-			} else if (cmd->command == interfaceCommandGreen )
+			} else if (cmd->command == interfaceCommandGreen ||
+			           cmd->command == interfaceCommandInfo)
 			{
 				eprintf("RTSP: Stream %03d: '%s'\n", streamNumber, URL);
 				if( stream_ptr->poster && stream_ptr->poster[0] )

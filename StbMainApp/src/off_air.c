@@ -4381,6 +4381,7 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			snprintf(offair_lcn_buf, sizeof(offair_lcn_buf),"%d",channelNumber);
 			offair_changeLCN(pMenu, pArg);
 			return 0;
+		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			dvb_getServiceDescription(offair_services[channelNumber].service, URL);
 			eprintf("offaie: Channel %d info:\n%s\n", channelNumber, URL);
