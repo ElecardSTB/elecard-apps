@@ -100,6 +100,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define RTP_PROGRAM_BAR_BLUE  (0x88)
 #define RTP_PROGRAM_BAR_ALPHA INTERFACE_BACKGROUND_ALPHA
 
+#define ENABLE_EPG
+
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
@@ -243,7 +245,13 @@ interfaceListMenu_t rtpStreamMenu;
 
 void rtp_buildMenu(interfaceMenu_t *pParent)
 {
-	int rtp_icons[4] = { statusbar_f1_sorting, statusbar_f2_info, statusbar_f3_add, statusbar_f4_enterurl };
+	int rtp_icons[4] = { statusbar_f1_sorting, statusbar_f2_info, statusbar_f3_add,
+#ifdef ENABLE_EPG
+	statusbar_f4_schedule
+#else
+	statusbar_f4_enterurl
+#endif
+	};
 
 	rtp.selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
 
@@ -1911,7 +1919,7 @@ int rtp_playURL(int which, char *value, char *description, char *thumbnail)
 	return rtp_setChannelFromURL(interfaceInfo.currentMenu, value, description, thumbnail, SET_NUMBER(which));
 }
 
-#ifndef ENABLE_PVR
+#ifndef ENABLE_EPG
 static char *rtp_urlvalue(int num, void *pArg)
 {
 	return num == 0 ? appControlInfo.rtpMenuInfo.lastUrl : NULL;
@@ -2056,7 +2064,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 	switch( cmd->command )
 	{
 		case interfaceCommandBlue:
-#ifdef ENABLE_PVR
+#ifdef ENABLE_EPG
 			if( appControlInfo.rtpMenuInfo.epg[0] != 0 )
 				rtp_initEpgMenu( pMenu, pArg );
 			else
