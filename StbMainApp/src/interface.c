@@ -3500,9 +3500,7 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 	/* Hot keys */
 	else if (!interfaceInfo.lockMenu &&
 	         (cmd->command == interfaceCommandServices ||
-	          cmd->command == interfaceCommandPhone ||
-	          cmd->command == interfaceCommandWeb ||
-	          cmd->command == interfaceCommandFavorites)
+	          cmd->command == interfaceCommandPhone)
 	        )
 	{
 		static interfaceMenu_t *lastMenu = (interfaceMenu_t*)&OutputMenu;
@@ -3568,11 +3566,6 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 						voip_fillMenu(interfaceInfo.currentMenu, (void*)1);
 					}
 				}
-#endif
-			break;
-			case interfaceCommandWeb:
-#ifdef ENABLE_BROWSER
-				open_browser((interfaceMenu_t*)&interfaceMainMenu, NULL);
 #endif
 			break;
 			default:;
@@ -3919,7 +3912,21 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 	} else if ( cmd->command == interfaceCommandTV )
 	{
 		interface_enterChannelList();
-	} else
+	} else if ( cmd->command == interfaceCommandUsb )
+	{
+		media_initUSBBrowserMenu(pMenu, (void*)mediaVideo);
+	} else if ( cmd->command == interfaceCommandFavorites )
+	{
+		extern interfaceListMenu_t playlistMenu;
+		interface_menuActionShowMenu(pMenu, &playlistMenu);
+	}
+#ifdef ENABLE_BROWSER
+	else if ( cmd->command == interfaceCommandWeb )
+	{
+		open_browser(pMenu, NULL);
+	}
+#endif
+	else
 	{
 		// unknown command
 		return 1;
