@@ -1723,13 +1723,10 @@ int media_startPlayback()
 		interface_showMenu(0, 0);
 		interface_hideLoadingAnimation();
 
-#ifdef STBxx
-		if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL){
-			interface_hideLoading();
-		}
-#else
+#ifdef ENABLE_TVMYWAY
+		if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL)
+#endif // ENABLE_TVMYWAY
 		interface_hideLoading();
-#endif
 
 		media_failedMedia[0] = 0;
 //SergA: wait some time for starting video provider
@@ -1792,13 +1789,12 @@ int media_startPlayback()
 		ret_val	=	gfx_getPosition(&length_stream,&position_stream);
 		if(ret_val == 0)
 		{
-#ifdef STBxx
-			if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL){
-				interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-			}
-#else
-			interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);	
-#endif
+
+#ifdef ENABLE_TVMYWAY
+		if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL)
+#endif // ENABLE_TVMYWAY
+			interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
+
 			//dprintf("%s: start from pos %f\n", __FUNCTION__, position_stream);
 			//interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);	
 #ifndef STSDK			
@@ -1813,14 +1809,11 @@ int media_startPlayback()
 #endif // STSDK
 		}else
 		{
-#ifdef STBxx
-			if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL){
+#ifdef ENABLE_TVMYWAY
+			if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") == NULL)
+#endif // ENABLE_TVMYWAY
 				interface_playControlSlider(0, 0, 0);
-			}
-#else
-			interface_playControlSlider(0, 0, 0);
-#endif
-			//interface_playControlSlider(0, 0, 0);
+
 #ifndef STSDK
 			// for HLS only
 #ifdef ENABLE_VIDIMAX	
