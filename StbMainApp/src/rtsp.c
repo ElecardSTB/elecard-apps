@@ -254,20 +254,14 @@ static void rtsp_setStopTimer(int which, int length)
 static int rtsp_stateTimerEvent(void *pArg)
 {
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
-	double length_stream = 0.0;
-	double position_stream = 0.0;
-	int		ret_val;
-	DFBVideoProviderStatus status;
-
-	
-	status = gfx_getVideoProviderStatus(which);
-	switch( status )
+	DFBVideoProviderStatus status = gfx_getVideoProviderStatus(which);
+	switch (status)
 	{
 		case DVSTATE_FINISHED:
 		case DVSTATE_STOP:
 			eprintf("%s: status = DVSTATE_STOP || DVSTATE_FINISHED\n", __FUNCTION__);
 			
-			if( status == DVSTATE_FINISHED )
+			if ( status == DVSTATE_FINISHED )
 				interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 0);
 			interface_playControlSlider(0,0,0);
 #ifdef ENABLE_VIDIMAX
@@ -277,7 +271,9 @@ static int rtsp_stateTimerEvent(void *pArg)
 #endif
 			rtsp_stopVideo(screenMain);
 			interface_showMenu(1, 1);
-			break;
+
+			return 0;
+
 #ifdef STBPNX
 		case DVSTATE_STOP_REWIND:
 			appControlInfo.playbackInfo.scale = 1.0;
@@ -289,23 +285,23 @@ static int rtsp_stateTimerEvent(void *pArg)
 		default:
 			if (!gfx_videoProviderIsPaused(screenMain))
 			{
-				ret_val	=	gfx_getPosition(&length_stream,&position_stream);
-				//eprintf("%s: got position %f, set it\n", __FUNCTION__, position_stream);
-				if((ret_val == 0)&&(position_stream <= length_stream))
-				{
-					interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
-					rtsp_setStateCheckTimer(which, 1, 0);
+				double length_stream   = 0.0;
+				double position_stream = 0.0;
+				int ret_val = gfx_getPosition(&length_stream,&position_stream);
+				if (ret_val == 0) {
+					//dprintf("%s: got position %f, set it\n", __FUNCTION__, ret_val, position_stream);
+					if (position_stream <= length_stream)
+						interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
+					else {
+						eprintf("%s: RTSP played 'till the end\n", __FUNCTION__);
+						rtsp_stopVideo(screenMain);
+
+						return 0;
+					}
 				}
-				else if( ret_val == 0 )
-				{
-					eprintf("%s: ret_val == 0\n", __FUNCTION__);
-					rtsp_stopVideo(screenMain);
-				}
-			} else
-			{
-				rtsp_setStateCheckTimer(which, 1, 0);
 			}
 	}
+	rtsp_setStateCheckTimer(which, 1, 0);
 
 	return 0;
 }
