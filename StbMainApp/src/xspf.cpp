@@ -61,7 +61,7 @@ int xspf_parseBuffer(const char *data, xspfEntryHandler pCallback, void *pArg)
 	xspf->Parse(data);
 	if (xspf->Error() != 0)
 	{
-		eprintf("%s: XML parse failed: %s\n", __FUNCTION__, xspf->ErrorDesc());
+		eprintf("%s: XML parse failed [%d:%d]: %s\n", __FUNCTION__, xspf->ErrorRow(), xspf->ErrorCol(), xspf->ErrorDesc());
 		delete xspf;
 		return -2;
 	}
