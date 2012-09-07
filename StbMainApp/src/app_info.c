@@ -975,6 +975,9 @@ void appInfo_init(void)
 	strcpy(appControlInfo.rtpMenuInfo.lastUrl,      "rtp://");
 	appControlInfo.rtpMenuInfo.playlist[0]        = 0;
 	appControlInfo.rtpMenuInfo.pidTimeout         = 3;
+	appControlInfo.rtpMenuInfo.hasInternalPlaylist=helperFileExists(IPTV_FW_PLAYLIST_FILENAME);
+	if (appControlInfo.rtpMenuInfo.hasInternalPlaylist)
+		appControlInfo.rtpMenuInfo.usePlaylistURL = iptvPlaylistFw;
 
 	appControlInfo.inStandby                      = 0;
 

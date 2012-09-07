@@ -333,6 +333,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#define PLAYLIST_FILENAME	CONFIG_DIR "/playlist.m3u"
 #endif
 
+#ifndef IPTV_FW_PLAYLIST_FILENAME
+	#define IPTV_FW_PLAYLIST_FILENAME CONFIG_DIR "/iptv.xspf"
+#endif
+
 #ifndef ADDRESSBOOK_FILENAME
 	#define ADDRESSBOOK_FILENAME	CONFIG_DIR "/addressbook.m3u"
 #endif
@@ -436,6 +440,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DEFAULT_FONT_HEIGHT          (24)
 #define DEFAULT_SMALL_FONT_HEIGHT    (20)
 #endif
+
 /*************************************
  * Interface options (interface.h)
  *************************************/
@@ -469,10 +474,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /** RTP engine to use with RTP streaming, 0 - Elecard, 1 - ccRTP, 2 - smallRTP
  */
 #define RTP_ENGINE	(2)
-
-/** specify RTP engine to use with RTSP streaming, 0 - Elecard, 1 - ccRTP, 2 - smallRTP
- */
-#define RTSP_ENGINE	(2)
 
 /***********************************************************
 * DVB Options

@@ -2309,7 +2309,7 @@ static int output_toggleURL(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_IPTV
 static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.rtpMenuInfo.usePlaylistURL = (appControlInfo.rtpMenuInfo.usePlaylistURL+1)%2;
+	appControlInfo.rtpMenuInfo.usePlaylistURL = (appControlInfo.rtpMenuInfo.usePlaylistURL+1)%(appControlInfo.rtpMenuInfo.hasInternalPlaylist?3:2);
 	if( appControlInfo.rtpMenuInfo.usePlaylistURL && appControlInfo.rtpMenuInfo.playlist[0] == 0 )
 	{
 		output_toggleURL( pMenu, (void*)optionRtpPlaylist );
@@ -5885,12 +5885,24 @@ static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&IPTVSubMenu);
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.usePlaylistURL ? "URL" : "SAP");
+	{
+	char *str = NULL;
+	switch (appControlInfo.rtpMenuInfo.usePlaylistURL)
+	{
+		case iptvPlaylistUrl:  str = "URL"; break;
+		case iptvPlaylistFw:   str = "FW";  break;
+		default: str = "SAP"; break;
+	}
+	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), str);
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_toggleIPTVPlaylist, NULL, thumbnail_configure);
+	}
 
+	if (appControlInfo.rtpMenuInfo.usePlaylistURL == iptvPlaylistUrl)
+	{
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpPlaylist, thumbnail_enterurl);
+	}
 
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_EPG"), appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,

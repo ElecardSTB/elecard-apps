@@ -105,6 +105,8 @@ int playlist_getFromURL(const char *url, xspfEntryHandler pEntryCallback, void *
  */
 int playlist_getFromBuffer(const char *data, const size_t size, xspfEntryHandler pEntryCallback, void *pArg);
 
+int playlist_getFromFile(const char *filename, xspfEntryHandler pEntryCallback, void *pArg);
+
 #ifdef __cplusplus
 }
 #endif

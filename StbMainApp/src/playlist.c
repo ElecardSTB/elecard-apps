@@ -708,6 +708,34 @@ int playlist_getFromBuffer(const char* data, const size_t size, xspfEntryHandler
 		return ret;
 }
 
+int playlist_getFromFile(const char *filename, xspfEntryHandler pEntryCallback, void *pArg)
+{
+	int fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		eprintf("%s: failed to open %s: %s\n", __FUNCTION__, filename, strerror(errno));
+		return -1;
+	}
+
+	int ret = -1;
+	struct stat s;
+
+	fstat(fd, &s);
+	if (s.st_size <= 0)
+		goto end;
+	dprintf("%s: playlist file size %lld\n", __FUNCTION__, s.st_size);
+	char *buffer = malloc(s.st_size+1);
+	if (!buffer) {
+		eprintf("%s: failed to allocate %lld bytes for playlist\n", __FUNCTION__, s.st_size+1);
+		goto end;
+	}
+	read(fd, buffer, s.st_size);
+	buffer[s.st_size] = 0;
+	ret = playlist_getFromBuffer(buffer, 0 /*ignored*/, pEntryCallback, NULL);
+	free(buffer);
+end:
+	close(fd);
+	return ret;
+}
 
 #ifdef ENABLE_PLAYLIST_HTTP_HEADER
 #define MAC_PATH "/sys/class/net/eth0/address"

@@ -297,9 +297,17 @@ typedef struct __stb810_rtpInfo
 	char                 *pServerName;
 } stb810_rtpInfo;
 
+typedef enum
+{
+	iptvPlaylistSap = 0,
+	iptvPlaylistUrl,
+	iptvPlaylistFw,
+} iptvPlaylistSource_t;
+
 typedef struct __stb810_rtpMenuInfo
 {
 	int                  channel;
+	int                  hasInternalPlaylist;
 	int                  usePlaylistURL;
 	char                 lastUrl[MAX_URL];
 	char                 playlist[MAX_URL];

@@ -1750,11 +1750,22 @@ void rtp_getPlaylist(int which)
 
 		if (streams.count == 0)
 		{
+			if (appControlInfo.rtpMenuInfo.usePlaylistURL == iptvPlaylistFw)
+			{
+				dprintf("%s: get firmware playlist from %s\n", __FUNCTION__, IPTV_FW_PLAYLIST_FILENAME);
+				playlist_getFromFile(IPTV_FW_PLAYLIST_FILENAME, rtp_urlHandler, NULL);
+				if (streams.count == 0)
+					interface_showMessageBox(_T("ERR_SERVICE_UNAVAILABLE"), thumbnail_error, 0);
+			} else
+			{
+
 			dprintf("%s: get playlist from %s\n", __FUNCTION__, appControlInfo.rtpMenuInfo.playlist);
 
 			if (PLAYLIST_ERR_DOWNLOAD == playlist_getFromURL( appControlInfo.rtpMenuInfo.playlist, rtp_urlHandler, NULL))
 			{
 				interface_showMessageBox(_T("ERR_SERVICE_UNAVAILABLE"), thumbnail_error, 0);
+			}
+
 			}
 
 			if (streams.count > 0)
