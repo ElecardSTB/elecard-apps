@@ -1287,6 +1287,11 @@ void interface_splashCleanup(void);
  */
 int  interface_menuActionShowMenu(interfaceMenu_t *pMenu, void *pArg);
 
+/** Switch menu but don't update display
+ * @sa interface_menuActionShowMenu()
+ */
+int  interface_switchMenu(interfaceMenu_t *pMenu, interfaceMenu_t *pTargetMenu);
+
 /**
  *  @brief Enables and configures play control.
  *

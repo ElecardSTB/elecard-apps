@@ -990,6 +990,7 @@ static void media_setupPlayControl(void* pArg)
 	{
 		case playlistModeFavorites: set_channel = playlist_setChannel; break;
 		case playlistModeIPTV:      set_channel = rtp_setChannel;
+			interface_playControlSetProcessCommand(rtp_playControlProcessCommand);
 			strcpy(appControlInfo.rtpMenuInfo.lastUrl, appControlInfo.mediaInfo.filename);
 			break;
 #ifdef ENABLE_DLNA

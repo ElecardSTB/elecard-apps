@@ -118,6 +118,8 @@ void rtp_cleanupEPG();
  */
 void rtp_cleanupPlaylist(int which);
 
+int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
+
 #ifdef ENABLE_PVR
 /** Record current or last played RTP stream
  *  @return pvr_record return value

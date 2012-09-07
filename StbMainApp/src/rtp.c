@@ -147,6 +147,8 @@ typedef struct
 typedef struct
 {
 	rtpEPGProgramInfo_t program;
+	interfaceMenu_t *previousMenu;
+	int showMenuOnExit;
 } rtpEPGInfo_t;
 
 /******************************************************************
@@ -167,6 +169,7 @@ static int rtp_fillGenreMenu();
 static int rtp_stopCollect(interfaceMenu_t* pMenu, void *pArg);
 
 static void* rtp_epgThread(void *pArg);
+static void rtp_showEpg(void);
 
 static int rtp_getProgramInfo(int channel, int offset, rtpInfoType_t type);
 static void rtp_displayShortInfo();
@@ -178,15 +181,14 @@ static void rtp_setStateCheckTimer(int which, int bEnable);
 static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int rtp_menuEntryDisplay(interfaceMenu_t *pMenu, DFBRectangle *rect, int i);
 
+static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #ifdef ENABLE_PVR
 #ifdef STBPNX
-static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int rtp_epgEntryDisplay(interfaceMenu_t *pMenu, DFBRectangle *rect, int i);
 #endif
 #endif
 
 #ifdef ENABLE_MULTI_VIEW
-static int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 static int rtp_multiviewPlay(interfaceMenu_t *pMenu, void *pArg);
 #endif
 
@@ -275,9 +277,7 @@ void rtp_buildMenu(interfaceMenu_t *pParent)
 		/* interfaceInfo.clientX, interfaceInfo.clientY,
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuNoThumbnail,
 		NULL, NULL, NULL);
-#if (defined ENABLE_PVR) && (defined STBPNX)
 	interface_setCustomKeysCallback((interfaceMenu_t*)&rtpEpgMenu, rtp_epgKeyCallback);
-#endif
 
 	mysem_create(&rtp_semaphore);
 	mysem_create(&rtp_epg_semaphore);
@@ -285,6 +285,8 @@ void rtp_buildMenu(interfaceMenu_t *pParent)
 
 	rtpEpgInfo.program.title = NULL;
 	rtpEpgInfo.program.info[0] = 0;
+	rtpEpgInfo.showMenuOnExit = 0;
+	rtpEpgInfo.previousMenu = NULL;
 }
 
 void rtp_cleanupMenu()
@@ -1395,9 +1397,7 @@ static void rtp_setupPlayControl(void *pArg)
 #endif
 	if( appControlInfo.playbackInfo.channel >= 0 )
 		interface_channelNumberShow(appControlInfo.playbackInfo.channel);
-#ifdef ENABLE_MULTI_VIEW
 	interface_playControlSetProcessCommand(rtp_playControlProcessCommand);
-#endif
 }
 
 int rtp_setChannel(int channel, void* pArg)
@@ -2563,7 +2563,6 @@ static int rtp_shortInfoProcessCommand(pinterfaceCommandEvent_t cmd, void* pArg)
 					interface_showMenu(1, 1);
 					return 0;
 				case interfaceCommandBlue:
-				case interfaceCommandEpg:
 					if( appControlInfo.rtpMenuInfo.epg[0] != 0 )
 					{
 						if( rtp_getProgramInfo( channelNumber, program_offset, rtpInfoTypeFull ) == 0 )
@@ -2574,6 +2573,9 @@ static int rtp_shortInfoProcessCommand(pinterfaceCommandEvent_t cmd, void* pArg)
 							interface_showMessageBox(_T("ERR_CONNECT"), thumbnail_epg, RTP_EPG_ERROR_TIMEOUT);
 					} else
 						interface_showMessageBox(_T("EPG_UNAVAILABLE"), thumbnail_epg, RTP_EPG_ERROR_TIMEOUT);
+					return 0;
+				case interfaceCommandEpg:
+					rtp_showEpg();
 					return 0;
 				default:
 					interface_playControlRefresh(1);
@@ -2648,6 +2650,16 @@ static int rtp_longInfoCallback(interfaceMenu_t* pMenu, pinterfaceCommandEvent_t
 	}
 }
 
+void rtp_showEpg(void)
+{
+	if (appControlInfo.rtpMenuInfo.channel != CHANNEL_CUSTOM && appControlInfo.rtpMenuInfo.epg[0] != 0)
+	{
+		if (rtp_initEpgMenu( _M &rtpEpgMenu, SET_NUMBER(appControlInfo.rtpMenuInfo.channel) ) == 0)
+			interface_showMenu(1, 1);
+	} else
+		interface_showMessageBox(_T("EPG_UNAVAILABLE"), thumbnail_epg, RTP_EPG_ERROR_TIMEOUT);
+}
+
 int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	int channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
@@ -2667,6 +2679,9 @@ int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg)
 			return 1;
 		}
 	}
+
+	rtpEpgInfo.showMenuOnExit = interfaceInfo.showMenu;
+	rtpEpgInfo.previousMenu   = interfaceInfo.currentMenu;
 
 	interface_clearMenuEntries((interfaceMenu_t *)&rtpEpgMenu);
 
@@ -2762,23 +2777,51 @@ finish:
 	return interface_menuEntryDisplay(pMenu, rect, i);
 }
 
+int rtp_recordNow()
+{
+	if ( appControlInfo.rtpMenuInfo.channel != CHANNEL_CUSTOM )
+	{
+		char desc[MENU_ENTRY_INFO_LENGTH], *str;
+		strcpy(desc, streams.items[appControlInfo.rtpMenuInfo.channel].session_name);
+		str = index(desc, '\n');
+		if( str )
+			*str = 0;
+		return pvr_record( screenMain, rtp_info[appControlInfo.rtpMenuInfo.channel].url, desc );
+	} else
+	{
+		return pvr_record( screenMain, appControlInfo.rtpMenuInfo.lastUrl, appControlInfo.playbackInfo.description );
+	}
+}
+#endif //STBPNX
+#endif //ENABLE_PVR
+
 static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	list_element_t *element;
-	EIT_event_t *event = NULL;
-	int channelNumber;
-	unsigned int event_id;
-	pvrJob_t new_job;
-	url_desc_t url;
-	char buf[BUFFER_SIZE];
-
-	dprintf("%s: in %d\n", __FUNCTION__, cmd->command);
+	dprintf("%s: in %s %d\n", __FUNCTION__, interface_commandName(cmd->command), cmd->command);
 
 	switch(cmd->command)
 	{
+		case interfaceCommandEpg:
+			interface_switchMenu(pMenu, rtpEpgInfo.previousMenu);
+			if (rtpEpgInfo.showMenuOnExit)
+				interface_showMenu(1, 1);
+			else
+				interface_showMenu(0, 1);
+			return 0;
+#ifdef ENABLE_PVR
+#ifdef STBPNX
 		case interfaceCommandRecord:
 			if( rtpEpgMenu.baseMenu.selectedItem < 0 )
 				return 1;
+
+		{
+			list_element_t *element;
+			EIT_event_t *event = NULL;
+			int channelNumber;
+			unsigned int event_id;
+			pvrJob_t new_job;
+			url_desc_t url;
+			char buf[BUFFER_SIZE];
 
 			channelNumber = CHANNEL_INFO_GET_CHANNEL( rtpEpgMenu.baseMenu.menuEntry[rtpEpgMenu.baseMenu.selectedItem].pArg );
 			event_id      = CHANNEL_INFO_GET_SCREEN(  rtpEpgMenu.baseMenu.menuEntry[rtpEpgMenu.baseMenu.selectedItem].pArg );
@@ -2851,30 +2894,15 @@ static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 				return 0;
 			}
 			interface_displayMenu(1);
+		}
 			return 0;
+#endif // STBPNX
+#endif // ENABLE_PVR
 		default:
 			return 1;
 	}
 	return 1;
 }
-#endif // STBPNX
-
-int rtp_recordNow()
-{
-	if ( appControlInfo.rtpMenuInfo.channel != CHANNEL_CUSTOM )
-	{
-		char desc[MENU_ENTRY_INFO_LENGTH], *str;
-		strcpy(desc, streams.items[appControlInfo.rtpMenuInfo.channel].session_name);
-		str = index(desc, '\n');
-		if( str )
-			*str = 0;
-		return pvr_record( screenMain, rtp_info[appControlInfo.rtpMenuInfo.channel].url, desc );
-	} else
-	{
-		return pvr_record( screenMain, appControlInfo.rtpMenuInfo.lastUrl, appControlInfo.playbackInfo.description );
-	}
-}
-#endif // ENABLE_PVR
 
 static int rtp_saveAudioTrackList()
 {
@@ -2916,13 +2944,17 @@ static int rtp_loadAudioTrackList()
 	return 0;
 }
 
-#ifdef ENABLE_MULTI_VIEW
-static int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
+int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
-	dprintf("%s: in %d\n", __FUNCTION__, cmd->command);
+	dprintf("%s: in %s (%d)\n", __FUNCTION__, interface_commandName(cmd->command), cmd->command);
 
-	if( cmd->command == interfaceCommandTV)
+	switch (cmd->command)
 	{
+	case interfaceCommandEpg:
+		rtp_showEpg();
+		return 0;
+#ifdef ENABLE_MULTI_VIEW
+	case interfaceCommandTV:
 		if(appControlInfo.rtpMenuInfo.channel != CHANNEL_CUSTOM)
 		{
 			if( strncmp( rtp_info[appControlInfo.rtpMenuInfo.channel].url, URL_RTP_MEDIA, sizeof(URL_RTP_MEDIA)-1 ) == 0 ||
@@ -2933,10 +2965,14 @@ static int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pAr
 				rtp_multiviewPlay( (interfaceMenu_t*)&rtpStreamMenu, CHANNEL_INFO_SET(screenMain, CHANNEL_CUSTOM) );
 			return 0;
 		}
+		break;
+#endif
+	default:; // fall through
 	}
 	return 1;
 }
 
+#ifdef ENABLE_MULTI_VIEW
 static int rtp_multiviewNext(int direction, void* pArg)
 {
 	int indexdiff = direction == 0 ? 1 : -1;

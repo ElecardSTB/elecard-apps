@@ -4209,8 +4209,15 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 int interface_menuActionShowMenu(interfaceMenu_t *pMenu, void *pArg)
 {
 	interfaceMenu_t *pTargetMenu = (interfaceMenu_t*)pArg;
-	int ret = 0;
+	int ret = interface_switchMenu(pMenu, pTargetMenu);
+	if (ret == 0 && pMenu != pTargetMenu)
+		interface_animateMenu(1, 1);
+	return ret;
+}
 
+int interface_switchMenu(interfaceMenu_t *pMenu, interfaceMenu_t *pTargetMenu)
+{
+	int ret = 0;
 	if ( pTargetMenu != NULL && pTargetMenu != interfaceInfo.currentMenu )
 	{
 		if (pMenu->pDeactivatedAction != NULL)
@@ -4230,8 +4237,6 @@ int interface_menuActionShowMenu(interfaceMenu_t *pMenu, void *pArg)
 			}
 		}
 		interfaceInfo.currentMenu = pTargetMenu;
-		//eprintf ("%s: interface_animateMenu...\n", __FUNCTION__);
-		interface_animateMenu(1, 1);
 	}
 	return ret;
 }
@@ -6204,7 +6209,7 @@ void interface_showMenu(int showFlag, int redrawFlag)
 	}
 
 	if ( redrawFlag )
-	{		
+	{
 		interface_displayMenu(1);
 	}
 }

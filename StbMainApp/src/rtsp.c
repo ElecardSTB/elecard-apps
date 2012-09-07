@@ -1015,6 +1015,7 @@ static void rtsp_setupPlayControl(void *pArg)
 				break;
 			case playlistModeIPTV:
 				set_channel = rtp_setChannel;
+				interface_playControlSetProcessCommand(rtp_playControlProcessCommand);
 				sprintf(appControlInfo.rtpMenuInfo.lastUrl,"rtsp://%s:%d/%s",
 				stream_info.ip,
 				stream_info.port,
