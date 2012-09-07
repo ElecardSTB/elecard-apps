@@ -1681,6 +1681,8 @@ int  interface_symbolLookup( int num, int repeat, int *offset );
  */
 void interface_displayClock(int detached);
 
+const char *interface_commandName(interfaceCommand_t cmd);
+
 #ifdef STB225
 #undef inline
 #endif

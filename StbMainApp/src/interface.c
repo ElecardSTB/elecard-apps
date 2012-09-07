@@ -73,6 +73,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ctype.h>
 #include <pthread.h>
 
+#include <directfb_keynames.h>
 // for DirectFB memory access in interface_animateSurface()
 #include <core/system.h>
 #include <display/idirectfbsurface.h>
@@ -316,6 +317,75 @@ char keypad[KEYPAD_MAX_ROWS][KEYPAD_MAX_CELLS] = {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
+
+const char *interface_commandName(interfaceCommand_t cmd)
+{
+	switch (cmd)
+	{
+	case interfaceCommandNone:       return "None";
+	case interfaceCommandUp:         return "Up";
+	case interfaceCommandDown:       return "Down";
+	case interfaceCommandLeft:       return "Left";
+	case interfaceCommandRight:      return "Right";
+	case interfaceCommandEnter:      return "Enter";
+	case interfaceCommandOk:         return "Ok";
+	case interfaceCommandToggleMenu: return "ToggleMenu";
+	case interfaceCommandBack:       return "Back";
+	case interfaceCommandExit:       return "Exit";
+	case interfaceCommandMainMenu:   return "MainMenu";
+	case interfaceCommand1:          return "1";
+	case interfaceCommand2:          return "2";
+	case interfaceCommand3:          return "3";
+	case interfaceCommand4:          return "4";
+	case interfaceCommand5:          return "5";
+	case interfaceCommand6:          return "6";
+	case interfaceCommand7:          return "7";
+	case interfaceCommand8:          return "8";
+	case interfaceCommand9:          return "9";
+	case interfaceCommand0:          return "0";
+	case interfaceCommandVolumeUp:   return "VolumeUp";
+	case interfaceCommandVolumeDown: return "VolumeDown";
+	case interfaceCommandVolumeMute: return "Mute";
+	case interfaceCommandPrevious:   return "Previous";
+	case interfaceCommandRewind:     return "Rewind";
+	case interfaceCommandStop:       return "Stop";
+	case interfaceCommandPause:      return "Pause";
+	case interfaceCommandPlay:       return "Play";
+	case interfaceCommandFastForward:return "FastForward";
+	case interfaceCommandNext:       return "Next";
+	case interfaceCommandRecord:     return "Record";
+	case interfaceCommandChangeMenuStyle: return "MenuStyle";
+	case interfaceCommandRed:        return "Red";
+	case interfaceCommandGreen:      return "Green";
+	case interfaceCommandYellow:     return "Yellow";
+	case interfaceCommandBlue:       return "Blue";
+	case interfaceCommandChannelUp:  return "ChannelUp";
+	case interfaceCommandChannelDown:return "ChannelDown";
+	case interfaceCommandInfo:       return "Info";
+	case interfaceCommandServices:   return "Services";
+	case interfaceCommandFavorites:  return "Favorites";
+	case interfaceCommandTV:         return "TV";
+	case interfaceCommandUsb:        return "Usb";
+	case interfaceCommandPhone:      return "Phone";
+	case interfaceCommandWeb:        return "Web";
+	case interfaceCommandPageUp:     return "PageUp";
+	case interfaceCommandPageDown:   return "PageDown";
+	case interfaceCommandRefresh:    return "Refresh";
+	case interfaceCommandTeletext:   return "Teletex";
+	case interfaceCommandSearch:     return "Search";
+	case interfaceCommandEpg:        return "Epg";
+	case interfaceCommandCount: break;
+	}
+	static DirectFBKeySymbolNames(directfb_keynames);
+	int i;
+	for (i = 0; directfb_keynames[i].name != NULL; i++)
+		if (directfb_keynames[i].symbol == (DFBInputDeviceKeySymbol)cmd)
+			return directfb_keynames[i].name;
+
+	static char key[10];
+	snprintf(key, sizeof(key), "%d", (int)key);
+	return key;
+}
 
 void interface_drawInnerBorder(IDirectFBSurface *pSurface,
                                int r, int g, int b, int a,
