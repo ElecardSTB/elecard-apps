@@ -149,6 +149,7 @@ typedef struct
 	rtpEPGProgramInfo_t program;
 	interfaceMenu_t *previousMenu;
 	int showMenuOnExit;
+	int timestampWidth;
 } rtpEPGInfo_t;
 
 /******************************************************************
@@ -287,6 +288,7 @@ void rtp_buildMenu(interfaceMenu_t *pParent)
 	rtpEpgInfo.program.info[0] = 0;
 	rtpEpgInfo.showMenuOnExit = 0;
 	rtpEpgInfo.previousMenu = NULL;
+	DFBCHECK(pgfx_smallfont->GetStringWidth(pgfx_smallfont, "44:44", -1, &rtpEpgInfo.timestampWidth));
 }
 
 void rtp_cleanupMenu()
@@ -726,10 +728,10 @@ static int rtp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int 
 							event_start += event_length;
 							localtime_r( &event_start, &start_tm );
 							strftime( buf, sizeof(buf), "%H:%M", &start_tm );
-							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, rect->x+rect->w - interfaceInfo.thumbnailSize, text_y, buf, 0, 0);
+							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, rect->x+rect->w - rtpEpgInfo.timestampWidth, text_y, buf, 0, 0);
 
 							/* Draw programme name */
-							text_x += fh+interfaceInfo.thumbnailSize;
+							text_x += fh+rtpEpgInfo.timestampWidth;
 							maxWidth = rect->x+rect->w - interfaceInfo.thumbnailSize - text_x;
 							strncpy( buf, (char*)event->description.event_name, sizeof(buf) );
 							buf[sizeof(buf)-1] = 0;
