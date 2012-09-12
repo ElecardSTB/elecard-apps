@@ -133,7 +133,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_DVB
 	/** @def ENABLE_TELETEXT Enable DVB Teletext
 	 */
+// STAPI uses it's own demuxer, incompatible with StbMainApp's teletext implementation
+#ifndef STSDK
 	#define ENABLE_TELETEXT
+#endif
 
 	/** @def ENABLE_DVB_DIAG Enable diagnostics mode for DVB
 	 */

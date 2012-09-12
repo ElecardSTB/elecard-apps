@@ -371,7 +371,7 @@ const char *interface_commandName(interfaceCommand_t cmd)
 	case interfaceCommandPageUp:     return "PageUp";
 	case interfaceCommandPageDown:   return "PageDown";
 	case interfaceCommandRefresh:    return "Refresh";
-	case interfaceCommandTeletext:   return "Teletex";
+	case interfaceCommandTeletext:   return "Teletext";
 	case interfaceCommandSearch:     return "Search";
 	case interfaceCommandEpg:        return "Epg";
 	case interfaceCommandCount: break;
