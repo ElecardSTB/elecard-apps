@@ -162,10 +162,11 @@ typedef struct
 
 typedef enum {
 	lanDhcpServer = 0,
-	lanBridge,
-	lanDhcpClient,
 	lanStatic,
-	lanModeCount
+	/// FIXME: add support for more LAN modes
+	lanModeCount,
+	lanDhcpClient,
+	lanBridge,
 } lanMode_t;
 
 typedef struct
@@ -223,9 +224,7 @@ static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
 
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static int output_fillLANMenu (interfaceMenu_t *pMenu, void* pArg);
-#ifdef STBPNX
 static int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg);
-#endif
 #endif
 
 #ifdef ENABLE_WIFI
@@ -319,6 +318,8 @@ static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
 
 static int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg);
+
+const char* output_getLanModeName(lanMode_t mode);
 #endif
 
 /******************************************************************
@@ -1698,7 +1699,10 @@ static int output_toggleGatewayBW(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
+#endif // STBPNX
+#endif // ENABLE_LAN
 
+#if (defined ENABLE_LAN) || (ENABLE_WIFI)
 static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 #ifdef STBPNX
@@ -1729,7 +1733,7 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		interface_showMessageBox(_T("GATEWAY_IN_PROGRESS"), settings_renew, 0);
 #ifdef STBPNX
 		char *str = "";
-		switch( mode ) {
+		switch (mode) {
 			case gatewayModeBridge: str = "BRIDGE"; break;
 			case gatewayModeNAT:    str = "NAT"; break;
 			case gatewayModeFull:   str = "FULL"; break;
@@ -1782,7 +1786,6 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 #endif
 
 		output_fillGatewayMenu(pMenu, (void*)0);
-
 		interface_hideMessageBox();
 
 		return 0;
@@ -1795,8 +1798,7 @@ static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg)
 	interface_showConfirmationBox(_T("GATEWAY_MODE_CONFIRM"), thumbnail_question, output_confirmGatewayMode, pArg);
 	return 0;
 }
-#endif // STBPNX
-#endif // ENABLE_LAN
+#endif // ENABLE_LAN || ENABLE_WIFI
 
 static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -2331,6 +2333,11 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 			networkInfo.lanMode = (networkInfo.lanMode+1)%lanModeCount;
 			output_writeDhcpConfig();
 			break;
+#ifdef ENABLE_WIFI
+		case ifaceWireless:
+			wifiInfo.dhcp = !wifiInfo.dhcp;
+			break;
+#endif
 		default:
 			return 0;
 	}
@@ -5077,22 +5084,10 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 		}
 #endif // ENABLE_LAN
 #endif // STBPNX
-#if 0
-// TODO: There currently no plans to support ST devices with two ethernet interfaces
-//#ifdef STSDK
-	{
-		char *str;
-		switch( networkInfo.lanMode )
-		{
-			case lanBridge:     str = _T("GATEWAY_BRIDGE"); break;
-			case lanStatic:     str = _T("ADDR_MODE_STATIC"); break;
-			case lanDhcpServer: str = _T("GATEWAY_FULL"); break;
-			case lanDhcpClient: str = _T("ADDR_MODE_DHCP"); break;
-			default:            str = _T("OFF"); break;
-		}
-		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), str);
+
+#ifdef STSDK
+		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), output_getLanModeName(networkInfo.lanMode));
 		interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_fillGatewayMenu, (void*)0, thumbnail_configure);
-	}
 #endif
 		return 0;
 	}
@@ -5738,8 +5733,7 @@ static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-#ifdef ENABLE_LAN
-#ifdef STBPNX
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_clearMenuEntries((interfaceMenu_t*)&GatewaySubMenu);
@@ -5758,35 +5752,21 @@ int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == output_gatewayMode ? NULL : output_toggleGatewayMode,
 		                       (void*)mode,  mode == output_gatewayMode ? radiobtn_filled : radiobtn_empty);
 	}
-#endif
-
-#if 0
+#endif // STBPNX
+#ifdef STSDK
 // TODO: There currently no plans to support ST devices with two ethernet interfaces
-//#ifdef STSDK
 	lanMode_t mode;
-	for( mode = 0; mode < lanModeCount; mode++)
+	for (mode = 0; mode < lanModeCount; mode++)
 	{
-		char *str = NULL;
-		switch( mode )
-		{
-			case lanBridge:     str = _T("GATEWAY_BRIDGE"); break;
-			//case lanStatic:     str = _T("ADDR_MODE_STATIC"); break; /// TODO
-			case lanDhcpServer: str = _T("GATEWAY_FULL"); break;
-			//case lanDhcpClient: str = _T("ADDR_MODE_DHCP"); break; /// TODO
-			default:
-				continue;
-		}
-		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode,
+		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, output_getLanModeName(mode), mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode,
 		                       (void*)mode,  mode == networkInfo.lanMode ? radiobtn_filled : radiobtn_empty);
 	}
-#endif
-
+#endif // STSDK
 	interface_menuActionShowMenu(pMenu, (void*)&GatewaySubMenu);
 
 	return 0;
 }
-#endif // STBPNX
-#endif // ENABLE_LAN
+#endif // ENABLE_LAN || ENABLE_WIFI
 
 int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -6372,6 +6352,9 @@ int output_readInterfacesFile(void)
 	if (strcasecmp(buf, "BRIDGE") == 0)
 		networkInfo.lanMode = lanBridge;
 	else
+	if (strcasecmp(buf, "STATIC") == 0)
+		networkInfo.lanMode = lanStatic;
+	else
 		networkInfo.lanMode = lanDhcpServer;
 	getParam(LAN_CONFIG_FILE, "IPADDR", "0.0.0.0", buf);
 	inet_aton(buf, &addr);
@@ -6465,7 +6448,16 @@ int output_writeInterfacesFile(void)
 		setParam(WAN_CONFIG_FILE, "DEFAULT_GATEWAY", inet_ntoa(networkInfo.wan.gw));
 
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-	setParam(LAN_CONFIG_FILE, "MODE", networkInfo.lanMode == lanBridge ? "BRIDGE" : "NAT" );
+	char *mode = NULL;
+	switch (networkInfo.lanMode)
+	{
+		case lanModeCount:  // fall through
+		case lanDhcpServer: mode = "NAT";    break;
+		case lanBridge:     mode = "BRIDGE"; break;
+		case lanDhcpClient: mode = "DHCP";   break;
+		case lanStatic:     mode = "STATIC"; break;
+	}
+	setParam(LAN_CONFIG_FILE, "MODE", mode);
 	setParam(LAN_CONFIG_FILE, "IPADDR", inet_ntoa(networkInfo.lan.ip));
 	if (networkInfo.lan.mask.s_addr == 0)
 		networkInfo.lan.mask.s_addr = 0x00ffffff;
@@ -6521,10 +6513,20 @@ int output_writeInterfacesFile(void)
 	return 0;
 }
 
+const char* output_getLanModeName(lanMode_t mode)
+{
+	switch (mode)
+	{
+		case lanBridge:     return _T("GATEWAY_BRIDGE");
+		case lanStatic:     return _T("ADDR_MODE_STATIC");
+		case lanDhcpServer: return _T("GATEWAY_FULL");
+		case lanDhcpClient: return _T("ADDR_MODE_DHCP");
+		default:            return _T("OFF");
+	}
+}
+
 int output_writeDhcpConfig(void)
 {
-//	struct in_addr subnet, range_start, range_end, mask;
-
 	if (networkInfo.lanMode != lanDhcpServer)
 	{
 		unlink(STB_DHCPD_CONF);
