@@ -186,6 +186,7 @@ typedef struct
 
 typedef struct
 {
+	int enable;
 	int wanMode;
 #ifdef STSDK
 	int wanChanged;
@@ -1297,7 +1298,6 @@ int output_toggleWifiKey(interfaceMenu_t *pMenu, void* pArg)
 		interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{10}", output_changeWifiKey, output_getWifiKey, inputModeDirect, pArg );
 	else
 		interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\w+", output_changeWifiKey, output_getWifiKey, inputModeABC, pArg );
-
 	return 0;
 }
 
@@ -1344,7 +1344,29 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 
 	output_fillWifiMenu(pMenu, 0);
 	interface_displayMenu(1);
+	return 0;
+}
 
+static int output_toggleWifiEnable(interfaceMenu_t *pMenu, void* pArg)
+{
+	wifiInfo.enable = !wifiInfo.enable;
+
+#ifdef STBPNX
+	int i = OUTPUT_INFO_GET_INDEX(pArg);
+	char path[MAX_CONFIG_PATH];
+	char value[16];
+
+	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
+	sprintf(value,"%d",wifiInfo.enable);
+
+	output_warnIfFailed(setParam(path, "ENABLE_WIRELESS", value));
+#endif
+#ifdef STSDK
+	output_warnIfFailed(setParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", wifiInfo.enable ? "1" : "0"));
+#endif
+
+	output_fillWifiMenu(pMenu, 0);
+	interface_displayMenu(1);
 	return 0;
 }
 
@@ -5100,11 +5122,13 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	output_readWirelessSettings();
 
+	sprintf(buf, "%s: %s", iface_name, _T(wifiInfo.enable ? "ON" : "OFF"));
+	interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiEnable, SET_NUMBER(i), thumbnail_configure);
+
 	if (wifiInfo.wanMode || exists)
 	{
 		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN");
 		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiWAN, SET_NUMBER(i), thumbnail_configure);
-		
 	} else
 	{
 		sprintf(buf, "%s: %s", iface_name, _T("OFF"));
@@ -5113,8 +5137,10 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			WifiSubMenu.baseMenu.selectedItem = MENU_ITEM_BACK;
 	}
 
-	if (!exists)
+	if (!exists) {
+		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("NET_RESET"), output_toggleReset, SET_NUMBER(i), settings_renew);
 		return 0;
+	}
 
 	if (wifiInfo.wanMode)
 	{
@@ -5324,9 +5350,12 @@ int output_readWirelessSettings(void)
 	wifiInfo.encryption = wifiEncTKIP;
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(ifaceWireless));
+	getParam(path, "ENABLE_WIRELESS", "0", buf);
+	wifiInfo.enable = strtol( buf, NULL, 10 );
+
 	getParam(path, "WAN_MODE", "0", buf);
 	wifiInfo.wanMode = strtol( buf, NULL, 10 );
-	
+
 	getParam(path, "MODE", "ad-hoc", buf);
 	wifiInfo.mode = strcmp(buf, "managed") == 0 ? wifiModeManaged : wifiModeAdHoc;
 
@@ -6349,6 +6378,8 @@ int output_readInterfacesFile(void)
 	networkInfo.lan.ip = addr;
 #endif
 #ifdef ENABLE_WIFI
+	getParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", "0", buf);
+	wifiInfo.enable = atol(buf);
 	getParam(WLAN_CONFIG_FILE, "WAN_MODE", "0", buf);
 	wifiInfo.wanMode = atol(buf);
 	getParam(WLAN_CONFIG_FILE, "BOOTPROTO", "0", buf);
