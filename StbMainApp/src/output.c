@@ -258,6 +258,8 @@ static int output_toggleVODPlaylist(interfaceMenu_t *pMenu, void* pArg);
 #endif
 static int output_fillWebMenu (interfaceMenu_t *pMenu, void* pArg);
 
+static void output_warnIfFailed(int failed);
+
 #ifdef STB82
 static int output_toggleInterfaceAnimation(interfaceMenu_t* pMenu, void* pArg);
 #endif
@@ -372,8 +374,6 @@ static interfaceEditEntry_t DateEntry;
 #if (defined ENABLE_LAN) && (defined STBPNX)
 static gatewayMode_t output_gatewayMode = gatewayModeOff;
 #endif
-
-static int bDisplayedWarning = 0;
 
 static long info_progress;
 
@@ -541,11 +541,7 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 
 	appControlInfo.outputInfo.standart = tv_standard;
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 #else //#ifdef STB6x8x
 //	system("mount -o rw,remount /");
 //	setParam("/etc/init.d/S35pnxcore.sh", "resolution", GET_NUMBER(pArg) == 720 ? "1280x720x60p" : "1920x1080x60i");
@@ -567,6 +563,16 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 #endif
 
     return 0;
+}
+
+void output_warnIfFailed(int failed)
+{
+	static int bDisplayedWarning = 0;
+	if (failed && !bDisplayedWarning)
+	{
+		bDisplayedWarning = 1;
+		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	}
 }
 
 #ifdef STSDK
@@ -674,11 +680,7 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
 
 	appControlInfo.outputInfo.format = format;
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 
     /*switch(format)
     {
@@ -733,11 +735,10 @@ static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
             break;
     }
 
-    gfx_setOutputFormat(0);
-    //output_fillBlankingMenu();
+	gfx_setOutputFormat(0);
+	//output_fillBlankingMenu();
 	interface_displayMenu(1);
-
-    return 0;
+	return 0;
 }
 
 #ifndef HIDE_EXTRA_FUNCTIONS
@@ -753,16 +754,10 @@ static int output_toggleAudio(interfaceMenu_t *pMenu, void* pArg)
 
 	/* Just force rcaOutput for now */
 	appControlInfo.soundInfo.rcaOutput = 1;
-
 	sound_restart();
+
+	output_warnIfFailed(saveAppSettings());
 	output_fillVideoMenu(pMenu, NULL);
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
 	interface_displayMenu(1);
 	return 0;
 }
@@ -777,16 +772,9 @@ static int output_togglePCR(interfaceMenu_t *pMenu, void* pArg)
 		appControlInfo.bProcessPCR = 1;
 	}
 
+	output_warnIfFailed(saveAppSettings());
 	output_fillVideoMenu(pMenu, pArg);
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -801,15 +789,8 @@ static int output_toggleRSync(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	output_fillVideoMenu(pMenu, pArg);
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -824,14 +805,8 @@ static int output_toggleBufferTracking(interfaceMenu_t *pMenu, void* pArg)
 		appControlInfo.bUseBufferModel = 1;
 	}
 
+	output_warnIfFailed(saveAppSettings());
 	output_fillVideoMenu(pMenu, pArg);
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
 	interface_displayMenu(1);
 
 	return 0;
@@ -847,13 +822,7 @@ static int output_toggleInterfaceAnimation(interfaceMenu_t *pMenu, void* pArg)
 		interfaceInfo.currentMenu = (interfaceMenu_t*)&interfaceMainMenu; // toggles animation
 		interface_displayMenu(1);
 	}
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 #endif
@@ -863,84 +832,46 @@ static int output_toggleHighlightColor(interfaceMenu_t *pMenu, void* pArg)
 	interfaceInfo.highlightColor++;
 	if (interface_colors[interfaceInfo.highlightColor].A==0)
 		interfaceInfo.highlightColor = 0;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 
 static int output_toggleResumeAfterStart(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.playbackInfo.bResumeAfterStart = (appControlInfo.playbackInfo.bResumeAfterStart + 1) % 2;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillPlaybackMenu(pMenu, NULL);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
 static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.playbackInfo.bAutoPlay = (appControlInfo.playbackInfo.bAutoPlay + 1) % 2;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillPlaybackMenu(pMenu, NULL);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
 int output_toggleFileSorting(interfaceMenu_t* pMenu, void* pArg)
 {
 	appControlInfo.mediaInfo.fileSorting = appControlInfo.mediaInfo.fileSorting == naturalsort ? alphasort : naturalsort;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 
 static int output_togglePlayControlTimeout(interfaceMenu_t *pMenu, void* pArg)
 {
 	interfacePlayControl.showTimeout = interfacePlayControl.showTimeout % PLAYCONTROL_TIMEOUT_MAX + 1;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 
 static int output_togglePlayControlShowOnStart(interfaceMenu_t *pMenu, void* pArg)
 {
 	interfacePlayControl.showOnStart = !interfacePlayControl.showOnStart;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 
@@ -948,13 +879,7 @@ static int output_togglePlayControlShowOnStart(interfaceMenu_t *pMenu, void* pAr
 static int output_toggleVoipIndication(interfaceMenu_t *pMenu, void* pArg)
 {
 	interfaceInfo.enableVoipIndication = (interfaceInfo.enableVoipIndication + 1) % 2;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 
@@ -962,12 +887,7 @@ static int output_toggleVoipBuzzer(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.voipInfo.buzzer = (appControlInfo.voipInfo.buzzer + 1) % 2;
 	voip_setBuzzer();
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	return output_fillInterfaceMenu(pMenu, pArg);
 }
 #endif
@@ -1109,21 +1029,13 @@ int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
-	if (setParam(path, "ESSID", value) != 0	&& bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "ESSID", value));
 #endif // STBPNX
 #ifdef STSDK
 	if (wifiInfo.wanMode)
 		output_writeWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
 	else
-	if (setParam(STB_HOSTAPD_CONF, "ssid", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(STB_HOSTAPD_CONF, "ssid", value));
 #endif // STSDK
 
 	output_fillWifiMenu(pMenu, 0);
@@ -1159,18 +1071,10 @@ static int output_changeWifiChannel(interfaceMenu_t *pMenu, char *value, void* p
 	char path[MAX_CONFIG_PATH];
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-	if (setParam(path, "CHANNEL", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "CHANNEL", value));
 #endif // STBPNX
 #ifdef STSDK
-	if (output_setHostapdChannel(atol(value)) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_setHostapdChannel(atol(value)));
 	
 #endif // STSDK
 
@@ -1194,14 +1098,12 @@ char* output_getWifiChannel(int index, void* pArg)
 static int output_toggleWifiChannel(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_getText(pMenu, _T("ENTER_WIFI_CHANNEL"), "\\d{2}", output_changeWifiChannel, output_getWifiChannel, inputModeDirect, pArg );
-
 	return 0;
 }
 
 static int output_toggleAuthMode(interfaceMenu_t *pMenu, void* pArg)
 {
 	outputWifiAuth_t maxAuth = wifiInfo.mode == wifiModeAdHoc ? wifiAuthWEP+1 : wifiAuthCount;
-
 	return output_changeAuthMode(pMenu, (void*)((wifiInfo.auth+1)%maxAuth));
 }
 
@@ -1253,11 +1155,7 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 			return 1;
 	}
 
-	if (setParam(path, "AUTH", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "AUTH", value));
 #endif
 #ifdef STSDK
 	buf[0] = 0;
@@ -1280,11 +1178,7 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 	if (wifiInfo.auth > wifiAuthOpen && wifiInfo.key[0] == 0)
 		strcpy(wifiInfo.key, "0102030405");
 
-	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
 	output_fillWifiMenu(pMenu, 0);
@@ -1316,18 +1210,10 @@ int output_changeWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 		default: return 1;
 	}
 
-	if( setParam(path, "ENCRYPTION", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "ENCRYPTION", value));
 #endif
 #ifdef STSDK
-	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
 	output_fillWifiMenu(pMenu, 0);
@@ -1379,18 +1265,10 @@ static int output_changeWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
-	if (setParam(path, "KEY", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "KEY", value));
 #endif // STBPNX
 #ifdef STSDK
-	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
 	if( pAction != NULL )
@@ -1446,11 +1324,7 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 			setParam(path, "KEY",        "0102030405");
 		}
 	}
-	if( setParam(path, "WAN_MODE", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "WAN_MODE", value));
 #endif
 #ifdef STSDK
 	if (wifiInfo.wanMode)
@@ -1465,11 +1339,7 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 
 	output_readWirelessSettings();
 
-	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
 	output_fillWifiMenu(pMenu, 0);
@@ -1505,18 +1375,10 @@ int output_changeWifiMode(interfaceMenu_t *pMenu, void* pArg)
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
-	if( setParam(path, "MODE", value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, "MODE", value));
 #endif
 #ifdef STSDK
-	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
 	output_fillWifiMenu(pMenu, 0);
@@ -1633,11 +1495,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 		case optionMode: key = "BOOTPROTO";       break;
 	}
 
-	if( setParam(path, key, value) != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(setParam(path, key, value));
 #endif
 #ifdef STSDK
 	outputNfaceInfo_t *nface = NULL;
@@ -1683,11 +1541,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 	if (i == ifaceLAN)
 		output_writeDhcpConfig();
-	if (output_writeInterfacesFile() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
 	switch (i)
@@ -2166,11 +2020,8 @@ static int output_changeURL(interfaceMenu_t *pMenu, char *value, void* pArg)
 			sprintf(dest, "http://%s",value);
 		}
 	}
-	if ((ret = saveAppSettings() != 0) && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	ret = saveAppSettings();
+	output_warnIfFailed(ret);
 	if (ret == 0)
 	{
 		switch((outputUrlOption)pArg)
@@ -2315,11 +2166,7 @@ static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
 		output_toggleURL( pMenu, (void*)optionRtpPlaylist );
 	} else
 	{
-		if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-		{
-			bDisplayedWarning = 1;
-			interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-		}
+		output_warnIfFailed(saveAppSettings());
 		output_fillIPTVMenu( pMenu, pArg );
 		interface_displayMenu(1);
 	}
@@ -2331,11 +2178,7 @@ static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleVODPlaylist(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.rtspInfo.usePlaylistURL = (appControlInfo.rtspInfo.usePlaylistURL+1)%2;
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 	output_fillVODMenu( pMenu, pArg );
 	interface_displayMenu(1);
 	return 0;
@@ -2502,18 +2345,11 @@ static int output_changeVODIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 		interface_showMessageBox(_T("ERR_INCORRECT_IP"), thumbnail_error, 0);
 		return -1;
 	}
-
 	strcpy(appControlInfo.rtspInfo.streamIP, value);
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillVODMenu(pMenu, 0);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -2528,18 +2364,11 @@ static int output_changeVODINFOIP(interfaceMenu_t *pMenu, char *value, void* pAr
 		interface_showMessageBox(_T("ERR_INCORRECT_IP"), thumbnail_error, 0);
 		return -1;
 	}
-
 	strcpy(appControlInfo.rtspInfo.streamInfoIP, value);
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillVODMenu(pMenu, 0);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -2547,7 +2376,6 @@ static int output_toggleVODIP(interfaceMenu_t *pMenu, void* pArg)
 {
 	output_parseIP( appControlInfo.rtspInfo.streamIP );
 	interface_getText(pMenu, _T("ENTER_VOD_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVODIP, output_getIPfield, inputModeDirect, NULL);
-
 	return 0;
 }
 
@@ -2555,7 +2383,6 @@ static int output_toggleVODINFOIP(interfaceMenu_t *pMenu, void* pArg)
 {
 	output_parseIP( appControlInfo.rtspInfo.streamInfoIP );
 	interface_getText(pMenu, _T("ENTER_VOD_INFO_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVODINFOIP, output_getIPfield, inputModeDirect, NULL);
-
 	return 0;
 }
 #endif /* ENABLE_VOD */
@@ -2617,13 +2444,7 @@ static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEv
 static int output_toggleDvbDiagnosticsOnStart(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.diagnosticsMode = appControlInfo.offairInfo.diagnosticsMode != DIAG_ON ? DIAG_ON : DIAG_FORCED_OFF;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -2633,13 +2454,7 @@ static int output_toggleDvbDiagnosticsOnStart(interfaceMenu_t *pMenu, void* pArg
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.dvbShowScrambled = (appControlInfo.offairInfo.dvbShowScrambled + 1) % 3;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	offair_initServices();
 	offair_fillDVBTMenu();
@@ -2651,13 +2466,7 @@ static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleDvbNetworkSearch(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.dvbCommonInfo.networkScan = !appControlInfo.dvbCommonInfo.networkScan;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -2681,12 +2490,7 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 	}
 	fe->inversion = fe->inversion == 0 ? 1 : 0;
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -2705,12 +2509,7 @@ static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg)
 			appControlInfo.dvbtInfo.bandwidth = BANDWIDTH_8_MHZ;
 	}
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -2720,30 +2519,20 @@ static int output_toggleDvbSpeed(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.dvbCommonInfo.adapterSpeed = (appControlInfo.dvbCommonInfo.adapterSpeed+1) % 11;
 
-    if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-    {
-    	bDisplayedWarning = 1;
-    	interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-    }
-
-    output_fillDVBMenu(pMenu, pArg);
+	output_warnIfFailed(saveAppSettings());
+	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
-    return 0;
+	return 0;
 }
 
 static int output_toggleDvbExtScan(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.dvbCommonInfo.extendedScan ^= 1;
 
-    if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-    {
-    	bDisplayedWarning = 1;
-    	interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-    }
-
-    output_fillDVBMenu(pMenu, pArg);
+	output_warnIfFailed(saveAppSettings());
+	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
-    return 0;
+	return 0;
 }
 
 static stb810_dvbfeInfo* getDvbRange(void)
@@ -2839,15 +2628,9 @@ static int output_changeDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg
 		default: return 0;
 	}
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -2862,15 +2645,9 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 		default: appControlInfo.dvbcInfo.modulation = QAM_16;
 	}
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillDVBMenu(pMenu, pArg);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -3040,24 +2817,11 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_VERIMATRIX
 static int output_toggleVMEnable(interfaceMenu_t *pMenu, void* pArg)
 {
-    if (appControlInfo.useVerimatrix == 0)
-    {
-    	appControlInfo.useVerimatrix = 1;
-    }
-    else
-    {
-    	appControlInfo.useVerimatrix = 0;
-    }
-
-    if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-    {
-    	bDisplayedWarning = 1;
-    	interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-    }
-
-    output_fillNetworkMenu(pMenu, 0);
+	appControlInfo.useVerimatrix = !appControlInfo.useVerimatrix;
+	output_warnIfFailed(saveAppSettings());
+	output_fillNetworkMenu(pMenu, 0);
 	interface_displayMenu(1);
-    return 0;
+	return 0;
 }
 
 static int output_changeVMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -3193,17 +2957,13 @@ static int output_changeVMCompany(interfaceMenu_t *pMenu, char *value, void* pAr
 
 static int output_toggleVMAddress(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	interface_getText(pMenu, _T("VERIMATRIX_ADDRESS"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVMAddress, NULL, inputModeDirect, pArg);
-
 	return 0;
 }
 
 static int output_toggleVMCompany(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	interface_getText(pMenu, _T("VERIMATRIX_COMPANY"), "\\w+", output_changeVMCompany, NULL, inputModeABC, pArg);
-
 	return 0;
 }
 #endif // #ifdef ENABLE_VERIMATRIX
@@ -3211,24 +2971,11 @@ static int output_toggleVMCompany(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_SECUREMEDIA
 static int output_toggleSMEnable(interfaceMenu_t *pMenu, void* pArg)
 {
-    if (appControlInfo.useSecureMedia == 0)
-    {
-    	appControlInfo.useSecureMedia = 1;
-    }
-    else
-    {
-    	appControlInfo.useSecureMedia = 0;
-    }
-
-    if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-    {
-    	bDisplayedWarning = 1;
-    	interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-    }
-
-    output_fillNetworkMenu(pMenu, 0);
+	appControlInfo.useSecureMedia = !appControlInfo.useSecureMedia;
+	output_warnIfFailed(saveAppSettings());
+	output_fillNetworkMenu(pMenu, 0);
 	interface_displayMenu(1);
-    return 0;
+	return 0;
 }
 
 static int output_changeSMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -3285,19 +3032,10 @@ static int output_toggleSMAddress(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleAspectRatio(interfaceMenu_t *pMenu, void* pArg)
 {
 	if (appControlInfo.outputInfo.aspectRatio == aspectRatio_4x3)
-	{
 		appControlInfo.outputInfo.aspectRatio = aspectRatio_16x9;
-	} else
-	{
+	else
 		appControlInfo.outputInfo.aspectRatio = aspectRatio_4x3;
-	}
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
     output_fillVideoMenu(pMenu, pArg);
 	interface_displayMenu(1);
     return 0;
@@ -3312,12 +3050,7 @@ static int output_toggleAutoScale(interfaceMenu_t *pMenu, void* pArg)
     (void)event_send(gfxDimensionsEvent);
 #endif
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
     output_fillVideoMenu(pMenu, pArg);
 	interface_displayMenu(1);
     return 0;
@@ -3326,13 +3059,7 @@ static int output_toggleAutoScale(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleScreenFiltration(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.outputInfo.bScreenFiltration = (appControlInfo.outputInfo.bScreenFiltration + 1) % 2;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillVideoMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -3507,11 +3234,7 @@ static int output_setTimeZone(interfaceMenu_t *pMenu, void* pArg)
 	if (symlink(buf, TIMEZONE_FILE) < 0)
 #endif
 	{
-		if (bDisplayedWarning == 0)
-		{
-			bDisplayedWarning = 1;
-			interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-		}
+		output_warnIfFailed(1);
 	}
 
 	tzset();
@@ -4379,11 +4102,7 @@ int output_colorCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 			return 1;
 		case interfaceCommandExit:
 			interfacePlayControl.enabled = 1;
-			if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-			{
-				bDisplayedWarning = 1;
-				interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-			}
+			output_warnIfFailed(saveAppSettings());
 			//dprintf("%s: b=%d h=%d s=%d\n", __FUNCTION__, appCon);
 			return 0;
 		default:
@@ -4577,10 +4296,7 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
 	interfaceInfo.enable3d = (interfaceInfo.enable3d+1) & 1;
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 
 #if defined(STB225)
 	if(interfaceInfo.mode3D==0 || interfaceInfo.enable3d==0) {
@@ -4596,11 +4312,7 @@ static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
 
 static int output_toggle3DContent(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.content3d = (appControlInfo.outputInfo.content3d + 1) % 3;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 	output_fill3DMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -4608,11 +4320,7 @@ static int output_toggle3DContent(interfaceMenu_t *pMenu, void* pArg) {
 
 static int output_toggle3DFormat(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.format3d = (appControlInfo.outputInfo.format3d + 1) % 3;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 	output_fill3DMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -4620,11 +4328,7 @@ static int output_toggle3DFormat(interfaceMenu_t *pMenu, void* pArg) {
 
 static int output_toggleUseFactor(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.use_factor = (appControlInfo.outputInfo.use_factor + 1) % 2;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 	output_fill3DMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -4632,11 +4336,7 @@ static int output_toggleUseFactor(interfaceMenu_t *pMenu, void* pArg) {
 
 static int output_toggleUseOffset(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.use_offset= (appControlInfo.outputInfo.use_offset + 1) % 2;
-
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
+	output_warnIfFailed(saveAppSettings());
 	output_fill3DMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -5158,9 +4858,7 @@ static int output_setPPPPassword(interfaceMenu_t *pMenu, char *value, void* pArg
 		fclose(f);
 	} else
 	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-		return 0;
+		output_warnIfFailed(1);
 	}
 
 	output_fillPPPMenu(pMenu, pArg);
@@ -5748,10 +5446,9 @@ int output_setHostapdChannel(int channel)
 #if (defined ENABLE_IPTV) && (defined ENABLE_XWORKS)
 static int output_togglexWorks(interfaceMenu_t *pMenu, void* pArg)
 {
-	if ( setParam( STB_CONFIG_FILE, "XWORKS", pArg ? "ON" : "OFF" ) != 0 && bDisplayedWarning == 0)
+	if (setParam( STB_CONFIG_FILE, "XWORKS", pArg ? "ON" : "OFF" ) != 0)
 	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+		output_warnIfFailed(1);
 		return 1;
 	}
 	output_fillIPTVMenu( pMenu, NULL );
@@ -5776,10 +5473,9 @@ static int output_togglexWorksProto(interfaceMenu_t *pMenu, void* pArg)
 		default:             str = "http";
 	}
 
-	if ( setParam( STB_CONFIG_FILE, "XWORKS_PROTO", str ) != 0 && bDisplayedWarning == 0)
+	if (setParam( STB_CONFIG_FILE, "XWORKS_PROTO", str ) != 0)
 	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+		output_warnIfFailed(1);
 		return 1;
 	}
 	system("/usr/local/etc/init.d/S94xworks config");
@@ -5813,44 +5509,26 @@ int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg)
 	else
 		appControlInfo.playbackInfo.autoStop = timeouts[ (i+1)%timeouts_count ];
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillPlaybackMenu(pMenu, pArg);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
 int output_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (media_setNextPlaybackMode() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(media_setNextPlaybackMode());
 	output_fillPlaybackMenu(pMenu, pArg);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
 int output_toggleVolumeFadein(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.soundInfo.fadeinVolume = !appControlInfo.soundInfo.fadeinVolume;
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillPlaybackMenu(pMenu, pArg);
 	interface_displayMenu(1);
-
 	return 0;
 }
 
@@ -5868,12 +5546,7 @@ int output_toggleIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
 	else
 		appControlInfo.rtpMenuInfo.pidTimeout = timeouts[ (i+1)%timeouts_count ];
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	output_fillIPTVMenu(pMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
@@ -6568,12 +6241,7 @@ static int output_setProfile(interfaceMenu_t *pMenu, void* pArg)
 	fclose(profile);
 	interface_hideMessageBox();
 
-	if (saveAppSettings() != 0 && bDisplayedWarning == 0)
-	{
-		bDisplayedWarning = 1;
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	}
-
+	output_warnIfFailed(saveAppSettings());
 	unlink(STB_PROVIDER_PROFILE);
 	symlink(full_path, STB_PROVIDER_PROFILE);
 	for( i = 0; i < ProfileMenu.baseMenu.menuEntryCount; i++ )
