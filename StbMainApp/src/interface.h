@@ -620,6 +620,7 @@ typedef struct __interfaceMenu_t
 
 	int thumbnailWidth;
 	int thumbnailHeight;
+	int maxEntryTextWidth;
 
 	int menuEntryCount;
 	interfaceMenuEntry_t menuEntry[MENU_MAX_ENTRIES];

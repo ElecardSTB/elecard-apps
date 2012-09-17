@@ -840,10 +840,6 @@ static int rtp_fillStreamMenu(int which)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&rtpStreamMenu);
 
-	interfaceMenu_t *pMenu = (interfaceMenu_t*)&rtpStreamMenu;
-	// maxima
-	menuEventFunction savReinit = pMenu->reinitializeMenu;
-	pMenu->reinitializeMenu = NULL;
 	mysem_get(rtp_semaphore);
 	if ( streams.count > 0 )
 	{
@@ -942,8 +938,6 @@ static int rtp_fillStreamMenu(int which)
 			}
 		}
 	}
-	pMenu->reinitializeMenu = savReinit;
-	interface_menuReset(pMenu);
 	mysem_release(rtp_semaphore);
 
 	if (streams.count <= 0 || (genre_index != GENRE_COUNT && cur_genre == GENRE_INVALID))

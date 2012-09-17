@@ -215,6 +215,8 @@ static int interface_hideSliderControl(void *pArg);
 
 static int interface_editNext(interfaceMenu_t* pMenu);
 
+static void interface_listEntrySetReplacedCharPos(interfaceMenu_t* pMenu, int i);
+
 static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i);
 
 static int interface_editEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i);
@@ -4544,7 +4546,6 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	int x,y;
 	int r,g,b,a;
 	char entryText[MENU_ENTRY_INFO_LENGTH];
-	int maxWidth;
 	char *second_line;
 	if ( selected )
 	{
@@ -4623,12 +4624,10 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	second_line = strchr(pListMenu->baseMenu.menuEntry[i].info, '\n');
 	if ( pListMenu->listMenuType == interfaceListMenuNoThumbnail )
 	{
-		maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*4/*- INTERFACE_ARROW_SIZE*/ - INTERFACE_SCROLLBAR_WIDTH;
 		x = rect->x+interfaceInfo.paddingSize;//+INTERFACE_ARROW_SIZE;
 		y = rect->y + fh;
 	} else
 	{
-		maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*5/* - INTERFACE_ARROW_SIZE*/ - interfaceInfo.thumbnailSize - INTERFACE_SCROLLBAR_WIDTH;
 		x = rect->x+interfaceInfo.paddingSize*2/*+INTERFACE_ARROW_SIZE*/+pListMenu->baseMenu.thumbnailWidth;
 		if (second_line)
 			y = rect->y + pListMenu->baseMenu.thumbnailHeight/2 - 2; // + fh/4;
@@ -4653,7 +4652,7 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 #endif
 			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
 
-		length = getMaxStringLengthForFont(pgfx_smallfont, info_second_line, maxWidth-fh);
+		length = getMaxStringLengthForFont(pgfx_smallfont, info_second_line, pListMenu->baseMenu.maxEntryTextWidth-fh);
 		info_second_line[length] = 0;
 		gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, x+fh, y+fh, info_second_line, 0, i == pListMenu->baseMenu.selectedItem);
 		*second_line = '\n';
@@ -4791,9 +4790,19 @@ void smartLineTrim(char *string, int length)
 		string[length] = 0;
 }
 
+static void interface_listEntrySetReplacedCharPos(interfaceMenu_t *pMenu, int i)
+{
+	if (pMenu->menuEntry[i].infoReplacedChar != 0)
+		pMenu->menuEntry[i].info[pMenu->menuEntry[i].infoReplacedCharPos] = pMenu->menuEntry[i].infoReplacedChar;
+	int length = pMenu->menuEntry[i].info[0] ? getMaxStringLength(pMenu->menuEntry[i].info, pMenu->maxEntryTextWidth) : 0;
+	pMenu->menuEntry[i].infoReplacedCharPos = length;
+	pMenu->menuEntry[i].infoReplacedChar = pMenu->menuEntry[i].info[length];
+	pMenu->menuEntry[i].info[length] = 0;
+}
+
 static void interface_reinitializeListMenu(interfaceMenu_t *pMenu)
 {
-	int i, length, maxWidth;
+	int i;
 	interfaceListMenu_t *pListMenu = (interfaceListMenu_t*)pMenu;
 
 	if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail )
@@ -4808,48 +4817,19 @@ static void interface_reinitializeListMenu(interfaceMenu_t *pMenu)
 
 	if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail )
 	{
-		maxWidth =  interfaceInfo.clientWidth/2 - interfaceInfo.paddingSize*4/*- INTERFACE_ARROW_SIZE*/ - INTERFACE_SCROLLBAR_WIDTH;
+		pListMenu->baseMenu.maxEntryTextWidth =  interfaceInfo.clientWidth/2 - interfaceInfo.paddingSize*4/*- INTERFACE_ARROW_SIZE*/ - INTERFACE_SCROLLBAR_WIDTH;
 	} else if ( pListMenu->listMenuType == interfaceListMenuIconThumbnail )
 	{
-		maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*5/* - INTERFACE_ARROW_SIZE*/ - interfaceInfo.thumbnailSize - INTERFACE_SCROLLBAR_WIDTH;
+		pListMenu->baseMenu.maxEntryTextWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*5/* - INTERFACE_ARROW_SIZE*/ - interfaceInfo.thumbnailSize - INTERFACE_SCROLLBAR_WIDTH;
 	} else
 	{
-		maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*4/*- INTERFACE_ARROW_SIZE*/ - INTERFACE_SCROLLBAR_WIDTH;
+		pListMenu->baseMenu.maxEntryTextWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*4/*- INTERFACE_ARROW_SIZE*/ - INTERFACE_SCROLLBAR_WIDTH;
 	}
 
 	//dprintf("%s: maxWidth %d, clientWidth %d\n", __FUNCTION__, maxWidth, interfaceInfo.clientWidth);
 
 	for ( i=0; i<pListMenu->baseMenu.menuEntryCount; i++ )
-	{
-		if ( pListMenu->baseMenu.menuEntry[i].infoReplacedChar != 0 )
-		{
-			pListMenu->baseMenu.menuEntry[i].info[pListMenu->baseMenu.menuEntry[i].infoReplacedCharPos] = pListMenu->baseMenu.menuEntry[i].infoReplacedChar;
-		}
-
-#if 0
-		length = strlen(pListMenu->baseMenu.menuEntry[i].info)+1;
-
-		do
-		{
-			/* ensure that we don't stop in the middle of utf-8 multibyte symbol */
-			do
-			{
-				length--;
-			} while ( (pListMenu->baseMenu.menuEntry[i].info[length] & 0xC0) == 0x80 );
-
-			val = pListMenu->baseMenu.menuEntry[i].info[length];
-			pListMenu->baseMenu.menuEntry[i].info[length] = 0;
-			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, pListMenu->baseMenu.menuEntry[i].info, -1, &rectangle, NULL) );
-			pListMenu->baseMenu.menuEntry[i].info[length] = val;
-		} while ( rectangle.w-rectangle.x > maxWidth && length > 0 );
-#endif
-
-		length = getMaxStringLength(pListMenu->baseMenu.menuEntry[i].info, maxWidth);
-
-		pListMenu->baseMenu.menuEntry[i].infoReplacedCharPos = length;
-		pListMenu->baseMenu.menuEntry[i].infoReplacedChar = pListMenu->baseMenu.menuEntry[i].info[length];
-		pListMenu->baseMenu.menuEntry[i].info[length] = 0;
-	}
+		interface_listEntrySetReplacedCharPos(pMenu, i);
 }
 
 void interface_menuReset(interfaceMenu_t *pMenu)
@@ -5174,6 +5154,8 @@ interfaceListMenu_t * createListMenu( interfaceListMenu_t *pMenu,
 	pMenu->infoAreaHeight = interfaceInfo.clientHeight;
 	pMenu->listMenuType = listMenuType;
 
+	interface_reinitializeListMenu(_M pMenu);
+
 	return pMenu;
 }
 
@@ -5224,9 +5206,9 @@ int interface_addMenuEntryCustom(interfaceMenu_t *pMenu,
 		pMenu->menuEntry[pMenu->menuEntryCount].thumbnail = thumbnail;
 		pMenu->menuEntry[pMenu->menuEntryCount].image     = 0;
 
-		pMenu->menuEntryCount++;
+		interface_listEntrySetReplacedCharPos(pMenu, pMenu->menuEntryCount);
 
-		interface_menuReset(pMenu);
+		pMenu->menuEntryCount++;
 
 		return pMenu->menuEntryCount;
 	}
