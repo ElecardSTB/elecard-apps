@@ -622,8 +622,10 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	if (videoIndex != CHANNEL_CUSTOM)
 	{
 		youtubeInfo.index = videoIndex;
-		if (interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, videoIndex+1+(youtubeInfo.search_offset > 0), temp, sizeof(temp) ) == 0)
+		int menuIndex = videoIndex+1+(youtubeInfo.search_offset > 0);
+		if (interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, menuIndex, temp, sizeof(temp) ) == 0)
 			descr = temp;
+		interface_setSelectedItem(_M &YoutubeMenu, menuIndex);
 		thumbnail = youtubeInfo.videos[videoIndex].thumbnail[0] ? youtubeInfo.videos[videoIndex].thumbnail : NULL;
 		appControlInfo.playbackInfo.channel = videoIndex+1;
 		appControlInfo.playbackInfo.playlistMode = playlistModeYoutube;
