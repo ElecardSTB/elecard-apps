@@ -551,7 +551,7 @@ int offair_wizardStart(interfaceMenu_t *pMenu, void* pArg)
 	if (wizard_show(1, 1, pMenu, (unsigned long)pArg) == 0)
 	{
 		//interface_showMessageBox(_T("SETTINGS_WIZARD_NO_LOCATIONS"), thumbnail_warning, 5000);
-		output_fillDVBMenu((interfaceMenu_t*)&wizardHelperMenu, NULL);
+		output_showDVBMenu(pMenu, NULL);
 		interface_showMenu(1, 1);
 	}
 
@@ -575,7 +575,7 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	memset(&DVBTChannelMenu[1], 0, sizeof(interfaceListMenu_t));*/
 	appControlInfo.dvbInfo.channel = 0;//dvb_getChannelNumber(0);
 
-	output_fillDVBMenu(pMenu, pArg);
+	output_showDVBMenu(pMenu, NULL);
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
 #ifdef ENABLE_PVR
@@ -686,7 +686,7 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	memset(&nit, 0, sizeof(NIT_table_t));
 	if (dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay, appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL) == 0)
 	{
-		output_fillDVBMenu(pMenu, pArg);
+		output_showDVBMenu(pMenu, NULL);
 		offair_fillDVBTMenu();
 		offair_fillDVBTOutputMenu(which);
 #ifdef ENABLE_PVR
@@ -2160,8 +2160,7 @@ int offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	if( dvb_getNumberOfServices() == 0 )
 	{
-		interface_menuActionShowMenu(pMenu,(void*)&DVBSubMenu);
-		output_fillDVBMenu((interfaceMenu_t *)&DVBSubMenu, pArg);
+		output_showDVBMenu(pMenu, NULL);
 		interface_showConfirmationBox( _T("DVB_NO_CHANNELS"), thumbnail_dvb, offair_confirmAutoScan, NULL);
 		return 1;
 	}
@@ -4651,7 +4650,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 	{
 		if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 		{
-			output_fillDVBMenu((interfaceMenu_t*)&wizardHelperMenu, NULL);
+			output_showDVBMenu(pMenu, NULL);
 			wizard_cleanup(1);
 		} else if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandBack)
 		{
@@ -5300,7 +5299,7 @@ int wizard_init()
 			//interface_showMessageBox(_T("SETTINGS_WIZARD_NO_LOCATIONS"), thumbnail_warning, 5000);
 
 #ifdef ENABLE_DVB_DIAG
-			output_fillDVBMenu((interfaceMenu_t*)&wizardHelperMenu, NULL);
+			output_showDVBMenu(interfaceInfo.currentMenu, NULL);
 #endif
 		}
 	}

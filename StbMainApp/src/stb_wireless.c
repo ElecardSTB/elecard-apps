@@ -287,7 +287,7 @@ int wireless_changeNetwork(interfaceMenu_t* pMenu, void *pArg)
 	interface_menuActionShowMenu( pMenu, &WifiSubMenu );
 	if( wl_list[wl_selected].auth != wifiAuthOpen )
 	{
-		output_toggleWifiKey(_M &WifiSubMenu, NULL);
+		output_changeWifiKey(_M &WifiSubMenu, NULL);
 	}
 
 	return 0;
@@ -295,14 +295,14 @@ int wireless_changeNetwork(interfaceMenu_t* pMenu, void *pArg)
 
 int wireless_setNetwork(interfaceMenu_t* pMenu, void *pArg)
 {
-	output_changeESSID         (_M &WifiSubMenu,        wl_list[wl_selected].essid, (void*)ifaceWireless);
-	output_changeAuthMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].auth);
+	output_setESSID         (_M &WifiSubMenu,        wl_list[wl_selected].essid, (void*)ifaceWireless);
+	output_setAuthMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].auth);
 	if (wl_list[wl_selected].auth > wifiAuthWEP)
 	{
 		// We always must call output_changeWifiEncryption only after output_changeAuthMode as it can reset encryption!
-		output_changeWifiEncryption(_M &WifiSubMenu, (void*)wl_list[wl_selected].encr);
+		output_setWifiEncryption(_M &WifiSubMenu, (void*)wl_list[wl_selected].encr);
 	}
-	output_changeWifiMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].mode);
+	output_setWifiMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].mode);
 	return 0;
 }
 

@@ -67,9 +67,6 @@ typedef enum _colorSetting_t
 
 extern stbTimeZoneDesc_t timezones[];
 extern interfaceListMenu_t OutputMenu;
-#ifdef ENABLE_DVB
-extern interfaceListMenu_t DVBSubMenu;
-#endif
 
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
@@ -88,7 +85,7 @@ void output_buildMenu(interfaceMenu_t *pParent);
 void output_cleanupMenu();
 
 #ifdef ENABLE_DVB
-int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg);
+int output_showDVBMenu(interfaceMenu_t *pMenu, void* notused);
 #endif
 
 #ifdef ENABLE_PROVIDER_PROFILES
@@ -116,22 +113,22 @@ int output_isBridge(void);
 #ifdef ENABLE_WIFI
 extern interfaceListMenu_t WifiSubMenu;
 
-int output_toggleWifiKey(interfaceMenu_t *pMenu, void* pArg);
-int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg);
+int output_changeWifiKey(interfaceMenu_t *pMenu, void* pArg);
+int output_setESSID(interfaceMenu_t *pMenu, char *value, void* pArg);
 /**
  * @param[in] pArg outputWifiAuth_t to change wireless authentification to
  */
-int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg);
+int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg);
 
 /**
  * @param[in] pArg outputWifiEncryption_t to change wireless encryption to
  */
-int output_changeWifiEncryption(interfaceMenu_t *pMenu, void* pArg);
+int output_setWifiEncryption(interfaceMenu_t *pMenu, void* pArg);
 
 /**
  * @param[in] pArg outputWifiMode_t to change wireless mode to
  */
-int output_changeWifiMode(interfaceMenu_t *pMenu, void* pArg);
+int output_setWifiMode(interfaceMenu_t *pMenu, void* pArg);
 #endif
 
 #ifdef STSDK

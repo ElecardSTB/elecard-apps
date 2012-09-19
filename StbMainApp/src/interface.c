@@ -3337,15 +3337,8 @@ static void interface_enterChannelList()
 #endif
 	if ( appControlInfo.playbackInfo.streamSource != streamSourceIPTV && offair_tunerPresent() )
 	{
-		if ( dvb_getNumberOfServices() > 0 )
-		{
-			interface_showMenu(1, 0);
-			interface_menuActionShowMenu(interfaceInfo.currentMenu,(void*)&DVBTMenu);
-		} else
-		{
-			output_fillDVBMenu((interfaceMenu_t *)&DVBSubMenu, NULL);
-			interface_menuActionShowMenu(interfaceInfo.currentMenu,(void*)&DVBSubMenu);
-		}
+		interface_showMenu(1, 0);
+		interface_menuActionShowMenu(interfaceInfo.currentMenu, &DVBTMenu);
 	} else
 #endif /* ENABLE_DVB */
 	{

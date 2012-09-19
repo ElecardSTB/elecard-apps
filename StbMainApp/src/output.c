@@ -137,8 +137,16 @@ typedef enum
 	optionGW   = 0x02,
 	optionMask = 0x04,
 	optionDNS  = 0x08,
-	optionMode = 0x10
+	optionMode = 0x10,
 } outputIPOption;
+
+typedef enum
+{
+	optionLowFreq    = 0,
+	optionHighFreq,
+	optionFreqStep,
+	optionSymbolRate,
+} outputDvbOption;
 
 #ifdef ENABLE_PPP
 typedef struct
@@ -209,27 +217,47 @@ typedef struct
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
 
-static void output_fillOutputMenu(void);
-static int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg);
-static int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg);
-static int output_fillTimeMenu(interfaceMenu_t *pMenu, void* pArg);
-static int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg);
-static int output_fillPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
+// Please follow this rules when naming and implementing functions:
+// 1. Menus
+//   output_enter<Name>Menu - Should be a pActivatedAction, specified in createListMenu(<Name>Menu), clears and re-fills menu with entries.
+//                            This functions implementation implies that pMenu is always <Name>Menu, and not any other menu.
+//                            Menu created with this callback can be refilled using output_refillMenu(pMenu) from entry handlers, so
+//                            this function shouldn't be called manually.
+//                            Use this callback for menus with dynamical content, which should be updated each time user visits this menu.
+//   output_leave<Name>Menu - Should be a pDeactivatedAction, specified in createListMenu(<Name>Menu). pMenu is assumed to be &<Name>Menu.
+//   output_fill<Name>Menu  - Clears and refills <Name>Menu. Should be called manually.
+//                            Use it for menus which seldom updates it's contents.
+// 2. Entries
+//   output_show<Name>Menu  - Should be pAction, specified in addMenuEntry, and call menuActionShowMenu(pMenu, &<Name>Menu).
+//                            Use to change value using submenu with possible values.
+//   output_toggle<Option>  - Change <Option> value in-place and redraw menu. Use for boolean and enumeration values.
+//   output_change<Option>  - Change <Option> value using interface_getText. Use for string and numeric values with this callbacks:
+//      output_set<Option>  - Text box input callback function
+//      output_get<Option>  - Text box field callback function
+//   output_confirm<Action> - Use for confirmation message box callbacks
 
-static int output_fillWANMenu (interfaceMenu_t *pMenu, void* pArg);
+static void output_fillOutputMenu(void);
+static int output_enterNetworkMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
+
+static int output_enterWANMenu (interfaceMenu_t *wanMenu, void* pArg);
 #ifdef ENABLE_PPP
-static int output_fillPPPMenu (interfaceMenu_t *pMenu, void* pArg);
+static int output_enterPPPMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
 #endif
-
+#ifdef ENABLE_LAN
+static int output_enterLANMenu (interfaceMenu_t *lanMenu, void* pArg);
+#endif
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-static int output_fillLANMenu (interfaceMenu_t *pMenu, void* pArg);
-static int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg);
+static int output_showGatewayMenu(interfaceMenu_t *pMenu, void* ignored);
 #endif
 
 #ifdef ENABLE_WIFI
 static int output_readWirelessSettings(void);
-static int output_fillWifiMenu (interfaceMenu_t *pMenu, void* pArg);
+static int output_enterWifiMenu (interfaceMenu_t *pMenu, void* ignored);
 static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pArg);
 #ifdef STSDK
@@ -242,8 +270,8 @@ static int output_writeWpaSupplicantConf(const char *filename);
 #endif // ENABLE_WIFI
 
 #ifdef ENABLE_IPTV
-static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg);
-static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg);
+static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg);
+static int output_changeIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg);
 
 #ifdef ENABLE_PROVIDER_PROFILES
 static int output_enterProfileMenu(interfaceMenu_t *pMenu, void* pArg);
@@ -253,12 +281,10 @@ static int output_setProfile(interfaceMenu_t *pMenu, void* pArg);
 
 #endif // ENABLE_IPTV
 #ifdef ENABLE_VOD
-static int output_fillVODMenu (interfaceMenu_t *pMenu, void* pArg);
+static int output_enterVODMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleVODPlaylist(interfaceMenu_t *pMenu, void* pArg);
 #endif
-static int output_fillWebMenu (interfaceMenu_t *pMenu, void* pArg);
-
-static void output_warnIfFailed(int failed);
+static int output_enterWebMenu (interfaceMenu_t *pMenu, void* pArg);
 
 #ifdef STB82
 static int output_toggleInterfaceAnimation(interfaceMenu_t* pMenu, void* pArg);
@@ -277,6 +303,7 @@ static int output_toggleVoipIndication(interfaceMenu_t* pMenu, void* pArg);
 static int output_toggleVoipBuzzer(interfaceMenu_t* pMenu, void* pArg);
 #endif
 #ifdef ENABLE_DVB
+static int output_enterDVBMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
@@ -291,28 +318,28 @@ static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
 
 #ifdef ENABLE_3D
 static interfaceListMenu_t Video3DSubMenu;
-static int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg);
+static int output_enter3DMenu(interfaceMenu_t *pMenu, void* pArg);
 #endif // #ifdef STB225
 
 static void output_colorSliderUpdate(void *pArg);
 
 static char* output_getOption(outputUrlOption option);
 static char* output_getURL(int index, void* pArg);
-static int output_changeURL(interfaceMenu_t *pMenu, char *value, void* pArg);
-static int output_toggleURL(interfaceMenu_t *pMenu, void* pArg);
+static int output_setURL(interfaceMenu_t *pMenu, char *value, void* pArg);
+static int output_changeURL(interfaceMenu_t *pMenu, void* urlOption);
 
 #ifdef ENABLE_PASSWORD
 static int output_askPassword(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterPassword(interfaceMenu_t *pMenu, char *value, void* pArg);
+static int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg);
 #endif
 static void output_fillStandardMenu(void);
 static void output_fillFormatMenu(void);
 static void output_fillBlankingMenu(void);
-
 static void output_fillTimeZoneMenu(void);
 
 #ifdef STSDK
-static int output_fillUpdateMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 
 static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
@@ -322,10 +349,35 @@ static int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg);
 const char* output_getLanModeName(lanMode_t mode);
 #endif
 
+/** Display message box if failed is non-zero and no previous failures occured.
+ *  Return non-zero if message was displayed (and display updated). */
+static int output_warnIfFailed(int failed);
+
+/** Display message box if saveFailed and redraw menu */
+static int output_saveAndRedraw(int saveFailed, interfaceMenu_t *pMenu);
+
+/** Refill menu using pActivatedAction
+ * Use this function in messageBox handlers, as display will be updated on exit automatically */
+static inline int output_refillMenu(interfaceMenu_t *pMenu)
+{
+	// assert (pMenu->pActivatedAction != NULL);
+	return pMenu->pActivatedAction(pMenu, pMenu->pArg);
+}
+
+/** Refill menu using pActivatedAction and update display */
+static inline void output_redrawMenu(interfaceMenu_t *pMenu)
+{
+	output_refillMenu(pMenu);
+	interface_displayMenu(1);
+}
+
 /******************************************************************
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
 *******************************************************************/
 
+#ifdef ENABLE_DVB
+static interfaceListMenu_t DVBSubMenu;
+#endif
 static interfaceListMenu_t StandardMenu;
 static interfaceListMenu_t FormatMenu;
 static interfaceListMenu_t BlankingMenu;
@@ -341,8 +393,10 @@ static interfaceListMenu_t WANSubMenu;
 #ifdef ENABLE_PPP
 static interfaceListMenu_t PPPSubMenu;
 #endif
-#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+#ifdef ENABLE_LAN
 static interfaceListMenu_t LANSubMenu;
+#endif
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static interfaceListMenu_t GatewaySubMenu;
 #endif
 #ifdef ENABLE_WIFI
@@ -404,9 +458,6 @@ static const DirectFBScreenOutputResolutionNames(resolutions);
 ***************************************************************************/
 
 interfaceListMenu_t OutputMenu;
-#ifdef ENABLE_DVB
-interfaceListMenu_t DVBSubMenu;
-#endif
 
 stbTimeZoneDesc_t timezones[] = {
 	{"Russia/Kaliningrad", "(MSK-1) Калининградское время"},
@@ -567,32 +618,41 @@ static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
     return 0;
 }
 
-void output_warnIfFailed(int failed)
+int output_warnIfFailed(int failed)
 {
 	static int bDisplayedWarning = 0;
 	if (failed && !bDisplayedWarning)
 	{
 		bDisplayedWarning = 1;
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+		return failed;
 	}
+	return 0;
+}
+
+int output_saveAndRedraw(int saveFailed, interfaceMenu_t *pMenu)
+{
+	output_refillMenu(pMenu);
+	if (output_warnIfFailed(saveFailed) == 0)
+		interface_displayMenu(1);
+	return 0;
 }
 
 #ifdef STSDK
 static void output_applyFormat(void)
 {
-	if(st_needRestart()) {
+	if (st_needRestart()) {
 		interface_showMessageBox(_T("RESTARTING"), thumbnail_warning, 0);
 		helperStartApp("");
-	}	
+	}
 }
 
-static int output_cancelFormat(void *pArg)
+static int output_cancelFormat(void *formatMenu)
 {
 	interface_hideMessageBox();
 	st_changeOutputMode(output_originalFormat, output_currentFormat);
 	strcpy(output_currentFormat, output_originalFormat);
-	output_fillFormatMenu();
-	interface_displayMenu(1);
+	output_refillMenu(formatMenu);
 	output_applyFormat();
 
 	return 0;
@@ -601,30 +661,28 @@ static int output_cancelFormat(void *pArg)
 static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	if ((cmd->command == interfaceCommandGreen) ||
-		(cmd->command == interfaceCommandEnter) ||
-		(cmd->command == interfaceCommandOk))
+	    (cmd->command == interfaceCommandEnter) ||
+	    (cmd->command == interfaceCommandOk))
 	{
 		interface_hideMessageBox();
 		interface_removeEvent(output_cancelFormat, NULL);
 		output_applyFormat();
 		strcpy(output_originalFormat, output_currentFormat);
 	} else {
+		// output_cancelFormat MUST NOT be called from keyThread, because it tries to cancel it
 		interface_addEvent(output_cancelFormat, NULL, 0, 1);
 	}
-	
 	return 0;
 }
 
-static int output_toggleOutputModesEvent(void *pArg)
+static int output_toggleOutputModesEvent(void *pFormatStr)
 {
-	st_changeOutputMode(pArg, output_currentFormat);
-	strcpy(output_currentFormat, pArg);
-	interface_displayMenu(1);
+	st_changeOutputMode(pFormatStr, output_currentFormat);
+	strcpy(output_currentFormat, pFormatStr);
 
 	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
 	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
-
-	return 0;
+	return 1;
 }
 
 static char *output_getFormatName(interfaceMenu_t *pMenu, int itemMenu)
@@ -643,9 +701,7 @@ static char *output_getFormatName(interfaceMenu_t *pMenu, int itemMenu)
 int output_toggleOutputModes(void)
 {
 	int next = 0;
-	interfaceMenu_t *pMenu = &(FormatMenu.baseMenu);
-	if(VideoSubMenu.baseMenu.menuEntryCount == 0)
-		output_fillVideoMenu(interfaceInfo.currentMenu, NULL);
+	interfaceMenu_t *pMenu = _M &FormatMenu;
 	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
 	next = pMenu->selectedItem + 1;
 	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
@@ -715,9 +771,7 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
  */
 static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
 {
-    int blanking;
-
-    blanking = GET_NUMBER(pArg);
+    int blanking = GET_NUMBER(pArg);
 
     appControlInfo.outputInfo.encConfig[0].slow_blanking = blanking;
     appControlInfo.outputInfo.encConfig[0].flags = DSECONF_SLOW_BLANKING;
@@ -736,9 +790,7 @@ static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
         default:
             break;
     }
-
 	gfx_setOutputFormat(0);
-	//output_fillBlankingMenu();
 	interface_displayMenu(1);
 	return 0;
 }
@@ -746,72 +798,29 @@ static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
 #ifndef HIDE_EXTRA_FUNCTIONS
 static int output_toggleAudio(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (appControlInfo.soundInfo.rcaOutput == 1)
-	{
-		appControlInfo.soundInfo.rcaOutput = 0;
-	} else
-	{
-		appControlInfo.soundInfo.rcaOutput = 1;
-	}
-
-	/* Just force rcaOutput for now */
+	appControlInfo.soundInfo.rcaOutput = !appControlInfo.soundInfo.rcaOutput
+	// FIXME: Just force rcaOutput for now
 	appControlInfo.soundInfo.rcaOutput = 1;
 	sound_restart();
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillVideoMenu(pMenu, NULL);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_togglePCR(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (appControlInfo.bProcessPCR == 1)
-	{
-		appControlInfo.bProcessPCR = 0;
-	} else
-	{
-		appControlInfo.bProcessPCR = 1;
-	}
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillVideoMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.bProcessPCR = !appControlInfo.bProcessPCR;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleRSync(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (appControlInfo.bRendererDisableSync == 1)
-	{
-		appControlInfo.bRendererDisableSync = 0;
-	} else
-	{
-		appControlInfo.bRendererDisableSync = 1;
-	}
-
-	output_fillVideoMenu(pMenu, pArg);
-	output_warnIfFailed(saveAppSettings());
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.bRendererDisableSync = !appControlInfo.bRendererDisableSync;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
-
 
 static int output_toggleBufferTracking(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (appControlInfo.bUseBufferModel == 1)
-	{
-		appControlInfo.bUseBufferModel = 0;
-	} else
-	{
-		appControlInfo.bUseBufferModel = 1;
-	}
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillVideoMenu(pMenu, pArg);
-	interface_displayMenu(1);
-
-	return 0;
+	appControlInfo.bUseBufferModel = !appControlInfo.bUseBufferModel;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
 
@@ -824,8 +833,7 @@ static int output_toggleInterfaceAnimation(interfaceMenu_t *pMenu, void* pArg)
 		interfaceInfo.currentMenu = (interfaceMenu_t*)&interfaceMainMenu; // toggles animation
 		interface_displayMenu(1);
 	}
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
 
@@ -834,63 +842,51 @@ static int output_toggleHighlightColor(interfaceMenu_t *pMenu, void* pArg)
 	interfaceInfo.highlightColor++;
 	if (interface_colors[interfaceInfo.highlightColor].A==0)
 		interfaceInfo.highlightColor = 0;
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleResumeAfterStart(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.playbackInfo.bResumeAfterStart = (appControlInfo.playbackInfo.bResumeAfterStart + 1) % 2;
-	output_warnIfFailed(saveAppSettings());
-	output_fillPlaybackMenu(pMenu, NULL);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.playbackInfo.bResumeAfterStart = !appControlInfo.playbackInfo.bResumeAfterStart;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleAutoPlay(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.playbackInfo.bAutoPlay = (appControlInfo.playbackInfo.bAutoPlay + 1) % 2;
-	output_warnIfFailed(saveAppSettings());
-	output_fillPlaybackMenu(pMenu, NULL);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.playbackInfo.bAutoPlay = !appControlInfo.playbackInfo.bAutoPlay;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 int output_toggleFileSorting(interfaceMenu_t* pMenu, void* pArg)
 {
 	appControlInfo.mediaInfo.fileSorting = appControlInfo.mediaInfo.fileSorting == naturalsort ? alphasort : naturalsort;
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_togglePlayControlTimeout(interfaceMenu_t *pMenu, void* pArg)
 {
 	interfacePlayControl.showTimeout = interfacePlayControl.showTimeout % PLAYCONTROL_TIMEOUT_MAX + 1;
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_togglePlayControlShowOnStart(interfaceMenu_t *pMenu, void* pArg)
 {
 	interfacePlayControl.showOnStart = !interfacePlayControl.showOnStart;
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 #ifdef ENABLE_VOIP
 static int output_toggleVoipIndication(interfaceMenu_t *pMenu, void* pArg)
 {
-	interfaceInfo.enableVoipIndication = (interfaceInfo.enableVoipIndication + 1) % 2;
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	interfaceInfo.enableVoipIndication = !interfaceInfo.enableVoipIndication;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleVoipBuzzer(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.voipInfo.buzzer = (appControlInfo.voipInfo.buzzer + 1) % 2;
+	appControlInfo.voipInfo.buzzer = !appControlInfo.voipInfo.buzzer;
 	voip_setBuzzer();
-	output_warnIfFailed(saveAppSettings());
-	return output_fillInterfaceMenu(pMenu, pArg);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
 
@@ -1015,7 +1011,7 @@ int setParam(const char *path, const char *param, const char *value)
 }
 
 #ifdef ENABLE_WIFI
-int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
+int output_setESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	if (value == NULL)
 		return 1;
@@ -1040,9 +1036,7 @@ int output_changeESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 	output_warnIfFailed(setParam(STB_HOSTAPD_CONF, "ssid", value));
 #endif // STSDK
 
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-
+	output_refillMenu(pMenu);
 	return 0;
 }
 
@@ -1051,14 +1045,12 @@ char* output_getESSID(int index, void* pArg)
 	return index == 0 ? wifiInfo.essid : NULL;
 }
 
-static int output_toggleESSID(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeESSID(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_ESSID"), "\\w+", output_changeESSID, output_getESSID, inputModeABC, pArg );
-
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_ESSID"), "\\w+", output_setESSID, output_getESSID, inputModeABC, pArg );
 }
 
-static int output_changeWifiChannel(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setWifiChannel(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	if (value == NULL)
 		return 1;
@@ -1080,9 +1072,7 @@ static int output_changeWifiChannel(interfaceMenu_t *pMenu, char *value, void* p
 	
 #endif // STSDK
 
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-
+	output_refillMenu(pMenu);
 	return 0;
 }
 
@@ -1097,19 +1087,18 @@ char* output_getWifiChannel(int index, void* pArg)
 		return NULL;
 }
 
-static int output_toggleWifiChannel(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeWifiChannel(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_WIFI_CHANNEL"), "\\d{2}", output_changeWifiChannel, output_getWifiChannel, inputModeDirect, pArg );
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_WIFI_CHANNEL"), "\\d{2}", output_setWifiChannel, output_getWifiChannel, inputModeDirect, pArg );
 }
 
 static int output_toggleAuthMode(interfaceMenu_t *pMenu, void* pArg)
 {
 	outputWifiAuth_t maxAuth = wifiInfo.mode == wifiModeAdHoc ? wifiAuthWEP+1 : wifiAuthCount;
-	return output_changeAuthMode(pMenu, (void*)((wifiInfo.auth+1)%maxAuth));
+	return output_setAuthMode(pMenu, (void*)((wifiInfo.auth+1)%maxAuth));
 }
 
-int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
+int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STSDK
 	char buf[MENU_ENTRY_INFO_LENGTH];
@@ -1133,6 +1122,7 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 #endif
 	wifiInfo.auth = (outputWifiAuth_t)pArg;
 
+	int show_error = 0;
 #ifdef STBPNX
 	char path[MAX_CONFIG_PATH];
 	int i = ifaceWireless;
@@ -1157,7 +1147,7 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 			return 1;
 	}
 
-	output_warnIfFailed(setParam(path, "AUTH", value));
+	show_error = setParam(path, "AUTH", value);
 #endif
 #ifdef STSDK
 	buf[0] = 0;
@@ -1180,24 +1170,21 @@ int output_changeAuthMode(interfaceMenu_t *pMenu, void* pArg)
 	if (wifiInfo.auth > wifiAuthOpen && wifiInfo.key[0] == 0)
 		strcpy(wifiInfo.key, "0102030405");
 
-	output_warnIfFailed(output_writeInterfacesFile());
+	show_error = output_writeInterfacesFile();
 #endif
-
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-
-	return 0;
+	return output_saveAndRedraw(show_error, pMenu);
 }
 
 static int output_toggleWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 {
-	return output_changeWifiEncryption(pMenu, (void*)((wifiInfo.encryption+1)%wifiEncCount));
+	return output_setWifiEncryption(pMenu, (void*)((wifiInfo.encryption+1)%wifiEncCount));
 }
 
-int output_changeWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
+int output_setWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 {
 	wifiInfo.encryption = (outputWifiEncryption_t)pArg;
 
+	int show_error = 0;
 #ifdef STBPNX
 	char path[MAX_CONFIG_PATH];
 	int i = ifaceWireless;
@@ -1212,19 +1199,15 @@ int output_changeWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 		default: return 1;
 	}
 
-	output_warnIfFailed(setParam(path, "ENCRYPTION", value));
+	show_error = setParam(path, "ENCRYPTION", value);
 #endif
 #ifdef STSDK
-	output_warnIfFailed(output_writeInterfacesFile());
+	show_error = output_writeInterfacesFile();
 #endif
-
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-
-	return 0;
+	return output_saveAndRedraw(show_error, pMenu);
 }
 
-static int output_changeWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	menuActionFunction pAction = pArg;
 
@@ -1278,9 +1261,7 @@ static int output_changeWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return pAction(pMenu, SET_NUMBER(ifaceWireless));
 	}
 
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-
+	output_refillMenu(pMenu);
 	return 0;
 }
 
@@ -1293,19 +1274,19 @@ char* output_getWifiKey(int index, void* pArg)
  * @param[in] pArg Pointer to menuActionFunction, which will be called after successfull password change.
  * Callback will be called as pArg(pMenu, SET_NUMBER(ifaceWireless)). Can be NULL.
  */
-int output_toggleWifiKey(interfaceMenu_t *pMenu, void* pArg)
+int output_changeWifiKey(interfaceMenu_t *pMenu, void* pArg)
 {
 	if( wifiInfo.auth == wifiAuthWEP )
-		interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{10}", output_changeWifiKey, output_getWifiKey, inputModeDirect, pArg );
+		return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{10}", output_setWifiKey, output_getWifiKey, inputModeDirect, pArg );
 	else
-		interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\w+", output_changeWifiKey, output_getWifiKey, inputModeABC, pArg );
-	return 0;
+		return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\w+", output_setWifiKey, output_getWifiKey, inputModeABC, pArg );
 }
 
 static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 {
-	wifiInfo.wanMode = (wifiInfo.wanMode+1)%2;
+	wifiInfo.wanMode = !wifiInfo.wanMode;
 
+	int show_error = 0;
 #ifdef STBPNX
 	int i = OUTPUT_INFO_GET_INDEX(pArg);
 	char path[MAX_CONFIG_PATH];
@@ -1325,7 +1306,7 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 			setParam(path, "KEY",        "0102030405");
 		}
 	}
-	output_warnIfFailed(setParam(path, "WAN_MODE", value));
+	show_error = setParam(path, "WAN_MODE", value);
 #endif
 #ifdef STSDK
 	if (wifiInfo.wanMode)
@@ -1340,18 +1321,16 @@ static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 
 	output_readWirelessSettings();
 
-	output_warnIfFailed(output_writeInterfacesFile());
+	show_error = output_writeInterfacesFile();
 #endif
-
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(show_error, pMenu);
 }
 
 static int output_toggleWifiEnable(interfaceMenu_t *pMenu, void* pArg)
 {
 	wifiInfo.enable = !wifiInfo.enable;
 
+	int show_error = 0;
 #ifdef STBPNX
 	int i = OUTPUT_INFO_GET_INDEX(pArg);
 	char path[MAX_CONFIG_PATH];
@@ -1360,29 +1339,26 @@ static int output_toggleWifiEnable(interfaceMenu_t *pMenu, void* pArg)
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 	sprintf(value,"%d",wifiInfo.enable);
 
-	output_warnIfFailed(setParam(path, "ENABLE_WIRELESS", value));
+	show_error = setParam(path, "ENABLE_WIRELESS", value);
 #endif
 #ifdef STSDK
-	output_warnIfFailed(setParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", wifiInfo.enable ? "1" : "0"));
+	show_error = setParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", wifiInfo.enable ? "1" : "0");
 #endif
-
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(show_error, pMenu);
 }
 
 #ifdef STBPNX
 static int output_toggleWifiMode(interfaceMenu_t *pMenu, void* pArg)
 {
-	return output_changeWifiMode( pMenu, (void*)((wifiInfo.mode+1)%wifiModeCount));
+	return output_setWifiMode( pMenu, (void*)((wifiInfo.mode+1)%wifiModeCount));
 }
 #endif
 
-int output_changeWifiMode(interfaceMenu_t *pMenu, void* pArg)
+int output_setWifiMode(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	wifiInfo.mode = (outputWifiMode_t)pArg;
 
+	int show_error = 0;
 #ifdef STBPNX
 	char path[MAX_CONFIG_PATH];
 	char *value = NULL;
@@ -1398,16 +1374,12 @@ int output_changeWifiMode(interfaceMenu_t *pMenu, void* pArg)
 
 	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
 
-	output_warnIfFailed(setParam(path, "MODE", value));
+	show_error = setParam(path, "MODE", value);
 #endif
 #ifdef STSDK
-	output_warnIfFailed(output_writeInterfacesFile());
+	show_error = output_writeInterfacesFile();
 #endif
-
-	output_fillWifiMenu(pMenu, 0);
-	interface_displayMenu(1);
-
-	return 0;
+	return output_saveAndRedraw(show_error, pMenu);
 }
 #endif
 
@@ -1485,7 +1457,7 @@ static char* output_getIPfield(int field, void* pArg)
 	return field < 4 ? &output_ip[field*4] : NULL;
 }
 
-static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	in_addr_t ip;
 	int i = OUTPUT_INFO_GET_INDEX(pArg);
@@ -1503,6 +1475,8 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 			return -1;
 		}
 	}
+
+	int show_error = 0;
 #ifdef STBPNX
 	char path[MAX_CONFIG_PATH];
 	char *key = "";
@@ -1518,7 +1492,7 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 		case optionMode: key = "BOOTPROTO";       break;
 	}
 
-	output_warnIfFailed(setParam(path, key, value));
+	show_error = setParam(path, key, value);
 #endif
 #ifdef STSDK
 	outputNfaceInfo_t *nface = NULL;
@@ -1564,63 +1538,38 @@ static int output_changeIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 	if (i == ifaceLAN)
 		output_writeDhcpConfig();
-	output_warnIfFailed(output_writeInterfacesFile());
+	show_error = output_writeInterfacesFile();
 #endif
-
-	switch (i)
-	{
-		case ifaceWAN: output_fillWANMenu(pMenu, SET_NUMBER(type)); break;
-#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-		case ifaceLAN: output_fillLANMenu(pMenu, SET_NUMBER(type)); break;
-#endif
-#ifdef ENABLE_WIFI
-		case ifaceWireless: output_fillWifiMenu(pMenu, 0); break;
-#endif
-	}
-	interface_displayMenu(1);
-
-	return 0;
+	return output_saveAndRedraw(show_error, pMenu);
 }
 
-static int output_toggleIP(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeIP(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	output_getIP(OUTPUT_INFO_SET(optionIP,GET_NUMBER(pArg)));
-	interface_getText(pMenu, _T("ENTER_DEFAULT_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionIP,GET_NUMBER(pArg)) );
-
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_DEFAULT_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionIP,GET_NUMBER(pArg)) );
 }
 
-static int output_toggleGw(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeGw(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	output_getIP(OUTPUT_INFO_SET(optionGW,GET_NUMBER(pArg)));
-	interface_getText(pMenu, _T("ENTER_GATEWAY"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionGW,GET_NUMBER(pArg)) );
-
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_GATEWAY"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionGW,GET_NUMBER(pArg)) );
 }
 
-static int output_toggleDNSIP(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeDNS(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	output_getIP(OUTPUT_INFO_SET(optionDNS,GET_NUMBER(pArg)));
-	interface_getText(pMenu, _T("ENTER_DNS_ADDRESS"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionDNS,GET_NUMBER(pArg)) );
-
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_DNS_ADDRESS"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionDNS,GET_NUMBER(pArg)) );
 }
 
-static int output_toggleNetmask(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeNetmask(interfaceMenu_t *pMenu, void* pArg)
 {
-
 	output_getIP(OUTPUT_INFO_SET(optionMask,GET_NUMBER(pArg)));
-	interface_getText(pMenu, _T("ENTER_NETMASK"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionMask,GET_NUMBER(pArg)) );
-
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_NETMASK"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionMask,GET_NUMBER(pArg)) );
 }
 
 #ifdef ENABLE_LAN
 #ifdef STBPNX
-char *output_BWField(int field, void* pArg)
+char *output_getBandwidth(int field, void* pArg)
 {
 	if( field == 0 )
 	{
@@ -1631,7 +1580,7 @@ char *output_BWField(int field, void* pArg)
 		return NULL;
 }
 
-char *output_MACField(int field, void* pArg)
+char *output_getMAC(int field, void* pArg)
 {
 	int i;
 	char *ptr;
@@ -1654,7 +1603,7 @@ char *output_MACField(int field, void* pArg)
 	return ptr;
 }
 
-static int output_changeBW(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setBandwidth(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ivalue;
 	char buf[32];
@@ -1686,18 +1635,14 @@ static int output_changeBW(interfaceMenu_t *pMenu, char *value, void* pArg)
 	// Start network interfaces
 	system("/usr/local/etc/init.d/S90dhcpd start");
 
-	output_fillLANMenu(pMenu, 0);
-	interface_displayMenu(1);
+	output_refillMenu(pMenu);
 
 	return 0;
 }
 
-static int output_toggleGatewayBW(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeGatewayBandwidth(interfaceMenu_t *pMenu, void* pArg)
 {
-
-	interface_getText(pMenu, _T("GATEWAY_BANDWIDTH_INPUT"), "\\d*", output_changeBW, output_BWField, inputModeDirect, pArg);
-
-	return 0;
+	return interface_getText(pMenu, _T("GATEWAY_BANDWIDTH_INPUT"), "\\d*", output_setBandwidth, output_getBandwidth, inputModeDirect, pArg);
 }
 #endif // STBPNX
 #endif // ENABLE_LAN
@@ -1785,7 +1730,7 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 #endif
 #endif
 
-		output_fillGatewayMenu(pMenu, (void*)0);
+		output_showGatewayMenu(pMenu, (void*)0);
 		interface_hideMessageBox();
 
 		return 0;
@@ -1796,11 +1741,11 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showConfirmationBox(_T("GATEWAY_MODE_CONFIRM"), thumbnail_question, output_confirmGatewayMode, pArg);
-	return 0;
+	return 1;
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
-static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
+static int output_applyNetworkSettings(interfaceMenu_t *pMenu, void* pArg)
 {
     interface_showMessageBox(_T("RENEW_IN_PROGRESS"), settings_renew, 0);
 
@@ -1821,7 +1766,7 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 			strcpy(buf, "/etc/init.d/additional/dhcp.sh");
 #endif
 			system(buf);
-			output_fillWANMenu( (interfaceMenu_t*)&WANSubMenu, NULL );
+			output_refillMenu(pMenu);
 			break;
 #ifdef ENABLE_LAN
 		case ifaceLAN:
@@ -1906,7 +1851,7 @@ static int output_toggleReset(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-static int output_changeProxyAddr(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setProxyAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	char *ptr1, *ptr2;
 	char buf[MENU_ENTRY_INFO_LENGTH];
@@ -1963,21 +1908,14 @@ static int output_changeProxyAddr(interfaceMenu_t *pMenu, char *value, void* pAr
 		ret = setParam(BROWSER_CONFIG_FILE, "HTTPProxyServer", ptr2);
 #endif
 #ifdef STSDK
-		if( (ret = saveProxySettings()) != 0 )
-			interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+		ret = saveProxySettings();
 #endif
 		ret |= setenv("http_proxy", ptr2, 1);
 	}
 #ifdef STSDK
 	system( "killall -SIGHUP '" ELCD_BASENAME "'" );
 #endif
-
-	if (ret == 0)
-	{
-		output_fillWebMenu(pMenu, 0);
-		interface_displayMenu(1);
-	}
-	return ret;
+	return output_saveAndRedraw(ret, pMenu);
 }
 
 static char* output_getOption(outputUrlOption option)
@@ -2004,39 +1942,39 @@ static char* output_getOption(outputUrlOption option)
 	return NULL;
 }
 
-static int output_changeURL(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setURL(interfaceMenu_t *pMenu, char *value, void* urlOption)
 {
-	int ret;
-	char *dest;
+	outputUrlOption option = GET_NUMBER(urlOption);
 
-	if( value == NULL )
+	if ( value == NULL )
 	{
-		if( (outputUrlOption)pArg == optionRtpPlaylist && appControlInfo.rtpMenuInfo.playlist[0] == 0 )
+		if (option == optionRtpPlaylist && appControlInfo.rtpMenuInfo.playlist[0] == 0)
 		{
 			appControlInfo.rtpMenuInfo.usePlaylistURL = 0;
+			output_refillMenu(pMenu);
 		}
 		return 1;
 	}
 
-	dest = output_getOption((outputUrlOption)pArg);
-	if( dest == NULL )
+	char *dest = output_getOption(option);
+	if ( dest == NULL )
 		return 1;
 
-	if( value[0] == 0 )
+	if ( value[0] == 0 )
 	{
 		dest[0] = 0;
-		if( (outputUrlOption)pArg == optionRtpPlaylist )
+		if (option == optionRtpPlaylist)
 		{
 			appControlInfo.rtpMenuInfo.usePlaylistURL = 0;
 		}
 	} else
 	{
-		if( strlen( value ) < 8 )
+		if ( strlen( value ) < 8 )
 		{
 			interface_showMessageBox(_T("ERR_INCORRECT_URL"), thumbnail_warning, 3000);
 			return 1;
 		}
-		if( strncasecmp( value, "http://", 7 ) == 0 || strncasecmp( value, "https://", 8 ) == 0 )
+		if ( strncasecmp( value, "http://", 7 ) == 0 || strncasecmp( value, "https://", 8 ) == 0 )
 		{
 			strcpy(dest, value);
 		} else
@@ -2044,41 +1982,28 @@ static int output_changeURL(interfaceMenu_t *pMenu, char *value, void* pArg)
 			sprintf(dest, "http://%s",value);
 		}
 	}
-	ret = saveAppSettings();
-	output_warnIfFailed(ret);
-	if (ret == 0)
+	switch (option)
 	{
-		switch((outputUrlOption)pArg)
-		{
 #ifdef ENABLE_IPTV
-			case optionRtpEpg:
-				rtp_cleanupEPG();
-				output_fillIPTVMenu(pMenu, NULL);
-				break;
-			case optionRtpPlaylist:
-				rtp_cleanupPlaylist(screenMain);
-				output_fillIPTVMenu(pMenu, NULL);
-				break;
-#endif
-#ifdef ENABLE_VOD
-			case optionVodPlaylist:
-				output_fillVODMenu(pMenu, NULL);
+		case optionRtpEpg:
+			rtp_cleanupEPG();
+			break;
+		case optionRtpPlaylist:
+			rtp_cleanupPlaylist(screenMain);
+			break;
 #endif
 #ifdef ENABLE_TELETES
-			case optionTeletesPlaylist:
-				teletes_cleanupMenu();
-				output_fillIPTVMenu(pMenu, NULL);
-				break;
+		case optionTeletesPlaylist:
+			teletes_cleanupMenu();
+			break;
 #endif
-			default:;
-		}
-		interface_displayMenu(1);
+		default:;
 	}
-
-	return ret;
+	output_refillMenu(pMenu);
+	return output_warnIfFailed(saveAppSettings());
 }
 
-static int output_changeProxyLogin(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setProxyLogin(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ret = 0;
 
@@ -2087,23 +2012,17 @@ static int output_changeProxyLogin(interfaceMenu_t *pMenu, char *value, void* pA
 
 	strncpy(appControlInfo.networkInfo.login, value, sizeof(appControlInfo.networkInfo.login));
 	appControlInfo.networkInfo.login[sizeof(appControlInfo.networkInfo.login)-1]=0;
+	setenv("http_proxy_login", value, 1);
 #ifdef STBPNX
 	ret = setParam(BROWSER_CONFIG_FILE, "HTTPProxyLogin", value);
 #endif
 #ifdef STSDK
 	ret = saveProxySettings();
 #endif
-	if (ret == 0)
-	{
-		setenv("http_proxy_login", value, 1);
-		output_fillWebMenu(pMenu, 0);
-		interface_displayMenu(1);
-	}
-
-	return ret;
+	return output_saveAndRedraw(ret, pMenu);
 }
 
-static int output_changeProxyPasswd(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setProxyPassword(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ret = 0;
 
@@ -2112,20 +2031,14 @@ static int output_changeProxyPasswd(interfaceMenu_t *pMenu, char *value, void* p
 
 	strncpy(appControlInfo.networkInfo.passwd, value, sizeof(appControlInfo.networkInfo.passwd));
 	appControlInfo.networkInfo.passwd[sizeof(appControlInfo.networkInfo.passwd)-1]=0;
+	setenv("http_proxy_passwd", value, 1);
 #ifdef STBPNX
 	ret = setParam(BROWSER_CONFIG_FILE, "HTTPProxyPasswd", value);
 #endif
 #ifdef STSDK
 	ret = saveProxySettings();
 #endif
-	if (ret == 0)
-	{
-		setenv("http_proxy_passwd", value, 1);
-		output_fillWebMenu(pMenu, 0);
-		interface_displayMenu(1);
-	}
-
-	return ret;
+	return output_saveAndRedraw(ret, pMenu);
 }
 
 static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
@@ -2165,10 +2078,10 @@ static char *output_getURL(int index, void* pArg)
 	return index == 0 ? output_getOption((outputUrlOption)pArg) : NULL;
 }
 
-static int output_toggleURL(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeURL(interfaceMenu_t *pMenu, void* urlOption)
 {
 	char *str = "";
-	switch( (outputUrlOption)pArg )
+	switch (GET_NUMBER(urlOption))
 	{
 		case optionRtpEpg:      str = _T("ENTER_IPTV_EPG_ADDRESS");  break;
 #ifdef ENABLE_TELETES
@@ -2177,22 +2090,19 @@ static int output_toggleURL(interfaceMenu_t *pMenu, void* pArg)
 		case optionRtpPlaylist: str = _T("ENTER_IPTV_LIST_ADDRESS"); break;
 		case optionVodPlaylist: str = _T("ENTER_VOD_LIST_ADDRESS");  break;
 	}
-	interface_getText(pMenu, str, "\\w+", output_changeURL, output_getURL, inputModeABC, pArg);
-	return 0;
+	return interface_getText(pMenu, str, "\\w+", output_setURL, output_getURL, inputModeABC, urlOption);
 }
 
 #ifdef ENABLE_IPTV
-static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.rtpMenuInfo.usePlaylistURL = (appControlInfo.rtpMenuInfo.usePlaylistURL+1)%(appControlInfo.rtpMenuInfo.hasInternalPlaylist?3:2);
 	if( appControlInfo.rtpMenuInfo.usePlaylistURL && appControlInfo.rtpMenuInfo.playlist[0] == 0 )
 	{
-		output_toggleURL( pMenu, (void*)optionRtpPlaylist );
+		return output_changeURL( pMenu, SET_NUMBER(optionRtpPlaylist) );
 	} else
 	{
-		output_warnIfFailed(saveAppSettings());
-		output_fillIPTVMenu( pMenu, pArg );
-		interface_displayMenu(1);
+		output_saveAndRedraw(saveAppSettings(), pMenu);
 	}
 	return 0;
 }
@@ -2201,34 +2111,28 @@ static int output_toggleIPTVPlaylist(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_VOD
 static int output_toggleVODPlaylist(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.rtspInfo.usePlaylistURL = (appControlInfo.rtspInfo.usePlaylistURL+1)%2;
-	output_warnIfFailed(saveAppSettings());
-	output_fillVODMenu( pMenu, pArg );
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.rtspInfo.usePlaylistURL = !appControlInfo.rtspInfo.usePlaylistURL;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
 
-static int output_toggleProxyAddr(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeProxyAddress(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_PROXY_ADDR"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}:\\d+", output_changeProxyAddr, NULL, inputModeDirect, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_PROXY_ADDR"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}:\\d+", output_setProxyAddress, NULL, inputModeDirect, pArg);
 }
 
-static int output_toggleProxyLogin(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeProxyLogin(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_PROXY_LOGIN"), "\\w+", output_changeProxyLogin, NULL, inputModeABC, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_PROXY_LOGIN"), "\\w+", output_setProxyLogin, NULL, inputModeABC, pArg);
 }
 
-static int output_toggleProxyPasswd(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeProxyPassword(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_PROXY_PASSWD"), "\\w+", output_changeProxyPasswd, NULL, inputModeABC, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_PROXY_PASSWD"), "\\w+", output_setProxyPassword, NULL, inputModeABC, pArg);
 }
 
 #ifdef ENABLE_BROWSER
-char *output_getMWAddr(int field, void* pArg)
+char *output_getMiddlewareUrl(int field, void* pArg)
 {
 	if( field == 0 )
 	{
@@ -2241,7 +2145,7 @@ char *output_getMWAddr(int field, void* pArg)
 	return NULL;
 }
 
-static int output_changeMWAddr(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setMiddlewareUrl(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ret = 0;
 
@@ -2261,24 +2165,18 @@ static int output_changeMWAddr(interfaceMenu_t *pMenu, char *value, void* pArg)
 		strcpy(buf,value);
 	}
 	ret = setParam(BROWSER_CONFIG_FILE, "HomeURL", buf);
-
-	if (ret == 0)
-	{
-		output_fillWebMenu(pMenu, 0);
-		interface_displayMenu(1);
-	}
 #endif
-	return ret;
+	return output_saveAndRedraw(ret, pMenu);
 }
 
-static int output_toggleMWAddr(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeMiddlewareUrl(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_MW_ADDR"), "\\w+", output_changeMWAddr, output_getMWAddr, inputModeABC, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_MW_ADDR"), "\\w+", output_setMiddlewareUrl, output_getMiddlewareUrl, inputModeABC, pArg);
 }
 
 static int output_toggleMWAutoLoading(interfaceMenu_t *pMenu, void* pArg)
 {
+	int ret = 0;
 #ifdef STBPNX
 	char *str;
 	char temp[256];
@@ -2294,17 +2192,16 @@ static int output_toggleMWAutoLoading(interfaceMenu_t *pMenu, void* pArg)
 		dprintf("%s: Set ON  \n", __FUNCTION__);
 		str = "ON";
 	}
-	setParam(BROWSER_CONFIG_FILE, "AutoLoadingMW",str);
-	output_fillWebMenu(pMenu, 0);
-	interface_displayMenu(1);
+	ret = setParam(BROWSER_CONFIG_FILE, "AutoLoadingMW",str);
 #endif
-	return 0;
+	return output_saveAndRedraw(ret, pMenu);
 }
 #endif // ENABLE_BROWSER
 
 static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 {
 	int i = GET_NUMBER(pArg);
+	int ret = 0;
 
 #ifdef STBPNX
 	char value[MENU_ENTRY_INFO_LENGTH];
@@ -2321,7 +2218,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 		strcpy(value, "dhcp+dns");
 	}
 
-	output_changeIP(pMenu, value, OUTPUT_INFO_SET( optionMode,i));
+	ret = output_setIP(pMenu, value, OUTPUT_INFO_SET(optionMode,i));
 #endif
 #ifdef STSDK
 	switch (i)
@@ -2342,28 +2239,13 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 			return 0;
 	}
 
-	if (0 != output_writeInterfacesFile())
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	ret = output_writeInterfacesFile();
 #endif
-
-
-	switch (i)
-	{
-		case ifaceWAN: output_fillWANMenu(pMenu, SET_NUMBER(i)); break;
-#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-		case ifaceLAN: output_fillLANMenu(pMenu, SET_NUMBER(i)); break;
-#endif
-#ifdef ENABLE_WIFI
-		case ifaceWireless: output_fillWifiMenu(pMenu, 0); break;
-#endif
-	}
-	interface_displayMenu(1);
-
-	return 0;
+	return output_saveAndRedraw(ret, pMenu);
 }
 
 #ifdef ENABLE_VOD
-static int output_changeVODIP(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setVODIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	if( value == NULL )
 		return 1;
@@ -2376,13 +2258,10 @@ static int output_changeVODIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 	strcpy(appControlInfo.rtspInfo.streamIP, value);
 
-	output_warnIfFailed(saveAppSettings());
-	output_fillVODMenu(pMenu, 0);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static int output_changeVODINFOIP(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setVODINFOIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	if( value == NULL )
 		return 1;
@@ -2395,24 +2274,19 @@ static int output_changeVODINFOIP(interfaceMenu_t *pMenu, char *value, void* pAr
 	}
 	strcpy(appControlInfo.rtspInfo.streamInfoIP, value);
 
-	output_warnIfFailed(saveAppSettings());
-	output_fillVODMenu(pMenu, 0);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static int output_toggleVODIP(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeVODIP(interfaceMenu_t *pMenu, void* pArg)
 {
 	output_parseIP( appControlInfo.rtspInfo.streamIP );
-	interface_getText(pMenu, _T("ENTER_VOD_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVODIP, output_getIPfield, inputModeDirect, NULL);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_VOD_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setVODIP, output_getIPfield, inputModeDirect, NULL);
 }
 
-static int output_toggleVODINFOIP(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeVODINFOIP(interfaceMenu_t *pMenu, void* pArg)
 {
 	output_parseIP( appControlInfo.rtspInfo.streamInfoIP );
-	interface_getText(pMenu, _T("ENTER_VOD_INFO_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVODINFOIP, output_getIPfield, inputModeDirect, NULL);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_VOD_INFO_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setVODINFOIP, output_getIPfield, inputModeDirect, NULL);
 }
 #endif /* ENABLE_VOD */
 
@@ -2427,15 +2301,13 @@ static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg)
 #endif
 	str = _T("DVB_CLEAR_SERVICES_CONFIRM");
 	interface_showConfirmationBox(str, thumbnail_question, output_confirmClearDvb, pArg);
-
-	return 0;
+	return 1;
 }
 
 static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showConfirmationBox(_T("DVB_CLEAR_CHANNELS_CONFIRM"), thumbnail_question, output_confirmClearOffair, pArg);
-
-	return 0;
+	return 1;
 }
 
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
@@ -2446,10 +2318,9 @@ static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 	{
 		offair_clearServiceList(1);
-		output_fillDVBMenu(pMenu, pArg);
+		output_redrawMenu(pMenu);
 		return 0;
 	}
-
 	return 1;
 }
 
@@ -2473,32 +2344,23 @@ static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEv
 static int output_toggleDvbDiagnosticsOnStart(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.diagnosticsMode = appControlInfo.offairInfo.diagnosticsMode != DIAG_ON ? DIAG_ON : DIAG_FORCED_OFF;
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
 
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.dvbShowScrambled = (appControlInfo.offairInfo.dvbShowScrambled + 1) % 3;
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
 	offair_initServices();
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleDvbNetworkSearch(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.dvbCommonInfo.networkScan = !appControlInfo.dvbCommonInfo.networkScan;
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 #ifdef STBPNX
@@ -2519,10 +2381,7 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 	}
 	fe->inversion = fe->inversion == 0 ? 1 : 0;
 
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
 
@@ -2538,30 +2397,19 @@ static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg)
 			appControlInfo.dvbtInfo.bandwidth = BANDWIDTH_8_MHZ;
 	}
 
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleDvbSpeed(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.dvbCommonInfo.adapterSpeed = (appControlInfo.dvbCommonInfo.adapterSpeed+1) % 11;
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleDvbExtScan(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.dvbCommonInfo.extendedScan ^= 1;
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.dvbCommonInfo.extendedScan = !appControlInfo.dvbCommonInfo.extendedScan;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static stb810_dvbfeInfo* getDvbRange(void)
@@ -2626,9 +2474,9 @@ static char *output_getDvbRange(int field, void* pArg)
 		return NULL;
 }
 
-static int output_changeDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	int id = GET_NUMBER(pArg);
+	outputDvbOption option = GET_NUMBER(pArg);
 	long val;
 	stb810_dvbfeInfo *fe;
 
@@ -2641,26 +2489,22 @@ static int output_changeDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg
 	if (!fe || !symbolRate)
 		return 0;
 
-	if ( (id < 3 && (val < 1000 || val > 860000)) ||
-		 (id == 3 && (val < 1 || val > 50000)) )
+	if ( (option <= optionFreqStep && (val < 1000 || val > 860000)) ||
+	     (option == optionFreqStep && (val < 1    || val > 50000)) )
 	{
 		interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_error, 0);
 		return -1;
 	}
 
-	switch (id)
+	switch (option)
 	{
-		case 0: fe->lowFrequency = val; break;
-		case 1: fe->highFrequency = val; break;
-		case 2: fe->frequencyStep = val; break;
-		case 3: *symbolRate = val; break;
+		case optionLowFreq:     fe->lowFrequency  = val; break;
+		case optionHighFreq:    fe->highFrequency = val; break;
+		case optionFreqStep:    fe->frequencyStep = val; break;
+		case optionSymbolRate: *symbolRate = val; break;
 		default: return 0;
 	}
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
@@ -2673,11 +2517,7 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 		case QAM_128: appControlInfo.dvbcInfo.modulation = QAM_256; break;
 		default: appControlInfo.dvbcInfo.modulation = QAM_16;
 	}
-
-	output_warnIfFailed(saveAppSettings());
-	output_fillDVBMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static char *get_HZprefix(int tunerType)
@@ -2688,7 +2528,7 @@ static char *get_HZprefix(int tunerType)
 		return _T("KHZ");
 }
 
-static int output_toggleDvbRange(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeDvbRange(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	int id = GET_NUMBER(pArg);
@@ -2698,33 +2538,33 @@ static int output_toggleDvbRange(interfaceMenu_t *pMenu, void* pArg)
 
 	switch (id)
 	{
-		case 0: sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"), get_HZprefix(tunerType)); break;
-		case 1: sprintf(buf, "%s, %s: ", _T("DVB_HIGH_FREQ"), get_HZprefix(tunerType)); break;
-		case 2: sprintf(buf, "%s, %s: ", _T("DVB_STEP_FREQ"), _T("KHZ")); break;
-		case 3: sprintf(buf, "%s, %s: ", _T("DVB_SYMBOL_RATE"), _T("KHZ")); break;
+		case optionLowFreq:    sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"), get_HZprefix(tunerType)); break;
+		case optionHighFreq:   sprintf(buf, "%s, %s: ", _T("DVB_HIGH_FREQ"), get_HZprefix(tunerType)); break;
+		case optionFreqStep:   sprintf(buf, "%s, %s: ", _T("DVB_STEP_FREQ"), _T("KHZ")); break;
+		case optionSymbolRate: sprintf(buf, "%s, %s: ", _T("DVB_SYMBOL_RATE"), _T("KHZ")); break;
 		default: return -1;
 	}
-
-	interface_getText(pMenu, buf, "\\d+", output_changeDvbRange, output_getDvbRange, inputModeDirect, pArg);
-
-	return 0;
+	return interface_getText(pMenu, buf, "\\d+", output_setDvbRange, output_getDvbRange, inputModeDirect, pArg);
 }
 
-int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_showDVBMenu(interfaceMenu_t *pMenu, void* notused)
+{
+	return interface_menuActionShowMenu(pMenu, &DVBSubMenu);
+}
+
+int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
-	stb810_dvbfeInfo	*fe;
-	tunerFormat			tuner;
-	int					tunerType;
+	stb810_dvbfeInfo	*fe = getDvbRange();
+	tunerFormat			tuner = offair_getTuner();
+	int					tunerType = dvb_getType(tuner);
 
-	tuner = offair_getTuner();
-	tunerType = dvb_getType(tuner);
+	// assert (dvbMenu == (interfaceMenu_t*)&DVBSubMenu);
+	interface_clearMenuEntries(dvbMenu);
 
-	interface_clearMenuEntries((interfaceMenu_t*)&DVBSubMenu);
-
-	if ((fe = getDvbRange()) == NULL)
-		return interface_menuActionShowMenu(pMenu, (void*)&DVBSubMenu);
+	if (fe == NULL)
+		return 1;
 
 #ifdef STSDK
 	if( tuner < VMSP_COUNT ) {
@@ -2734,52 +2574,58 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 	if (getParam(buf, "LOCATION_NAME", NULL, NULL))
 	{
 		str = _T("SETTINGS_WIZARD");
-		interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, str, offair_wizardStart, NULL, thumbnail_scan);
+		interface_addMenuEntry(dvbMenu, str, offair_wizardStart, NULL, thumbnail_scan);
 	}
 
 	str = _T("DVB_MONITOR");
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, str, offair_frequencyMonitor, NULL, thumbnail_info);
+	interface_addMenuEntry(dvbMenu, str, offair_frequencyMonitor, NULL, thumbnail_info);
 
 #ifdef STSDK
 	}
 #endif
 
 	str = _T("DVB_INSTALL");
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, str, offair_serviceScan, NULL, thumbnail_scan);
+	interface_addMenuEntry(dvbMenu, str, offair_serviceScan, NULL, thumbnail_scan);
 
 	str = _T("DVB_SCAN_FREQUENCY");
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, str, offair_frequencyScan, screenMain, thumbnail_scan);
+	interface_addMenuEntry(dvbMenu, str, offair_frequencyScan, screenMain, thumbnail_scan);
 
 	sprintf(buf, "%s (%d)", _T("DVB_CLEAR_SERVICES"), dvb_getNumberOfServices());
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_clearDvbSettings, screenMain, thumbnail_scan);
+	interface_addMenuEntry(dvbMenu, buf, output_clearDvbSettings, screenMain, thumbnail_scan);
 
 	str = _T("DVB_CLEAR_CHANNELS");
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, str, output_clearOffairSettings, screenMain, thumbnail_scan);
+	interface_addMenuEntry(dvbMenu, str, output_clearOffairSettings, screenMain, thumbnail_scan);
 
 #ifdef ENABLE_DVB_DIAG
 	sprintf(buf, "%s: %s", _T("DVB_START_WITH_DIAGNOSTICS"), _T( appControlInfo.offairInfo.diagnosticsMode == DIAG_FORCED_OFF ? "OFF" : "ON" ) );
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbDiagnosticsOnStart, NULL, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbDiagnosticsOnStart, NULL, thumbnail_configure);
 #endif
 
-	sprintf(buf, "%s: %s", _T("DVB_SHOW_SCRAMBLED"), _T( appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY ? "PLAY" : (appControlInfo.offairInfo.dvbShowScrambled ? "ON" : "OFF") ) );
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
+	switch (appControlInfo.offairInfo.dvbShowScrambled)
+	{
+		case SCRAMBLED_SHOW: str = _T("ON"); break;
+		case SCRAMBLED_PLAY: str = _T("PLAY"); break;
+		default:             str = _T("OFF");
+	}
+	sprintf(buf, "%s: %s", _T("DVB_SHOW_SCRAMBLED"), str);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
 
 #ifdef STSDK
 	if( offair_getTuner() < VMSP_COUNT ) {
 #endif
 	sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
 #ifdef STSDK
 	}
 #endif
 #ifdef STBPNX
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
 #endif
 	if ((tunerType == FE_QAM) || (tunerType == FE_QPSK)) //dvb-c or dvb-s needs symbol rate option
 	{
 		sprintf(buf, "%s: %u %s", _T("DVB_SYMBOL_RATE"), getDvbSymbolRange()?*(getDvbSymbolRange()):0, _T("KHZ"));
-		interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)3, thumbnail_configure);
+		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)3, thumbnail_configure);
 	}
 	if (tunerType == FE_OFDM)
 	{
@@ -2791,7 +2637,7 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 			default:
 				sprintf(buf, "%s: Auto", _T("DVB_BANDWIDTH") );
 		}
-		interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
+		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
 	} else if (tunerType == FE_QAM)
 	{
 		char *mod;
@@ -2807,14 +2653,14 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 		}
 
 		sprintf(buf, "%s: %s", _T("DVB_QAM_MODULATION"), mod);
-		interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
+		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
 	}
 
 	sprintf(buf, "%s: %ld %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, get_HZprefix(tunerType));
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)0, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)0, thumbnail_configure);
 
 	sprintf(buf, "%s: %ld %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, get_HZprefix(tunerType));
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)1, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)1, thumbnail_configure);
 
 #ifdef STSDK
 	if( offair_getTuner() < VMSP_COUNT ) {
@@ -2826,18 +2672,16 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 	{
 		sprintf(buf, "%s: 1", _T("DVB_SPEED"));
 	}
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbSpeed, NULL, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbSpeed, NULL, thumbnail_configure);
 
 	sprintf(buf,"%s: %s", _T("DVB_EXT_SCAN") , _T( appControlInfo.dvbCommonInfo.extendedScan == 0 ? "OFF" : "ON" ));
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbExtScan, NULL, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbExtScan, NULL, thumbnail_configure);
 
 	sprintf(buf, "%s: %ld %s", _T("DVB_STEP_FREQ"), fe->frequencyStep, _T("KHZ"));
-	interface_addMenuEntry((interfaceMenu_t*)&DVBSubMenu, buf, output_toggleDvbRange, (void*)2, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)2, thumbnail_configure);
 #ifdef STSDK
 	}
 #endif
-
-	interface_menuActionShowMenu(pMenu, (void*)&DVBSubMenu);
 
 	return 0;
 }
@@ -2847,13 +2691,10 @@ int output_fillDVBMenu(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleVMEnable(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.useVerimatrix = !appControlInfo.useVerimatrix;
-	output_warnIfFailed(saveAppSettings());
-	output_fillNetworkMenu(pMenu, 0);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static int output_changeVMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setVMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ret;
 
@@ -2878,8 +2719,7 @@ static int output_changeVMAddress(interfaceMenu_t *pMenu, char *value, void* pAr
 
 	if (ret == 0)
 	{
-		output_fillNetworkMenu(pMenu, 0);
-		interface_displayMenu(1);
+		output_refillMenu(pMenu);
 	}
 
 	return ret;
@@ -2966,7 +2806,7 @@ static int output_getVMRootCert(interfaceMenu_t *pMenu, void* pArg)
 	return ret;
 }
 
-static int output_changeVMCompany(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setVMCompany(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int ret;
 
@@ -2977,23 +2817,20 @@ static int output_changeVMCompany(interfaceMenu_t *pMenu, char *value, void* pAr
 
 	if (ret == 0)
 	{
-		output_fillNetworkMenu(pMenu, 0);
-		interface_displayMenu(1);
+		output_refillMenu(pMenu);
 	}
 
 	return ret;
 }
 
-static int output_toggleVMAddress(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeVMAddress(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("VERIMATRIX_ADDRESS"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeVMAddress, NULL, inputModeDirect, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("VERIMATRIX_ADDRESS"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setVMAddress, NULL, inputModeDirect, pArg);
 }
 
-static int output_toggleVMCompany(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeVMCompany(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("VERIMATRIX_COMPANY"), "\\w+", output_changeVMCompany, NULL, inputModeABC, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("VERIMATRIX_COMPANY"), "\\w+", output_setVMCompany, NULL, inputModeABC, pArg);
 }
 #endif // #ifdef ENABLE_VERIMATRIX
 
@@ -3001,13 +2838,10 @@ static int output_toggleVMCompany(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleSMEnable(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.useSecureMedia = !appControlInfo.useSecureMedia;
-	output_warnIfFailed(saveAppSettings());
-	output_fillNetworkMenu(pMenu, 0);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static int output_changeSMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setSMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int type = GET_NUMBER(pArg);
 	int ret;
@@ -3034,26 +2868,23 @@ static int output_changeSMAddress(interfaceMenu_t *pMenu, char *value, void* pAr
 	{
 		/* Restart smdaemon */
 		system("killall smdaemon");
-		output_fillNetworkMenu(pMenu, 0);
-		interface_displayMenu(1);
+		output_redrawMenu(pMenu);
 	}
 
 	return ret;
 }
 
-static int output_toggleSMAddress(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeSMAddress(interfaceMenu_t *pMenu, void* pArg)
 {
 	int type = GET_NUMBER(pArg);
 
 	if (type == 1)
 	{
-		interface_getText(pMenu, _T("SECUREMEDIA_ESAM_HOST"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeSMAddress, NULL, inputModeDirect, pArg);
+		return interface_getText(pMenu, _T("SECUREMEDIA_ESAM_HOST"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setSMAddress, NULL, inputModeDirect, pArg);
 	} else
 	{
-		interface_getText(pMenu, _T("SECUREMEDIA_RANDOM_HOST"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_changeSMAddress, NULL, inputModeDirect, pArg);
+		return interface_getText(pMenu, _T("SECUREMEDIA_RANDOM_HOST"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setSMAddress, NULL, inputModeDirect, pArg);
 	}
-
-	return 0;
 }
 #endif // #ifdef ENABLE_SECUREMEDIA
 
@@ -3064,10 +2895,7 @@ static int output_toggleAspectRatio(interfaceMenu_t *pMenu, void* pArg)
 		appControlInfo.outputInfo.aspectRatio = aspectRatio_16x9;
 	else
 		appControlInfo.outputInfo.aspectRatio = aspectRatio_4x3;
-	output_warnIfFailed(saveAppSettings());
-    output_fillVideoMenu(pMenu, pArg);
-	interface_displayMenu(1);
-    return 0;
+    return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleAutoScale(interfaceMenu_t *pMenu, void* pArg)
@@ -3078,20 +2906,13 @@ static int output_toggleAutoScale(interfaceMenu_t *pMenu, void* pArg)
 	gfxUseScaleParams = 0;
     (void)event_send(gfxDimensionsEvent);
 #endif
-
-	output_warnIfFailed(saveAppSettings());
-    output_fillVideoMenu(pMenu, pArg);
-	interface_displayMenu(1);
-    return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleScreenFiltration(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.outputInfo.bScreenFiltration = (appControlInfo.outputInfo.bScreenFiltration + 1) % 2;
-	output_warnIfFailed(saveAppSettings());
-	output_fillVideoMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.outputInfo.bScreenFiltration = !appControlInfo.outputInfo.bScreenFiltration;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif // STB82
 
@@ -3184,7 +3005,6 @@ static int output_setDate(interfaceMenu_t *pMenu, void* pArg)
 	    lt->tm_year != newtime.tm_year )
 	{
 		struct timeval tv;
-		interfaceEditEntry_t *pEditEntry = (interfaceEditEntry_t *)pArg;
 
 		tv.tv_usec = 0;
 		tv.tv_sec = mktime(&newtime);
@@ -3192,8 +3012,7 @@ static int output_setDate(interfaceMenu_t *pMenu, void* pArg)
 		settimeofday(&tv, NULL);
 		system("hwclock -w -u");
 
-		output_fillTimeMenu(pMenu, pEditEntry->pArg);
-		interface_displayMenu(1);
+		output_redrawMenu(pMenu);
 	}
 	return 0;
 }
@@ -3226,17 +3045,13 @@ static int output_setTime(interfaceMenu_t *pMenu, void* pArg)
 	    lt->tm_min  != newtime.tm_min)
 	{
 		struct timeval tv;
-		interfaceEditEntry_t *pEditEntry = (interfaceEditEntry_t *)pArg;
 
 		tv.tv_usec = 0;
 		tv.tv_sec = mktime(&newtime);
-
 		settimeofday(&tv, NULL);
-
 		system("hwclock -w -u");
 
-		output_fillTimeMenu(pMenu, pEditEntry->pArg);
-		interface_displayMenu(1);
+		output_redrawMenu(pMenu);
 	}
 	return 0;
 }
@@ -3268,7 +3083,7 @@ static int output_setTimeZone(interfaceMenu_t *pMenu, void* pArg)
 
 	tzset();
 
-	output_fillTimeMenu(pMenu, pArg);
+	interface_menuActionShowMenu(pMenu, &TimeSubMenu);
 
 	return 0;
 }
@@ -3289,7 +3104,7 @@ static char* output_getNTP(int field, void* pArg)
 		return NULL;
 }
 
-static int output_changeNTPValue(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setNTP(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	if( value == NULL )
 		return 1;
@@ -3301,7 +3116,7 @@ static int output_changeNTPValue(interfaceMenu_t *pMenu, char *value, void* pArg
 	} else
 	{
 		system("/usr/sbin/ntpupdater");
-		output_fillTimeMenu(pMenu, pArg);
+		output_refillMenu(pMenu);
 	}
 #endif
 #ifdef STSDK
@@ -3325,19 +3140,18 @@ static int output_changeNTPValue(interfaceMenu_t *pMenu, char *value, void* pArg
 		system("/etc/init.d/S85ntp stop");
 		system("/etc/init.d/S85ntp start");
 
+		
 		interface_hideLoading();
-		output_fillTimeMenu(pMenu, NULL);
-		interface_displayMenu(1);
+		output_refillMenu(pMenu);
 	}
 #endif
 
 	return 0;
 }
 
-static int output_setNTP(interfaceMenu_t *pMenu, void* pArg)
+static int output_changeNTP(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText(pMenu, _T("ENTER_NTP_ADDRESS"), "\\w+", output_changeNTPValue, output_getNTP, inputModeABC, pArg);
-	return 0;
+	return interface_getText(pMenu, _T("ENTER_NTP_ADDRESS"), "\\w+", output_setNTP, output_getNTP, inputModeABC, pArg);
 }
 
 static void output_fillTimeZoneMenu(void)
@@ -3580,7 +3394,7 @@ static void output_fillBlankingMenu(void)
 	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_OFF, thumbnail_configure);
 }
 
-long get_info_progress()
+static long get_info_progress()
 {
 	return info_progress;
 }
@@ -4186,8 +4000,7 @@ static int output_askPassword(interfaceMenu_t *pMenu, void* pArg)
 		if ( fgets(passwd, MAX_PASSWORD_LENGTH, file) != NULL && passwd[0] != 0 && passwd[0] != '\n' )
 		{
 			fclose(file);
-			interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\w+", output_enterPassword, NULL, inputModeDirect, pArg);
-			return 0;
+			return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\w+", output_enterPassword, NULL, inputModeDirect, pArg);
 		}
 	}
 
@@ -4264,18 +4077,24 @@ static int output_enterPassword(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 	return 1;
 }
-#endif
 
-int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_menuActionShowMenu(pMenu, &NetworkSubMenu);
+}
+#endif // ENABLE_PASSWORD
+
+int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 {
 	char *str;
 
-	interface_clearMenuEntries((interfaceMenu_t*)&VideoSubMenu);
+	// assert (videoMenu == (interfaceMenu_t*)&VideoSubMenu);
+	interface_clearMenuEntries(videoMenu);
 
 #ifdef STB82
     {
 		str = _T("TV_STANDARD");
-		interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&StandardMenu, thumbnail_tvstandard);
+		interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &StandardMenu, thumbnail_tvstandard);
     }
 
     /* We only enable this menu when we are outputting SD and we do not only have the HD denc. (HDMI is not denc[0])*/
@@ -4283,13 +4102,13 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif
 	{
 		str = _T("TV_FORMAT");
-		interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&FormatMenu, thumbnail_channels);
+		interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &FormatMenu, thumbnail_channels);
 #ifdef STB82
         /*Only add slow blanking if we have the capability*/
         if(appControlInfo.outputInfo.encDesc[0].caps & DSOCAPS_SLOW_BLANKING)
         {
 			str = _T("TV_BLANKING");
-			interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&BlankingMenu, thumbnail_configure);
+			interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &BlankingMenu, thumbnail_configure);
             output_fillBlankingMenu();
         }
 #endif
@@ -4300,32 +4119,28 @@ int output_fillVideoMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	str = appControlInfo.outputInfo.aspectRatio == aspectRatio_16x9 ? "16:9" : "4:3";
 	sprintf(buf, "%s: %s", _T("ASPECT_RATIO"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, buf, output_toggleAspectRatio, NULL, thumbnail_channels);
+	interface_addMenuEntry(videoMenu, buf, output_toggleAspectRatio, NULL, thumbnail_channels);
 
-	str = appControlInfo.outputInfo.autoScale == videoMode_scale ? _T("AUTO_SCALE_ENABLED") :
-		_T("AUTO_STRETCH_ENABLED");
+	str = appControlInfo.outputInfo.autoScale == videoMode_scale ? _T("AUTO_SCALE_ENABLED") : _T("AUTO_STRETCH_ENABLED");
 	sprintf(buf, "%s: %s", _T("SCALE_MODE"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, buf, output_toggleAutoScale, NULL, settings_size);
+	interface_addMenuEntry(videoMenu, buf, output_toggleAutoScale, NULL, settings_size);
 #ifndef HIDE_EXTRA_FUNCTIONS
 	sprintf(buf, "%s: %s", _T("AUDIO_OUTPUT"), appControlInfo.soundInfo.rcaOutput == 0 ? "SCART" : "RCA");
-	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, buf, output_toggleAudio, NULL, thumbnail_sound);
+	interface_addMenuEntry(videoMenu, buf, output_toggleAudio, NULL, thumbnail_sound);
 #endif
 	sprintf(buf, "%s: %s", _T("SCREEN_FILTRATION"), _T( appControlInfo.outputInfo.bScreenFiltration ? "ON" : "OFF" ));
-	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, buf, output_toggleScreenFiltration, NULL, thumbnail_channels);
+	interface_addMenuEntry(videoMenu, buf, output_toggleScreenFiltration, NULL, thumbnail_channels);
 
 	str = _T("COLOR_SETTINGS");
-	interface_addMenuEntry((interfaceMenu_t*)&VideoSubMenu, str, output_showColorSlider, NULL, thumbnail_tvstandard);
+	interface_addMenuEntry(videoMenu, str, output_showColorSlider, NULL, thumbnail_tvstandard);
 #endif // STB82
-	interface_menuActionShowMenu(pMenu, (void*)&VideoSubMenu);
 
 	return 0;
 }
 
 #ifdef ENABLE_3D
 static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
-	interfaceInfo.enable3d = (interfaceInfo.enable3d+1) & 1;
-
-	output_warnIfFailed(saveAppSettings());
+	interfaceInfo.enable3d = !interfaceInfo.enable3d;
 
 #if defined(STB225)
 	if(interfaceInfo.mode3D==0 || interfaceInfo.enable3d==0) {
@@ -4334,41 +4149,27 @@ static int output_toggle3DMonitor(interfaceMenu_t *pMenu, void* pArg) {
 		Stb225ChangeDestRect("/dev/fb0", 0, 0, 960, 1080);
 	}
 #endif
-	output_fill3DMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggle3DContent(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.content3d = (appControlInfo.outputInfo.content3d + 1) % 3;
-	output_warnIfFailed(saveAppSettings());
-	output_fill3DMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggle3DFormat(interfaceMenu_t *pMenu, void* pArg) {
 	appControlInfo.outputInfo.format3d = (appControlInfo.outputInfo.format3d + 1) % 3;
-	output_warnIfFailed(saveAppSettings());
-	output_fill3DMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleUseFactor(interfaceMenu_t *pMenu, void* pArg) {
-	appControlInfo.outputInfo.use_factor = (appControlInfo.outputInfo.use_factor + 1) % 2;
-	output_warnIfFailed(saveAppSettings());
-	output_fill3DMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.outputInfo.use_factor = !appControlInfo.outputInfo.use_factor;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleUseOffset(interfaceMenu_t *pMenu, void* pArg) {
-	appControlInfo.outputInfo.use_offset= (appControlInfo.outputInfo.use_offset + 1) % 2;
-	output_warnIfFailed(saveAppSettings());
-	output_fill3DMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	appControlInfo.outputInfo.use_offset = !appControlInfo.outputInfo.use_offset;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 char *output_get3DFactor(int index, void* pArg) {
@@ -4376,20 +4177,18 @@ char *output_get3DFactor(int index, void* pArg) {
 		static char temp[8];
 		sprintf(temp, "%03d", appControlInfo.outputInfo.factor);
 		return temp;
-	} else	return NULL;
+	} else return NULL;
 }
 
-static int output_change3DFactor(interfaceMenu_t *pMenu, char *value, void* pArg) {
+static int output_set3DFactor(interfaceMenu_t *pMenu, char *value, void* pArg) {
 	if( value != NULL && value[0] != 0)  {
 		int ivalue = atoi(value);
 		if (ivalue < 0 || ivalue > 255) ivalue = 255;
 
 		appControlInfo.outputInfo.factor = ivalue;
 	}
-	output_fill3DMenu(pMenu, 0);
-	interface_displayMenu(1);
-
-	return 0;
+	output_refillMenu(pMenu);
+	return output_warnIfFailed(saveAppSettings());
 }
 
 char *output_get3DOffset(int index, void* pArg) {
@@ -4400,27 +4199,25 @@ char *output_get3DOffset(int index, void* pArg) {
 	} else	return NULL;
 }
 
-static int output_change3DOffset(interfaceMenu_t *pMenu, char *value, void* pArg) {
+static int output_set3DOffset(interfaceMenu_t *pMenu, char *value, void* pArg) {
 	if( value != NULL && value[0] != 0)  {
 		int ivalue = atoi(value);
 		if (ivalue < 0 || ivalue > 255) ivalue = 255;
 
 		appControlInfo.outputInfo.offset = ivalue;
 	}
-	output_fill3DMenu(pMenu, 0);
-	interface_displayMenu(1);
-
-	return 0;
+	output_refillMenu(pMenu);
+	return output_warnIfFailed(saveAppSettings());
 }
 
-static int output_toggle3DFactor(interfaceMenu_t *pMenu, void* pArg) {
-	return interface_getText(pMenu, _T("3D_FACTOR"), "\\d{3}", output_change3DFactor, output_get3DFactor, inputModeDirect, pArg);
+static int output_change3DFactor(interfaceMenu_t *pMenu, void* pArg) {
+	return interface_getText(pMenu, _T("3D_FACTOR"), "\\d{3}", output_set3DFactor, output_get3DFactor, inputModeDirect, pArg);
 }
-static int output_toggle3DOffset(interfaceMenu_t *pMenu, void* pArg) {
-	return interface_getText(pMenu, _T("3D_OFFSET"), "\\d{3}", output_change3DOffset, output_get3DOffset, inputModeDirect, pArg);
+static int output_change3DOffset(interfaceMenu_t *pMenu, void* pArg) {
+	return interface_getText(pMenu, _T("3D_OFFSET"), "\\d{3}", output_set3DOffset, output_get3DOffset, inputModeDirect, pArg);
 }
 
-int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_enter3DMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char *str;
 	char buf[MENU_ENTRY_INFO_LENGTH];
@@ -4428,7 +4225,6 @@ int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 	char *chContent[] = {_T("VIDEO"), _T("3D_SIGNAGE"), _T("3D_STILLS")};
 	char *chFormat [] = {_T("3D_2dZ"), _T("3D_DECLIPSE_RD"), _T("3D_DECLIPSE_FULL")};
 
-//OutputMenu
 	interface_clearMenuEntries((interfaceMenu_t*)&Video3DSubMenu);
 
 	sprintf(buf, "%s: %s", _T("3D_MONITOR"), _T( interfaceInfo.enable3d ? "ON" : "OFF" ));
@@ -4449,12 +4245,10 @@ int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggleUseOffset, NULL, thumbnail_channels);
 
 	sprintf(buf, "%s: %d", _T("3D_FACTOR"), appControlInfo.outputInfo.factor);
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggle3DFactor, NULL, thumbnail_channels);
+	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_change3DFactor, NULL, thumbnail_channels);
 
 	sprintf(buf, "%s: %d", _T("3D_OFFSET"), appControlInfo.outputInfo.offset);
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggle3DOffset, NULL, thumbnail_channels);
-
-	interface_menuActionShowMenu(pMenu, (void*)&Video3DSubMenu);
+	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_change3DOffset, NULL, thumbnail_channels);
 
 	return 0;
 }
@@ -4464,39 +4258,41 @@ int output_fill3DMenu(interfaceMenu_t *pMenu, void* pArg)
 void output_onUpdate(int found)
 {
 	if (interfaceInfo.currentMenu == _M &UpdateMenu) {
-		output_fillUpdateMenu(_M &UpdateMenu, NULL);
+		output_refillMenu(_M &UpdateMenu);
 		if (interfaceInfo.messageBox.type == interfaceMessageBoxNone)
 			interface_showMessageBox(_T(found ? "UPDATE_FOUND" : "UPDATE_NOT_FOUND"), thumbnail_info, 3000);
 	}
 }
 
-static int output_updateCheck(interfaceMenu_t *pMenu, void* notused) {
+static int output_updateCheck(interfaceMenu_t *pMenu, void* notused)
+{
 	system("killall -HUP updaterDaemon");
 	return 0;
 }
 
-static int output_updateCheckNetwork(interfaceMenu_t *pMenu, void* on) {
+static int output_updateCheckNetwork(interfaceMenu_t *pMenu, void* on)
+{
 	int res;
 	if (on)
 		res = system("hwconfigManager s -1 UPNET 1 &>/dev/null");
 	else
 		res = system("hwconfigManager f -1 UPNET   &>/dev/null");
+
 	if (WIFEXITED(res) != 1 || WEXITSTATUS(res) != 0)
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	else {
-		output_fillUpdateMenu(pMenu, NULL);
-		interface_displayMenu(1);
-	}
+	else
+		output_redrawMenu(pMenu);
 	return 0;
 }
 
-static int output_rebootAndUpdate(interfaceMenu_t *pMenu, void* notused) {
+static int output_rebootAndUpdate(interfaceMenu_t *pMenu, void* notused)
+{
 	system("hwconfigManager s -1 UPFOUND 1 2>/dev/null");
 	system("reboot");
 	return 0;
 }
 
-int output_fillUpdateMenu(interfaceMenu_t *pMenu, void* notused)
+int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
@@ -4536,53 +4332,50 @@ int output_fillUpdateMenu(interfaceMenu_t *pMenu, void* notused)
 
 static int output_resetTimeEdit(interfaceMenu_t *pMenu, void* pArg)
 {
-	interfaceEditEntry_t *pEditEntry = (interfaceEditEntry_t *)pArg;
-	return output_fillTimeMenu( pMenu, pEditEntry->pArg );
+	return output_refillMenu(pMenu);
 }
 
-int output_fillTimeMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_enterTimeMenu(interfaceMenu_t *timeMenu, void* notused)
 {
 	struct tm *t;
 	time_t now;
 	char   buf[BUFFER_SIZE], *str;
 
-	interface_clearMenuEntries((interfaceMenu_t*)&TimeSubMenu);
+	// assert (timeMenu == (interfaceMenu_t*)&TimeSubMenu);
+	interface_clearMenuEntries(timeMenu);
 
 	time(&now);
 	t = localtime(&now);
 	strftime( TimeEntry.info.time.value, sizeof(TimeEntry.info.time.value), "%H%M", t);
-	interface_addEditEntryTime((interfaceMenu_t *)&TimeSubMenu, _T("SET_TIME"), output_setTime, output_resetTimeEdit, pArg, thumbnail_log, &TimeEntry);
+	interface_addEditEntryTime(timeMenu, _T("SET_TIME"), output_setTime, output_resetTimeEdit, NULL, thumbnail_log, &TimeEntry);
 	strftime( DateEntry.info.date.value, sizeof(DateEntry.info.date.value), "%d%m%Y", t);
-	interface_addEditEntryDate((interfaceMenu_t *)&TimeSubMenu, _T("SET_DATE"), output_setDate, output_resetTimeEdit, pArg, thumbnail_log, &DateEntry);
+	interface_addEditEntryDate(timeMenu, _T("SET_DATE"), output_setDate, output_resetTimeEdit, NULL, thumbnail_log, &DateEntry);
 
-	//interface_addMenuEntry((interfaceMenu_t*)&TimeSubMenu, _T("SET_TIME"), output_changeTime, NULL, thumbnail_log);
-	interface_addMenuEntry((interfaceMenu_t*)&TimeSubMenu, _T("SET_TIME_ZONE"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&TimeZoneMenu, thumbnail_log);
-	//interface_addMenuEntry((interfaceMenu_t*)&TimeSubMenu, _T("SET_DATE"), output_changeDate, NULL, thumbnail_log);
+	interface_addMenuEntry(timeMenu, _T("SET_TIME_ZONE"), interface_menuActionShowMenu, &TimeZoneMenu, thumbnail_log);
 
 	sprintf(buf, "%s: ", _T("NTP_SERVER"));
 	str = &buf[strlen(buf)];
 	strcpy( str, output_getNTP( 0, NULL ) );
 	if ( *str == 0 )
 		strcpy(str, _T("NOT_AVAILABLE_SHORT") );
-	interface_addMenuEntry((interfaceMenu_t*)&TimeSubMenu, buf, output_setNTP, NULL, thumbnail_enterurl);
-
-	interface_menuActionShowMenu(pMenu, (void*)&TimeSubMenu);
+	interface_addMenuEntry(timeMenu, buf, output_changeNTP, NULL, thumbnail_enterurl);
 
 	return 0;
 }
 
-int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 {
 #ifdef STBPNX
 	char path[MAX_CONFIG_PATH];
 #endif
 	char temp[MENU_ENTRY_INFO_LENGTH];
 
-	interface_clearMenuEntries((interfaceMenu_t*)&NetworkSubMenu);
+	// assert (networkMenu == (interfaceMenu_t*)&NetworkSubMenu);
+	interface_clearMenuEntries(networkMenu);
 	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWAN));
 	if( helperCheckDirectoryExsists(temp) )
 	{
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, "WAN", (menuActionFunction)menuDefaultActionShowMenu, (void*)&WANSubMenu, settings_network);
+		interface_addMenuEntry(networkMenu, "WAN", interface_menuActionShowMenu, (void*)&WANSubMenu, settings_network);
 #ifdef STBPNX
 		sprintf(path, "/config/ifcfg-%s", helperEthDevice(ifaceWAN));
 #ifdef ENABLE_LAN
@@ -4607,73 +4400,66 @@ int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif // STBPNX
 	} else
 	{
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&NetworkSubMenu, "WAN", settings_network);
+		interface_addMenuEntryDisabled(networkMenu, "WAN", settings_network);
 	}
 #ifdef ENABLE_PPP
-	interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("PPP"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&PPPSubMenu, settings_network);
+	interface_addMenuEntry(networkMenu, _T("PPP"), interface_menuActionShowMenu, (void*)&PPPSubMenu, settings_network);
 #endif
-#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+#ifdef ENABLE_LAN
 	int hasLan = helperCheckDirectoryExsists("/sys/class/net/eth1");
-#ifdef ENABLE_WIFI
-	if (!hasLan )
-	{
-		sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWireless));
-		hasLan = helperCheckDirectoryExsists(temp);
-	}
-#endif
 	if ( hasLan )
 	{
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, "LAN", (menuActionFunction)menuDefaultActionShowMenu, (void*)&LANSubMenu, settings_network);
+		interface_addMenuEntry(networkMenu, "LAN", interface_menuActionShowMenu, (void*)&LANSubMenu, settings_network);
 	}
-#endif // ENABLE_LAN || ENABLE_WIFI
+#endif // ENABLE_LAN
 #ifdef ENABLE_WIFI
 #if !(defined STB225)
 	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWireless));
 	if( wifiInfo.wanMode || helperCheckDirectoryExsists(temp) )
 	{
 #endif
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("WIRELESS"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&WifiSubMenu, settings_network);
+		interface_addMenuEntry(networkMenu, _T("WIRELESS"), interface_menuActionShowMenu, (void*)&WifiSubMenu, settings_network);
 #if !(defined STB225)
 	} else
 	{
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&NetworkSubMenu, _T("WIRELESS"), settings_network);
+		interface_addMenuEntryDisabled(networkMenu, _T("WIRELESS"), settings_network);
 	}
 #endif
 #endif // ENABLE_WIFI
 
 #ifdef ENABLE_IPTV
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("TV_CHANNELS"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&IPTVSubMenu, thumbnail_multicast);
+		interface_addMenuEntry(networkMenu, _T("TV_CHANNELS"), interface_menuActionShowMenu, (void*)&IPTVSubMenu, thumbnail_multicast);
 #endif
 #ifdef ENABLE_VOD
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("MOVIES"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&VODSubMenu, thumbnail_vod);
+		interface_addMenuEntry(networkMenu, _T("MOVIES"), interface_menuActionShowMenu, (void*)&VODSubMenu, thumbnail_vod);
 #endif
 
 #ifdef STBPNX
 	if (helperFileExists(BROWSER_CONFIG_FILE))
 #endif
 	{
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("INTERNET_BROWSING"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&WebSubMenu, thumbnail_internet);
+		interface_addMenuEntry(networkMenu, _T("INTERNET_BROWSING"), interface_menuActionShowMenu, (void*)&WebSubMenu, thumbnail_internet);
 	}
 #ifdef ENABLE_VERIMATRIX
 	if (helperFileExists(VERIMATRIX_INI_FILE))
 	{
 		sprintf(path,"%s: %s", _T("VERIMATRIX_ENABLE"), appControlInfo.useVerimatrix == 0 ? _T("OFF") : _T("ON"));
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, path, output_toggleVMEnable, NULL, thumbnail_configure);
+		interface_addMenuEntry(networkMenu, path, output_toggleVMEnable, NULL, thumbnail_configure);
 		if (appControlInfo.useVerimatrix != 0)
 		{
 			getParam(VERIMATRIX_INI_FILE, "COMPANY", "", temp);
 			if (temp[0] != 0)
 			{
 				sprintf(path, "%s: %s", _T("VERIMATRIX_COMPANY"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, path, output_toggleVMCompany, pArg, thumbnail_enterurl);
+				interface_addMenuEntry(networkMenu, path, output_changeVMCompany, NULL, thumbnail_enterurl);
 			}
 			getParam(VERIMATRIX_INI_FILE, "SERVERADDRESS", "", temp);
 			if (temp[0] != 0)
 			{
 				sprintf(path, "%s: %s", _T("VERIMATRIX_ADDRESS"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, path, output_toggleVMAddress, pArg, thumbnail_enterurl);
+				interface_addMenuEntry(networkMenu, path, output_changeVMAddress, NULL, thumbnail_enterurl);
 			}
-			interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, _T("VERIMATRIX_GET_ROOTCERT"), output_getVMRootCert, NULL, thumbnail_turnaround);
+			interface_addMenuEntry(networkMenu, _T("VERIMATRIX_GET_ROOTCERT"), output_getVMRootCert, NULL, thumbnail_turnaround);
 		}
 	}
 #endif
@@ -4681,20 +4467,20 @@ int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 	if (helperFileExists(SECUREMEDIA_CONFIG_FILE))
 	{
 		sprintf(path,"%s: %s", _T("SECUREMEDIA_ENABLE"), appControlInfo.useSecureMedia == 0 ? _T("OFF") : _T("ON"));
-		interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, path, output_toggleSMEnable, NULL, thumbnail_configure);
+		interface_addMenuEntry(networkMenu, path, output_toggleSMEnable, NULL, thumbnail_configure);
 		if (appControlInfo.useSecureMedia != 0)
 		{
 			getParam(SECUREMEDIA_CONFIG_FILE, "SECUREMEDIA_ESAM_HOST", "", temp);
 			if (temp[0] != 0)
 			{
 				sprintf(path, "%s: %s", _T("SECUREMEDIA_ESAM_HOST"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, path, output_toggleSMAddress, (void*)1, thumbnail_enterurl);
+				interface_addMenuEntry(networkMenu, path, output_changeSMAddress, (void*)1, thumbnail_enterurl);
 			}
 			getParam(SECUREMEDIA_CONFIG_FILE, "SECUREMEDIA_RANDOM_HOST", "", temp);
 			if (temp[0] != 0)
 			{
 				sprintf(path, "%s: %s", _T("SECUREMEDIA_RANDOM_HOST"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, path, output_toggleSMAddress, (void*)2, thumbnail_enterurl);
+				interface_addMenuEntry(networkMenu, path, output_changeSMAddress, (void*)2, thumbnail_enterurl);
 			}
 		}
 	}
@@ -4704,171 +4490,161 @@ int output_fillNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifndef HIDE_EXTRA_FUNCTIONS
 	char *str;
 	str = _T("PROCESS_PCR");
-	interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, str, output_togglePCR, NULL, appControlInfo.bProcessPCR ? thumbnail_yes : thumbnail_no);
+	interface_addMenuEntry(networkMenu, str, output_togglePCR, NULL, appControlInfo.bProcessPCR ? thumbnail_yes : thumbnail_no);
 	str = _T( appControlInfo.bUseBufferModel ? "BUFFER_TRACKING" : "PCR_TRACKING");
-	interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, str, output_toggleBufferTracking, NULL, thumbnail_configure);
+	interface_addMenuEntry(networkMenu, str, output_toggleBufferTracking, NULL, thumbnail_configure);
 	str = _T("RENDERER_SYNC");
-	interface_addMenuEntry((interfaceMenu_t*)&NetworkSubMenu, str, output_toggleRSync, NULL, appControlInfo.bRendererDisableSync ? thumbnail_no : thumbnail_yes);
+	interface_addMenuEntry(networkMenu, str, output_toggleRSync, NULL, appControlInfo.bRendererDisableSync ? thumbnail_no : thumbnail_yes);
 #endif
-
-	interface_menuActionShowMenu(pMenu, (void*)&NetworkSubMenu);
 
 	return 0;
 }
 
-static int output_fillWANMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterWANMenu(interfaceMenu_t *wanMenu, void* pArg)
 {
 	char path[MAX_CONFIG_PATH];
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char temp[MENU_ENTRY_INFO_LENGTH];
 	int dhcp = 0;
+	stb810_networkInterface_t iface = GET_NUMBER(pArg);
 
-	interface_clearMenuEntries((interfaceMenu_t*)&WANSubMenu);
+	// assert (wanMenu == &WANSubMenu);
+	interface_clearMenuEntries(wanMenu);
 
-	const int i = ifaceWAN;
-	sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
-	if( helperCheckDirectoryExsists(temp) )
-	{
 #ifdef STBPNX
-		sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
-		getParam(path, "BOOTPROTO", _T("NOT_AVAILABLE_SHORT"), temp);
-		if (strcmp("dhcp+dns", temp) == 0)
-		{
-			strcpy(temp, _T("ADDR_MODE_DHCP"));
-			dhcp = 1;
-		} else
-		{
-			strcpy(temp, _T("ADDR_MODE_STATIC"));
-			dhcp = 0;
-		}
+	getParam("/config/ifcfg-eth0", "BOOTPROTO", _T("NOT_AVAILABLE_SHORT"), temp);
+	if (strcmp("dhcp+dns", temp) == 0)
+	{
+		strcpy(temp, _T("ADDR_MODE_DHCP"));
+		dhcp = 1;
+	} else
+	{
+		strcpy(temp, _T("ADDR_MODE_STATIC"));
+		dhcp = 0;
+	}
 #endif // STBPNX
 #ifdef STSDK
-		dhcp = networkInfo.wanDhcp;
-		strcpy(temp, _T( dhcp ? "ADDR_MODE_DHCP" : "ADDR_MODE_STATIC" ));
+	dhcp = networkInfo.wanDhcp;
+	strcpy(temp, _T( dhcp ? "ADDR_MODE_DHCP" : "ADDR_MODE_STATIC" ));
 #endif // STSDK
-		sprintf(buf, "%s: %s", _T("ADDR_MODE"), temp);
-		interface_addMenuEntry((interfaceMenu_t*)&WANSubMenu, buf, output_toggleMode, SET_NUMBER(i), thumbnail_configure);
+	sprintf(buf, "%s: %s", _T("ADDR_MODE"), temp);
+	interface_addMenuEntry(wanMenu, buf, output_toggleMode, SET_NUMBER(iface), thumbnail_configure);
 
-		if (dhcp == 0)
-		{
+	if (dhcp == 0)
+	{
 #ifdef STBPNX
-			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
+		getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
 #endif
 #ifdef STSDK
-			strcpy(temp, networkInfo.wan.ip.s_addr != 0 ? inet_ntoa(networkInfo.wan.ip) : _T("NOT_AVAILABLE_SHORT") );
+		strcpy(temp, networkInfo.wan.ip.s_addr != 0 ? inet_ntoa(networkInfo.wan.ip) : _T("NOT_AVAILABLE_SHORT") );
 #endif
-			sprintf(buf, "%s: %s",  _T("IP_ADDRESS"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WANSubMenu, buf, output_toggleIP, SET_NUMBER(i), thumbnail_configure);
+		sprintf(buf, "%s: %s",  _T("IP_ADDRESS"), temp);
+		interface_addMenuEntry(wanMenu, buf, output_changeIP, SET_NUMBER(iface), thumbnail_configure);
 
 #ifdef STBPNX
-			getParam(path, "NETMASK", _T("NOT_AVAILABLE_SHORT"), temp);
+		getParam(path, "NETMASK", _T("NOT_AVAILABLE_SHORT"), temp);
 #endif
 #ifdef STSDK
-			strcpy(temp, networkInfo.wan.mask.s_addr != 0 ? inet_ntoa(networkInfo.wan.mask) : _T("NOT_AVAILABLE_SHORT") );
+		strcpy(temp, networkInfo.wan.mask.s_addr != 0 ? inet_ntoa(networkInfo.wan.mask) : _T("NOT_AVAILABLE_SHORT") );
 #endif
-			sprintf(buf, "%s: %s", _T("NETMASK"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WANSubMenu, buf, output_toggleNetmask, SET_NUMBER(i), thumbnail_configure);
+		sprintf(buf, "%s: %s", _T("NETMASK"), temp);
+		interface_addMenuEntry(wanMenu, buf, output_changeNetmask, SET_NUMBER(iface), thumbnail_configure);
 
 #ifdef STBPNX
-			getParam(path, "DEFAULT_GATEWAY", _T("NOT_AVAILABLE_SHORT"), temp);
+		getParam(path, "DEFAULT_GATEWAY", _T("NOT_AVAILABLE_SHORT"), temp);
 #endif
 #ifdef STSDK
-			strcpy(temp, networkInfo.wan.gw.s_addr != 0 ? inet_ntoa(networkInfo.wan.gw) : _T("NOT_AVAILABLE_SHORT") );
+		strcpy(temp, networkInfo.wan.gw.s_addr != 0 ? inet_ntoa(networkInfo.wan.gw) : _T("NOT_AVAILABLE_SHORT") );
 #endif
-			sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WANSubMenu, buf, output_toggleGw, SET_NUMBER(i), thumbnail_configure);
+		sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
+		interface_addMenuEntry(wanMenu, buf, output_changeGw, SET_NUMBER(iface), thumbnail_configure);
 
 #ifdef STBPNX
-			getParam(path, "NAMESERVERS", _T("NOT_AVAILABLE_SHORT"), temp);
+		getParam(path, "NAMESERVERS", _T("NOT_AVAILABLE_SHORT"), temp);
 #endif
 #ifdef STSDK
-			strcpy(temp, networkInfo.dns.s_addr != 0 ? inet_ntoa(networkInfo.dns) : _T("NOT_AVAILABLE_SHORT"));
+		strcpy(temp, networkInfo.dns.s_addr != 0 ? inet_ntoa(networkInfo.dns) : _T("NOT_AVAILABLE_SHORT"));
 #endif
-			sprintf(buf, "%s: %s", _T("DNS_SERVER"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WANSubMenu, buf, output_toggleDNSIP, SET_NUMBER(i), thumbnail_configure);
-		} else
-		{
-			sprintf(path, "ifconfig %s | grep \"inet addr\"", helperEthDevice(i));
-			if (!helperParseLine(INFO_TEMP_FILE, path, "inet addr:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-			{
-				strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
-			}
-			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
-			interface_addMenuEntryDisabled((interfaceMenu_t*)&WANSubMenu, buf, thumbnail_configure);
-
-			sprintf(path, "ifconfig %s | grep \"Mask:\"", helperEthDevice(i));
-			if (!helperParseLine(INFO_TEMP_FILE, path, "Mask:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-			{
-				strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
-			}
-			sprintf(buf, "%s: %s", _T("NETMASK"), temp);
-			interface_addMenuEntryDisabled((interfaceMenu_t*)&WANSubMenu, buf, thumbnail_configure);
-
-			sprintf(path, "route -n | grep -e \"0\\.0\\.0\\.0 .* 0\\.0\\.0\\.0 *UG .* %s\"", helperEthDevice(i));
-			if (!helperParseLine(INFO_TEMP_FILE, path, "0.0.0.0", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-			{
-				strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
-			}
-			sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
-			interface_addMenuEntryDisabled((interfaceMenu_t*)&WANSubMenu, buf, thumbnail_configure);
-
-			int found = -1;
-			int fd = open( "/etc/resolv.conf", O_RDONLY );
-			if( fd > 0 )
-			{
-				char *ptr;
-				while( helperReadLine( fd, temp ) == 0 && temp[0] )
-				{
-					if( (ptr = strstr( temp, "nameserver " )) != NULL )
-					{
-						ptr += 11;
-						found++;
-						sprintf(buf, "%s %d: %s", _T("DNS_SERVER"), found+1, ptr);
-						interface_addMenuEntryDisabled((interfaceMenu_t*)&WANSubMenu, buf, thumbnail_configure);
-					}
-				}
-				close(fd);
-			}
-			if( found < 0 )
-			{
-				sprintf(buf, "%s: %s", _T("DNS_SERVER"), _T("NOT_AVAILABLE_SHORT"));
-				interface_addMenuEntryDisabled((interfaceMenu_t*)&WANSubMenu, buf, thumbnail_configure);
-			}
-		}
-		/*sprintf(path, "ifconfig %s | grep HWaddr", helperEthDevice(i));
-		if (!helperParseLine(INFO_TEMP_FILE, path, "HWaddr ", temp, ' '))			 // eth0      Link encap:Ethernet  HWaddr 76:60:37:02:24:02
+		sprintf(buf, "%s: %s", _T("DNS_SERVER"), temp);
+		interface_addMenuEntry(wanMenu, buf, output_changeDNS, SET_NUMBER(iface), thumbnail_configure);
+	} else
+	{
+		sprintf(path, "ifconfig %s | grep \"inet addr\"", helperEthDevice(iface));
+		if (!helperParseLine(INFO_TEMP_FILE, path, "inet addr:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
 		{
 			strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
 		}
-		sprintf(buf, "%s: %s",  _T("MAC_ADDRESS"), temp);
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&WANSubMenu, buf, thumbnail_configure);
-		*/
+		sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
+		interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
 
-		sprintf(buf, "%s", _T("NET_RESET"));
-		interface_addMenuEntry((interfaceMenu_t*)&WANSubMenu, buf, output_toggleReset, SET_NUMBER(i), settings_renew);
+		sprintf(path, "ifconfig %s | grep \"Mask:\"", helperEthDevice(iface));
+		if (!helperParseLine(INFO_TEMP_FILE, path, "Mask:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
+		{
+			strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
+		}
+		sprintf(buf, "%s: %s", _T("NETMASK"), temp);
+		interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
 
-		return 0;
+		sprintf(path, "route -n | grep -e \"0\\.0\\.0\\.0 .* 0\\.0\\.0\\.0 *UG .* %s\"", helperEthDevice(iface));
+		if (!helperParseLine(INFO_TEMP_FILE, path, "0.0.0.0", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
+		{
+			strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
+		}
+		sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
+		interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
+
+		int dns_found = 0;
+		int dns_fd = open( "/etc/resolv.conf", O_RDONLY );
+		if (dns_fd > 0)
+		{
+			char *ptr;
+			while( helperReadLine( dns_fd, temp ) == 0 && temp[0] )
+			{
+				if( (ptr = strstr( temp, "nameserver " )) != NULL )
+				{
+					ptr += 11;
+					dns_found++;
+					sprintf(buf, "%s %d: %s", _T("DNS_SERVER"), dns_found, ptr);
+					interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
+				}
+			}
+			close(dns_fd);
+		}
+		if (!dns_found)
+		{
+			sprintf(buf, "%s: %s", _T("DNS_SERVER"), _T("NOT_AVAILABLE_SHORT"));
+			interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
+		}
 	}
 
-	return 1;
+	interface_addMenuEntry(wanMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(iface), settings_renew);
+
+#ifndef HIDE_EXTRA_FUNCTIONS
+	char temp[MENU_ENTRY_INFO_LENGTH];
+	int offset = sprintf(temp, "%s: ",  _T("MAC_ADDRESS"));
+	int mac_fd = open("/sys/class/net/eth0/address", O_RDONLY);
+	if (mac_fd > 0)
+	{
+		int len = read(mac_fd, temp+offset, sizeof(temp)-offset);
+		if (len <= 0) len = 1;
+		temp[offset+len-1] = 0;
+		close(mac_fd);
+	} else
+		strcpy(temp+offset, _T("NOT_AVAILABLE_SHORT"));
+	interface_addMenuEntryDisabled(wanMenu, temp, thumbnail_configure);
+#endif
+	return 0;
 }
 
 #ifdef ENABLE_PPP
 static char* output_getPPPPassword(int field, void* pArg)
 {
-	if( field == 0 )
-		return pppInfo.password;
-
-	return NULL;
+	return field == 0 ? pppInfo.password : NULL;
 }
 
 static char* output_getPPPLogin(int field, void* pArg)
 {
-	if( field == 0 )
-		return pppInfo.login;
-
-	return NULL;
+	return field == 0 ? pppInfo.login : NULL;
 }
 
 static int output_setPPPPassword(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -4876,12 +4652,10 @@ static int output_setPPPPassword(interfaceMenu_t *pMenu, char *value, void* pArg
 	if (value == NULL )
 		return 1;
 
-	FILE *f;
-
 	strcpy( pppInfo.password, value );
 
-	f = fopen(PPP_CHAP_SECRETS_FILE, "w");
-	if( f != NULL )
+	FILE *f = fopen(PPP_CHAP_SECRETS_FILE, "w");
+	if (f != NULL)
 	{
 		fprintf( f, "%s pppoe %s *\n", pppInfo.login, pppInfo.password );
 		fclose(f);
@@ -4890,16 +4664,13 @@ static int output_setPPPPassword(interfaceMenu_t *pMenu, char *value, void* pArg
 		output_warnIfFailed(1);
 	}
 
-	output_fillPPPMenu(pMenu, pArg);
-
+	output_refillMenu(pMenu);
 	return 0;
 }
 
-static int output_togglePPPPassword(interfaceMenu_t *pMenu, void* pArg)
+static int output_changePPPPassword(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText( pMenu, _T("PASSWORD"), "\\w+", output_setPPPPassword, output_getPPPPassword, inputModeABC, NULL );
-
-	return 0;
+	return interface_getText( pMenu, _T("PASSWORD"), "\\w+", output_setPPPPassword, output_getPPPPassword, inputModeABC, NULL );
 }
 
 static int output_setPPPLogin(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -4907,57 +4678,52 @@ static int output_setPPPLogin(interfaceMenu_t *pMenu, char *value, void* pArg)
 	if (value == NULL )
 		return 1;
 
-	if( value[0] == 0 )
+	if (value[0] == 0)
 	{
 		system("rm -f " PPP_CHAP_SECRETS_FILE);
-		output_fillPPPMenu(pMenu, pArg);
+		output_refillMenu(pMenu);
 		return 0;
 	}
-
 	strcpy(pppInfo.login, value);
 
-	output_togglePPPPassword(pMenu, pArg);
-
-	return 1;
+	output_changePPPPassword(pMenu, pArg);
+	return 1; // don't hide message box
 }
 
-static int output_togglePPPLogin(interfaceMenu_t *pMenu, void* pArg)
+static int output_changePPPLogin(interfaceMenu_t *pMenu, void* pArg)
 {
-	interface_getText( pMenu, _T("LOGIN"), "\\w+", output_setPPPLogin, output_getPPPLogin, inputModeABC, NULL );
-	return 0;
+	return interface_getText( pMenu, _T("LOGIN"), "\\w+", output_setPPPLogin, output_getPPPLogin, inputModeABC, NULL );
 }
 
-static void* output_checkPPPThread(void *pArg)
+static void* output_checkPPPThread(void *pMenu)
 {
-	for(;;)
+	for (;;)
 	{
 		sleep(2);
-		output_fillPPPMenu(interfaceInfo.currentMenu, pArg);
-		interface_displayMenu(1);
+		output_redrawMenu(pMenu);
 	}
 	pthread_exit(NULL);
 }
 
-static int output_togglePPP(interfaceMenu_t *pMenu, void* pArg)
+static int output_restartPPP(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showMessageBox(_T("RENEW_IN_PROGRESS"), settings_renew, 0);
 
 	system("/etc/init.d/S65ppp stop");
 	system("/etc/init.d/S65ppp start");
 
-	output_fillPPPMenu( pMenu, pArg );
-
+	output_refillMenu(pMenu);
 	interface_hideMessageBox();
 
-	if( pppInfo.check_thread == 0 )
-		pthread_create( &pppInfo.check_thread, NULL, output_checkPPPThread, NULL );
+	if (pppInfo.check_thread == 0)
+		pthread_create( &pppInfo.check_thread, NULL, output_checkPPPThread, pMenu );
 
 	return 0;
 }
 
 static int output_leavePPPMenu(interfaceMenu_t *pMenu, void* pArg)
 {
-	if( pppInfo.check_thread != 0 )
+	if (pppInfo.check_thread != 0)
 	{
 		pthread_cancel( pppInfo.check_thread );
 		pthread_join( pppInfo.check_thread, NULL );
@@ -4966,7 +4732,7 @@ static int output_leavePPPMenu(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-static int output_fillPPPMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
@@ -4995,15 +4761,15 @@ static int output_fillPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntryDisabled(pMenu, buf, thumbnail_configure);
 
 	snprintf(buf, sizeof(buf), "%s: %s", _T("LOGIN"), pppInfo.login[0] ? pppInfo.login : _T("OFF") );
-	interface_addMenuEntry(pMenu, buf, output_togglePPPLogin, NULL, thumbnail_enterurl);
+	interface_addMenuEntry(pMenu, buf, output_changePPPLogin, NULL, thumbnail_enterurl);
 
 	if( pppInfo.login[0] != 0 )
 	{
 		snprintf(buf, sizeof(buf), "%s: ***", _T("PASSWORD"));
-		interface_addMenuEntry(pMenu, buf, output_togglePPPPassword, NULL, thumbnail_enterurl);
+		interface_addMenuEntry(pMenu, buf, output_changePPPPassword, NULL, thumbnail_enterurl);
 	}
 
-	interface_addMenuEntry(pMenu, _T("NET_RESET"), output_togglePPP, NULL, settings_renew);
+	interface_addMenuEntry(pMenu, _T("APPLY_NETWORK_SETTINGS"), output_restartPPP, NULL, settings_renew);
 
 	if( helperCheckDirectoryExsists( "/sys/class/net/ppp0" ) )
 	{
@@ -5016,7 +4782,7 @@ static int output_fillPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 		{
 			str = _T("CONNECTING");
 			if( pppInfo.check_thread == 0 )
-				pthread_create( &pppInfo.check_thread, NULL, output_checkPPPThread, NULL );
+				pthread_create( &pppInfo.check_thread, NULL, output_checkPPPThread, pMenu );
 		}
 		else
 			str = _T("OFF");
@@ -5028,8 +4794,8 @@ static int output_fillPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_PPP
 
-#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
+#ifdef ENABLE_LAN
+int output_enterLANMenu(interfaceMenu_t *lanMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char temp[MENU_ENTRY_INFO_LENGTH];
@@ -5038,8 +4804,8 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 //	sprintf(path, "/sys/class/net/%s", helperEthDevice(i));
 //	if( helperCheckDirectoryExsists(path) )
 	{
-		interface_clearMenuEntries((interfaceMenu_t*)&LANSubMenu);
-		if( !output_isBridge() )
+		interface_clearMenuEntries(lanMenu);
+		if (!output_isBridge())
 		{
 #ifdef STBPNX
 			char path[MAX_CONFIG_PATH];
@@ -5051,15 +4817,15 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 			strcpy(temp, networkInfo.lan.ip.s_addr != 0 ? inet_ntoa(networkInfo.lan.ip) : _T("NOT_AVAILABLE_SHORT") );
 #endif
 			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_toggleIP, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry(lanMenu, buf, output_changeIP, SET_NUMBER(i), thumbnail_configure);
 		} else
 		{
 			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), _T("GATEWAY_BRIDGE"));
-			interface_addMenuEntryDisabled((interfaceMenu_t*)&LANSubMenu, buf, thumbnail_configure);
+			interface_addMenuEntryDisabled(lanMenu, buf, thumbnail_configure);
 		}
 
-		sprintf(buf, "%s", _T("NET_RESET"));
-		interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_toggleReset, SET_NUMBER(i), settings_renew);
+		sprintf(buf, "%s", _T("APPLY_NETWORK_SETTINGS"));
+		interface_addMenuEntry(lanMenu, buf, output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
 
 #ifdef STBPNX
 #ifdef ENABLE_LAN
@@ -5074,12 +4840,12 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 				default:                str = _T("OFF");
 			}
 			sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), str);
-			interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_fillGatewayMenu, (void*)0, thumbnail_configure);
+			interface_addMenuEntry(lanMenu, buf, output_showGatewayMenu, (void*)0, thumbnail_configure);
 			if (output_gatewayMode != gatewayModeOff)
 			{
 				getParam(STB_CONFIG_FILE, "CONFIG_TRAFFIC_SHAPE", "0", temp);
 				sprintf(buf,"%s: %s %s", _T("GATEWAY_BANDWIDTH"), atoi(temp) <= 0 ? _T("NONE") : temp, atoi(temp) <= 0 ? "" : _T("KBPS"));
-				interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_toggleGatewayBW, (void*)0, thumbnail_configure);
+				interface_addMenuEntry(lanMenu, buf, output_changeGatewayBandwidth, (void*)0, thumbnail_configure);
 			}
 		}
 #endif // ENABLE_LAN
@@ -5087,7 +4853,7 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 
 #ifdef STSDK
 		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), output_getLanModeName(networkInfo.lanMode));
-		interface_addMenuEntry((interfaceMenu_t*)&LANSubMenu, buf, output_fillGatewayMenu, (void*)0, thumbnail_configure);
+		interface_addMenuEntry(lanMenu, buf, output_showGatewayMenu, (void*)0, thumbnail_configure);
 #endif
 		return 0;
 	}
@@ -5097,7 +4863,7 @@ int output_fillLANMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif // ENABLE_LAN
 
 #ifdef ENABLE_WIFI
-static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char temp[MENU_ENTRY_INFO_LENGTH];
@@ -5111,7 +4877,7 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 	sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
 	exists = helperCheckDirectoryExsists(temp);
 #else
-	exists = 1; // no check
+	exists = 1; // don't check
 #endif
 	interface_clearMenuEntries((interfaceMenu_t*)&WifiSubMenu);
 
@@ -5133,13 +4899,13 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	if (!exists) {
-		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("NET_RESET"), output_toggleReset, SET_NUMBER(i), settings_renew);
+		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
 		return 0;
 	}
 
 	if (wifiInfo.wanMode)
 	{
-		interface_addMenuEntry(pMenu, _T("WIRELESS_LIST"), (menuActionFunction)menuDefaultActionShowMenu, &WirelessMenu, thumbnail_search);
+		interface_addMenuEntry(pMenu, _T("WIRELESS_LIST"), interface_menuActionShowMenu, &WirelessMenu, thumbnail_search);
 
 		char *state = NULL;
 		struct wpa_ctrl *ctrl = wpa_ctrl_open(STB_WPA_SUPPLICANT_CTRL_DIR "/wlan0");
@@ -5178,16 +4944,16 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 	} else
 	{
 		sprintf(buf, "%s: %s", _T("ESSID"), wifiInfo.essid);
-		interface_addMenuEntry(pMenu, buf, output_toggleESSID, SET_NUMBER(i), thumbnail_enterurl);
+		interface_addMenuEntry(pMenu, buf, output_changeESSID, SET_NUMBER(i), thumbnail_enterurl);
 
 		if (wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount)
 		{
 			sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.key );
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiKey, NULL, thumbnail_enterurl);
+			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeWifiKey, NULL, thumbnail_enterurl);
 		}
 	}
 
-	interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("NET_RESET"), output_toggleReset, SET_NUMBER(i), settings_renew);
+	interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
 
 	if (!wifiInfo.showAdvanced)
 	{
@@ -5213,39 +4979,33 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		{
 			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
 			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleIP, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeIP, SET_NUMBER(i), thumbnail_configure);
 
 			getParam(path, "NETMASK", _T("NOT_AVAILABLE_SHORT"), temp);
 			sprintf(buf, "%s: %s", _T("NETMASK"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleNetmask, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeNetmask, SET_NUMBER(i), thumbnail_configure);
 			
 			if ( wifiInfo.wanMode )
 			{
 				getParam(path, "DEFAULT_GATEWAY", _T("NOT_AVAILABLE_SHORT"), temp);
 				sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleGw, SET_NUMBER(i), thumbnail_configure);
+				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeGw, SET_NUMBER(i), thumbnail_configure);
 
 				getParam(path, "NAMESERVERS", _T("NOT_AVAILABLE_SHORT"), temp);
 				sprintf(buf, "%s: %s", _T("DNS_SERVER"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleDNSIP, SET_NUMBER(i), thumbnail_configure);
+				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeDNS, SET_NUMBER(i), thumbnail_configure);
 			}
 		}
 #endif // STBPNX
-#ifdef STSDK
-		sprintf(buf, "%s %s", iface_name, _T("IP_ADDRESS"));
-		interface_addMenuEntry(_M &WifiSubMenu, buf, (menuActionFunction)menuDefaultActionShowMenu,
-			(void*)((wifiInfo.wanMode || networkInfo.lanMode == lanBridge) ? &WANSubMenu : &LANSubMenu), settings_network);
-#endif // STSDK
-
 		if (wifiInfo.wanMode)
 		{
 			sprintf(buf, "%s: %s", _T("ESSID"), wifiInfo.essid);
-			interface_addMenuEntry(pMenu, buf, output_toggleESSID, SET_NUMBER(i), thumbnail_enterurl);
+			interface_addMenuEntry(pMenu, buf, output_changeESSID, SET_NUMBER(i), thumbnail_enterurl);
 
 			if (wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount)
 			{
 				sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.key );
-				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiKey, NULL, thumbnail_enterurl);
+				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeWifiKey, NULL, thumbnail_enterurl);
 			}
 		} else
 		{
@@ -5296,7 +5056,7 @@ static int output_fillWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		if (wifiInfo.channelCount > 0)
 		{
 			sprintf(buf, "%s: %d", _T("CHANNEL_NUMBER"), wifiInfo.currentChannel);
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiChannel, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeWifiChannel, SET_NUMBER(i), thumbnail_configure);
 		}
 		}
 
@@ -5329,8 +5089,7 @@ int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
 	wifiInfo.showAdvanced = !wifiInfo.showAdvanced;
 	if (!wifiInfo.showAdvanced)
 		interface_setSelectedItem(pMenu, 4); // jump to toggle advanced entry
-	output_fillWifiMenu(pMenu, NULL);
-	interface_displayMenu(1);
+	output_redrawMenu(pMenu);
 	return 0;
 }
 
@@ -5470,14 +5229,7 @@ int output_setHostapdChannel(int channel)
 #if (defined ENABLE_IPTV) && (defined ENABLE_XWORKS)
 static int output_togglexWorks(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (setParam( STB_CONFIG_FILE, "XWORKS", pArg ? "ON" : "OFF" ) != 0)
-	{
-		output_warnIfFailed(1);
-		return 1;
-	}
-	output_fillIPTVMenu( pMenu, NULL );
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(setParam( STB_CONFIG_FILE, "XWORKS", pArg ? "ON" : "OFF" ), pMenu);
 }
 
 static int output_togglexWorksProto(interfaceMenu_t *pMenu, void* pArg)
@@ -5503,8 +5255,7 @@ static int output_togglexWorksProto(interfaceMenu_t *pMenu, void* pArg)
 		return 1;
 	}
 	system("/usr/local/etc/init.d/S94xworks config");
-	output_fillIPTVMenu( pMenu, NULL );
-	interface_displayMenu(1);
+	output_redrawMenu(pMenu);
 	return 0;
 }
 
@@ -5514,7 +5265,7 @@ static int output_restartxWorks(interfaceMenu_t *pMenu, void* pArg)
 
 	system("/usr/local/etc/init.d/S94xworks restart");
 
-	output_fillIPTVMenu( pMenu, NULL );
+	output_refillMenu(pMenu);
 	interface_hideMessageBox();
 	return 0;
 }
@@ -5533,31 +5284,22 @@ int output_toggleAutoStopTimeout(interfaceMenu_t *pMenu, void* pArg)
 	else
 		appControlInfo.playbackInfo.autoStop = timeouts[ (i+1)%timeouts_count ];
 
-	output_warnIfFailed(saveAppSettings());
-	output_fillPlaybackMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 int output_togglePlaybackMode(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_warnIfFailed(media_setNextPlaybackMode());
-	output_fillPlaybackMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(media_setNextPlaybackMode(), pMenu);
 }
 
 int output_toggleVolumeFadein(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.soundInfo.fadeinVolume = !appControlInfo.soundInfo.fadeinVolume;
-	output_warnIfFailed(saveAppSettings());
-	output_fillPlaybackMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 #ifdef ENABLE_IPTV
-int output_toggleIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
+int output_changeIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
 {
 	static const time_t timeouts[] = { 3, 5, 7, 10, 15, 30 };
 	static const int    timeouts_count = sizeof(timeouts)/sizeof(timeouts[0]);
@@ -5570,13 +5312,10 @@ int output_toggleIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
 	else
 		appControlInfo.rtpMenuInfo.pidTimeout = timeouts[ (i+1)%timeouts_count ];
 
-	output_warnIfFailed(saveAppSettings());
-	output_fillIPTVMenu(pMenu, pArg);
-	interface_displayMenu(1);
-	return 0;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
@@ -5591,22 +5330,25 @@ static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 		default: str = "SAP"; break;
 	}
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_toggleIPTVPlaylist, NULL, thumbnail_configure);
+	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVPlaylist, NULL, thumbnail_configure);
 	}
 
 	if (appControlInfo.rtpMenuInfo.usePlaylistURL == iptvPlaylistUrl)
 	{
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
-	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpPlaylist, thumbnail_enterurl);
+	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionRtpPlaylist), thumbnail_enterurl);
 	}
 
+	if (appControlInfo.rtpMenuInfo.usePlaylistURL != iptvPlaylistSap)
+	{
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_EPG"), appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
-	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_toggleURL, NULL, NULL, NULL, (void*)optionRtpEpg, thumbnail_enterurl);
+	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionRtpEpg), thumbnail_enterurl);
+	}
 
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %ld", _T("IPTV_WAIT_TIMEOUT"), appControlInfo.rtpMenuInfo.pidTimeout);
-	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_toggleIPTVtimeout, pArg, thumbnail_configure);
+	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVtimeout, pArg, thumbnail_configure);
 
 #ifdef ENABLE_XWORKS
 	int xworks_enabled;
@@ -5655,11 +5397,11 @@ static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif
 #ifdef ENABLE_PROVIDER_PROFILES
-	interface_addMenuEntry( (interfaceMenu_t*)&IPTVSubMenu, _T("PROFILE"), (menuActionFunction)menuDefaultActionShowMenu, (void*)&ProfileMenu, thumbnail_account );
+	interface_addMenuEntry( (interfaceMenu_t*)&IPTVSubMenu, _T("PROFILE"), interface_menuActionShowMenu, (void*)&ProfileMenu, thumbnail_account );
 #endif
 #ifdef ENABLE_TELETES
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", "Teletes playlist", appControlInfo.rtpMenuInfo.teletesPlaylist[0] != 0 ? appControlInfo.rtpMenuInfo.teletesPlaylist : _T("NONE"));
-	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, 1, output_toggleURL, NULL, NULL, NULL, (void*)optionTeletesPlaylist, thumbnail_enterurl);
+	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, 1, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionTeletesPlaylist), thumbnail_enterurl);
 #endif
 
 	return 0;
@@ -5667,7 +5409,7 @@ static int output_fillIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif
 
 #ifdef ENABLE_VOD
-static int output_fillVODMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterVODMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
@@ -5680,34 +5422,34 @@ static int output_fillVODMenu(interfaceMenu_t *pMenu, void* pArg)
 	{
 		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"),
 			appControlInfo.rtspInfo.streamInfoUrl != 0 ? appControlInfo.rtspInfo.streamInfoUrl : _T("NONE"));
-		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleURL, (void*)optionVodPlaylist, thumbnail_enterurl);
+		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeURL, SET_NUMBER(optionVodPlaylist), thumbnail_enterurl);
 	}
 	else
 	{
 		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_INFO_IP_ADDRESS"), appControlInfo.rtspInfo.streamInfoIP);
-		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODINFOIP, NULL, thumbnail_enterurl);
+		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeVODINFOIP, NULL, thumbnail_enterurl);
 	}
 
 	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_IP_ADDRESS"), appControlInfo.rtspInfo.streamIP);
-	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODIP, NULL, thumbnail_enterurl);
+	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeVODIP, NULL, thumbnail_enterurl);
 
 	return 0;
 }
 #endif
 
-static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterWebMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
 	interface_clearMenuEntries((interfaceMenu_t*)&WebSubMenu);
 	sprintf(buf, "%s: %s", _T("PROXY_ADDR"), appControlInfo.networkInfo.proxy[0] != 0 ? appControlInfo.networkInfo.proxy : _T("NONE"));
-	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleProxyAddr, pArg, thumbnail_enterurl);
+	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeProxyAddress, pArg, thumbnail_enterurl);
 
 	sprintf(buf, "%s: %s", _T("PROXY_LOGIN"), appControlInfo.networkInfo.login[0] != 0 ? appControlInfo.networkInfo.login : _T("NONE"));
-	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleProxyLogin, pArg, thumbnail_enterurl);
+	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeProxyLogin, pArg, thumbnail_enterurl);
 
 	sprintf(buf, "%s: ***", _T("PROXY_PASSWD"));
-	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleProxyPasswd, pArg, thumbnail_enterurl);
+	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeProxyPassword, pArg, thumbnail_enterurl);
 
 #ifdef ENABLE_BROWSER
 #ifdef STBPNX
@@ -5715,7 +5457,7 @@ static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
 
 		getParam(BROWSER_CONFIG_FILE, "HomeURL", "", temp);
 		sprintf(buf, "%s: %s", _T("MW_ADDR"), temp);
-		interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleMWAddr, pArg, thumbnail_enterurl);
+		interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeMiddlewareUrl, pArg, thumbnail_enterurl);
 
 		getParam(BROWSER_CONFIG_FILE, "AutoLoadingMW", "", temp);
 		if (temp[0] != 0)
@@ -5734,9 +5476,10 @@ static int output_fillWebMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_showGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_clearMenuEntries((interfaceMenu_t*)&GatewaySubMenu);
+	GatewaySubMenu.baseMenu.pParentMenu = pMenu;
 
 #ifdef STBPNX
 	gatewayMode_t mode;
@@ -5768,14 +5511,15 @@ int output_fillGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
-int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
-	interface_clearMenuEntries((interfaceMenu_t*)&InterfaceMenu);
+	// assert (interfaceMenu == _M &InterfaceMenu);
+	interface_clearMenuEntries(interfaceMenu);
 
 	sprintf( buf, "%s: %s", _T("FILE_SORTING"), _T( appControlInfo.mediaInfo.fileSorting == naturalsort ? "SORT_NATURAL" : "SORT_ALPHA" ));
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleFileSorting, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleFileSorting, NULL, settings_interface);
 
 #ifdef STB82
 	char *str;
@@ -5789,27 +5533,24 @@ int output_fillInterfaceMenu(interfaceMenu_t *pMenu, void* pArg)
 		default:                                   str = _T("NONE");
 	}
 	snprintf(buf, sizeof(buf), "%s: %s", _T("MENU_ANIMATION"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleInterfaceAnimation, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleInterfaceAnimation, NULL, settings_interface);
 #endif
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, _T("CHANGE_HIGHLIGHT_COLOR"), output_toggleHighlightColor, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, _T("CHANGE_HIGHLIGHT_COLOR"), output_toggleHighlightColor, NULL, settings_interface);
 	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYCONTROL_SHOW_TIMEOUT"), interfacePlayControl.showTimeout, _T("SECOND_SHORT"));
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_togglePlayControlTimeout, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlTimeout, NULL, settings_interface);
 	snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYCONTROL_SHOW_ON_START"), interfacePlayControl.showOnStart ? _T("ON") : _T("OFF") );
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_togglePlayControlShowOnStart, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlShowOnStart, NULL, settings_interface);
 #ifdef ENABLE_VOIP
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_INDICATION"), _T( interfaceInfo.enableVoipIndication ? "ON" : "OFF" ));
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleVoipIndication, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipIndication, NULL, settings_interface);
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
-	interface_addMenuEntry((interfaceMenu_t*)&InterfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
-
-	interface_menuActionShowMenu(pMenu, (void*)&InterfaceMenu);
-	interface_displayMenu(1);
 
 	return 0;
 }
 
-int output_fillPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
+int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
@@ -5844,30 +5585,31 @@ int output_fillPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 void output_fillOutputMenu(void)
 {
 	char *str;
-	interface_clearMenuEntries((interfaceMenu_t*)&OutputMenu);
+	interfaceMenu_t *outputMenu = (interfaceMenu_t*)&OutputMenu;
 
-//#ifdef STB6x8x
+	interface_clearMenuEntries(outputMenu);
+
 	str = _T("INFO");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, show_info, NULL, thumbnail_info);
-//#endif
+	interface_addMenuEntry(outputMenu, str, show_info, NULL, thumbnail_info);
+
 #ifdef ENABLE_STATS
 	str = _T("PROFILE");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&StatsMenu, thumbnail_recorded);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &StatsMenu, thumbnail_recorded);
 #endif
 	str = _T("LANGUAGE");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, l10n_initLanguageMenu, NULL, settings_language);
+	interface_addMenuEntry(outputMenu, str, l10n_initLanguageMenu, NULL, settings_language);
 
 #ifdef ENABLE_MESSAGES
 	str = _T("MESSAGES");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&MessagesMenu, thumbnail_messages);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &MessagesMenu, thumbnail_messages);
 #endif
 
 	str = _T("TIME_DATE_CONFIG");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillTimeMenu, NULL, settings_datetime);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &TimeSubMenu, settings_datetime);
 
 #if (defined STBxx) || (defined STSDK)
 	str = _T("VIDEO_CONFIG");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillVideoMenu, NULL, settings_video);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
 
 #ifdef ENABLE_DVB
@@ -5877,55 +5619,47 @@ void output_fillOutputMenu(void)
 	{
 		str = _T("DVB_CONFIG");
 #ifndef ENABLE_PASSWORD
-		interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillDVBMenu, NULL, settings_dvb);
+		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &DVBSubMenu, settings_dvb);
 #else
-		interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_askPassword, (void*)output_fillDVBMenu, settings_dvb);
+		interface_addMenuEntry(outputMenu, str, output_askPassword, (void*)output_showDVBMenu, settings_dvb);
 #endif
 	}
 #endif // #ifdef ENABLE_DVB
 
 	str = _T("NETWORK_CONFIG");
 #ifndef ENABLE_PASSWORD
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillNetworkMenu, NULL, settings_network);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &NetworkSubMenu, settings_network);
 #else
-		interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_askPassword, (void*)output_fillNetworkMenu, settings_network);
+	interface_addMenuEntry(outputMenu, str, output_askPassword, (void*)output_showNetworkMenu, settings_network);
 #endif
 
 	str = _T("INTERFACE");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fillInterfaceMenu, NULL, settings_interface);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InterfaceMenu, settings_interface);
 
 	str = _T("PLAYBACK");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &PlaybackMenu, thumbnail_loading);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &PlaybackMenu, thumbnail_loading);
 
 #ifdef ENABLE_3D
 	str = _T("3D_SETTINGS");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_fill3DMenu, NULL, thumbnail_channels);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &Video3DSubMenu, thumbnail_channels);
 #endif
 
 #ifdef STSDK
 	str = _T("UPDATES");
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &UpdateMenu, settings_updates);
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &UpdateMenu, settings_updates);
 #endif
 
 	str = _T("RESET_SETTINGS");
 #ifndef ENABLE_PASSWORD
-	interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_resetSettings, NULL, thumbnail_warning);
+	interface_addMenuEntry(outputMenu, str, output_resetSettings, NULL, thumbnail_warning);
 #else
-		interface_addMenuEntry((interfaceMenu_t*)&OutputMenu, str, output_askPassword, (void*)output_resetSettings, thumbnail_warning);
+	interface_addMenuEntry(outputMenu, str, output_askPassword, (void*)output_resetSettings, thumbnail_warning);
 #endif
 
 	output_fillStandardMenu();
 	output_fillFormatMenu();
 	output_fillTimeZoneMenu();
-#if 0
-    if(!(gfx_isHDoutput()))
-    {
-        /* Ensure that the correct format entry is selected */
-		interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 1);
-    }
-#endif
 }
-
 
 void output_buildMenu(interfaceMenu_t *pParent)
 {
@@ -5943,21 +5677,21 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enter3DMenu, NULL, NULL);
 #endif // #ifdef STB225
 
 	createListMenu(&TimeSubMenu, _T("TIME_DATE_CONFIG"), settings_datetime, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterTimeMenu, NULL, NULL);
 #ifdef ENABLE_DVB
 	createListMenu(&DVBSubMenu, _T("DVB_CONFIG"), settings_dvb, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
 #endif
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterNetworkMenu, NULL, NULL);
 
 	createListMenu(&StandardMenu, _T("TV_STANDARD"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
@@ -5977,36 +5711,37 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
 
 	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, output_fillPlaybackMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterPlaybackMenu, NULL, NULL);
 
 	createListMenu(&WANSubMenu, "WAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillWANMenu, NULL, SET_NUMBER(ifaceWAN));
+		interfaceListMenuIconThumbnail, output_enterWANMenu, NULL, SET_NUMBER(ifaceWAN));
 
 #ifdef ENABLE_PPP
 	createListMenu(&PPPSubMenu, _T("PPP"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillPPPMenu, output_leavePPPMenu, SET_NUMBER(ifaceWAN));
+		interfaceListMenuIconThumbnail, output_enterPPPMenu, output_leavePPPMenu, SET_NUMBER(ifaceWAN));
+#endif
+#ifdef ENABLE_LAN
+	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+		interfaceListMenuIconThumbnail, output_enterLANMenu, NULL, SET_NUMBER(ifaceLAN));
 #endif
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillLANMenu, NULL, SET_NUMBER(ifaceLAN));
-
-	createListMenu(&GatewaySubMenu, _T("GATEWAY_MODE"), settings_network, NULL, (interfaceMenu_t*)&LANSubMenu,
+	createListMenu(&GatewaySubMenu, _T("GATEWAY_MODE"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 #endif
 #ifdef ENABLE_WIFI
 	int wifi_icons[4] = { 0, 0, 0, statusbar_f4_enterurl };
 	createListMenu(&WifiSubMenu, _T("WIRELESS"), settings_network, wifi_icons, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillWifiMenu, NULL, SET_NUMBER(ifaceWireless));
+		interfaceListMenuIconThumbnail, output_enterWifiMenu, NULL, SET_NUMBER(ifaceWireless));
 	interface_setCustomKeysCallback(_M &WifiSubMenu, output_wifiKeyCallback);
 
 	wireless_buildMenu(_M &WifiSubMenu);
 #endif
 #ifdef ENABLE_IPTV
 	createListMenu(&IPTVSubMenu, _T("TV_CHANNELS"), thumbnail_multicast, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillIPTVMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterIPTVMenu, NULL, NULL);
 #ifdef ENABLE_PROVIDER_PROFILES
 	createListMenu(&ProfileMenu, _T("PROFILE"), thumbnail_account, NULL, (interfaceMenu_t*)&IPTVSubMenu,
 		interfaceListMenuIconThumbnail, output_enterProfileMenu, output_leaveProfileMenu, NULL);
@@ -6014,14 +5749,14 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #endif
 #ifdef ENABLE_VOD
 	createListMenu(&VODSubMenu, _T("MOVIES"), thumbnail_vod, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillVODMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterVODMenu, NULL, NULL);
 #endif
 	createListMenu(&WebSubMenu, _T("INTERNET_BROWSING"), thumbnail_internet, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_fillWebMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterWebMenu, NULL, NULL);
 
 #ifdef STSDK
 	createListMenu(&UpdateMenu, _T("UPDATES"), settings_updates, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, output_fillUpdateMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterUpdateMenu, NULL, NULL);
 #endif
 
 #ifdef ENABLE_MESSAGES

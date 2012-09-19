@@ -16,6 +16,7 @@ ANSWER_CALL=Қоңырауды қабылдау
 ANSWERED_CALLS=Қабылданған қоңырлаулар 
 APP_RELEASE=Тігу
 APP_VERSION=Бағдарлама нұсқасы
+APPLY_NETWORK_SETTINGS=Применить настройки сети
 APS_NOTIFY=Авторлық Төлеу Жүйесіне хабарлама жіберу... 
 ASPECT_RATIO=Жақтардың арақатынасы 
 ATR_FAILED=ATR картасының қателігі 

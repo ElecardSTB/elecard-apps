@@ -9,6 +9,7 @@ ADD_URL=URL–ის დამატება
 ANSWERED_CALLS=შემოსული ზარები
 APP_RELEASE=Firmware
 APP_VERSION=ვერსია
+APPLY_NETWORK_SETTINGS=Применить настройки сети
 APS_NOTIFY=ვაგზავნი APS შეტყობინებას...
 ATR_FAILED=Card ATR Check Failed
 AUDIO=აუდიო
