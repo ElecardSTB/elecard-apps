@@ -193,6 +193,7 @@ void *wireless_scanThread(void *pArg)
 	{
 		eprintf("%s: Failed to scan wireless networks: %s\n", __FUNCTION__, strerror(errno));
 		interface_addMenuEntryDisabled(pMenu, _T("WIRELESS_SCAN_FAILED"), thumbnail_error);
+		interface_addMenuEntryDisabled(pMenu, _T("SETTINGS_APPLY_REQUIRED"), thumbnail_info);
 		goto thread_exit;
 	}
 

@@ -91,6 +91,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef STB82
 #define PPP_CHAP_SECRETS_FILE       "/etc/ppp/chap-secrets"
 #endif
+#ifdef STBPNX
+#define IFACE_CONFIG_PREFIX         "/config/ifcfg-"
+#define WAN_CONFIG_FILE             IFACE_CONFIG_PREFIX "eth0"
+#define LAN_CONFIG_FILE             IFACE_CONFIG_PREFIX "eth1"
+#define WLAN_CONFIG_FILE            IFACE_CONFIG_PREFIX "wlan0"
+#endif
 #ifdef STSDK
 #define PPP_CHAP_SECRETS_FILE       "/var/etc/ppp/chap-secrets"
 #define TIMEZONE_FILE               "/var/etc/localtime"
@@ -111,15 +117,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
-
-typedef enum
-{
-	gatewayModeOff = 0,
-	gatewayModeBridge,
-	gatewayModeNAT,
-	gatewayModeFull,
-	gatewayModeCount
-} gatewayMode_t;
 
 typedef enum
 {
@@ -148,6 +145,19 @@ typedef enum
 	optionSymbolRate,
 } outputDvbOption;
 
+typedef enum {
+	lanDhcpServer = 0,
+	lanStatic,
+#ifdef STSDK
+	lanModeCount,
+#endif
+	lanBridge,
+#ifndef STSDK
+	lanModeCount,
+#endif
+	lanDhcpClient,
+} lanMode_t;
+
 #ifdef ENABLE_PPP
 typedef struct
 {
@@ -167,25 +177,19 @@ typedef struct
 	struct in_addr mask;
 	struct in_addr gw;
 } outputNfaceInfo_t;
-
-typedef enum {
-	lanDhcpServer = 0,
-	lanStatic,
-	/// FIXME: add support for more LAN modes
-	lanModeCount,
-	lanDhcpClient,
-	lanBridge,
-} lanMode_t;
+#endif // STSDK
 
 typedef struct
 {
+#ifdef STSDK
 	outputNfaceInfo_t wan;
 	int               wanDhcp;
 	struct in_addr    dns;
 	outputNfaceInfo_t lan;
+#endif
 	lanMode_t         lanMode;
+	int               changed;
 } outputNetworkInfo_t;
-#endif // STSDK
 
 #ifdef ENABLE_WIFI
 
@@ -238,12 +242,15 @@ typedef struct
 
 static void output_fillOutputMenu(void);
 static int output_enterNetworkMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_leaveNetworkMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
 
 static int output_enterWANMenu (interfaceMenu_t *wanMenu, void* pArg);
+static int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface);
 #ifdef ENABLE_PPP
 static int output_enterPPPMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
@@ -252,6 +259,8 @@ static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
 static int output_enterLANMenu (interfaceMenu_t *lanMenu, void* pArg);
 #endif
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+static int output_fillLANMenu(interfaceMenu_t *lanMenu, void* pIface);
+static int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce);
 static int output_showGatewayMenu(interfaceMenu_t *pMenu, void* ignored);
 #endif
 
@@ -259,7 +268,6 @@ static int output_showGatewayMenu(interfaceMenu_t *pMenu, void* ignored);
 static int output_readWirelessSettings(void);
 static int output_enterWifiMenu (interfaceMenu_t *pMenu, void* ignored);
 static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-static int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pArg);
 #ifdef STSDK
 static int output_setHostapdChannel(int channel);
 #endif
@@ -311,7 +319,7 @@ static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #endif
-#if (defined STBPNX) && (defined ENABLE_LAN)
+#ifdef ENABLE_LAN
 static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
 #endif
@@ -345,9 +353,10 @@ static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
 
 static int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg);
-
-const char* output_getLanModeName(lanMode_t mode);
 #endif
+static const char* output_getLanModeName(lanMode_t mode);
+static void output_setIfaceMenuName(interfaceMenu_t *pMenu, const char *ifaceName, int wan, lanMode_t lanMode);
+static int  output_isIfaceDhcp(stb810_networkInterface_t iface);
 
 /** Display message box if failed is non-zero and no previous failures occured.
  *  Return non-zero if message was displayed (and display updated). */
@@ -420,28 +429,23 @@ static interfaceListMenu_t VODSubMenu;
 #endif
 static interfaceListMenu_t WebSubMenu;
 
-#ifdef ENABLE_WIFI
-static outputWifiInfo_t wifiInfo;
-#endif
-
 static interfaceEditEntry_t TimeEntry;
 static interfaceEditEntry_t DateEntry;
-
-#if (defined ENABLE_LAN) && (defined STBPNX)
-static gatewayMode_t output_gatewayMode = gatewayModeOff;
-#endif
 
 static long info_progress;
 
 static char output_ip[4*4];
 
+static outputNetworkInfo_t networkInfo;
+#ifdef ENABLE_WIFI
+static outputWifiInfo_t wifiInfo;
+#endif
 #ifdef ENABLE_PPP
 static pppInfo_t pppInfo;
 #endif
 
 #ifdef STSDK
 static interfaceListMenu_t UpdateMenu;
-static outputNetworkInfo_t networkInfo;
 static char output_currentFormat[64] = "";
 static char output_originalFormat[64] = "";
 #endif
@@ -798,7 +802,7 @@ static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
 #ifndef HIDE_EXTRA_FUNCTIONS
 static int output_toggleAudio(interfaceMenu_t *pMenu, void* pArg)
 {
-	appControlInfo.soundInfo.rcaOutput = !appControlInfo.soundInfo.rcaOutput
+	appControlInfo.soundInfo.rcaOutput = !appControlInfo.soundInfo.rcaOutput;
 	// FIXME: Just force rcaOutput for now
 	appControlInfo.soundInfo.rcaOutput = 1;
 	sound_restart();
@@ -900,7 +904,7 @@ int getParam(const char *path, const char *param, const char *defaultValue, char
 	fd = fopen(path, "r");
 	if (fd != NULL)
 	{
-		while (fgets(buf, MENU_ENTRY_INFO_LENGTH, fd) != NULL)
+		while (fgets(buf, sizeof(buf), fd) != NULL)
 		{
 			plen = strlen(param);
 			vlen = strlen(buf)-1;
@@ -960,7 +964,7 @@ int setParam(const char *path, const char *param, const char *value)
 
 	if (fdi != NULL)
 	{
-		while (fgets(buf, MENU_ENTRY_INFO_LENGTH, fdi) != NULL)
+		while (fgets(buf, sizeof(buf), fdi) != NULL)
 		{
 			//dprintf("%s: line %s\n", __FUNCTION__, buf);
 			if (strncasecmp(param, buf, strlen(param)) == 0 ||
@@ -1022,12 +1026,7 @@ int output_setESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	memcpy( wifiInfo.essid, value, essid_len+1 );
 #ifdef STBPNX
-	int i = OUTPUT_INFO_GET_INDEX(pArg);
-	char path[MAX_CONFIG_PATH];
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
-	output_warnIfFailed(setParam(path, "ESSID", value));
+	output_warnIfFailed(setParam(WLAN_CONFIG_FILE, "ESSID", value));
 #endif // STBPNX
 #ifdef STSDK
 	if (wifiInfo.wanMode)
@@ -1035,7 +1034,7 @@ int output_setESSID(interfaceMenu_t *pMenu, char *value, void* pArg)
 	else
 	output_warnIfFailed(setParam(STB_HOSTAPD_CONF, "ssid", value));
 #endif // STSDK
-
+	networkInfo.changed = 1;
 	output_refillMenu(pMenu);
 	return 0;
 }
@@ -1061,17 +1060,13 @@ static int output_setWifiChannel(interfaceMenu_t *pMenu, char *value, void* pArg
 
 	wifiInfo.currentChannel = channel;
 #ifdef STBPNX
-	int i = OUTPUT_INFO_GET_INDEX(pArg);
-	char path[MAX_CONFIG_PATH];
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-	output_warnIfFailed(setParam(path, "CHANNEL", value));
+	output_warnIfFailed(setParam(WLAN_CONFIG_FILE, "CHANNEL", value));
 #endif // STBPNX
 #ifdef STSDK
 	output_warnIfFailed(output_setHostapdChannel(atol(value)));
 	
 #endif // STSDK
-
+	networkInfo.changed = 1;
 	output_refillMenu(pMenu);
 	return 0;
 }
@@ -1124,10 +1119,7 @@ int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg)
 
 	int show_error = 0;
 #ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
-	int i = ifaceWireless;
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
+	char *path = WLAN_CONFIG_FILE;
 	char *value = NULL;
 	switch(wifiInfo.auth)
 	{
@@ -1172,25 +1164,21 @@ int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg)
 
 	show_error = output_writeInterfacesFile();
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(show_error, pMenu);
 }
 
 static int output_toggleWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 {
-	return output_setWifiEncryption(pMenu, (void*)((wifiInfo.encryption+1)%wifiEncCount));
+	return output_setWifiEncryption(pMenu, SET_NUMBER((wifiInfo.encryption+1)%wifiEncCount));
 }
 
 int output_setWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 {
-	wifiInfo.encryption = (outputWifiEncryption_t)pArg;
+	wifiInfo.encryption = GET_NUMBER(pArg);
 
 	int show_error = 0;
 #ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
-	int i = ifaceWireless;
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
 	char *value = NULL;
 	switch(wifiInfo.encryption)
 	{
@@ -1198,12 +1186,12 @@ int output_setWifiEncryption(interfaceMenu_t *pMenu, void* pArg)
 		case wifiEncTKIP: value = "TKIP"; break;
 		default: return 1;
 	}
-
-	show_error = setParam(path, "ENCRYPTION", value);
+	show_error = setParam(WLAN_CONFIG_FILE, "ENCRYPTION", value);
 #endif
 #ifdef STSDK
 	show_error = output_writeInterfacesFile();
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(show_error, pMenu);
 }
 
@@ -1215,7 +1203,6 @@ static int output_setWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return 1;
 
 	size_t key_len = strlen(value);
-
 	if ( wifiInfo.auth == wifiAuthWEP )
 	{
 		if ( key_len != 10 )
@@ -1243,24 +1230,18 @@ static int output_setWifiKey(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 
 	memcpy( wifiInfo.key, value, key_len+1 );
-
 #ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
-	int i = ifaceWireless;
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
-	output_warnIfFailed(setParam(path, "KEY", value));
+	output_warnIfFailed(setParam(WLAN_CONFIG_FILE, "KEY", value));
 #endif // STBPNX
 #ifdef STSDK
 	output_warnIfFailed(output_writeInterfacesFile());
 #endif
 
+	networkInfo.changed = 1;
 	if( pAction != NULL )
 	{
 		return pAction(pMenu, SET_NUMBER(ifaceWireless));
 	}
-
 	output_refillMenu(pMenu);
 	return 0;
 }
@@ -1285,44 +1266,49 @@ int output_changeWifiKey(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleWifiWAN(interfaceMenu_t *pMenu, void* pArg)
 {
 	wifiInfo.wanMode = !wifiInfo.wanMode;
+	wifiInfo.enable  = 1;
 
 	int show_error = 0;
 #ifdef STBPNX
-	int i = OUTPUT_INFO_GET_INDEX(pArg);
-	char path[MAX_CONFIG_PATH];
 	char value[16];
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-	sprintf(value,"%d",wifiInfo.wanMode);
-
-	if( !wifiInfo.wanMode )
+	snprintf(value,sizeof(value),"%d",wifiInfo.wanMode);
+	if (!wifiInfo.wanMode)
 	{
-		setParam(path, "BOOTPROTO",      "static");
-		setParam(path, "MODE",           "ad-hoc");
-		if( wifiInfo.auth > wifiAuthWEP )
+		setParam(WLAN_CONFIG_FILE, "BOOTPROTO",      "static");
+		setParam(WLAN_CONFIG_FILE, "MODE",           "ad-hoc");
+		if (wifiInfo.auth > wifiAuthWEP)
 		{
-			setParam(path, "AUTH",       "SHARED");
-			setParam(path, "ENCRYPTION", "WEP");
-			setParam(path, "KEY",        "0102030405");
+			setParam(WLAN_CONFIG_FILE, "AUTH",       "SHARED");
+			setParam(WLAN_CONFIG_FILE, "ENCRYPTION", "WEP");
+			setParam(WLAN_CONFIG_FILE, "KEY",        "0102030405");
 		}
 	}
-	show_error = setParam(path, "WAN_MODE", value);
+	show_error = setParam(WLAN_CONFIG_FILE, "WAN_MODE", value);
 #endif
 #ifdef STSDK
 	if (wifiInfo.wanMode)
 	{
 		wifiInfo.mode = wifiModeManaged;
+
+		// Disable DHCP server
+		networkInfo.lanMode = lanStatic;
 	} else {
 		wifiInfo.mode = wifiModeMaster;
 		wifiInfo.auth = wifiAuthWPA2PSK;
 		wifiInfo.encryption = wifiEncAES;
+
+		// Enable DHCP server
+		networkInfo.lanMode = lanDhcpServer;
 	}
 	wifiInfo.wanChanged = 1;
 
+	// Re-read wpa_supplicant or hostapd settings to update essid/password settings
 	output_readWirelessSettings();
 
+	output_writeDhcpConfig();
 	show_error = output_writeInterfacesFile();
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(show_error, pMenu);
 }
 
@@ -1332,18 +1318,14 @@ static int output_toggleWifiEnable(interfaceMenu_t *pMenu, void* pArg)
 
 	int show_error = 0;
 #ifdef STBPNX
-	int i = OUTPUT_INFO_GET_INDEX(pArg);
-	char path[MAX_CONFIG_PATH];
 	char value[16];
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-	sprintf(value,"%d",wifiInfo.enable);
-
-	show_error = setParam(path, "ENABLE_WIRELESS", value);
+	snprintf(value,sizeof(value),"%d",wifiInfo.enable);
+	show_error = setParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", value);
 #endif
 #ifdef STSDK
 	show_error = setParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", wifiInfo.enable ? "1" : "0");
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(show_error, pMenu);
 }
 
@@ -1360,10 +1342,7 @@ int output_setWifiMode(interfaceMenu_t *pMenu, void* pArg)
 
 	int show_error = 0;
 #ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
 	char *value = NULL;
-	int i = ifaceWireless;
-
 	switch(wifiInfo.mode)
 	{
 		case wifiModeCount:
@@ -1371,14 +1350,12 @@ int output_setWifiMode(interfaceMenu_t *pMenu, void* pArg)
 		case wifiModeMaster:  value = "master"; break;
 		case wifiModeManaged: value = "managed"; break;
 	}
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
-	show_error = setParam(path, "MODE", value);
+	show_error = setParam(WLAN_CONFIG_FILE, "MODE", value);
 #endif
 #ifdef STSDK
 	show_error = output_writeInterfacesFile();
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(show_error, pMenu);
 }
 #endif
@@ -1402,12 +1379,9 @@ static void output_parseIP(char *value)
 	}
 }
 
-static void output_getIP(void* pArg)
+static int output_getIP(stb810_networkInterface_t iface, outputIPOption type, char value[MENU_ENTRY_INFO_LENGTH])
 {
-	char value[MENU_ENTRY_INFO_LENGTH];
-	int i = OUTPUT_INFO_GET_INDEX(pArg);
-	outputIPOption type = (outputIPOption)OUTPUT_INFO_GET_TYPE(pArg);
-
+	int ret = 0;
 #ifdef STBPNX
 	char path[MAX_CONFIG_PATH];
 	char *key = "";
@@ -1418,37 +1392,57 @@ static void output_getIP(void* pArg)
 		case optionMask: key = "NETMASK";         break;
 		case optionDNS:  key = "NAMESERVERS";     break;
 		default:
-			return;
+			return 1;
 	}
-
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
-	if( getParam(path, key, "0.0.0.0", value) )
+	sprintf(path, "/config/ifcfg-%s", helperEthDevice(iface));
+	ret = getParam(path, key, "0.0.0.0", value);
 #endif
 #ifdef STSDK
+	if (type == optionDNS)
+	{
+		strcpy(value, inet_ntoa(networkInfo.dns));
+		return 0;
+	}
 	outputNfaceInfo_t *nface = NULL;
-	struct in_addr ip;
-
-	switch( i )
+	struct in_addr *ip = NULL;
+	switch (iface)
 	{
 		case ifaceWAN: nface = &networkInfo.wan; break;
 		case ifaceLAN: nface = &networkInfo.lan; break;
-		default:
-			return;
-	}
-	switch(type)
-	{
-		case optionIP:   ip = nface->ip;   break;
-		case optionGW:   ip = nface->gw;   break;
-		case optionMask: ip = nface->mask; break;
-		case optionDNS:  ip = networkInfo.dns; break;
-		default:
-			return;
-	}
-	strcpy( value, inet_ntoa(ip) );
+#ifdef ENABLE_WIFI
+		case ifaceWireless: nface = &wifiInfo.wlan; break;
 #endif
+		default:
+			return 1;
+	}
+	switch (type)
+	{
+		case optionIP:   ip = &nface->ip;   break;
+		case optionGW:   ip = &nface->gw;   break;
+		case optionMask: ip = &nface->mask; break;
+		default:
+			return 1;
+	}
+	if (ip->s_addr == INADDR_NONE || ip->s_addr == INADDR_ANY)
+		return 1;
+	strcpy(value, inet_ntoa(*ip));
+#endif
+	return ret;
+}
+
+static void output_initIPfield(outputIPOption type, stb810_networkInterface_t iface)
+{
+	char value[MENU_ENTRY_INFO_LENGTH];
+	if (output_getIP(iface, type, value) == 0)
 	{
 		output_parseIP(value);
+	}
+	else
+	{
+		int i;
+		memset(&output_ip, 0, sizeof(output_ip));
+		for (i = 0; i<16; i+=4)
+			output_ip[i] = '0';
 	}
 }
 
@@ -1457,11 +1451,11 @@ static char* output_getIPfield(int field, void* pArg)
 	return field < 4 ? &output_ip[field*4] : NULL;
 }
 
-static int output_setIP(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int output_setIP(interfaceMenu_t *pMenu, char *value, void* pOptionIface)
 {
 	in_addr_t ip;
-	int i = OUTPUT_INFO_GET_INDEX(pArg);
-	outputIPOption type = (outputIPOption)OUTPUT_INFO_GET_TYPE(pArg);
+	int i = OUTPUT_INFO_GET_INDEX(pOptionIface);
+	outputIPOption type = OUTPUT_INFO_GET_TYPE(pOptionIface);
 
 	if( value == NULL )
 		return 1;
@@ -1540,30 +1534,31 @@ static int output_setIP(interfaceMenu_t *pMenu, char *value, void* pArg)
 		output_writeDhcpConfig();
 	show_error = output_writeInterfacesFile();
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(show_error, pMenu);
 }
 
 static int output_changeIP(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_getIP(OUTPUT_INFO_SET(optionIP,GET_NUMBER(pArg)));
+	output_initIPfield(optionIP,GET_NUMBER(pArg));
 	return interface_getText(pMenu, _T("ENTER_DEFAULT_IP"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionIP,GET_NUMBER(pArg)) );
 }
 
 static int output_changeGw(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_getIP(OUTPUT_INFO_SET(optionGW,GET_NUMBER(pArg)));
+	output_initIPfield(optionGW,GET_NUMBER(pArg));
 	return interface_getText(pMenu, _T("ENTER_GATEWAY"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionGW,GET_NUMBER(pArg)) );
 }
 
 static int output_changeDNS(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_getIP(OUTPUT_INFO_SET(optionDNS,GET_NUMBER(pArg)));
+	output_initIPfield(optionDNS,GET_NUMBER(pArg));
 	return interface_getText(pMenu, _T("ENTER_DNS_ADDRESS"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionDNS,GET_NUMBER(pArg)) );
 }
 
 static int output_changeNetmask(interfaceMenu_t *pMenu, void* pArg)
 {
-	output_getIP(OUTPUT_INFO_SET(optionMask,GET_NUMBER(pArg)));
+	output_initIPfield(optionMask,GET_NUMBER(pArg));
 	return interface_getText(pMenu, _T("ENTER_NETMASK"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setIP, output_getIPfield, inputModeDirect, OUTPUT_INFO_SET(optionMask,GET_NUMBER(pArg)) );
 }
 
@@ -1608,25 +1603,19 @@ static int output_setBandwidth(interfaceMenu_t *pMenu, char *value, void* pArg)
 	int ivalue;
 	char buf[32];
 
-	if( value == NULL )
+	if (value == NULL)
 		return 1;
 
 	if (helperFileExists(STB_CONFIG_OVERRIDE_FILE))
-	{
 		return 0;
-	}
 
 	interface_showMessageBox(_T("GATEWAY_IN_PROGRESS"), settings_renew, 0);
 
 	ivalue = atoi(value);
-
 	if (value[0] == 0 || ivalue <= 0)
-	{
-		strcpy(buf, "");
-	} else
-	{
+		buf[0] = 0;
+	else
 		sprintf(buf, "%d", ivalue);
-	}
 
 	// Stop network interfaces
 	system("/usr/local/etc/init.d/S90dhcpd stop");
@@ -1636,7 +1625,6 @@ static int output_setBandwidth(interfaceMenu_t *pMenu, char *value, void* pArg)
 	system("/usr/local/etc/init.d/S90dhcpd start");
 
 	output_refillMenu(pMenu);
-
 	return 0;
 }
 
@@ -1647,12 +1635,10 @@ static int output_changeGatewayBandwidth(interfaceMenu_t *pMenu, void* pArg)
 #endif // STBPNX
 #endif // ENABLE_LAN
 
-#if (defined ENABLE_LAN) || (ENABLE_WIFI)
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-#ifdef STBPNX
-	gatewayMode_t mode = (gatewayMode_t)pArg;
-#endif
+	lanMode_t mode = GET_NUMBER(pArg);
 
 	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
 	{
@@ -1664,32 +1650,22 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		{
 			return 0;
 		}
-		if (mode >= gatewayModeCount )
+#endif
+		if (mode >= lanModeCount )
 		{
 			return 0;
 		}
-#endif
-#ifdef STSDK
-		if( (lanMode_t)pArg >= lanModeCount )
-		{
-			return 0;
-		}
-#endif
 		interface_showMessageBox(_T("GATEWAY_IN_PROGRESS"), settings_renew, 0);
 #ifdef STBPNX
 		char *str = "";
 		switch (mode) {
-			case gatewayModeBridge: str = "BRIDGE"; break;
-			case gatewayModeNAT:    str = "NAT"; break;
-			case gatewayModeFull:   str = "FULL"; break;
-			default:                str = "OFF"; break;
+			case lanBridge:     str = "BRIDGE"; break;
+			case lanStatic:     str = "NAT"; break;
+			case lanDhcpServer: str = "FULL"; break;
+			default:            str = "OFF"; break;
 		}
-
-		output_gatewayMode = mode;
 #endif
-#ifdef STSDK
-		networkInfo.lanMode = (lanMode_t)pArg;
-#endif
+		networkInfo.lanMode = mode;
 
 #ifdef STBPNX
 		// Stop network interfaces
@@ -1730,7 +1706,8 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 #endif
 #endif
 
-		output_showGatewayMenu(pMenu, (void*)0);
+		networkInfo.changed = 0;
+		output_showGatewayMenu(pMenu, NULL);
 		interface_hideMessageBox();
 
 		return 0;
@@ -1766,7 +1743,6 @@ static int output_applyNetworkSettings(interfaceMenu_t *pMenu, void* pArg)
 			strcpy(buf, "/etc/init.d/additional/dhcp.sh");
 #endif
 			system(buf);
-			output_refillMenu(pMenu);
 			break;
 #ifdef ENABLE_LAN
 		case ifaceLAN:
@@ -1846,7 +1822,9 @@ static int output_applyNetworkSettings(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif // STSDK
 
-    interface_hideMessageBox();
+	networkInfo.changed = 0;
+	output_refillMenu(pMenu);
+	interface_hideMessageBox();
 
 	return 0;
 }
@@ -2241,6 +2219,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 
 	ret = output_writeInterfacesFile();
 #endif
+	networkInfo.changed = 1;
 	return output_saveAndRedraw(ret, pMenu);
 }
 
@@ -2696,9 +2675,7 @@ static int output_toggleVMEnable(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_setVMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	int ret;
-
-	if( value == NULL )
+	if (value == NULL)
 		return 1;
 
 	value = inet_addr_prepare(value);
@@ -2708,20 +2685,15 @@ static int output_setVMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return -1;
 	}
 
-	ret = setParam(VERIMATRIX_INI_FILE, "SERVERADDRESS", value);
+	int ret = setParam(VERIMATRIX_INI_FILE, "SERVERADDRESS", value);
 	if (ret == 0)
 	{
 		char buf[64];
-
-		sprintf(buf, "%s/%d", value, VERIMATRIX_VKS_PORT);
+		snprintf(buf, sizeof(buf), "%s/%d", value, VERIMATRIX_VKS_PORT);
 		ret = setParam(VERIMATRIX_INI_FILE, "PREFERRED_VKS", buf);
 	}
-
 	if (ret == 0)
-	{
 		output_refillMenu(pMenu);
-	}
-
 	return ret;
 }
 
@@ -2742,7 +2714,7 @@ static size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
 
 static int output_getVMRootCert(interfaceMenu_t *pMenu, void* pArg)
 {
-	char info_url[MAX_URL];
+	char info_url[MAX_CONFIG_PATH];
 	int fd, code;
 	char rootcert[DATA_BUFF_SIZE];
 	char errbuff[CURL_ERROR_SIZE];
@@ -2808,18 +2780,12 @@ static int output_getVMRootCert(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_setVMCompany(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	int ret;
-
-	if( value == NULL )
+	if (value == NULL)
 		return 1;
 
-	ret = setParam(VERIMATRIX_INI_FILE, "COMPANY", value);
-
+	int ret = setParam(VERIMATRIX_INI_FILE, "COMPANY", value);
 	if (ret == 0)
-	{
 		output_refillMenu(pMenu);
-	}
-
 	return ret;
 }
 
@@ -2835,6 +2801,11 @@ static int output_changeVMCompany(interfaceMenu_t *pMenu, void* pArg)
 #endif // #ifdef ENABLE_VERIMATRIX
 
 #ifdef ENABLE_SECUREMEDIA
+enum
+{
+	smEsamHost = 1,
+	smRandomHost = 2,
+};
 static int output_toggleSMEnable(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.useSecureMedia = !appControlInfo.useSecureMedia;
@@ -2846,7 +2817,7 @@ static int output_setSMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 	int type = GET_NUMBER(pArg);
 	int ret;
 
-	if( value == NULL )
+	if  (value == NULL)
 		return 1;
 
 	value = inet_addr_prepare(value);
@@ -2855,36 +2826,21 @@ static int output_setSMAddress(interfaceMenu_t *pMenu, char *value, void* pArg)
 		interface_showMessageBox(_T("ERR_INCORRECT_IP"), thumbnail_error, 0);
 		return -1;
 	}
-
-	if (type == 1)
-	{
-		ret = setParam(SECUREMEDIA_CONFIG_FILE, "SECUREMEDIA_ESAM_HOST", value);
-	} else
-	{
-		ret = setParam(SECUREMEDIA_CONFIG_FILE, "SECUREMEDIA_RANDOM_HOST", value);
-	}
-
+	ret = setParam(SECUREMEDIA_CONFIG_FILE, type == smEsamHost ? "SECUREMEDIA_ESAM_HOST" : "SECUREMEDIA_RANDOM_HOST", value);
 	if (ret == 0)
 	{
 		/* Restart smdaemon */
 		system("killall smdaemon");
 		output_redrawMenu(pMenu);
 	}
-
 	return ret;
 }
 
 static int output_changeSMAddress(interfaceMenu_t *pMenu, void* pArg)
 {
 	int type = GET_NUMBER(pArg);
-
-	if (type == 1)
-	{
-		return interface_getText(pMenu, _T("SECUREMEDIA_ESAM_HOST"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setSMAddress, NULL, inputModeDirect, pArg);
-	} else
-	{
-		return interface_getText(pMenu, _T("SECUREMEDIA_RANDOM_HOST"), "\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setSMAddress, NULL, inputModeDirect, pArg);
-	}
+	return interface_getText(pMenu, _T(type == smEsamHost ? "SECUREMEDIA_ESAM_HOST" : "SECUREMEDIA_RANDOM_HOST"),
+		"\\d{3}.\\d{3}.\\d{3}.\\d{3}", output_setSMAddress, NULL, inputModeDirect, pArg);
 }
 #endif // #ifdef ENABLE_SECUREMEDIA
 
@@ -3427,7 +3383,14 @@ static void show_ip(stb810_networkInterface_t i, const char *iface_name, char *i
 			strcat(info_text, temp);
 		}
 	}
-
+#ifdef STBPNX
+	if (i == ifaceLAN && output_isBridge())
+	{
+		snprintf(temp, sizeof(temp), "%s: %s", iface_name, _T("GATEWAY_BRIDGE"));
+		strcat(info_text, temp);
+		return;
+	}
+#endif
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0)
 	{
@@ -3473,7 +3436,7 @@ static void show_wireless(const char *iface_name, char *info_text)
 {
 	char temp[MENU_ENTRY_INFO_LENGTH];
 
-	sprintf(temp, "%s ESSID: %s\n", iface_name, wifiInfo.essid);
+	sprintf(temp, "%s %s: %s\n", iface_name, _T("ESSID"), wifiInfo.essid);
 	strcat(info_text, temp);
 	sprintf(temp, "%s %s: %s\n", iface_name, _T("MODE"), wireless_mode_print( wifiInfo.mode ));
 	strcat(info_text, temp);
@@ -3635,83 +3598,32 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	info_progress++;
 	interface_displayMenu(1);
 
-#ifndef STBPNX
-#ifdef ENABLE_WIFI
-	if (wifiInfo.wanMode)
+	show_ip(ifaceWAN, "Ethernet", &info_text[strlen(info_text)]);
+	strcat(info_text, "\n");
+#ifdef ENABLE_LAN
+	if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
 	{
-		i = ifaceWireless;
-		iface_name = _T("WIRELESS");
-
-		show_wireless(iface_name, &info_text[strlen(info_text)]);
-	} else
-#endif
-	{
-		i = ifaceWAN;
-		iface_name = "WAN";
+		show_ip(ifaceLAN, "Ethernet 2", &info_text[strlen(info_text)]);
+		strcat(info_text, "\n");
 	}
-
-	show_ip(i, iface_name, &info_text[strlen(info_text)]);
+#endif
+#ifdef ENABLE_WIFI
+	if (helperCheckDirectoryExsists("/sys/class/net/wlan0"))
+	{
+		iface_name = _T("WIRELESS");
+		show_wireless(iface_name, &info_text[strlen(info_text)]);
+		show_ip(ifaceWireless, iface_name, &info_text[strlen(info_text)]);
+		strcat(info_text, "\n");
+	}
+#endif
 #ifdef ENABLE_PPP
-	i = ifacePPP;
-	sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
+	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifacePPP));
 	if (helperCheckDirectoryExsists(temp))
 	{
-		show_ip(i, "PPP", &info_text[strlen(info_text)]);
+		show_ip(ifacePPP, "PPP", &info_text[strlen(info_text)]);
+		strcat(info_text, "\n");
 	}
 #endif
-	strcat(info_text, "\n");
-#ifdef ENABLE_WIFI
-	if (!wifiInfo.wanMode)
-	{
-		i = ifaceWireless;
-		sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
-		if (helperCheckDirectoryExsists(temp))
-		{
-			iface_name = _T("WIRELESS");
-			show_wireless(iface_name, &info_text[strlen(info_text)]);
-			show_ip(i, iface_name, &info_text[strlen(info_text)]);
-			strcat(info_text, "\n");
-		}
-	}
-#endif
-#else
-	// STBPNX
-	for (i=0;;i++)
-	{
-		eprintf("%s: checking %s\n", __FUNCTION__, helperEthDevice(i));
-		sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
-		if (helperCheckDirectoryExsists(temp))
-		{
-			switch( i )
-			{
-				case ifaceWAN:
-					iface_name = output_isBridge() ? _T("GATEWAY_BRIDGE") : "WAN";
-					break;
-#ifdef ENABLE_LAN
-				case ifaceLAN:
-					iface_name = "LAN"; break;
-#endif
-#ifdef ENABLE_PPP
-				case ifacePPP: iface_name = "PPP"; break;
-#endif
-#ifdef ENABLE_WIFI
-				case ifaceWireless: iface_name = _T("WIRELESS");
-					show_wireless(iface_name, &info_text[strlen(info_text)]);
-					break;
-#endif
-				default:
-					eprintf("%s: unknown network interface %s\n", temp);
-					iface_name = "";
-			}
-			strcat(info_text, "\n");
-
-			show_ip(i, iface_name, &info_text[strlen(info_text)]);
-		} else
-		{
-			break;
-		}
-	}
-#endif // STBPNX
 	if (helperParseLine(INFO_TEMP_FILE, "route -n | grep -e \"0\\.0\\.0\\.0 .* 0\\.0\\.0\\.0 *UG .*\"", "0.0.0.0", buf, ' '))
 	{
 		sprintf(temp, "%s: ", _T("GATEWAY"));
@@ -4365,99 +4277,146 @@ int output_enterTimeMenu(interfaceMenu_t *timeMenu, void* notused)
 
 int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 {
-#ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
-#endif
-	char temp[MENU_ENTRY_INFO_LENGTH];
+	char  buf[MENU_ENTRY_INFO_LENGTH];
+	char *str;
 
 	// assert (networkMenu == (interfaceMenu_t*)&NetworkSubMenu);
 	interface_clearMenuEntries(networkMenu);
-	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWAN));
-	if( helperCheckDirectoryExsists(temp) )
-	{
-		interface_addMenuEntry(networkMenu, "WAN", interface_menuActionShowMenu, (void*)&WANSubMenu, settings_network);
+
+	// Read required network settings
 #ifdef STBPNX
-		sprintf(path, "/config/ifcfg-%s", helperEthDevice(ifaceWAN));
 #ifdef ENABLE_LAN
-		if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
-		{
-			getParam(STB_CONFIG_FILE, "CONFIG_GATEWAY_MODE", "OFF", temp);
-			if (strcmp("NAT", temp) == 0)
-			{
-				output_gatewayMode = gatewayModeNAT;
-			} else if (strcmp("FULL", temp) == 0)
-			{
-				output_gatewayMode = gatewayModeFull;
-			} else if (strcmp("BRIDGE", temp) == 0)
-			{
-				output_gatewayMode = gatewayModeBridge;
-			} else
-			{
-				output_gatewayMode = gatewayModeOff;
-			}
-		}
-#endif
-#endif // STBPNX
-	} else
+	if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
 	{
-		interface_addMenuEntryDisabled(networkMenu, "WAN", settings_network);
-	}
-#ifdef ENABLE_PPP
-	interface_addMenuEntry(networkMenu, _T("PPP"), interface_menuActionShowMenu, (void*)&PPPSubMenu, settings_network);
-#endif
-#ifdef ENABLE_LAN
-	int hasLan = helperCheckDirectoryExsists("/sys/class/net/eth1");
-	if ( hasLan )
-	{
-		interface_addMenuEntry(networkMenu, "LAN", interface_menuActionShowMenu, (void*)&LANSubMenu, settings_network);
+		char temp[MENU_ENTRY_INFO_LENGTH];
+		getParam(STB_CONFIG_FILE, "CONFIG_GATEWAY_MODE", "OFF", temp);
+		if (strcmp("FULL", temp) == 0)
+			networkInfo.lanMode = lanDhcpServer;
+		else if (strcmp("BRIDGE", temp) == 0)
+			networkInfo.lanMode = lanBridge;
+		else
+			networkInfo.lanMode = lanStatic;
 	}
 #endif // ENABLE_LAN
 #ifdef ENABLE_WIFI
-#if !(defined STB225)
-	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWireless));
-	if( wifiInfo.wanMode || helperCheckDirectoryExsists(temp) )
 	{
+		char temp[MENU_ENTRY_INFO_LENGTH];
+		getParam(WLAN_CONFIG_FILE, "WAN_MODE", "0", temp);
+		wifiInfo.wanMode = atoi(temp);
+
+		getParam(WLAN_CONFIG_FILE, "ENABLE_WIRELESS", "1", temp);
+		wifiInfo.enable = atoi(temp);
+	}
+#endif // ENABLE_WIFI
+#endif // STBPNX
+
+	// Get current LAN mode for future use
+	char *lanMode = (char*)output_getLanModeName(networkInfo.lanMode);
+
+	// ------------------ Display current Internet connection ------------------
+#ifdef ENABLE_WIFI
+	if (wifiInfo.wanMode)
+		str = _T("WIRELESS");
+	else
 #endif
-		interface_addMenuEntry(networkMenu, _T("WIRELESS"), interface_menuActionShowMenu, (void*)&WifiSubMenu, settings_network);
-#if !(defined STB225)
+	str = "Ethernet";
+	sprintf(buf, "%s: %s", _T("INTERNET_CONNECTION"), str);
+#ifdef ENABLE_WIFI
+	int wifiExists = helperCheckDirectoryExsists("/sys/class/net/wlan0");
+	if (wifiExists || wifiInfo.wanMode)
+		interface_addMenuEntry(networkMenu, buf, output_toggleWifiWAN, NULL, thumbnail_info);
+	else
+#endif
+	interface_addMenuEntryDisabled(networkMenu, buf, thumbnail_info);
+
+	// --------------------------- Ethernet 1 ----------------------------------
+	if (helperCheckDirectoryExsists("/sys/class/net/eth0"))
+	{
+#ifdef ENABLE_WIFI
+		if (wifiInfo.wanMode)
+#ifdef STBPNX
+			str = _T("NOT_AVAILABLE");
+#else
+			str = lanMode;
+#endif
+		else
+#endif
+		str = _T("INTERNET_CONNECTION");
+		snprintf(buf, sizeof(buf), "Ethernet - %s", str);
+		interface_addMenuEntry(networkMenu, buf, interface_menuActionShowMenu, &WANSubMenu, settings_network);
 	} else
 	{
-		interface_addMenuEntryDisabled(networkMenu, _T("WIRELESS"), settings_network);
+		interface_addMenuEntryDisabled(networkMenu, "Ethernet", settings_network);
+	}
+
+	// --------------------------- Ethernet 2 ----------------------------------
+#ifdef ENABLE_LAN
+	if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
+	{
+		snprintf(buf, sizeof(buf), "Ethernet 2 - %s", lanMode);
+		interface_addMenuEntry(networkMenu, buf, interface_menuActionShowMenu, &LANSubMenu, settings_network);
+	}
+#endif // ENABLE_LAN
+
+	// ----------------------------- Wi-Fi -------------------------------------
+#ifdef ENABLE_WIFI
+#if !(defined STB225)
+	if (wifiExists)
+#endif
+	{
+		if (wifiInfo.enable)
+			str = wifiInfo.wanMode ? _T("INTERNET_CONNECTION") : lanMode;
+		else
+			str = _T("OFF");
+		snprintf(buf, sizeof(buf), "%s - %s", _T("WIRELESS"), str);
+		interface_addMenuEntry(networkMenu, buf, interface_menuActionShowMenu, &WifiSubMenu, settings_network);
+	}
+#if !(defined STB225)
+	else
+	{
+		snprintf(buf, sizeof(buf), "%s - %s", _T("WIRELESS"), _T("NOT_AVAILABLE"));
+		interface_addMenuEntryDisabled(networkMenu, buf, settings_network);
 	}
 #endif
 #endif // ENABLE_WIFI
 
+	// ----------------------------- PPP ---------------------------------------
+#ifdef ENABLE_PPP
+	interface_addMenuEntry(networkMenu, _T("PPP"), interface_menuActionShowMenu, &PPPSubMenu, settings_network);
+#endif
+	// -------------------------------------------------------------------------
+
 #ifdef ENABLE_IPTV
-		interface_addMenuEntry(networkMenu, _T("TV_CHANNELS"), interface_menuActionShowMenu, (void*)&IPTVSubMenu, thumbnail_multicast);
+	interface_addMenuEntry(networkMenu, _T("TV_CHANNELS"), interface_menuActionShowMenu, (void*)&IPTVSubMenu, thumbnail_multicast);
 #endif
 #ifdef ENABLE_VOD
-		interface_addMenuEntry(networkMenu, _T("MOVIES"), interface_menuActionShowMenu, (void*)&VODSubMenu, thumbnail_vod);
+	interface_addMenuEntry(networkMenu, _T("MOVIES"), interface_menuActionShowMenu, (void*)&VODSubMenu, thumbnail_vod);
 #endif
 
 #ifdef STBPNX
 	if (helperFileExists(BROWSER_CONFIG_FILE))
 #endif
-	{
-		interface_addMenuEntry(networkMenu, _T("INTERNET_BROWSING"), interface_menuActionShowMenu, (void*)&WebSubMenu, thumbnail_internet);
-	}
+	interface_addMenuEntry(networkMenu, _T("INTERNET_BROWSING"), interface_menuActionShowMenu, (void*)&WebSubMenu, thumbnail_internet);
+
 #ifdef ENABLE_VERIMATRIX
 	if (helperFileExists(VERIMATRIX_INI_FILE))
 	{
-		sprintf(path,"%s: %s", _T("VERIMATRIX_ENABLE"), appControlInfo.useVerimatrix == 0 ? _T("OFF") : _T("ON"));
-		interface_addMenuEntry(networkMenu, path, output_toggleVMEnable, NULL, thumbnail_configure);
+		sprintf(buf,"%s: %s", _T("VERIMATRIX_ENABLE"), appControlInfo.useVerimatrix == 0 ? _T("OFF") : _T("ON"));
+		interface_addMenuEntry(networkMenu, buf, output_toggleVMEnable, NULL, thumbnail_configure);
 		if (appControlInfo.useVerimatrix != 0)
 		{
+			char temp[MENU_ENTRY_INFO_LENGTH];
 			getParam(VERIMATRIX_INI_FILE, "COMPANY", "", temp);
 			if (temp[0] != 0)
 			{
-				sprintf(path, "%s: %s", _T("VERIMATRIX_COMPANY"), temp);
+				sprintf(buf, "%s: %s", _T("VERIMATRIX_COMPANY"), temp);
 				interface_addMenuEntry(networkMenu, path, output_changeVMCompany, NULL, thumbnail_enterurl);
 			}
 			getParam(VERIMATRIX_INI_FILE, "SERVERADDRESS", "", temp);
 			if (temp[0] != 0)
 			{
-				sprintf(path, "%s: %s", _T("VERIMATRIX_ADDRESS"), temp);
-				interface_addMenuEntry(networkMenu, path, output_changeVMAddress, NULL, thumbnail_enterurl);
+				sprintf(buf, "%s: %s", _T("VERIMATRIX_ADDRESS"), temp);
+				interface_addMenuEntry(networkMenu, buf, output_changeVMAddress, NULL, thumbnail_enterurl);
 			}
 			interface_addMenuEntry(networkMenu, _T("VERIMATRIX_GET_ROOTCERT"), output_getVMRootCert, NULL, thumbnail_turnaround);
 		}
@@ -4466,21 +4425,22 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 #ifdef ENABLE_SECUREMEDIA
 	if (helperFileExists(SECUREMEDIA_CONFIG_FILE))
 	{
-		sprintf(path,"%s: %s", _T("SECUREMEDIA_ENABLE"), appControlInfo.useSecureMedia == 0 ? _T("OFF") : _T("ON"));
-		interface_addMenuEntry(networkMenu, path, output_toggleSMEnable, NULL, thumbnail_configure);
+		sprintf(buf,"%s: %s", _T("SECUREMEDIA_ENABLE"), appControlInfo.useSecureMedia == 0 ? _T("OFF") : _T("ON"));
+		interface_addMenuEntry(networkMenu, buf, output_toggleSMEnable, NULL, thumbnail_configure);
 		if (appControlInfo.useSecureMedia != 0)
 		{
+			char temp[MENU_ENTRY_INFO_LENGTH];
 			getParam(SECUREMEDIA_CONFIG_FILE, "SECUREMEDIA_ESAM_HOST", "", temp);
 			if (temp[0] != 0)
 			{
-				sprintf(path, "%s: %s", _T("SECUREMEDIA_ESAM_HOST"), temp);
-				interface_addMenuEntry(networkMenu, path, output_changeSMAddress, (void*)1, thumbnail_enterurl);
+				sprintf(buf, "%s: %s", _T("SECUREMEDIA_ESAM_HOST"), temp);
+				interface_addMenuEntry(networkMenu, buf, output_changeSMAddress, SET_NUMBER(smEsamHost), thumbnail_enterurl);
 			}
 			getParam(SECUREMEDIA_CONFIG_FILE, "SECUREMEDIA_RANDOM_HOST", "", temp);
 			if (temp[0] != 0)
 			{
-				sprintf(path, "%s: %s", _T("SECUREMEDIA_RANDOM_HOST"), temp);
-				interface_addMenuEntry(networkMenu, path, output_changeSMAddress, (void*)2, thumbnail_enterurl);
+				sprintf(buf, "%s: %s", _T("SECUREMEDIA_RANDOM_HOST"), temp);
+				interface_addMenuEntry(networkMenu, buf, output_changeSMAddress, SET_NUMBER(smRandomHost), thumbnail_enterurl);
 			}
 		}
 	}
@@ -4488,7 +4448,6 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 //HTTPProxyServer=http://192.168.1.2:3128
 //http://192.168.1.57:8080/media/stb/home.html
 #ifndef HIDE_EXTRA_FUNCTIONS
-	char *str;
 	str = _T("PROCESS_PCR");
 	interface_addMenuEntry(networkMenu, str, output_togglePCR, NULL, appControlInfo.bProcessPCR ? thumbnail_yes : thumbnail_no);
 	str = _T( appControlInfo.bUseBufferModel ? "BUFFER_TRACKING" : "PCR_TRACKING");
@@ -4500,96 +4459,121 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 	return 0;
 }
 
-static int output_enterWANMenu(interfaceMenu_t *wanMenu, void* pArg)
+int output_leaveNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 {
-	char path[MAX_CONFIG_PATH];
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	char temp[MENU_ENTRY_INFO_LENGTH];
-	int dhcp = 0;
-	stb810_networkInterface_t iface = GET_NUMBER(pArg);
+	if (networkInfo.changed)
+	{
+		interface_showConfirmationBox(_T("CONFIRM_NETWORK_SETTINGS"), thumbnail_question, output_confirmNetworkSettings, NULL);
+		return 1;
+	}
+	return 0;
+}
 
+int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
+{
+	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
+	{
+		return 0;
+	} else
+	if ((cmd->command == interfaceCommandGreen) ||
+	    (cmd->command == interfaceCommandEnter) ||
+	    (cmd->command == interfaceCommandOk))
+	{
+		output_applyNetworkSettings(pMenu, SET_NUMBER(ifaceWAN));
+	}
+	return 0;
+}
+
+int output_enterWANMenu(interfaceMenu_t *wanMenu, void* pArg)
+{
 	// assert (wanMenu == &WANSubMenu);
+	int wan = 1;
+#if (defined ENABLE_WIFI) && (!defined STBPNX)
+	wan = !wifiInfo.wanMode;
+#endif
+	output_setIfaceMenuName(wanMenu, "Ethernet", wan, networkInfo.lanMode);
 	interface_clearMenuEntries(wanMenu);
 
+#ifdef ENABLE_WIFI
+	if (wifiInfo.wanMode) {
 #ifdef STBPNX
-	getParam("/config/ifcfg-eth0", "BOOTPROTO", _T("NOT_AVAILABLE_SHORT"), temp);
-	if (strcmp("dhcp+dns", temp) == 0)
-	{
-		strcpy(temp, _T("ADDR_MODE_DHCP"));
-		dhcp = 1;
+		interface_addMenuEntryDisabled(wanMenu, _T("NOT_AVAILABLE"), thumbnail_info);
+#else
+		output_fillLANMenu(wanMenu, SET_NUMBER(ifaceLAN));
+#endif
 	} else
+#endif // ENABLE_WIFI
+	output_fillWANMenu(wanMenu, SET_NUMBER(ifaceWAN));
+
+	interface_addMenuEntry(wanMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(ifaceWAN), settings_renew);
+
+#ifndef HIDE_EXTRA_FUNCTIONS
+	char temp[MENU_ENTRY_INFO_LENGTH];
+	int offset = sprintf(temp, "%s: ",  _T("MAC_ADDRESS"));
+	int mac_fd = open("/sys/class/net/eth0/address", O_RDONLY);
+	if (mac_fd > 0)
 	{
-		strcpy(temp, _T("ADDR_MODE_STATIC"));
-		dhcp = 0;
-	}
-#endif // STBPNX
-#ifdef STSDK
-	dhcp = networkInfo.wanDhcp;
+		int len = read(mac_fd, temp+offset, sizeof(temp)-offset);
+		if (len <= 0) len = 1;
+		temp[offset+len-1] = 0;
+		close(mac_fd);
+	} else
+		strcpy(temp+offset, _T("NOT_AVAILABLE_SHORT"));
+	interface_addMenuEntryDisabled(wanMenu, temp, thumbnail_configure);
+#endif
+	return 0;
+}
+
+int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface)
+{
+	char  buf[MENU_ENTRY_INFO_LENGTH];
+	char temp[MENU_ENTRY_INFO_LENGTH];
+	int dhcp = 0;
+	stb810_networkInterface_t iface = GET_NUMBER(pIface);
+
+	dhcp = output_isIfaceDhcp(iface);
 	strcpy(temp, _T( dhcp ? "ADDR_MODE_DHCP" : "ADDR_MODE_STATIC" ));
-#endif // STSDK
 	sprintf(buf, "%s: %s", _T("ADDR_MODE"), temp);
 	interface_addMenuEntry(wanMenu, buf, output_toggleMode, SET_NUMBER(iface), thumbnail_configure);
 
+	char *not_available = _T("NOT_AVAILABLE_SHORT");
 	if (dhcp == 0)
 	{
-#ifdef STBPNX
-		getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
-#endif
-#ifdef STSDK
-		strcpy(temp, networkInfo.wan.ip.s_addr != 0 ? inet_ntoa(networkInfo.wan.ip) : _T("NOT_AVAILABLE_SHORT") );
-#endif
-		sprintf(buf, "%s: %s",  _T("IP_ADDRESS"), temp);
+		int ret;
+
+		ret = output_getIP(iface, optionIP, temp);
+		sprintf(buf, "%s: %s",  _T("IP_ADDRESS"), ret ? not_available : temp);
 		interface_addMenuEntry(wanMenu, buf, output_changeIP, SET_NUMBER(iface), thumbnail_configure);
 
-#ifdef STBPNX
-		getParam(path, "NETMASK", _T("NOT_AVAILABLE_SHORT"), temp);
-#endif
-#ifdef STSDK
-		strcpy(temp, networkInfo.wan.mask.s_addr != 0 ? inet_ntoa(networkInfo.wan.mask) : _T("NOT_AVAILABLE_SHORT") );
-#endif
-		sprintf(buf, "%s: %s", _T("NETMASK"), temp);
+		ret = output_getIP(iface, optionMask, temp);
+		sprintf(buf, "%s: %s", _T("NETMASK"),     ret ? not_available : temp);
 		interface_addMenuEntry(wanMenu, buf, output_changeNetmask, SET_NUMBER(iface), thumbnail_configure);
 
-#ifdef STBPNX
-		getParam(path, "DEFAULT_GATEWAY", _T("NOT_AVAILABLE_SHORT"), temp);
-#endif
-#ifdef STSDK
-		strcpy(temp, networkInfo.wan.gw.s_addr != 0 ? inet_ntoa(networkInfo.wan.gw) : _T("NOT_AVAILABLE_SHORT") );
-#endif
-		sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
+		ret = output_getIP(iface, optionGW, temp);
+		sprintf(buf, "%s: %s", _T("GATEWAY"),     ret ? not_available : temp);
 		interface_addMenuEntry(wanMenu, buf, output_changeGw, SET_NUMBER(iface), thumbnail_configure);
 
-#ifdef STBPNX
-		getParam(path, "NAMESERVERS", _T("NOT_AVAILABLE_SHORT"), temp);
-#endif
-#ifdef STSDK
-		strcpy(temp, networkInfo.dns.s_addr != 0 ? inet_ntoa(networkInfo.dns) : _T("NOT_AVAILABLE_SHORT"));
-#endif
-		sprintf(buf, "%s: %s", _T("DNS_SERVER"), temp);
+		ret = output_getIP(iface, optionDNS, temp);
+		sprintf(buf, "%s: %s", _T("DNS_SERVER"),  ret ? not_available : temp);
 		interface_addMenuEntry(wanMenu, buf, output_changeDNS, SET_NUMBER(iface), thumbnail_configure);
 	} else
 	{
+		char path[MAX_CONFIG_PATH];
 		sprintf(path, "ifconfig %s | grep \"inet addr\"", helperEthDevice(iface));
 		if (!helperParseLine(INFO_TEMP_FILE, path, "inet addr:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-		{
-			strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
-		}
+			strcpy(temp, not_available);
 		sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
 		interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
 
 		sprintf(path, "ifconfig %s | grep \"Mask:\"", helperEthDevice(iface));
 		if (!helperParseLine(INFO_TEMP_FILE, path, "Mask:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-		{
-			strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
-		}
+			strcpy(temp, not_available);
 		sprintf(buf, "%s: %s", _T("NETMASK"), temp);
 		interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
 
 		sprintf(path, "route -n | grep -e \"0\\.0\\.0\\.0 .* 0\\.0\\.0\\.0 *UG .* %s\"", helperEthDevice(iface));
 		if (!helperParseLine(INFO_TEMP_FILE, path, "0.0.0.0", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
-		{
-			strcpy(temp, _T("NOT_AVAILABLE_SHORT"));
-		}
+			strcpy(temp, not_available);
 		sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
 		interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
 
@@ -4612,27 +4596,11 @@ static int output_enterWANMenu(interfaceMenu_t *wanMenu, void* pArg)
 		}
 		if (!dns_found)
 		{
-			sprintf(buf, "%s: %s", _T("DNS_SERVER"), _T("NOT_AVAILABLE_SHORT"));
+			sprintf(buf, "%s: %s", _T("DNS_SERVER"), not_available);
 			interface_addMenuEntryDisabled(wanMenu, buf, thumbnail_configure);
 		}
 	}
 
-	interface_addMenuEntry(wanMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(iface), settings_renew);
-
-#ifndef HIDE_EXTRA_FUNCTIONS
-	char temp[MENU_ENTRY_INFO_LENGTH];
-	int offset = sprintf(temp, "%s: ",  _T("MAC_ADDRESS"));
-	int mac_fd = open("/sys/class/net/eth0/address", O_RDONLY);
-	if (mac_fd > 0)
-	{
-		int len = read(mac_fd, temp+offset, sizeof(temp)-offset);
-		if (len <= 0) len = 1;
-		temp[offset+len-1] = 0;
-		close(mac_fd);
-	} else
-		strcpy(temp+offset, _T("NOT_AVAILABLE_SHORT"));
-	interface_addMenuEntryDisabled(wanMenu, temp, thumbnail_configure);
-#endif
 	return 0;
 }
 
@@ -4797,120 +4765,132 @@ static int output_enterPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_LAN
 int output_enterLANMenu(interfaceMenu_t *lanMenu, void* pArg)
 {
+	// assume (lanMenu == (interfaceMenu_t*)&LANSubMenu);
+	output_setIfaceMenuName(lanMenu, "Ethernet 2", 0, networkInfo.lanMode);
+
+	interface_clearMenuEntries(lanMenu);
+	output_fillLANMenu(lanMenu, SET_NUMBER(ifaceLAN));
+	interface_addMenuEntry(lanMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(ifaceLAN), settings_renew);
+	return 0;
+}
+#endif
+
+#if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+int output_fillLANMenu(interfaceMenu_t *lanMenu, void* iFace)
+{
 	char buf[MENU_ENTRY_INFO_LENGTH];
-	char temp[MENU_ENTRY_INFO_LENGTH];
+	stb810_networkInterface_t iface = GET_NUMBER(iFace);
 
-	const int i = ifaceLAN;
-//	sprintf(path, "/sys/class/net/%s", helperEthDevice(i));
-//	if( helperCheckDirectoryExsists(path) )
+	if (!output_isBridge())
 	{
-		interface_clearMenuEntries(lanMenu);
-		if (!output_isBridge())
-		{
 #ifdef STBPNX
-			char path[MAX_CONFIG_PATH];
-			sprintf(path, "/config/ifcfg-%s", helperEthDevice(i));
-
-			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
+		char temp[MENU_ENTRY_INFO_LENGTH];
+		char *path = LAN_CONFIG_FILE;
+#ifdef ENABLE_WIFI
+		if (iface == ifaceWireless)
+			path = WLAN_CONFIG_FILE;
+#endif
+		getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
+		sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
 #endif
 #ifdef STSDK
-			strcpy(temp, networkInfo.lan.ip.s_addr != 0 ? inet_ntoa(networkInfo.lan.ip) : _T("NOT_AVAILABLE_SHORT") );
+		sprintf(buf, "%s: %s", _T("IP_ADDRESS"),
+			networkInfo.lan.ip.s_addr != 0 ? inet_ntoa(networkInfo.lan.ip) : _T("NOT_AVAILABLE_SHORT"));
 #endif
-			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
-			interface_addMenuEntry(lanMenu, buf, output_changeIP, SET_NUMBER(i), thumbnail_configure);
-		} else
-		{
-			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), _T("GATEWAY_BRIDGE"));
-			interface_addMenuEntryDisabled(lanMenu, buf, thumbnail_configure);
-		}
-
-		sprintf(buf, "%s", _T("APPLY_NETWORK_SETTINGS"));
-		interface_addMenuEntry(lanMenu, buf, output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
-
-#ifdef STBPNX
-#ifdef ENABLE_LAN
-		if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
-		{
-			char *str;
-			switch( output_gatewayMode )
-			{
-				case gatewayModeNAT:    str = _T("GATEWAY_NAT_ONLY"); break;
-				case gatewayModeFull:   str = _T("GATEWAY_FULL"); break;
-				case gatewayModeBridge: str = _T("GATEWAY_BRIDGE"); break;
-				default:                str = _T("OFF");
-			}
-			sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), str);
-			interface_addMenuEntry(lanMenu, buf, output_showGatewayMenu, (void*)0, thumbnail_configure);
-			if (output_gatewayMode != gatewayModeOff)
-			{
-				getParam(STB_CONFIG_FILE, "CONFIG_TRAFFIC_SHAPE", "0", temp);
-				sprintf(buf,"%s: %s %s", _T("GATEWAY_BANDWIDTH"), atoi(temp) <= 0 ? _T("NONE") : temp, atoi(temp) <= 0 ? "" : _T("KBPS"));
-				interface_addMenuEntry(lanMenu, buf, output_changeGatewayBandwidth, (void*)0, thumbnail_configure);
-			}
-		}
-#endif // ENABLE_LAN
-#endif // STBPNX
-
-#ifdef STSDK
-		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), output_getLanModeName(networkInfo.lanMode));
-		interface_addMenuEntry(lanMenu, buf, output_showGatewayMenu, (void*)0, thumbnail_configure);
-#endif
-		return 0;
+		interface_addMenuEntry(lanMenu, buf, output_changeIP, SET_NUMBER(iface), thumbnail_configure);
+	} else
+	{
+		sprintf(buf, "%s: %s", _T("IP_ADDRESS"), _T("GATEWAY_BRIDGE"));
+		interface_addMenuEntryDisabled(lanMenu, buf, thumbnail_configure);
 	}
 
-	return 1;
+#ifdef STBPNX
+	if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
+	{
+		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), output_getLanModeName(networkInfo.lanMode));
+		interface_addMenuEntry(lanMenu, buf, output_showGatewayMenu, NULL, thumbnail_configure);
+		if (networkInfo.lanMode != lanStatic)
+		{
+			char temp[MENU_ENTRY_INFO_LENGTH];
+			getParam(STB_CONFIG_FILE, "CONFIG_TRAFFIC_SHAPE", "0", temp);
+			sprintf(buf,"%s: %s %s", _T("GATEWAY_BANDWIDTH"), atoi(temp) <= 0 ? _T("NONE") : temp, atoi(temp) <= 0 ? "" : _T("KBPS"));
+			interface_addMenuEntry(lanMenu, buf, output_changeGatewayBandwidth, (void*)0, thumbnail_configure);
+		}
+	}
+#endif // STBPNX
+
+	sprintf(buf,"%s: %s", _T("INTERNET_CONNECTION_SHARING"), _T(networkInfo.lanMode == lanDhcpServer ? "YES" : "NO") );
+	interface_addMenuEntry(lanMenu, buf, output_toggleDhcpServer, NULL, thumbnail_configure);
+
+	return 0;
 }
 #endif // ENABLE_LAN
 
 #ifdef ENABLE_WIFI
-static int output_enterWifiMenu(interfaceMenu_t *pMenu, void* pArg)
+#ifdef HIDE_EXTRA_FUNCTIONS
+static int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pIndex)
 {
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	char temp[MENU_ENTRY_INFO_LENGTH];
-	char *iface_name;
+	wifiInfo.showAdvanced = !wifiInfo.showAdvanced;
+	if (!wifiInfo.showAdvanced)
+		interface_setSelectedItem(pMenu, GET_NUMBER(pIndex)); // jump to toggle advanced entry
+	output_redrawMenu(pMenu);
+	return 0;
+}
+#endif
+
+static int output_enterWifiMenu(interfaceMenu_t *wifiMenu, void* pArg)
+{
+	char  buf[MENU_ENTRY_INFO_LENGTH];
 	int exists;
 	char *str;
-
 	const int i = ifaceWireless;
-	iface_name  = _T("WIRELESS");
+	char *iface_name  = _T("WIRELESS");
+
+	// assert (wifiMenu == wifiMenu);
 #if !(defined STB225)
-	sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
-	exists = helperCheckDirectoryExsists(temp);
+	exists = helperCheckDirectoryExsists("/sys/class/net/wlan0");
 #else
 	exists = 1; // don't check
 #endif
-	interface_clearMenuEntries((interfaceMenu_t*)&WifiSubMenu);
-
 	output_readWirelessSettings();
 
-	sprintf(buf, "%s: %s", iface_name, _T(wifiInfo.enable ? "ON" : "OFF"));
-	interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiEnable, SET_NUMBER(i), thumbnail_configure);
+	if (wifiInfo.enable)
+		output_setIfaceMenuName(wifiMenu, iface_name, wifiInfo.wanMode, networkInfo.lanMode);
+	else {
+		size_t len = snprintf(buf, sizeof(buf), "%s: %s", iface_name, _T("OFF"));
+		interface_setMenuName(wifiMenu, buf, len+1);
+	}
 
-	if (wifiInfo.wanMode || exists)
+	interface_clearMenuEntries(wifiMenu);
+
+	sprintf(buf, "%s: %s", iface_name, _T(wifiInfo.enable ? "ON" : "OFF"));
+	interface_addMenuEntry(wifiMenu, buf, output_toggleWifiEnable, NULL, thumbnail_configure);
+
+	if (!exists)
 	{
-		sprintf(buf, "%s: %s", iface_name, wifiInfo.wanMode ? "WAN" : "LAN");
-		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiWAN, SET_NUMBER(i), thumbnail_configure);
-	} else
-	{
-		sprintf(buf, "%s: %s", iface_name, _T("OFF"));
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&WifiSubMenu, buf, thumbnail_no);
+		sprintf(buf, "%s: %s", iface_name, _T("NOT_AVAILABLE"));
+		interface_addMenuEntryDisabled(wifiMenu, buf, thumbnail_no);
 		if (WifiSubMenu.baseMenu.selectedItem >= 0)
 			WifiSubMenu.baseMenu.selectedItem = MENU_ITEM_BACK;
 	}
 
-	if (!exists) {
-		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
+	if (!wifiInfo.enable || !exists)
+	{
+		interface_addMenuEntry(wifiMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
 		return 0;
 	}
 
+	// Wireless-specific settings
 	if (wifiInfo.wanMode)
 	{
-		interface_addMenuEntry(pMenu, _T("WIRELESS_LIST"), interface_menuActionShowMenu, &WirelessMenu, thumbnail_search);
+		interface_addMenuEntry(wifiMenu, _T("WIRELESS_LIST"), interface_menuActionShowMenu, &WirelessMenu, thumbnail_search);
 
+#ifdef USE_WPA_SUPPLICANT
 		char *state = NULL;
 		struct wpa_ctrl *ctrl = wpa_ctrl_open(STB_WPA_SUPPLICANT_CTRL_DIR "/wlan0");
 		if (ctrl)
 		{
+			char temp[MENU_ENTRY_INFO_LENGTH];
 			size_t reply_len = sizeof(temp);
 
 			if (wpa_ctrl_request(ctrl, "STATUS", 6, temp, &reply_len, NULL) == 0)
@@ -4927,40 +4907,50 @@ static int output_enterWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 			} else
 				eprintf("%s: failed to get status: %s\n", __FUNCTION__, strerror(errno));
 			wpa_ctrl_close(ctrl);
+			if (state && strcasecmp(state, "COMPLETED") == 0)
+			{
+				snprintf(temp, sizeof(temp), "%s %s", _T("CONNECTED_TO"), wifiInfo.essid);
+				interface_addMenuEntryDisabled(wifiMenu, temp, thumbnail_info);
+			} else
+			{
+				snprintf(temp, sizeof(temp), "%s %s", _T("CONNECTING_TO"), wifiInfo.essid);
+				interface_addMenuEntryDisabled(wifiMenu, temp, thumbnail_question);
+			}
 		} else
 		{
 			eprintf("%s: failed to connect to wpa_supplicant: %s\n", __FUNCTION__, strerror(errno));
+			interface_addMenuEntryDisabled(wifiMenu, _T("SETTINGS_APPLY_REQUIRED"), thumbnail_info);
 		}
-
-		if (state && strcasecmp(state, "COMPLETED") == 0)
-		{
-			snprintf(temp, sizeof(temp), "%s %s", _T("CONNECTED_TO"), wifiInfo.essid);
-			interface_addMenuEntryDisabled(pMenu, temp, thumbnail_info);
-		} else
-		{
-			snprintf(temp, sizeof(temp), "%s %s", _T("CONNECTING_TO"), wifiInfo.essid);
-			interface_addMenuEntryDisabled(pMenu, temp, thumbnail_question);
-		}
+#endif // USE_WPA_SUPPLICANT
 	} else
 	{
 		sprintf(buf, "%s: %s", _T("ESSID"), wifiInfo.essid);
-		interface_addMenuEntry(pMenu, buf, output_changeESSID, SET_NUMBER(i), thumbnail_enterurl);
+		interface_addMenuEntry(wifiMenu, buf, output_changeESSID, SET_NUMBER(i), thumbnail_enterurl);
 
 		if (wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount)
 		{
 			sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.key );
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeWifiKey, NULL, thumbnail_enterurl);
+			interface_addMenuEntry(wifiMenu, buf, output_changeWifiKey, NULL, thumbnail_enterurl);
 		}
 	}
 
-	interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
+	// IP settings
+	if (wifiInfo.wanMode)
+		output_fillWANMenu(wifiMenu, SET_NUMBER(i));
+	else
+#ifdef STBPNX
+		output_fillLANMenu(wifiMenu, SET_NUMBER(i));
+#else
+		output_fillLANMenu(wifiMenu, SET_NUMBER(ifaceLAN));
+#endif
 
+#ifdef HIDE_EXTRA_FUNCTIONS
+	int basicOptionsCount = interface_getMenuEntryCount(wifiMenu);
 	if (!wifiInfo.showAdvanced)
 	{
-		interface_addMenuEntry(pMenu, _T("SHOW_ADVANCED"), output_wifiToggleAdvanced, NULL, thumbnail_configure);
-		return 0;
-	}
-
+		interface_addMenuEntry(wifiMenu, _T("SHOW_ADVANCED"), output_wifiToggleAdvanced, SET_NUMBER(basicOptionsCount), thumbnail_configure);
+	} else
+#endif
 	// Advanced settings
 	{
 #ifdef STBPNX
@@ -4968,44 +4958,44 @@ static int output_enterWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		char path[MAX_CONFIG_PATH];
 
 		sprintf(buf, "%s: %s", _T("MODE"), wifiInfo.mode == wifiModeAdHoc ? "Ad-Hoc" : "Managed");
-		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
+		interface_addMenuEntryCustom(wifiMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleWifiMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
 		sprintf(buf, "%s: %s", _T("ADDR_MODE"), wifiInfo.dhcp ? _T("ADDR_MODE_DHCP") : _T("ADDR_MODE_STATIC"));
-		interface_addMenuEntryCustom((interfaceMenu_t*)&WifiSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
+		interface_addMenuEntryCustom(wifiMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 		                             wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
 
 		if (wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0)
 		{
 			getParam(path, "IPADDR", _T("NOT_AVAILABLE_SHORT"), temp);
 			sprintf(buf, "%s: %s", _T("IP_ADDRESS"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeIP, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry(wifiMenu, buf, output_changeIP, SET_NUMBER(i), thumbnail_configure);
 
 			getParam(path, "NETMASK", _T("NOT_AVAILABLE_SHORT"), temp);
 			sprintf(buf, "%s: %s", _T("NETMASK"), temp);
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeNetmask, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry(wifiMenu, buf, output_changeNetmask, SET_NUMBER(i), thumbnail_configure);
 			
 			if ( wifiInfo.wanMode )
 			{
 				getParam(path, "DEFAULT_GATEWAY", _T("NOT_AVAILABLE_SHORT"), temp);
 				sprintf(buf, "%s: %s", _T("GATEWAY"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeGw, SET_NUMBER(i), thumbnail_configure);
+				interface_addMenuEntry(wifiMenu, buf, output_changeGw, SET_NUMBER(i), thumbnail_configure);
 
 				getParam(path, "NAMESERVERS", _T("NOT_AVAILABLE_SHORT"), temp);
 				sprintf(buf, "%s: %s", _T("DNS_SERVER"), temp);
-				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeDNS, SET_NUMBER(i), thumbnail_configure);
+				interface_addMenuEntry(wifiMenu, buf, output_changeDNS, SET_NUMBER(i), thumbnail_configure);
 			}
 		}
 #endif // STBPNX
 		if (wifiInfo.wanMode)
 		{
 			sprintf(buf, "%s: %s", _T("ESSID"), wifiInfo.essid);
-			interface_addMenuEntry(pMenu, buf, output_changeESSID, SET_NUMBER(i), thumbnail_enterurl);
+			interface_addMenuEntry(wifiMenu, buf, output_changeESSID, SET_NUMBER(i), thumbnail_enterurl);
 
 			if (wifiInfo.auth != wifiAuthOpen && wifiInfo.auth < wifiAuthCount)
 			{
-				sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.key );
-				interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeWifiKey, NULL, thumbnail_enterurl);
+				sprintf(buf, "%s: %s", _T("PASSWORD"), wifiInfo.wanMode ? "***" : wifiInfo.key );
+				interface_addMenuEntry(wifiMenu, buf, output_changeWifiKey, NULL, thumbnail_enterurl);
 			}
 		} else
 		{
@@ -5056,20 +5046,22 @@ static int output_enterWifiMenu(interfaceMenu_t *pMenu, void* pArg)
 		if (wifiInfo.channelCount > 0)
 		{
 			sprintf(buf, "%s: %d", _T("CHANNEL_NUMBER"), wifiInfo.currentChannel);
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_changeWifiChannel, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry(wifiMenu, buf, output_changeWifiChannel, SET_NUMBER(i), thumbnail_configure);
 		}
-		}
-
 		sprintf(buf, "%s: %s", _T("AUTHENTICATION"), wireless_auth_print( wifiInfo.auth ));
-		interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleAuthMode, SET_NUMBER(i), thumbnail_configure);
+		interface_addMenuEntry(wifiMenu, buf, output_toggleAuthMode, SET_NUMBER(i), thumbnail_configure);
 		if( wifiInfo.auth == wifiAuthWPAPSK || wifiInfo.auth == wifiAuthWPA2PSK )
 		{
 			sprintf(buf, "%s: %s", _T("ENCRYPTION"), wireless_encr_print( wifiInfo.encryption ));
-			interface_addMenuEntry((interfaceMenu_t*)&WifiSubMenu, buf, output_toggleWifiEncryption, SET_NUMBER(i), thumbnail_configure);
+			interface_addMenuEntry(wifiMenu, buf, output_toggleWifiEncryption, SET_NUMBER(i), thumbnail_configure);
 		}
+		} // !wifiInfo.wanMode
+#ifdef HIDE_EXTRA_FUNCTIONS
+		interface_addMenuEntry(wifiMenu, _T("HIDE_ADVANCED"), output_wifiToggleAdvanced, SET_NUMBER(basicOptionsCount), thumbnail_configure);
+#endif
 	}
 
-	interface_addMenuEntry(pMenu, _T("HIDE_ADVANCED"), output_wifiToggleAdvanced, NULL, thumbnail_configure);
+	interface_addMenuEntry(wifiMenu, _T("APPLY_NETWORK_SETTINGS"), output_applyNetworkSettings, SET_NUMBER(i), settings_renew);
 
 	return 0;
 }
@@ -5084,26 +5076,16 @@ static int output_wifiKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 	return 1;
 }
 
-int output_wifiToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
-{
-	wifiInfo.showAdvanced = !wifiInfo.showAdvanced;
-	if (!wifiInfo.showAdvanced)
-		interface_setSelectedItem(pMenu, 4); // jump to toggle advanced entry
-	output_redrawMenu(pMenu);
-	return 0;
-}
-
 int output_readWirelessSettings(void)
 {
 	char buf[BUFFER_SIZE];
 
 #ifdef STBPNX
-	char path[MAX_CONFIG_PATH];
+	char *path = WLAN_CONFIG_FILE;
 
 	wifiInfo.auth       = wifiAuthOpen;
 	wifiInfo.encryption = wifiEncTKIP;
 
-	sprintf(path, "/config/ifcfg-%s", helperEthDevice(ifaceWireless));
 	getParam(path, "ENABLE_WIRELESS", "0", buf);
 	wifiInfo.enable = strtol( buf, NULL, 10 );
 
@@ -5329,25 +5311,25 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 		case iptvPlaylistFw:   str = "FW";  break;
 		default: str = "SAP"; break;
 	}
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), str);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_PLAYLIST"), str);
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVPlaylist, NULL, thumbnail_configure);
 	}
 
 	if (appControlInfo.rtpMenuInfo.usePlaylistURL == iptvPlaylistUrl)
 	{
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
+	snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionRtpPlaylist), thumbnail_enterurl);
 	}
 
 	if (appControlInfo.rtpMenuInfo.usePlaylistURL != iptvPlaylistSap)
 	{
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("IPTV_EPG"), appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
+	snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_EPG"), appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
 	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionRtpEpg), thumbnail_enterurl);
 	}
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %ld", _T("IPTV_WAIT_TIMEOUT"), appControlInfo.rtpMenuInfo.pidTimeout);
+	snprintf(buf, sizeof(buf), "%s: %ld", _T("IPTV_WAIT_TIMEOUT"), appControlInfo.rtpMenuInfo.pidTimeout);
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVtimeout, pArg, thumbnail_configure);
 
 #ifdef ENABLE_XWORKS
@@ -5357,7 +5339,7 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	getParam( STB_CONFIG_FILE, "XWORKS", "OFF", buf );
 	xworks_enabled = strcasecmp( "ON", buf ) == 0;
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("XWORKS"), xworks_enabled ? _T("ON") : _T("OFF"));
+	snprintf(buf, sizeof(buf), "%s: %s", _T("XWORKS"), xworks_enabled ? _T("ON") : _T("OFF"));
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_togglexWorks, SET_NUMBER(!xworks_enabled), thumbnail_configure);
 
 	getParam( STB_CONFIG_FILE, "XWORKS_PROTO", "http", buf );
@@ -5371,13 +5353,13 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 		str = "HTTP";
 	}
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("USE_PROTOCOL"), str);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("USE_PROTOCOL"), str);
 	if( xworks_enabled )
 		interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_togglexWorksProto, (void*)proto, thumbnail_configure);
 	else
 		interface_addMenuEntryDisabled((interfaceMenu_t*)&IPTVSubMenu, buf, thumbnail_configure);
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("XWORKS"), _T("RESTART"));
+	snprintf(buf, sizeof(buf), "%s: %s", _T("XWORKS"), _T("RESTART"));
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_restartxWorks, NULL, settings_renew);
 
 	if( xworks_enabled && appControlInfo.rtpMenuInfo.usePlaylistURL )
@@ -5400,7 +5382,7 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry( (interfaceMenu_t*)&IPTVSubMenu, _T("PROFILE"), interface_menuActionShowMenu, (void*)&ProfileMenu, thumbnail_account );
 #endif
 #ifdef ENABLE_TELETES
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", "Teletes playlist", appControlInfo.rtpMenuInfo.teletesPlaylist[0] != 0 ? appControlInfo.rtpMenuInfo.teletesPlaylist : _T("NONE"));
+	snprintf(buf, sizeof(buf), "%s: %s", "Teletes playlist", appControlInfo.rtpMenuInfo.teletesPlaylist[0] != 0 ? appControlInfo.rtpMenuInfo.teletesPlaylist : _T("NONE"));
 	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, 1, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionTeletesPlaylist), thumbnail_enterurl);
 #endif
 
@@ -5415,22 +5397,22 @@ static int output_enterVODMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&VODSubMenu);
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"), appControlInfo.rtspInfo.usePlaylistURL ? "URL" : _T("IP_ADDRESS") );
+	snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_PLAYLIST"), appControlInfo.rtspInfo.usePlaylistURL ? "URL" : _T("IP_ADDRESS") );
 	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODPlaylist, NULL, thumbnail_configure);
 
 	if( appControlInfo.rtspInfo.usePlaylistURL )
 	{
-		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_PLAYLIST"),
+		snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_PLAYLIST"),
 			appControlInfo.rtspInfo.streamInfoUrl != 0 ? appControlInfo.rtspInfo.streamInfoUrl : _T("NONE"));
 		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeURL, SET_NUMBER(optionVodPlaylist), thumbnail_enterurl);
 	}
 	else
 	{
-		snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_INFO_IP_ADDRESS"), appControlInfo.rtspInfo.streamInfoIP);
+		snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_INFO_IP_ADDRESS"), appControlInfo.rtspInfo.streamInfoIP);
 		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeVODINFOIP, NULL, thumbnail_enterurl);
 	}
 
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("VOD_IP_ADDRESS"), appControlInfo.rtspInfo.streamIP);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_IP_ADDRESS"), appControlInfo.rtspInfo.streamIP);
 	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeVODIP, NULL, thumbnail_enterurl);
 
 	return 0;
@@ -5476,37 +5458,54 @@ static int output_enterWebMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-int output_showGatewayMenu(interfaceMenu_t *pMenu, void* pArg)
+#if (defined STSDK) && (defined ENABLE_WIFI)
+static int output_confirmDhcpServerEnable(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* ignored)
+{
+	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
+	{
+		return 0;
+	} else
+	if ((cmd->command == interfaceCommandGreen) ||
+	    (cmd->command == interfaceCommandEnter) ||
+	    (cmd->command == interfaceCommandOk))
+	{
+		output_toggleDhcpServer(pMenu, SET_NUMBER(1));
+		return 0;
+	}
+	return 1;
+}
+#endif // STSDK && ENABLE_WIFI
+
+int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
+{
+#ifdef STSDK
+#ifdef ENABLE_WIFI
+	if (wifiInfo.wanMode && networkInfo.lanMode != lanDhcpServer && !pForce) {
+		interface_showConfirmationBox(_T("CONFIRM_DHCP_ENABLE"), thumbnail_warning, output_confirmDhcpServerEnable, NULL);
+		return 1;
+	}
+#endif
+	networkInfo.lanMode = networkInfo.lanMode == lanDhcpServer ? lanStatic : lanDhcpServer;
+	networkInfo.changed = 1;
+	output_writeDhcpConfig();
+	return output_saveAndRedraw(output_writeInterfacesFile(), pMenu);
+#endif // STSDK
+#ifdef STBPNX
+	return output_toggleGatewayMode(pMenu, SET_NUMBER(networkInfo.lanMode == lanDhcpServer ? lanStatic : lanDhcpServer));
+#endif
+	return 0;
+}
+
+int output_showGatewayMenu(interfaceMenu_t *pMenu, void* ignored)
 {
 	interface_clearMenuEntries((interfaceMenu_t*)&GatewaySubMenu);
-	GatewaySubMenu.baseMenu.pParentMenu = pMenu;
 
-#ifdef STBPNX
-	gatewayMode_t mode;
-	for( mode = gatewayModeOff; mode < gatewayModeCount; mode++ )
-	{
-		char *str = NULL;
-		switch( mode ) {
-			case gatewayModeBridge: str = _T("GATEWAY_BRIDGE"); break;
-			case gatewayModeNAT:    str = _T("GATEWAY_NAT_ONLY"); break;
-			case gatewayModeFull:   str = _T("GATEWAY_FULL"); break;
-			default:                str = _T("OFF"); break;
-		}
-		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, str, mode == output_gatewayMode ? NULL : output_toggleGatewayMode,
-		                       (void*)mode,  mode == output_gatewayMode ? radiobtn_filled : radiobtn_empty);
-	}
-#endif // STBPNX
-#ifdef STSDK
-// TODO: There currently no plans to support ST devices with two ethernet interfaces
 	lanMode_t mode;
-	for (mode = 0; mode < lanModeCount; mode++)
-	{
+	for (mode = 0; mode < lanModeCount; mode++) {
 		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, output_getLanModeName(mode), mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode,
 		                       (void*)mode,  mode == networkInfo.lanMode ? radiobtn_filled : radiobtn_empty);
 	}
-#endif // STSDK
 	interface_menuActionShowMenu(pMenu, (void*)&GatewaySubMenu);
-
 	return 0;
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
@@ -5664,6 +5663,7 @@ void output_fillOutputMenu(void)
 void output_buildMenu(interfaceMenu_t *pParent)
 {
 #ifdef ENABLE_WIFI
+	memset(&wifiInfo, 0, sizeof(wifiInfo));
 	wifiInfo.channelCount   = 0;
 	wifiInfo.currentChannel = 1;
 	wifiInfo.showAdvanced   = 0;
@@ -5691,7 +5691,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
 #endif
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, (interfaceMenu_t*)&OutputMenu,
-		interfaceListMenuIconThumbnail, output_enterNetworkMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, output_enterNetworkMenu, output_leaveNetworkMenu, NULL);
 
 	createListMenu(&StandardMenu, _T("TV_STANDARD"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
@@ -5717,7 +5717,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterPlaybackMenu, NULL, NULL);
 
 	createListMenu(&WANSubMenu, "WAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_enterWANMenu, NULL, SET_NUMBER(ifaceWAN));
+		interfaceListMenuIconThumbnail, output_enterWANMenu, output_leaveNetworkMenu, SET_NUMBER(ifaceWAN));
 
 #ifdef ENABLE_PPP
 	createListMenu(&PPPSubMenu, _T("PPP"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
@@ -5725,7 +5725,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #endif
 #ifdef ENABLE_LAN
 	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_enterLANMenu, NULL, SET_NUMBER(ifaceLAN));
+		interfaceListMenuIconThumbnail, output_enterLANMenu, output_leaveNetworkMenu, SET_NUMBER(ifaceLAN));
 #endif
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 	createListMenu(&GatewaySubMenu, _T("GATEWAY_MODE"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
@@ -5734,7 +5734,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #ifdef ENABLE_WIFI
 	int wifi_icons[4] = { 0, 0, 0, statusbar_f4_enterurl };
 	createListMenu(&WifiSubMenu, _T("WIRELESS"), settings_network, wifi_icons, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_enterWifiMenu, NULL, SET_NUMBER(ifaceWireless));
+		interfaceListMenuIconThumbnail, output_enterWifiMenu, output_leaveNetworkMenu, SET_NUMBER(ifaceWireless));
 	interface_setCustomKeysCallback(_M &WifiSubMenu, output_wifiKeyCallback);
 
 	wireless_buildMenu(_M &WifiSubMenu);
@@ -5953,6 +5953,7 @@ static int output_setProfile(interfaceMenu_t *pMenu, void* pArg)
 				dprintf("%s: '%s'\n", __FUNCTION__, dst);
 				system(dst);
 			}
+#undef DBG_MUTE
 		}
 #if 0
 		else
@@ -6248,18 +6249,6 @@ int output_writeInterfacesFile(void)
 	return 0;
 }
 
-const char* output_getLanModeName(lanMode_t mode)
-{
-	switch (mode)
-	{
-		case lanBridge:     return _T("GATEWAY_BRIDGE");
-		case lanStatic:     return _T("ADDR_MODE_STATIC");
-		case lanDhcpServer: return _T("GATEWAY_FULL");
-		case lanDhcpClient: return _T("ADDR_MODE_DHCP");
-		default:            return _T("OFF");
-	}
-}
-
 int output_writeDhcpConfig(void)
 {
 	if (networkInfo.lanMode != lanDhcpServer)
@@ -6273,3 +6262,65 @@ int output_writeDhcpConfig(void)
 	return 0;
 }
 #endif // STSDK
+
+const char* output_getLanModeName(lanMode_t mode)
+{
+	switch (mode)
+	{
+		case lanBridge:     return _T("GATEWAY_BRIDGE");
+		case lanStatic:     return _T("LOCAL_NETWORK");
+		case lanDhcpServer: return _T("LOCAL_NETWORK_ICS");
+		case lanDhcpClient: return _T("ADDR_MODE_DHCP");
+		default:            return _T("OFF");
+	}
+}
+
+void output_setIfaceMenuName(interfaceMenu_t *pMenu, const char *ifaceName, int wan, lanMode_t lanMode)
+{
+	char name[MENU_ENTRY_INFO_LENGTH];
+	size_t len;
+	if (wan)
+		len = snprintf(name, sizeof(name), "%s - %s", ifaceName, _T("INTERNET_CONNECTION"));
+	else
+	{
+		len  = snprintf(name, sizeof(name), "%s - %s", ifaceName, output_getLanModeName(lanMode));
+	}
+	interface_setMenuName(pMenu, name, len+1);
+}
+
+int  output_isIfaceDhcp(stb810_networkInterface_t iface)
+{
+#ifdef STBPNX
+	char temp[MENU_ENTRY_INFO_LENGTH];
+#endif
+	switch (iface)
+	{
+		case ifaceWAN:
+#ifdef STBPNX
+			getParam(WAN_CONFIG_FILE, "BOOTPROTO", "static", temp);
+			return strcasecmp(temp, "static");
+#endif
+#ifdef STSDK
+			return networkInfo.wanDhcp;
+#endif
+			return 0;
+		case ifaceLAN:
+			return networkInfo.lanMode == lanDhcpClient;
+#ifdef ENABLE_WIFI
+		case ifaceWireless:
+#ifdef STBPNX
+			getParam(WLAN_CONFIG_FILE, "BOOTPROTO", "static", temp);
+			return strcasecmp(temp, "static");
+#endif
+#ifdef STSDK
+			return wifiInfo.dhcp;
+#endif
+			return 0;
+#endif // ENABLE_WIFI
+#ifdef ENABLE_PPP
+		case ifacePPP:
+			return 1;
+#endif
+	}
+	return 0;
+}
