@@ -66,6 +66,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pthread.h>
 #include <fcntl.h>
 
+/***********************************************
+* LOCAL TYPEDEFS                               *
+************************************************/
+
+typedef struct stream_files
+{
+	unsigned int index;
+	char *stream;
+	char *name;
+	char *description;
+	char *poster;
+	char *thumb;
+	unsigned int pidv;
+	unsigned int pida;
+	unsigned int pidp;
+	unsigned int vformat;
+	unsigned int aformat;
+	struct stream_files *next;
+} streams_struct;
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -77,19 +97,21 @@ static int  rtsp_setChannel(int channel, void* pArg);
 static int  rtsp_play_callback(interfacePlayControlButton_t button, void *pArg);
 static int  rtsp_setChannelFromURL(interfaceMenu_t *pMenu, const char *value, const char* description, const char* thumbnail, void* pArg);
 
-static int  rtsp_checkStream(void *pArg);
-
-static void rtsp_setStopTimer(int which, int length);
-static void rtsp_setStateCheckTimer(int which, int bEnable, int bRunNow);
+static void rtsp_enableStateCheck(void);
+static void rtsp_disableStateCheck(void);
+static int rtsp_checkPlaybackState(void *notused);
 
 static int  rtsp_startNextChannel(int direction, void* pArg);
 
+static void clean_list(streams_struct *stream_ptr);
+static int find_streams(streams_struct **ppstream_head);
 static streams_struct *add_stream(streams_struct **ppstream_head, char *stream, int index);
+static streams_struct *get_stream(unsigned int index);
+static int  get_rtsp_streams(streams_struct **ppstream_head);
+
 static int  rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 
-static streams_struct *get_stream(unsigned int index);
 static void *rtsp_list_updater(void *pArg);
-static int  get_rtsp_streams(streams_struct **ppstream_head);
 static int  rtsp_displayStreamMenu(void* pArg);
 static int  rtsp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i);
 
@@ -118,8 +140,6 @@ static char rtsp_lasturl[MAX_URL] = "rtsp://";
 ***************************************************************************/
 
 interfaceListMenu_t rtspMenu;
-
-struct rtsp_control_t rtspControl;
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -192,7 +212,7 @@ int find_streams(streams_struct **ppstream_head)
 	int  i;
 	int  index = 0;
 
-	dprintf("%s: in\n", __FUNCTION__);
+	dprintf("%s: get semaphore\n", __FUNCTION__);
 
 	mysem_get(rtsp_semaphore);
 
@@ -213,53 +233,20 @@ int find_streams(streams_struct **ppstream_head)
 		}
 	}
 
-	dprintf("%s: release sem\n", __FUNCTION__);
+	dprintf("%s: release semaphore\n", __FUNCTION__);
 	mysem_release(rtsp_semaphore);
 
 	return index == 0 ? -1 : 0;
 }
 
-static int rtsp_timerEvent(void *pArg)
+int rtsp_checkPlaybackState(void *notused)
 {
-	dprintf("%s: Stop video (will wait for end of stream)\n", __FUNCTION__);
-
-	//rtsp_stopVideo(which);
-	rtsp_setStopTimer(screenMain, 0);
-
-	return 0;
-}
-
-static void rtsp_setStopTimer(int which, int length)
-{
-	dprintf("%s: set timer for %d seconds\n", __FUNCTION__, length);
-
-	if (length > 0)
-	{
-		interface_removeEvent(rtsp_checkStream, CHANNEL_INFO_SET(which, 0));
-		interface_addEvent(rtsp_timerEvent, CHANNEL_INFO_SET(which, 0), length*1000, 1);
-	} else
-	{
-		interface_removeEvent(rtsp_timerEvent, CHANNEL_INFO_SET(which, 0));
-		if (length == 0)
-		{
-			interface_addEvent(rtsp_checkStream, CHANNEL_INFO_SET(which, 0), 5000, 1);
-		} else
-		{
-			interface_removeEvent(rtsp_checkStream, CHANNEL_INFO_SET(which, 0));
-		}
-	}
-}
-
-
-static int rtsp_stateTimerEvent(void *pArg)
-{
-	int which = CHANNEL_INFO_GET_SCREEN(pArg);
-	DFBVideoProviderStatus status = gfx_getVideoProviderStatus(which);
+	DFBVideoProviderStatus status = gfx_getVideoProviderStatus(screenMain);
 	switch (status)
 	{
 		case DVSTATE_FINISHED:
 		case DVSTATE_STOP:
-			eprintf("%s: status = DVSTATE_STOP || DVSTATE_FINISHED\n", __FUNCTION__);
+			dprintf("%s: status = DVSTATE_STOP || DVSTATE_FINISHED\n", __FUNCTION__);
 			
 			if ( status == DVSTATE_FINISHED )
 				interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 0);
@@ -301,63 +288,44 @@ static int rtsp_stateTimerEvent(void *pArg)
 				}
 			}
 	}
-	rtsp_setStateCheckTimer(which, 1, 0);
+	rtsp_enableStateCheck();
 
 	return 0;
 }
 
-static void rtsp_setStateCheckTimer(int which, int bEnable, int bRunNow)
+void rtsp_enableStateCheck(void)
 {
-	if (bEnable)
-	{
-		if (bRunNow)
-		{
-			eprintf("%s: bRunNow = 1, Update slider\n", __FUNCTION__);
-			rtsp_stateTimerEvent(CHANNEL_INFO_SET(which, 0));
-		}
-		interface_addEvent(rtsp_stateTimerEvent, CHANNEL_INFO_SET(which, 0), 1000, 1);
-	} else
-	{
-		// At the end make focused play controls but not slider 
-		interface_playControlSlider(0, 0, 0);
-		interface_playControlSetInputFocus(inputFocusPlayControl);
-		interface_playControlSelect(interfacePlayControlStop);
+	interface_addEvent(rtsp_checkPlaybackState, NULL, 1000, 1);
+}
 
-		interface_removeEvent(rtsp_stateTimerEvent, CHANNEL_INFO_SET(which, 0));
-		interface_notifyText(NULL, 1);
-	}
+void rtsp_disableStateCheck(void)
+{
+	// At the end make focused play controls but not slider 
+	interface_playControlSlider(0, 0, 0);
+	interface_playControlSetInputFocus(inputFocusPlayControl);
+	interface_playControlSelect(interfacePlayControlStop);
+
+	interface_removeEvent(rtsp_checkPlaybackState, NULL);
+	interface_notifyText(NULL, 1);
 }
 
 void rtsp_stopVideo(int which)
 {
-	dprintf("%s: in\n", __FUNCTION__);
+	dprintf("%s: in %d\n", __FUNCTION__, which);
 
 	mysem_get(rtsp_semaphore);
 	dprintf("%s: got sem\n", __FUNCTION__);
 
 	if ( appControlInfo.rtspInfo.active != 0 )
 	{
-		rtsp_setStopTimer(which, -1);
-		rtsp_setStateCheckTimer(which, 0, 0);
+		rtsp_disableStateCheck();
 
 		interface_playControlSlider(0, 0, 0);
-
 		interface_playControlSelect(interfacePlayControlStop);
 
-		dprintf("%s: Stop video screen %s\n", __FUNCTION__, which ? "Pip" : "Main");
-		eprintf("%s: Stop video screen %s\n", __FUNCTION__, which ? "Pip" : "Main");
 		gfx_stopVideoProvider(which, 1, 1);
 		appControlInfo.rtspInfo.active = 0;
-
-		rtspControl.enabled = 0;
-		rtspControl.startFromPos = 0;
-		rtspControl.currentPos = 0;
-
 		interface_disableBackground();
-		
-		//interface_playControlDisable(1);
-
-		//rtsp_fillMenu();
 	}
 
 	dprintf("%s: release sem\n", __FUNCTION__);
@@ -400,18 +368,6 @@ static streams_struct *add_stream(streams_struct **ppstream_head, char *stream, 
 	memcpy(stream_ptr->stream, stream, stream_size);
 	
 	return stream_ptr;
-}
-
-
-// FIXME: some data at the end of a stream is discarded because it is still being processed in demuxer buffer
-// when network streaming is finished
-static int rtsp_checkStream(void *pArg)
-{
-	dprintf("%s: in\n");
-
-	interface_addEvent(rtsp_checkStream, pArg, 5000, 1);
-
-	return 0;
 }
 
 static void *rtsp_list_updater(void *pArg)
@@ -514,9 +470,7 @@ static int get_rtsp_streams(streams_struct **ppstream_head)
 
 int rtsp_startVideo(int which)
 {
-	int ret;
-	char qualifier[64];
-	char pipeString[256];
+	char rtsp_url[256+32];
 	char *str;
 
 	interface_showLoadingAnimation();
@@ -528,22 +482,20 @@ int rtsp_startVideo(int which)
 
 	gfx_stopVideoProviders(which);
 
-	qualifier[0] = 0;
-	sprintf(pipeString,"rtsp://%s:%d/%s",
+	sprintf(rtsp_url,"rtsp://%s:%d/%s",
 		stream_info.ip,
 		stream_info.port,
 		stream_info.streamname);
 	// xWorks links workaround
-	if( (str = strstr(pipeString, "?manualDetectVideoInfo")) != NULL )
+	if( (str = strstr(rtsp_url, "?manualDetectVideoInfo")) != NULL )
 		*str = 0;
-	dprintf("%s: url=%s\n", __FUNCTION__,pipeString);
-	ret = gfx_startVideoProvider(pipeString, which, 1, qualifier);
 
-	if (ret != 0)
+	dprintf("%s: starting video %s\n", __FUNCTION__, rtsp_url);
+	if (gfx_startVideoProvider(rtsp_url, which, 1, "") != 0)
 	{
 		mysem_release(rtsp_semaphore);
 		interface_showMessageBox(_T("ERR_STREAM_UNAVAILABLE"), thumbnail_error, 0);
-		eprintf("RTSP: Failed to start video provider '%s'\n", pipeString);
+		eprintf("RTSP: Failed to start video provider '%s'\n", rtsp_url);
 		return -1;
 	}
 
@@ -589,14 +541,11 @@ int rtsp_startVideo(int which)
 	interface_playControlSelect(interfacePlayControlStop);
 	interface_playControlSelect(interfacePlayControlPlay);
 
-	rtspControl.enabled = 1;
-
 #ifdef STBPNX
 	double length_stream = 0.0;
 	double position_stream = 0.0;
 	/// FIXME: should be done by gfx_startVideoProvider
-	ret = gfx_getPosition(&length_stream,&position_stream);
-	if(ret == 0)
+	if(gfx_getPosition(&length_stream,&position_stream) == 0)
 	{
 		//dprintf("%s: start from pos %f\n", __FUNCTION__, position_stream);
 		interface_playControlSlider(0, (unsigned int)length_stream, (unsigned int)position_stream);
@@ -605,15 +554,14 @@ int rtsp_startVideo(int which)
 		interface_playControlSlider(0, 0, 0);
 	}
 #endif
-	rtsp_setStateCheckTimer(screenMain, 1, 0);
+	rtsp_enableStateCheck();
 
-	interface_displayMenu(1);
-	//rtsp_fillMenu();
-
-	dprintf("%s: released sem\n", __FUNCTION__);
+	dprintf("%s: release sem\n", __FUNCTION__);
 	mysem_release(rtsp_semaphore);
 
 	interface_hideLoadingAnimation();
+	interface_displayMenu(1);
+
 	return 0;
 }
 
@@ -706,41 +654,33 @@ int rtsp_startNextChannel(int direction, void* pArg)
 
 static int rtsp_displayStreamMenu(void* pArg)
 {
-	//int position = 0;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
-	int streamNumber = 0;
-	int which;
+	int  entryLength;
 	streams_struct* stream_ptr=NULL;
-
-	which = GET_NUMBER(pArg);
+	int which = GET_NUMBER(pArg);
 
 	interface_clearMenuEntries((interfaceMenu_t*)&rtspStreamMenu);
-
 	interface_showLoadingAnimation();
 
-	//find_streams(ppstream_head);
-	//get_rtsp_streams(ppstream_head);
-	if ( pstream_head != NULL )
+	int streamNumber = 0;
+	for (stream_ptr = pstream_head; stream_ptr != NULL; stream_ptr = stream_ptr->next)
 	{
-		stream_ptr = pstream_head;
+		entryLength = sprintf(channelEntry, "%d: %s", streamNumber+1, stream_ptr->name ? stream_ptr->name : stream_ptr->stream);
 
-		while ( stream_ptr != NULL )
+		interface_addMenuEntryCustom(_M &rtspStreamMenu, interfaceMenuEntryText, 
+			channelEntry, entryLength+1, 1,
+			rtsp_stream_change, NULL, NULL, rtsp_menuEntryDisplay,
+			CHANNEL_INFO_SET(which, streamNumber), thumbnail_vod);
+		//dprintf("%s: Compare current %s\n", __FUNCTION__, channelEntry);
+		if ( strcmp(stream_info.ip, appControlInfo.rtspInfo.streamIP) == 0 && 
+		     strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
 		{
-			sprintf(channelEntry, "%d: %s", streamNumber+1, stream_ptr->name ? stream_ptr->name : stream_ptr->stream);
-			
-			interface_addMenuEntryCustom((interfaceMenu_t*)&rtspStreamMenu, interfaceMenuEntryText, channelEntry, strlen(channelEntry)+1, 1, rtsp_stream_change, NULL, NULL, rtsp_menuEntryDisplay, CHANNEL_INFO_SET(which, streamNumber), thumbnail_vod);
-			//dprintf("%s: Compare current %s\n", __FUNCTION__, channelEntry);
-			if ( strcmp(stream_info.ip, appControlInfo.rtspInfo.streamIP) == 0 && strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
-			{
-				interface_setSelectedItem((interfaceMenu_t*)&rtspStreamMenu, streamNumber);
-			}
-			streamNumber++;
-			stream_ptr = (streams_struct *) stream_ptr->next;
+			interface_setSelectedItem((interfaceMenu_t*)&rtspStreamMenu, streamNumber);
 		}
-
+		streamNumber++;
 	}
 
-	if ( streamNumber == 0 )
+	if (streamNumber == 0)
 	{
 		char *str;
 		str = _T("NO_MOVIES");
@@ -748,7 +688,6 @@ static int rtsp_displayStreamMenu(void* pArg)
 	}
 
 	interface_hideLoadingAnimation();
-
 	interface_displayMenu(1);
 
 	return 0;
@@ -758,7 +697,6 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 {
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
 	//int streamNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
-	int res = 0;
 	char url[MAX_URL];
 
 	dprintf("%s: in %d\n", __FUNCTION__, button);
@@ -775,11 +713,9 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		if ( !appControlInfo.rtspInfo.active )
 		{
 			position					=	interface_playControlSliderGetPosition();
-			rtspControl.startFromPos	=	1;
 			appControlInfo.playbackInfo.scale = 1.0;
 			rtsp_startVideo(which);
 			gfx_setVideoProviderPosition(screenMain,position);
-			rtspControl.startFromPos	=	0;
 		} else
 		{
 			position	=	interface_playControlSliderGetPosition();
@@ -834,10 +770,9 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 				default: show_menu = (void*)&rtspStreamMenu;
 			}
 			rtsp_stopVideo(which);
-			eprintf("%s: () interface_menuActionShowMenu, interfaceInfo.currentMenu = %p\n", 
-				__FUNCTION__, interfaceInfo.currentMenu);
-/*				
+/*
 #ifdef ENABLE_VIDIMAX
+			dprintf("%s(stop): currentMenu %s\n", __FUNCTION__, interfaceInfo.currentMenu->name);
 			if (interfaceInfo.currentMenu == (interfaceMenu_t*)&VidimaxMenu){
 				show_menu = (void*)&VidimaxMenu;
 			}
@@ -868,7 +803,6 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		if ( !appControlInfo.rtspInfo.active )
 		{
 			rtsp_startVideo(which);
-			//appControlInfo.playbackInfo.scale = 2.0;
 			gfx_setSpeed(screenMain, appControlInfo.playbackInfo.scale);
 		} else
 		{
@@ -904,7 +838,6 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 		if ( !appControlInfo.rtspInfo.active )
 		{
 			rtsp_startVideo(which);
-			//appControlInfo.playbackInfo.scale = 2.0;
 			gfx_setSpeed(screenMain, appControlInfo.playbackInfo.scale);
 		} else
 		{
@@ -954,27 +887,6 @@ static int rtsp_play_callback(interfacePlayControlButton_t button, void *pArg)
 	{
 		// default action
 		return 1;
-	}
-
-	if ( res != 0 && appControlInfo.rtspInfo.active )
-	{
-		void *show_menu;
-		switch (appControlInfo.playbackInfo.playlistMode)
-		{
-			case playlistModeFavorites: show_menu = (void*)&playlistMenu; break;
-#ifdef ENABLE_DLNA
-			case playlistModeDLNA: show_menu = (void*)&BrowseServersMenu; break;
-#endif
-			default: show_menu = (void*)&rtspStreamMenu;
-		}
-		rtsp_stopVideo(which);
-		
-		eprintf("%s: (2) interface_menuActionShowMenu, interfaceInfo.currentMenu = %p\n", 
-			__FUNCTION__, interfaceInfo.currentMenu);
-		
-		interface_menuActionShowMenu(interfaceInfo.currentMenu, show_menu);
-		interface_showMenu(1, 0);
-		interface_showMessageBox(_T("ERR_CONNECT"), thumbnail_error, 0);
 	}
 
 	interface_displayMenu(1);
@@ -1037,41 +949,17 @@ static void rtsp_setupPlayControl(void *pArg)
 static int rtsp_stream_start(void* pArg)
 {
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
-	//int streamNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 
-	dprintf("%s: stream check\n", __FUNCTION__);
-
-	//printf("play: show menu %d, active %d\n", interfaceInfo.showMenu, appControlInfo.rtspInfo.active);
-
+	dprintf("%s: show menu %d, active %d\n", interfaceInfo.showMenu, appControlInfo.rtspInfo.active);
 	if ( appControlInfo.rtspInfo.active == 0 )
 	{
-
-		eprintf("%s: starting video\n", __FUNCTION__);
-
 		appControlInfo.playbackInfo.scale = 1.0;
-
 		rtsp_startVideo(which);
-
-		eprintf("%s: started video\n", __FUNCTION__);
-
-		//if ( appControlInfo.rtspInfo.active != 0 )
 		rtsp_setupPlayControl(pArg);
-		/*else
-		{
-			interface_playControlDisable(0);
-			stream_info.streamname[0] = 0;
-			rtsp_fillMenu();
-			return -1;
-		}*/
 	}
 
-	eprintf("%s: refill menu\n", __FUNCTION__);
-	//rtsp_fillMenu();
-	rtsp_displayStreamMenu(SET_NUMBER(which));
-
 	helperFlushEvents();
-
-	eprintf("%s: done\n", __FUNCTION__);
+	dprintf("%s: done: %d\n", __FUNCTION__, appControlInfo.rtspInfo.active);
 
 	return appControlInfo.rtspInfo.active != 0 ? 0 : -1;
 }
@@ -1089,17 +977,13 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
 	unsigned int streamNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	streams_struct* stream_ptr=NULL;
-	int ret;
 
-	dprintf("%s: in\n", __FUNCTION__);
-	eprintf("%s: in\n", __FUNCTION__);
+	dprintf("%s(%d): in %d\n", __FUNCTION__, which, streamNumber);
 
 	interface_removeEvent(rtsp_stream_start, pArg);
 
 	if ( appControlInfo.rtspInfo.active != 0 )
 	{
-		/*interface_playControlDisable(1);
-		stream_info.streamname[0] = 0;*/
 		eprintf("RTSP: stop video at %d\n", which);
 		// force showState to NOT be triggered
 		interfacePlayControl.activeButton = interfacePlayControlStop;
@@ -1114,14 +998,10 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 
 		if ( pstream_head != NULL )
 		{
-			//dprintf("%s: already have list\n", __FUNCTION__);
 			stream_ptr = pstream_head;
 		} else
 		{
-			//dprintf("%s: new list\n", __FUNCTION__);
-			//ip_buildIPStreamMenu(which);
-			//ret=find_streams(ppstream_head);
-			ret=get_rtsp_streams(ppstream_head);
+			int ret = get_rtsp_streams(ppstream_head);
 			dprintf("%s: Found streams %i\n", __FUNCTION__,ret);
 			if ( (ret == 0)&&(pstream_head != NULL) )
 			{
@@ -1155,12 +1035,8 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 	{
 		interface_showMenu(0, 1);
 
-		//interface_menuActionShowMenu(pMenu, (void*)&rtspMenu);
-
 		return 0;
 	}
-
-	//rtsp_startVideo(which);
 
 	return -1;
 }
@@ -1258,7 +1134,8 @@ static int rtsp_setChannelFromURL(interfaceMenu_t *pMenu, const char *value, con
 	memcpy(&stream_info, &sinfo, sizeof(rtsp_stream_info));
 
 	if( !description )
-		sprintf(appControlInfo.playbackInfo.description, "%s: rtsp://%s:%d/%s", _T("MOVIE"), stream_info.ip, stream_info.port, stream_info.streamname);
+		snprintf(appControlInfo.playbackInfo.description, sizeof(appControlInfo.playbackInfo.description),
+			"%s: rtsp://%s:%d/%s", _T("MOVIE"), stream_info.ip, stream_info.port, stream_info.streamname);
 	else
 		strcpy(appControlInfo.playbackInfo.description, description);
 	if( !thumbnail )
@@ -1316,8 +1193,6 @@ void rtsp_buildMenu(interfaceMenu_t *pParent)
 
 	mysem_create(&rtsp_semaphore);
 
-	rtspControl.startFromPos = 0;
-
 	memset(&stream_info, 0, sizeof(rtsp_stream_info));
 
 #ifdef ENABLE_TEST_MODE
@@ -1370,7 +1245,6 @@ static int rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 			{
 				ret=get_rtsp_streams(ppstream_head);
 				dprintf("%s: Found streams %i\n", __FUNCTION__,ret);
-				eprintf("%s: Found streams %i\n", __FUNCTION__,ret);
 				if ( (ret == 0)&&(pstream_head != NULL) )
 				{
 					stream_ptr = pstream_head;

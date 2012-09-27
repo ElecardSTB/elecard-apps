@@ -41,22 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED TYPEDEFS  *
 **********************/
 
-typedef struct stream_files
-{
-	unsigned int index;
-	char *stream;
-	char *name;
-	char *description;
-	char *poster;
-	char *thumb;
-	unsigned int pidv;
-	unsigned int pida;
-	unsigned int pidp;
-	unsigned int vformat;
-	unsigned int aformat;
-	struct stream_files *next;
-} streams_struct;
-
 typedef struct
 {
 	char streamname[MENU_ENTRY_INFO_LENGTH];
@@ -71,24 +55,6 @@ typedef struct
 
 	int custom_url;		// it this is not 0, then this stream is treated as custom url
 } rtsp_stream_info;
-
-// dgk
-struct rtsp_control_t {
-	float scale;
-	char stopFlag;
-	char exitFlag;
-	char restartFlag;
-	int enabled;
-
-	double currentScale;
-	double currentPos;
-	double lastPos;
-
-	int startFromPos;
-
-	struct timeval countstart;
-};
-// end dgk
 
 /*******************
 * EXPORTED DATA    *
