@@ -55,6 +55,7 @@ typedef struct __socketClient_t {
 	client_handler  before_connect;
 	client_handler  after_connect;
 	client_handler  on_disconnect;
+	int             connect_failed;
 } socketClient_t;
 
 /******************************************************************

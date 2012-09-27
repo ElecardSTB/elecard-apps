@@ -65,6 +65,7 @@ int client_create(socketClient_t *s, const char *socket_name,
 	s->after_connect  = after_connect;
 	s->on_disconnect  = on_disconnect;
 	s->socket_fd      = INVALID_SOCKET;
+	s->connect_failed = 0;
 
 	return client_connect(s);
 }
@@ -99,10 +100,14 @@ int client_connect(socketClient_t *s)
 
 	len = strlen(s->remote.sun_path) + sizeof(s->remote.sun_family);
 	if (connect(s->socket_fd, (struct sockaddr *)&s->remote, len) == -1) {
-		eprintf("%s: Can't connect to %s\n", __FUNCTION__, s->remote.sun_path);
+		if (!s->connect_failed) {
+			eprintf("%s: Can't connect to %s\n", __FUNCTION__, s->remote.sun_path);
+			s->connect_failed = 1;
+		}
 		close(s->socket_fd);
 		goto connect_failed;
 	}
+	s->connect_failed = 0;
 
 	if( s->after_connect )
 		s->after_connect(s);
