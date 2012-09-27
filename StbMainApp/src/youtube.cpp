@@ -551,6 +551,7 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	int selected_fmt = sizeof(supported_formats)/sizeof(supported_formats[0])-1;
 	int fmt;
+	int url_len;
 	char *fmt_url, *next_url, *fmt_str;
 	int i;
 	char buffer[video_info.length()+1];
@@ -588,8 +589,11 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 					break;
 			if (i<selected_fmt)
 			{
-				selected_fmt = i;
-				fmt_url = str+6; // "url%3D"
+				char *encoded_url = strstr(str, "url%3D");
+				if (encoded_url) {
+					fmt_url=encoded_url+6;
+					selected_fmt = i;
+				}
 			}
 			if (selected_fmt == 0 && fmt_url)
 				break;
@@ -607,11 +611,18 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	if (str) *str = 0;
 
 	//eprintf("%s: encoded url: %s\n", __FUNCTION__, fmt_url);
-	if (utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 ) < 0 ||
-	    utf8_urltomb(url_tmp, strlen(url_tmp)+1, url,     sizeof(url)-1     ) < 0)
+	if (           utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 )  < 0 ||
+	    (url_len = utf8_urltomb(url_tmp, strlen(url_tmp)+1, url,     sizeof(url)-1     )) < 0)
 	{
 		eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, fmt_url);
 		goto getinfo_failed;
+	}
+	str = strstr(url, "sig=");
+	if (str && url_len+6 < sizeof(url)) {
+		// Replace 'sig=' with 'signature='
+		str+=3;
+		memmove(str+6, str, url_len-(str-url)+1);
+		memcpy (str, "nature", 6);
 	}
 
 	eprintf("Youtube: Playing (format %2d) '%s'\n", supported_formats[selected_fmt], url );
