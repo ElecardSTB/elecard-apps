@@ -113,7 +113,6 @@ static int  rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cm
 
 static void *rtsp_list_updater(void *pArg);
 static int  rtsp_displayStreamMenu(void* pArg);
-static int  rtsp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i);
 
 /******************************************************************
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
@@ -435,6 +434,7 @@ static int get_rtsp_streams(streams_struct **ppstream_head)
 
 	if ( pstream_head != NULL && *ppstream_head != NULL )
 	{
+		interface_clearMenuEntries(_M &rtspStreamMenu); // don't leave thumb pointers to previous streams!
 		clean_list(*ppstream_head);
 		*ppstream_head = NULL;
 	}
@@ -655,27 +655,25 @@ int rtsp_startNextChannel(int direction, void* pArg)
 static int rtsp_displayStreamMenu(void* pArg)
 {
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
-	int  entryLength;
 	streams_struct* stream_ptr=NULL;
 	int which = GET_NUMBER(pArg);
+	interfaceMenu_t *rtspMenu = (interfaceMenu_t*)&rtspStreamMenu;
 
-	interface_clearMenuEntries((interfaceMenu_t*)&rtspStreamMenu);
+	interface_clearMenuEntries(rtspMenu);
 	interface_showLoadingAnimation();
 
 	int streamNumber = 0;
 	for (stream_ptr = pstream_head; stream_ptr != NULL; stream_ptr = stream_ptr->next)
 	{
-		entryLength = sprintf(channelEntry, "%d: %s", streamNumber+1, stream_ptr->name ? stream_ptr->name : stream_ptr->stream);
+		sprintf(channelEntry, "%d: %s", streamNumber+1, stream_ptr->name ? stream_ptr->name : stream_ptr->stream);
 
-		interface_addMenuEntryCustom(_M &rtspStreamMenu, interfaceMenuEntryText, 
-			channelEntry, entryLength+1, 1,
-			rtsp_stream_change, NULL, NULL, rtsp_menuEntryDisplay,
-			CHANNEL_INFO_SET(which, streamNumber), thumbnail_vod);
+		int entryIndex = interface_addMenuEntry(rtspMenu, channelEntry, rtsp_stream_change, CHANNEL_INFO_SET(which, streamNumber), thumbnail_vod) - 1;
+		interface_setMenuEntryImage(rtspMenu, entryIndex, stream_ptr->thumb);
 		//dprintf("%s: Compare current %s\n", __FUNCTION__, channelEntry);
 		if ( strcmp(stream_info.ip, appControlInfo.rtspInfo.streamIP) == 0 && 
 		     strcmp(stream_info.streamname, stream_ptr->stream) == 0 )
 		{
-			interface_setSelectedItem((interfaceMenu_t*)&rtspStreamMenu, streamNumber);
+			interface_setSelectedItem(rtspMenu, streamNumber);
 		}
 		streamNumber++;
 	}
@@ -684,7 +682,7 @@ static int rtsp_displayStreamMenu(void* pArg)
 	{
 		char *str;
 		str = _T("NO_MOVIES");
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&rtspStreamMenu, str, thumbnail_info);
+		interface_addMenuEntryDisabled(rtspMenu, str, thumbnail_info);
 	}
 
 	interface_hideLoadingAnimation();
@@ -1289,127 +1287,4 @@ static int rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 	}
 
 	return 1;
-}
-
-static int rtsp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i)
-{
-	if( pMenu->menuType != interfaceMenuList )
-	{
-		eprintf("%s: unsupported menu type %d\n", __FUNCTION__, pMenu->menuType);
-		return -1;
-	}
-	int selected                   = pMenu->selectedItem == i;
-	interfaceListMenu_t *pListMenu = (interfaceListMenu_t *)pMenu;
-	int fh;
-	int x,y;
-	int r,g,b,a;
-
-	switch( pListMenu->listMenuType )
-	{
-		case interfaceListMenuIconThumbnail:
-			if ( pListMenu->baseMenu.menuEntry[i].type == interfaceMenuEntryText )
-			{
-				char entryText[MENU_ENTRY_INFO_LENGTH];
-				int maxWidth;
-				char *second_line;
-				unsigned int index;
-				streams_struct *stream_ptr;
-				if ( selected )
-				{
-					DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-					// selection rectangle
-					gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, rect->x, rect->y, rect->w, rect->h);
-					/*
-					if ( pArrow != NULL )
-					{
-						//dprintf("%s: draw arrow\n", __FUNCTION__);
-						if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail || pListMenu->listMenuType == interfaceListMenuNoThumbnail )
-						{
-							x = interfaceInfo.clientX+interfaceInfo.paddingSize;
-							y = interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*(itemDisplayIndex+1)-INTERFACE_ARROW_SIZE;
-						} else
-						{
-							x = interfaceInfo.clientX+interfaceInfo.paddingSize;
-							y = interfaceInfo.clientY+(interfaceInfo.paddingSize+pListMenu->baseMenu.thumbnailHeight)*(itemDisplayIndex+1)-(pListMenu->baseMenu.thumbnailHeight+INTERFACE_ARROW_SIZE)/2;
-						}
-						interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR INTERFACE_ARROW_IMAGE, x, y, INTERFACE_ARROW_SIZE, INTERFACE_ARROW_SIZE, 0, 0, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignLeft|interfaceAlignTop);
-					}*/
-				}
-				if ( pListMenu->listMenuType == interfaceListMenuIconThumbnail && pListMenu->baseMenu.menuEntry[i].thumbnail > 0 )
-				{
-					x = rect->x+interfaceInfo.paddingSize+/*INTERFACE_ARROW_SIZE +*/ pListMenu->baseMenu.thumbnailWidth/2;
-					y = rect->y+pListMenu->baseMenu.thumbnailHeight/2;
-					index = CHANNEL_INFO_GET_CHANNEL(pListMenu->baseMenu.menuEntry[i].pArg);
-					if( appControlInfo.rtspInfo.usePlaylistURL == 0 || //pListMenu->baseMenu.menuEntry[i].thumbnail != thumbnail_multicast ||
-						(stream_ptr = get_stream(index)) == NULL ||
-					    stream_ptr->thumb == NULL || stream_ptr->thumb[0] == 0 ||
-					    0 != interface_drawImage(DRAWING_SURFACE, stream_ptr->thumb, x, y, pMenu->thumbnailWidth, pMenu->thumbnailHeight, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0)
-					)
-						interface_drawImage(DRAWING_SURFACE, resource_thumbnails[pListMenu->baseMenu.menuEntry[i].thumbnail], x, y, pMenu->thumbnailWidth, pMenu->thumbnailHeight, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0);
-					//interface_drawIcon(DRAWING_SURFACE, pListMenu->baseMenu.menuEntry[i].thumbnail, x, y, pMenu->thumbnailWidth, pMenu->thumbnailHeight, 0, 0, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle);
-				}
-				//dprintf("%s: draw text\n", __FUNCTION__);
-				if ( pListMenu->baseMenu.menuEntry[i].isSelectable )
-				{
-					//r = i == pListMenu->baseMenu.selectedItem ? INTERFACE_BOOKMARK_SELECTED_RED : INTERFACE_BOOKMARK_RED;
-					//g = i == pListMenu->baseMenu.selectedItem ? INTERFACE_BOOKMARK_SELECTED_GREEN : INTERFACE_BOOKMARK_GREEN;
-					//b = i == pListMenu->baseMenu.selectedItem ? INTERFACE_BOOKMARK_SELECTED_BLUE : INTERFACE_BOOKMARK_BLUE;
-					//a = i == pListMenu->baseMenu.selectedItem ? INTERFACE_BOOKMARK_SELECTED_ALPHA : INTERFACE_BOOKMARK_ALPHA;
-					r = INTERFACE_BOOKMARK_RED;
-					g = INTERFACE_BOOKMARK_GREEN;
-					b = INTERFACE_BOOKMARK_BLUE;
-					a = INTERFACE_BOOKMARK_ALPHA;
-				} else
-				{
-					r = INTERFACE_BOOKMARK_DISABLED_RED;
-					g = INTERFACE_BOOKMARK_DISABLED_GREEN;
-					b = INTERFACE_BOOKMARK_DISABLED_BLUE;
-					a = INTERFACE_BOOKMARK_DISABLED_ALPHA;
-				}
-				pgfx_font->GetHeight(pgfx_font, &fh);
-				second_line = strchr(pListMenu->baseMenu.menuEntry[i].info, '\n');
-				if ( pListMenu->listMenuType == interfaceListMenuNoThumbnail )
-				{
-					maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*4/*- INTERFACE_ARROW_SIZE*/ - INTERFACE_SCROLLBAR_WIDTH;
-					x = rect->x+interfaceInfo.paddingSize;//+INTERFACE_ARROW_SIZE;
-					y = rect->y;
-				} else
-				{
-					maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*5/* - INTERFACE_ARROW_SIZE*/ - interfaceInfo.thumbnailSize - INTERFACE_SCROLLBAR_WIDTH;
-					x = rect->x+interfaceInfo.paddingSize*2/*+INTERFACE_ARROW_SIZE*/+pListMenu->baseMenu.thumbnailWidth;
-					if (second_line)
-						y = rect->y + pListMenu->baseMenu.thumbnailHeight/2 - 2; // + fh/4;
-					else
-						y =rect->y + pListMenu->baseMenu.thumbnailHeight/2 + fh/4;
-				}
-
-				tprintf("%c%c%s\t\t\t|%d\n", i == pListMenu->baseMenu.selectedItem ? '>' : ' ', pListMenu->baseMenu.menuEntry[i].isSelectable ? ' ' : '-', pListMenu->baseMenu.menuEntry[i].info, pListMenu->baseMenu.menuEntry[i].thumbnail);
-				if (second_line)
-				{
-					char *info_second_line = entryText + (second_line - pListMenu->baseMenu.menuEntry[i].info) + 1;
-					int length;
-
-					interface_getMenuEntryInfo(pMenu,i,entryText,MENU_ENTRY_INFO_LENGTH);
-
-					*second_line = 0;
-					gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
-
-					length = getMaxStringLengthForFont(pgfx_smallfont, info_second_line, maxWidth-fh);
-					info_second_line[length] = 0;
-					gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, x+fh, y+fh, info_second_line, 0, i == pListMenu->baseMenu.selectedItem);
-					*second_line = '\n';
-				} else
-				{
-					gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
-				}
-			} else
-			{
-				return interface_menuEntryDisplay(pMenu, rect, i);
-			}
-			break;
-		default:
-			return interface_menuEntryDisplay(pMenu, rect, i);
-	}
-
-	return 0;
 }
