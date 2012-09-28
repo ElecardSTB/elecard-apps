@@ -2307,6 +2307,8 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	int job_channel;
 #endif
 
+	interface_displayMenuHeader();
+
 	//dprintf("%s: menu.sel=%d ri.cur=%d ri.hi=%d ri.he=%p\n", __FUNCTION__, pEpg->baseMenu.selectedItem, pEpg->currentService, pEpg->highlightedService, pEpg->highlightedEvent);
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 	DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );

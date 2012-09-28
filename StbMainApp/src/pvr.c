@@ -2689,6 +2689,8 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	time_t cur_time;
 	l = 0;
 
+	interface_displayMenuHeader();
+
 	//dprintf("%s: displaying EPG menu (menu.sel=%d ri.cur=%d ri.hi=%d ri.he=%p)\n", __FUNCTION__,EPGRecordMenu.selectedItem, recordInfo.currentService, recordInfo.highlightedService, recordInfo.highlightedEvent);
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 	DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );

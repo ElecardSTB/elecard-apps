@@ -1663,6 +1663,9 @@ void interface_flipSurface();
 void interface_customSlider(customSliderFunction pFunction, void *pArg,
                             int showOverMenu, int bRedrawFlag);
 
+// Draw menu name and navigation buttons on top of menu client area
+void interface_displayMenuHeader(void);
+
 void interface_listMenuDisplay(interfaceMenu_t *pMenu);
 
 int  interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd);

@@ -1900,7 +1900,6 @@ void interface_displayMenu(int flipFB)
 
 static void interface_animateMenu(int flipFB, int animate)
 {
-	int x, y, w, h, n;
 #ifdef SCREEN_TRACE
 	unsigned long long cur, start;
 #endif
@@ -2019,8 +2018,6 @@ static void interface_animateMenu(int flipFB, int animate)
 	}
 #endif
 
-
-
 	if ( !interfaceInfo.showMenu )
 	{
 		//dprintf("%s: display play control\n", __FUNCTION__);
@@ -2065,168 +2062,7 @@ static void interface_animateMenu(int flipFB, int animate)
 	}*/
 
 	//dprintf("%s: check parent\n", __FUNCTION__);
-	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 
-	if ( interfaceInfo.currentMenu->pParentMenu != NULL )
-	{
-		n = 1;
-		if ( interfaceInfo.currentMenu->pParentMenu->pParentMenu != NULL )
-		{
-			n++;
-		}
-		w = n*INTERFACE_MENU_ICON_WIDTH + (n+1)*interfaceInfo.paddingSize;
-		x = interfaceInfo.clientX + interfaceInfo.clientWidth - w;
-		y = interfaceInfo.clientY - INTERFACE_MENU_ICON_HEIGHT - interfaceInfo.paddingSize;
-
-		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-
-		gfx_drawRectangle(DRAWING_SURFACE,
-		                  INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
-		                  INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
-		                  x+INTERFACE_ROUND_CORNER_RADIUS, y,
-		                  w - 2*INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS);
-		gfx_drawRectangle(DRAWING_SURFACE,
-		                  INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
-		                  INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
-		                  x, y+INTERFACE_ROUND_CORNER_RADIUS,
-		                  w, INTERFACE_MENU_ICON_HEIGHT + interfaceInfo.paddingSize - INTERFACE_ROUND_CORNER_RADIUS);
-
-		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
-
-		DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE,
-			INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
-			INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
-		interface_drawRoundedCorner(x, y, 0, 0);
-		interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y, 0, 1);
-
-
-		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "menu_buttons.png", 
-		                   interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize - INTERFACE_MENU_ICON_WIDTH,
-		                   y + interfaceInfo.paddingSize, INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT,
-		                   interfaceInfo.currentMenu->selectedItem == MENU_ITEM_MAIN,
-		                   0, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
-
-		//interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "menu_logo.png", interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize - INTERFACE_MENU_ICON_WIDTH, y + interfaceInfo.paddingSize, INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
-
-		//interface_drawBookmark(DRAWING_SURFACE, pgfx_font, interfaceInfo.clientX, interfaceInfo.clientY/*+interfaceInfo.borderWidth*/, _T("MAIN_MENU"), interfaceInfo.currentMenu->selectedItem == 	MENU_ITEM_MAIN, &x);
-		if ( interfaceInfo.currentMenu->pParentMenu->pParentMenu != NULL )
-		{
-			tprintf("|%cMain menu|", interfaceInfo.currentMenu->selectedItem == MENU_ITEM_MAIN ? '>' : ' ');
-			tprintf("|%cBack|", interfaceInfo.currentMenu->selectedItem == MENU_ITEM_BACK ? '>' : ' ');
-			//interface_drawBookmark(DRAWING_SURFACE, pgfx_font, x+interfaceInfo.paddingSize, interfaceInfo.clientY/*+interfaceInfo.borderWidth*/, _T("BACK"), interfaceInfo.currentMenu->selectedItem == MENU_ITEM_BACK, &x);
-			interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "menu_buttons.png",
-			                   interfaceInfo.clientX + interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - 2*INTERFACE_MENU_ICON_WIDTH,
-			                   y + interfaceInfo.paddingSize,
-			                   INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT,
-			                   interfaceInfo.currentMenu->selectedItem == MENU_ITEM_BACK, 
-			                   1, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
-
-			//interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "menu_back.png", interfaceInfo.clientX + interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - 2*INTERFACE_MENU_ICON_WIDTH, y + interfaceInfo.paddingSize, INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
-		}
-		if (interfaceInfo.currentMenu->name[0] != 0)
-		{
-			/*//right-aligned bookmark
-			interface_drawBookmark(DRAWING_SURFACE, pgfx_font,
-			interfaceInfo.clientX,
-			interfaceInfo.clientY,//+interfaceInfo.borderWidth,
-			&interfaceInfo.currentMenu->name[getLeftStringOverflow(interfaceInfo.currentMenu->name,
-			interfaceInfo.clientX+interfaceInfo.clientWidth-x-3*interfaceInfo.paddingSize)], -1, &x);*/
-			char c;
-			int name_length;
-			DFBRectangle rectangle;
-
-			x = 3*interfaceInfo.paddingSize;
-			if (interfaceInfo.currentMenu->logo >0 && interfaceInfo.currentMenu->logoX < 0)
-			{
-				x += 2*interfaceInfo.paddingSize + INTERFACE_THUMBNAIL_SIZE;
-			}
-			name_length = getMaxStringLength(interfaceInfo.currentMenu->name, interfaceInfo.clientWidth - w - x);
-			c = interfaceInfo.currentMenu->name[name_length];
-			interfaceInfo.currentMenu->name[name_length] = 0;
-
-			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.currentMenu->name, -1, &rectangle, NULL) );
-			w = rectangle.w + x;
-			x = interfaceInfo.clientX;
-			h = 2*INTERFACE_ROUND_CORNER_RADIUS;
-			y = interfaceInfo.clientY - interfaceInfo.paddingSize - (INTERFACE_THUMBNAIL_SIZE + h)/2;
-
-			DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-
-			gfx_drawRectangle(DRAWING_SURFACE,
-			                  INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
-			                  INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
-			                  x+INTERFACE_ROUND_CORNER_RADIUS, y,
-			                  w-INTERFACE_ROUND_CORNER_RADIUS*2, 2*INTERFACE_ROUND_CORNER_RADIUS);
-
-			DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
-
-			DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, 
-				INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
-			interface_drawRoundedCorner(x,                                 y,                               0, 0);
-			interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y,                               0, 1);
-			interface_drawRoundedCorner(x,                                 y+INTERFACE_ROUND_CORNER_RADIUS, 1, 0);
-			interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y+INTERFACE_ROUND_CORNER_RADIUS, 1, 1);
-
-			if (interfaceInfo.currentMenu->logo >0 && interfaceInfo.currentMenu->logoX < 0)
-			{
-				x += 2*interfaceInfo.paddingSize;
-#ifdef ENABLE_REGPLAT
-				if (interfaceInfo.currentMenu == (interfaceMenu_t*)&regplatServicesMenu)
-				{
-					template_t *templ = (template_t *)regplatServicesMenu.baseMenu.menuEntry[0].pArg;
-					if (templ->sectionInfo.icon[0] != 0)
-					{
-						/* draw icon for a section */
-						interface_drawImage(DRAWING_SURFACE, templ->sectionInfo.icon,
-							x, interfaceInfo.clientY - INTERFACE_THUMBNAIL_SIZE - interfaceInfo.paddingSize,
-							INTERFACE_THUMBNAIL_SIZE, INTERFACE_THUMBNAIL_SIZE,
-							0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
-					}
-					/* draw user balance */
-					int font_h;
-					pgfx_font->GetHeight(pgfx_font, &font_h);
-					char balance_str[126] = "Баланс:\n";
-					strcat(balance_str, card_balance);
-					strcat(balance_str, " р.");
-					interface_drawTextWW(pgfx_font, 
-						INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
-						INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-#ifndef STSDK
-		                interfaceInfo.clientX+interfaceInfo.clientWidth-3.3*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH),
-		                interfaceInfo.screenHeight - interfaceInfo.marginSize, 
-#else
-		                interfaceInfo.clientX+interfaceInfo.clientWidth-(int)(5*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH)), 
-		                interfaceInfo.screenHeight - interfaceInfo.marginSize*5/4, 
-#endif
-						10*font_h, 2*font_h, balance_str, ALIGN_RIGHT);
-				}
-				else
-#endif
-				interface_drawImage(DRAWING_SURFACE, resource_thumbnails[interfaceInfo.currentMenu->logo],
-					x, interfaceInfo.clientY - INTERFACE_THUMBNAIL_SIZE - interfaceInfo.paddingSize,
-					INTERFACE_THUMBNAIL_SIZE, INTERFACE_THUMBNAIL_SIZE,
-					0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
-				x += INTERFACE_THUMBNAIL_SIZE;
-				w -= INTERFACE_THUMBNAIL_SIZE + interfaceInfo.paddingSize;
-			}
-			gfx_drawRectangle(DRAWING_SURFACE,
-			                  INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
-			                  INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-			                  x - interfaceInfo.paddingSize + INTERFACE_ROUND_CORNER_RADIUS,
-			                  y + 2*INTERFACE_ROUND_CORNER_RADIUS,
-			                  w-INTERFACE_ROUND_CORNER_RADIUS*2, 2);
-
-			DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-
-			y += INTERFACE_ROUND_CORNER_RADIUS + rectangle.h/2 - interfaceInfo.paddingSize;// + interfaceInfo.paddingSize - rectangle.h/2;//interfaceInfo.clientY - (INTERFACE_THUMBNAIL_SIZE + interfaceInfo.paddingSize - rectangle.h)/2;
-			x += interfaceInfo.paddingSize;
-
-			gfx_drawText(DRAWING_SURFACE, pgfx_font, 
-			             INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-			             x, y, interfaceInfo.currentMenu->name, 0, 0);
-			interfaceInfo.currentMenu->name[name_length] = c;
-		}
-	}
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 
 	//dprintf("%s: display menu\n", __FUNCTION__);
@@ -2248,7 +2084,7 @@ static void interface_animateMenu(int flipFB, int animate)
 	interface_displaySoundControl();
 	interface_displaySliderControl();
 	interface_displayStatusbar();
-	
+
 	if (interfaceInfo.currentMenu != NULL && interfaceInfo.currentMenu->menuType == interfaceMenuList)
 	{
 #ifdef ENABLE_VIDIMAX
@@ -2302,6 +2138,168 @@ static void interface_animateMenu(int flipFB, int animate)
 	}
 }
 
+void interface_displayMenuHeader(void)
+{
+	int n = 1;
+	if ( interfaceInfo.currentMenu->pParentMenu->pParentMenu != NULL )
+	{
+		n++;
+	}
+	int w = n*INTERFACE_MENU_ICON_WIDTH + (n+1)*interfaceInfo.paddingSize;
+	int h;
+	int x = interfaceInfo.clientX + interfaceInfo.clientWidth - w;
+	int y = interfaceInfo.clientY - INTERFACE_MENU_ICON_HEIGHT - interfaceInfo.paddingSize;
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+	gfx_drawRectangle(DRAWING_SURFACE,
+						INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
+						INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
+						x+INTERFACE_ROUND_CORNER_RADIUS, y,
+						w - 2*INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS);
+	gfx_drawRectangle(DRAWING_SURFACE,
+						INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
+						INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
+						x, y+INTERFACE_ROUND_CORNER_RADIUS,
+						w, INTERFACE_MENU_ICON_HEIGHT + interfaceInfo.paddingSize - INTERFACE_ROUND_CORNER_RADIUS);
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+
+	DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE,
+		INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
+		INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
+	interface_drawRoundedCorner(x, y, 0, 0);
+	interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y, 0, 1);
+
+
+	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "menu_buttons.png", 
+						interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize - INTERFACE_MENU_ICON_WIDTH,
+						y + interfaceInfo.paddingSize, INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT,
+						interfaceInfo.currentMenu->selectedItem == MENU_ITEM_MAIN,
+						0, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+
+	//interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "menu_logo.png", interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize - INTERFACE_MENU_ICON_WIDTH, y + interfaceInfo.paddingSize, INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
+
+	//interface_drawBookmark(DRAWING_SURFACE, pgfx_font, interfaceInfo.clientX, interfaceInfo.clientY/*+interfaceInfo.borderWidth*/, _T("MAIN_MENU"), interfaceInfo.currentMenu->selectedItem == 	MENU_ITEM_MAIN, &x);
+	if ( interfaceInfo.currentMenu->pParentMenu->pParentMenu != NULL )
+	{
+		tprintf("|%cMain menu|", interfaceInfo.currentMenu->selectedItem == MENU_ITEM_MAIN ? '>' : ' ');
+		tprintf("|%cBack|", interfaceInfo.currentMenu->selectedItem == MENU_ITEM_BACK ? '>' : ' ');
+		//interface_drawBookmark(DRAWING_SURFACE, pgfx_font, x+interfaceInfo.paddingSize, interfaceInfo.clientY/*+interfaceInfo.borderWidth*/, _T("BACK"), interfaceInfo.currentMenu->selectedItem == MENU_ITEM_BACK, &x);
+		interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "menu_buttons.png",
+							interfaceInfo.clientX + interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - 2*INTERFACE_MENU_ICON_WIDTH,
+							y + interfaceInfo.paddingSize,
+							INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT,
+							interfaceInfo.currentMenu->selectedItem == MENU_ITEM_BACK, 
+							1, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+
+		//interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "menu_back.png", interfaceInfo.clientX + interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - 2*INTERFACE_MENU_ICON_WIDTH, y + interfaceInfo.paddingSize, INTERFACE_MENU_ICON_WIDTH, INTERFACE_MENU_ICON_HEIGHT, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
+	}
+	if (interfaceInfo.currentMenu->name[0] != 0)
+	{
+		/*//right-aligned bookmark
+		interface_drawBookmark(DRAWING_SURFACE, pgfx_font,
+		interfaceInfo.clientX,
+		interfaceInfo.clientY,//+interfaceInfo.borderWidth,
+		&interfaceInfo.currentMenu->name[getLeftStringOverflow(interfaceInfo.currentMenu->name,
+		interfaceInfo.clientX+interfaceInfo.clientWidth-x-3*interfaceInfo.paddingSize)], -1, &x);*/
+		char c;
+		int name_length;
+		DFBRectangle rectangle;
+
+		x = 3*interfaceInfo.paddingSize;
+		if (interfaceInfo.currentMenu->logo >0 && interfaceInfo.currentMenu->logoX < 0)
+		{
+			x += 2*interfaceInfo.paddingSize + INTERFACE_THUMBNAIL_SIZE;
+		}
+		name_length = getMaxStringLength(interfaceInfo.currentMenu->name, interfaceInfo.clientWidth - w - x);
+		c = interfaceInfo.currentMenu->name[name_length];
+		interfaceInfo.currentMenu->name[name_length] = 0;
+
+		DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.currentMenu->name, -1, &rectangle, NULL) );
+		w = rectangle.w + x;
+		x = interfaceInfo.clientX;
+		h = 2*INTERFACE_ROUND_CORNER_RADIUS;
+		y = interfaceInfo.clientY - interfaceInfo.paddingSize - (INTERFACE_THUMBNAIL_SIZE + h)/2;
+
+		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+		gfx_drawRectangle(DRAWING_SURFACE,
+							INTERFACE_BACKGROUND_RED,  INTERFACE_BACKGROUND_GREEN,
+							INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
+							x+INTERFACE_ROUND_CORNER_RADIUS, y,
+							w-INTERFACE_ROUND_CORNER_RADIUS*2, 2*INTERFACE_ROUND_CORNER_RADIUS);
+
+		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+
+		DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, 
+			INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
+		interface_drawRoundedCorner(x,                                 y,                               0, 0);
+		interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y,                               0, 1);
+		interface_drawRoundedCorner(x,                                 y+INTERFACE_ROUND_CORNER_RADIUS, 1, 0);
+		interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS, y+INTERFACE_ROUND_CORNER_RADIUS, 1, 1);
+
+		if (interfaceInfo.currentMenu->logo >0 && interfaceInfo.currentMenu->logoX < 0)
+		{
+			x += 2*interfaceInfo.paddingSize;
+#ifdef ENABLE_REGPLAT
+			if (interfaceInfo.currentMenu == (interfaceMenu_t*)&regplatServicesMenu)
+			{
+				template_t *templ = (template_t *)regplatServicesMenu.baseMenu.menuEntry[0].pArg;
+				if (templ->sectionInfo.icon[0] != 0)
+				{
+					/* draw icon for a section */
+					interface_drawImage(DRAWING_SURFACE, templ->sectionInfo.icon,
+						x, interfaceInfo.clientY - INTERFACE_THUMBNAIL_SIZE - interfaceInfo.paddingSize,
+						INTERFACE_THUMBNAIL_SIZE, INTERFACE_THUMBNAIL_SIZE,
+						0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
+				}
+				/* draw user balance */
+				int font_h;
+				pgfx_font->GetHeight(pgfx_font, &font_h);
+				char balance_str[126] = "Баланс:\n";
+				strcat(balance_str, card_balance);
+				strcat(balance_str, " р.");
+				interface_drawTextWW(pgfx_font, 
+					INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
+					INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+#ifndef STSDK
+					interfaceInfo.clientX+interfaceInfo.clientWidth-3.3*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH),
+					interfaceInfo.screenHeight - interfaceInfo.marginSize,
+#else
+					interfaceInfo.clientX+interfaceInfo.clientWidth-(int)(5*(INTERFACE_CLOCK_DIGIT_WIDTH*4+INTERFACE_CLOCK_COLON_WIDTH)),
+					interfaceInfo.screenHeight - interfaceInfo.marginSize*5/4,
+#endif
+					10*font_h, 2*font_h, balance_str, ALIGN_RIGHT);
+			}
+			else
+#endif // ENABLE_REGPLAT
+			interface_drawImage(DRAWING_SURFACE, resource_thumbnails[interfaceInfo.currentMenu->logo],
+				x, interfaceInfo.clientY - INTERFACE_THUMBNAIL_SIZE - interfaceInfo.paddingSize,
+				INTERFACE_THUMBNAIL_SIZE, INTERFACE_THUMBNAIL_SIZE,
+				0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
+			x += INTERFACE_THUMBNAIL_SIZE;
+			w -= INTERFACE_THUMBNAIL_SIZE + interfaceInfo.paddingSize;
+		}
+		gfx_drawRectangle(DRAWING_SURFACE,
+							INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
+							INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+							x - interfaceInfo.paddingSize + INTERFACE_ROUND_CORNER_RADIUS,
+							y + 2*INTERFACE_ROUND_CORNER_RADIUS,
+							w-INTERFACE_ROUND_CORNER_RADIUS*2, 2);
+
+		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+		y += INTERFACE_ROUND_CORNER_RADIUS + rectangle.h/2 - interfaceInfo.paddingSize;// + interfaceInfo.paddingSize - rectangle.h/2;//interfaceInfo.clientY - (INTERFACE_THUMBNAIL_SIZE + interfaceInfo.paddingSize - rectangle.h)/2;
+		x += interfaceInfo.paddingSize;
+
+		gfx_drawText(DRAWING_SURFACE, pgfx_font, 
+						INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+						x, y, interfaceInfo.currentMenu->name, 0, 0);
+		interfaceInfo.currentMenu->name[name_length] = c;
+	}
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+}
 
 static int interface_soundControlSetVisible(void *pArg)
 {
@@ -4280,9 +4278,9 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 
 	//dprintf("%s: displaying\n", __FUNCTION__);
 
-	//DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+	if (pMenu->pParentMenu && pListMenu->listMenuType != interfaceListMenuBigThumbnail)
+		interface_displayMenuHeader();
 
-	//	gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0, interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.clientWidth, interfaceInfo.clientHeight);
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 	DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, 
 		INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
@@ -4355,6 +4353,7 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 	{
 		int last_row_index, last_row_col_count;
 		interfaceMenuEntry_t *selectedEntry = NULL;
+		char *second_line = NULL;
 
 		r = INTERFACE_BOOKMARK_RED;
 		g = INTERFACE_BOOKMARK_GREEN;
@@ -4369,6 +4368,9 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 				str = selectedEntry->info;
 				if (selectedEntry->infoReplacedChar != 0 )
 					selectedEntry->info[selectedEntry->infoReplacedCharPos] = selectedEntry->infoReplacedChar;
+				second_line = strchr(str, '\n');
+				if ( second_line )
+					*second_line = 0;
 		}
 		DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, str, -1, &rect, NULL) );
 		x = (interfaceInfo.screenWidth - rect.w)/2;
@@ -4376,6 +4378,8 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, str, 0, 1);
 		if (selectedEntry != NULL && selectedEntry->infoReplacedChar != 0)
 			selectedEntry->info[selectedEntry->infoReplacedCharPos] = 0;
+		if ( second_line )
+			*second_line = '\n';
 
 		switch (pListMenu->baseMenu.menuEntryCount)
 		{
@@ -4499,6 +4503,11 @@ int interface_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i
 							0, selected, DSBLIT_BLEND_ALPHACHANNEL,
 							(interfaceAlignCenter|interfaceAlignMiddle)))
 #endif
+			if (pListMenu->baseMenu.menuEntry[i].image != NULL)
+				interface_drawImage(DRAWING_SURFACE, pListMenu->baseMenu.menuEntry[i].image,
+				rect->x+INTERFACE_BIG_THUMBNAIL_SIZE/2, rect->y+INTERFACE_BIG_THUMBNAIL_SIZE/2,
+				pMenu->thumbnailWidth, pMenu->thumbnailHeight, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0);
+			else
 			interface_drawIcon(DRAWING_SURFACE,
 				resource_thumbnailsBig[pListMenu->baseMenu.menuEntry[i].thumbnail] != NULL
 				 ? resource_thumbnailsBig[pListMenu->baseMenu.menuEntry[i].thumbnail]
