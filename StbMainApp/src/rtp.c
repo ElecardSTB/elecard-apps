@@ -93,11 +93,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define GENRE_COUNT    (0x0C)
 #define GENRE_ALL      (0xFF)
 
+#define RTP_PROGRAM_BAR_HEIGHT 6
+
 /* RTP menu colors */
 
-#define RTP_PROGRAM_BAR_RED   (0x88)
-#define RTP_PROGRAM_BAR_GREEN (0x88)
-#define RTP_PROGRAM_BAR_BLUE  (0x88)
+#define RTP_PROGRAM_BAR_RED   (0x68)
+#define RTP_PROGRAM_BAR_GREEN (0x68)
+#define RTP_PROGRAM_BAR_BLUE  (0x68)
 #define RTP_PROGRAM_BAR_ALPHA INTERFACE_BACKGROUND_ALPHA
 
 #define ENABLE_EPG
@@ -682,10 +684,7 @@ static int rtp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int 
 
 				maxWidth = interfaceInfo.clientWidth - interfaceInfo.paddingSize*5/* - INTERFACE_ARROW_SIZE*/ - interfaceInfo.thumbnailSize - INTERFACE_SCROLLBAR_WIDTH;
 				x = rect->x+interfaceInfo.paddingSize*2/*+INTERFACE_ARROW_SIZE*/+pListMenu->baseMenu.thumbnailWidth;
-				//if (second_line)
-					y = rect->y + pListMenu->baseMenu.thumbnailHeight/2 - 2; // + fh/4;
-				//else
-				//	y =rect->y + pListMenu->baseMenu.thumbnailHeight/2 + fh/4;
+				y = rect->y + pListMenu->baseMenu.thumbnailHeight/2 - 2; // + fh/4;
 
 				/* Display current programme progress bar */
 				if ( appControlInfo.rtpMenuInfo.epg[0] != 0 &&
@@ -712,10 +711,11 @@ static int rtp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int 
 							*                   event_start   now        event_start+event_length *
 							* |rect->x         [x             x+bar_w]   rect->x+rect->w        | */
 						int bar_w = ( now-event_start )*( rect->w-(x-rect->x) )/( event_length );
+						int bar_h = RTP_PROGRAM_BAR_HEIGHT; //rect->h;
 						//dprintf("%s: '%s' %ld %ld %ld |%d [%d %d] %d|\n", __func__, event->description.event_name, event_start, now, event_length, rect->x, text_x, x+bar_w, rect->x+rect->w);
 						text_y = rect->y+rect->h-fh;
 						DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-						gfx_drawRectangle( DRAWING_SURFACE, RTP_PROGRAM_BAR_RED, RTP_PROGRAM_BAR_GREEN, RTP_PROGRAM_BAR_BLUE, RTP_PROGRAM_BAR_ALPHA, text_x, rect->y, bar_w, rect->h );
+						gfx_drawRectangle( DRAWING_SURFACE, RTP_PROGRAM_BAR_RED, RTP_PROGRAM_BAR_GREEN, RTP_PROGRAM_BAR_BLUE, RTP_PROGRAM_BAR_ALPHA, text_x, rect->y+rect->h-bar_h, bar_w, bar_h );
 
 						/* Dy default, prefer event from schedule over second line in playlist */
 						second_line = NULL;
@@ -724,14 +724,14 @@ static int rtp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int 
 							/* Draw start and end time */
 							text_y = rect->y+rect->h-fh/4;
 							strftime( buf, sizeof(buf), "%H:%M", &start_tm );
-							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, text_x+fh, text_y, buf, 0, 0);
+							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, text_x+fh, text_y, buf, 0, selected);
 							event_start += event_length;
 							localtime_r( &event_start, &start_tm );
 							strftime( buf, sizeof(buf), "%H:%M", &start_tm );
-							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, rect->x+rect->w - rtpEpgInfo.timestampWidth, text_y, buf, 0, 0);
+							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, rect->x+rect->w - rtpEpgInfo.timestampWidth, text_y, buf, 0, selected);
 
 							/* Draw programme name */
-							text_x += fh+rtpEpgInfo.timestampWidth;
+							text_x += 3*interfaceInfo.paddingSize+fh+rtpEpgInfo.timestampWidth;
 							maxWidth = rect->x+rect->w - interfaceInfo.thumbnailSize - text_x;
 							strncpy( buf, (char*)event->description.event_name, sizeof(buf) );
 							buf[sizeof(buf)-1] = 0;
@@ -743,7 +743,7 @@ static int rtp_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int 
 								buf[length-0] = '.';
 								buf[length+1] = 0;
 							}
-							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, text_x, text_y, buf, 0, 0);
+							gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, text_x, text_y, buf, 0, selected);
 						}
 					} else 
 					{
@@ -836,9 +836,10 @@ static int rtp_fillStreamMenu(int which)
 	}
 	//dprintf("%s: %d compose %d (%08X)\n", __FUNCTION__, which, streams.count, streams);
 
-	selected = interface_getSelectedItem((interfaceMenu_t*)&rtpStreamMenu);
+	interfaceMenu_t *rtpMenu = (interfaceMenu_t*)&rtpStreamMenu;
+	selected = interface_getSelectedItem(rtpMenu);
 
-	interface_clearMenuEntries((interfaceMenu_t*)&rtpStreamMenu);
+	interface_clearMenuEntries(rtpMenu);
 
 	mysem_get(rtp_semaphore);
 	if ( streams.count > 0 )
@@ -856,9 +857,9 @@ static int rtp_fillStreamMenu(int which)
 			else
 				sortedNumber = streamNumber;
 			genre = (rtp_info[ sortedNumber ].genre >> 4) & 0x0F;
-			if( genre_index < GENRE_COUNT && genre != genre_index )
+			if (genre_index  < GENRE_COUNT && genre != genre_index)
 				break;
-			if( genre_index != GENRE_COUNT && genre != cur_genre )
+			if (genre_index != GENRE_COUNT && genre != cur_genre)
 			{
 				cur_genre = genre;
 				switch( cur_genre )
@@ -878,7 +879,7 @@ static int rtp_fillStreamMenu(int which)
 				}
 				if( str != NULL )
 				{
-					interface_addMenuEntry((interfaceMenu_t*)&rtpStreamMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &rtpGenreMenu, -1);
+					interface_addMenuEntry(rtpMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &rtpGenreMenu, -1);
 				}
 			}
 			//dprintf("%s: Check-add stream 0 (fmt %d): %d: %s %s:%d\n", __FUNCTION__, streams.items[streamNumber].media[0].fmt, position, streams.items[streamNumber].session_name, inet_ntoa(streams.items[streamNumber].connection.address.IPv4), streams.items[streamNumber].media[0].port);
@@ -896,20 +897,21 @@ static int rtp_fillStreamMenu(int which)
 						{
 							sprintf(channelEntry, "%d: %s://%s:%d", sortedNumber+1, streams.items[sortedNumber].media[0].proto == mediaProtoRTP ? "rtp" : "udp", inet_ntoa(streams.items[sortedNumber].connection.address.IPv4), streams.items[sortedNumber].media[0].port);
 						}
-						interface_addMenuEntryCustom((interfaceMenu_t*)&rtpStreamMenu, interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
+						int entryIndex = interface_addMenuEntryCustom(rtpMenu, interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
 #ifdef ENABLE_AUTOPLAY
 						  rtp_stream_selected, rtp_stream_deselected,
 #else
 						  NULL, NULL,
 #endif
-						  rtp_menuEntryDisplay, STREAM_INFO_SET(which, sortedNumber), thumbnail_multicast);
+						  rtp_menuEntryDisplay, STREAM_INFO_SET(which, sortedNumber), thumbnail_multicast) - 1;
+						interface_setMenuEntryImage(rtpMenu, entryIndex, rtp_info[sortedNumber].thumb);
 						if( last_channel_is_udp &&
 						    strncasecmp( rtp_info[sortedNumber].url, appControlInfo.rtpMenuInfo.lastUrl, 3 ) == 0 &&
 						    parseURL( rtp_info[sortedNumber].url, &cmp ) == 0 )
 						{
 							// ignore fast PIDs and @ before address
 							if( src.port == cmp.port && strcmp( src.address, cmp.address ) == 0 )
-								selected = interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu)-1;
+								selected = entryIndex;
 						}
 					}
 					break;
@@ -924,15 +926,16 @@ static int rtp_fillStreamMenu(int which)
 						snprintf(channelEntry, sizeof(channelEntry)-1, "%d: %s", sortedNumber+1, rtp_info[sortedNumber].url);
 					}
 					channelEntry[sizeof(channelEntry)-1] = 0;
-					interface_addMenuEntryCustom((interfaceMenu_t*)&rtpStreamMenu, interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
+					int entryIndex = interface_addMenuEntryCustom(rtpMenu, interfaceMenuEntryText,  channelEntry, strlen(channelEntry)+1, 1, rtp_stream_change,
 #ifdef ENABLE_AUTOPLAY
 					  NULL, rtp_stream_deselected,
 #else
 					  NULL, NULL,
 #endif
-					  rtp_menuEntryDisplay, STREAM_INFO_SET(which, sortedNumber), (streams.items[sortedNumber].media[0].proto == mediaProtoRTSP ? thumbnail_vod : thumbnail_internet));
+					  rtp_menuEntryDisplay, STREAM_INFO_SET(which, sortedNumber), (streams.items[sortedNumber].media[0].proto == mediaProtoRTSP ? thumbnail_vod : thumbnail_internet)) - 1;
+					interface_setMenuEntryImage(rtpMenu, entryIndex, rtp_info[sortedNumber].thumb);
 					if( !last_channel_is_udp && 0 == strcmp( appControlInfo.rtpMenuInfo.lastUrl, rtp_info[sortedNumber].url ))
-						selected = interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu)-1;
+						selected = entryIndex;
 					break;
 				default:;
 			}
@@ -943,20 +946,15 @@ static int rtp_fillStreamMenu(int which)
 	if (streams.count <= 0 || (genre_index != GENRE_COUNT && cur_genre == GENRE_INVALID))
 	{
 		str = _T("NO_CHANNELS");
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&rtpStreamMenu, str, thumbnail_info);
+		interface_addMenuEntryDisabled(rtpMenu, str, thumbnail_info);
 		selected = MENU_ITEM_MAIN;
-	} else if (selected >= interface_getMenuEntryCount((interfaceMenu_t*)&rtpStreamMenu))
+	} else if (selected >= interface_getMenuEntryCount(rtpMenu))
 	{
 		selected = MENU_ITEM_MAIN;
 	}
-	interface_setSelectedItem((interfaceMenu_t*)&rtpStreamMenu, selected);
+	interface_setSelectedItem(rtpMenu, selected);
 
 	//dprintf("%s: compose done\n", __FUNCTION__);
-
-	if( interfaceInfo.showMenu )
-	{
-		interface_displayMenu(1);
-	}
 
 	return 0;
 }
@@ -1184,21 +1182,13 @@ static int rtp_stream_start(void* pArg)
 
 	//dprintf("%s: show menu %d, active %d\n", __FUNCTION__, interfaceInfo.showMenu, appControlInfo.rtpInfo.active);
 
-	if ( /*interfaceInfo.showMenu &&*/ /*(memcmp(&rtp.streamdesc, &streams.items[streamNumber], sizeof(sdp_desc)) != 0 ||*/
-	     appControlInfo.rtpInfo.active == 0 /*)*/
-	   )
+	if (appControlInfo.rtpInfo.active == 0)
 	{
 		if (CHANNEL_CUSTOM != streamNumber)
 		{
 			memcpy(&rtp.selectedDesc, &streams.items[streamNumber], sizeof(sdp_desc));
 			strcpy(appControlInfo.rtpMenuInfo.lastUrl, rtp_info[streamNumber].url );
 		}
-
-		//dprintf("%s: play control\n", __FUNCTION__);
-		//interface_playControlSetInputFocus(inputFocusPlayControl);
-		//interface_playControlSelect(interfacePlayControlStop);
-		//interface_playControlHighlight(interfacePlayControlPlay);
-
 		dprintf("%s: start video %d\n", __FUNCTION__, streamNumber);
 
 		rtp_startVideo(screenMain);
@@ -1209,19 +1199,9 @@ static int rtp_stream_start(void* pArg)
 			gfx_setVideoProviderAudioStream(screenMain, rtp_info[streamNumber].audio);
 		}
 
-		//dprintf("%s: refill menu\n", __FUNCTION__);
-		//rtp_fillStreamMenu(which);
-
-		//if ( appControlInfo.rtpInfo.active != 0 )
 		rtp_setupPlayControl(pArg);
-
 		saveAppSettings();
-		/*else
-		{
-			interface_playControlDisable(0);
-			//rtp.selectedDesc.connection.address.IPv4.s_addr = INADDR_NONE;
-			return -1;
-		}*/
+
 		if ( appControlInfo.rtpInfo.active == 0 )
 		{
 #ifndef RTP_RECONNECT
@@ -1699,7 +1679,8 @@ static void *stream_list_updater(void *pArg)
 			interface_hideLoadingAnimation();
 
 			rtp_fillStreamMenu(which);
-
+			if (interfaceInfo.showMenu)
+				interface_displayMenu(1);
 			sleepTime = 2;
 		}
 	}
@@ -2041,6 +2022,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 			genre_index = GENRE_ALL;
 		for( genre_index++; genre_index < GENRE_COUNT && genre_indeces[genre_index] < 0; genre_index++ );
 		rtp_fillStreamMenu(screenMain);
+		interface_displayMenu(1);
 		return 0;
 	}
 
@@ -2316,7 +2298,7 @@ static int rtp_getProgramInfo(int channel, int offset, rtpInfoType_t type)
 						ptr = index( str, '\n' );
 						if( !ptr || ptr[1] == 0 )
 						{
-							eprintf("%s: no description string, aborting\n", __FUNCTION__);
+							eprintf("%s: no description for channel %3d %s\n", __FUNCTION__, channel, streams.items[channel].session_name);
 							break;
 						}
 						*ptr = 0;
