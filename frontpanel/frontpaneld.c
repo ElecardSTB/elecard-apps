@@ -73,16 +73,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define LITTLE_INTEVAL			60000
 #define ADDITION_INTERVAL		100000
 
-/*#define DBG(x...) do {\
-{ \
-time_t ts = time(NULL); \
-struct tm tsm; \
-localtime_r(&ts, &tsm); \
-printf("%02d:%02d:%02d: ", tsm.tm_hour, tsm.tm_min, tsm.tm_sec); \
-} \
-printf(x); \
+#define DBG(x...) \
+do { \
+	time_t ts = time(NULL); \
+	struct tm tsm; \
+	localtime_r(&ts, &tsm); \
+	printf("%02d:%02d:%02d: ", tsm.tm_hour, tsm.tm_min, tsm.tm_sec); \
+	printf(x); \
 } while (0)
-*/
+
 #ifndef DBG
 #define DBG(x...)
 #endif
@@ -179,7 +178,7 @@ void SetTimer(timer_t timerid, int mcSecValue, int mcSecInterval)
 	timervals.it_interval.tv_nsec = (mcSecInterval % 1000) * 1000000;
 	if(timer_settime(timerid, 0, &timervals, NULL) == -1) {
 		perror("Failed to start timer");
-		exit(-1);
+//		exit(-1);
 	}
 }
 
@@ -190,7 +189,7 @@ void StopTimer(timer_t timerid)
 	timervals.it_value.tv_nsec = 0;
 	if(timer_settime(timerid, 0, &timervals, NULL) == -1) {
 		perror("Failed to stop timer");
-		exit(-1);
+//		exit(-1);
 	}
 }
 
@@ -255,7 +254,7 @@ void DisplayText()
 	switch(g_messageType) {
 		case NOTIFY:
 		case STATUS:
-			if((g_text[2] == ':') && (g_textLength < 6) && (g_textLength > 2)) {
+			if((g_textLength > 2) && (g_text[2] == ':') && (g_textLength < 6)) {
 				StopTimer(g_delayTimer);
 				strcpy(g_time_buffer, g_text);
 				strcpy(g_time_buffer + 2, g_time_buffer + 3);
@@ -612,6 +611,16 @@ int MainLoop()
 		}
 
 		DBG("%s: << '%s'\n", __func__, buffer);
+
+		{//we dont need CR and CN symbols
+			char	*ptr;
+			ptr = strchr(buffer, '\r');
+			if(ptr)
+				*ptr = 0;
+			ptr = strchr(buffer, '\n');
+			if(ptr)
+				*ptr = 0;
+		}
 
 		for(i = 0; i < sizeof(handlers)/sizeof(*handlers); i++) {
 			int argLen = strlen(handlers[i].argName);
