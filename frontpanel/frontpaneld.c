@@ -134,7 +134,7 @@ rollTextInfo_t	rollTextInfo;
 int32_t			g_brightness = 4;
 int32_t			g_timeEnabled = true;
 
-MessageType_t g_messageType;
+MessageType_t g_messageType = TIME;
 struct argHandler_s handlers[] = {
 	{"time",	ArgHandler_Time},
 	{"t",		ArgHandler_Time},
@@ -584,7 +584,6 @@ int MainLoop()
 		exit(1);
 	}
 
-	g_messageType = TIME;
 	SetBrightness(g_brightness);
 	ShowTime();
 
@@ -652,11 +651,24 @@ int MainLoop()
 
 int main(int argc, char **argv)
 {
-	(void)argv;
+	int32_t	opt;
+	int32_t	daemonize = 1;
+
+	while((opt = getopt(argc, argv, "td")) != -1) {
+		switch(opt) {
+			case 't':
+				g_timeEnabled = false;
+				break;
+			case 'd':
+				daemonize = 0;
+				break;
+			default:
+				break;
+		}
+	}
 
 	CheckBoardType();
-
-	if(argc < 2) {
+	if(daemonize) {
 		if(daemon(0, 0)) {
 			perror("Failed to daemonize");
 			exit(1);
