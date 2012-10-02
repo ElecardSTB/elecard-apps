@@ -131,6 +131,7 @@ typedef struct
 #ifdef STSDK
 	// Waiting for rpc answer: negative if none, queue index otherwise
 	int                      waiting;
+	double                   httpDuration;
 #endif
 #ifdef STBxx
 	IDirectFBVideoProvider * instance;
@@ -1409,12 +1410,10 @@ int gfx_resumeVideoProvider(int videoLayer)
 
 #ifdef STSDK
 
-static double httpDuration = 0.0;
-
 static size_t http_getinfo_cb(char* ptr, size_t size, size_t nmemb, void* userp)
 {
 	if (strstr(ptr, "VCinema-Content-Duration:") != NULL){
-		sscanf (ptr, "VCinema-Content-Duration: %lf\n", &httpDuration);
+		sscanf(ptr, "VCinema-Content-Duration: %lf\n", &gfx_videoProvider.httpDuration);
 	}
 	return size*nmemb;
 }
@@ -1424,7 +1423,7 @@ float getHttpVideoLength (const char * videoSource)
 	CURL     *curl;
 	CURLcode  res;
 
-	httpDuration = 0.0;
+	gfx_videoProvider.httpDuration = 0.0;
 
 	curl = curl_easy_init();
 	if(!curl) {
@@ -1446,9 +1445,9 @@ float getHttpVideoLength (const char * videoSource)
 	res = curl_easy_perform(curl);
 	(void)res;
 
-	pprintf("%s: 0x%02x: %s. Duration = %.2f\n", __FUNCTION__, res, curl_easy_strerror(res), httpDuration);
+	pprintf("%s: 0x%02x: %s. Duration = %.2f\n", __FUNCTION__, res, curl_easy_strerror(res), gfx_videoProvider.httpDuration);
 	curl_easy_cleanup(curl);
-	return httpDuration;
+	return gfx_videoProvider.httpDuration;
 }	
 #endif
 
@@ -1705,7 +1704,7 @@ static void gfx_videoProviderGetTimes(elcdRpcType_t type, cJSON *res, void* pArg
 	if ( type == elcdRpcResult && res && res->type == cJSON_Object )
 	{
 		double position = st_getTimeValue(res, "current");
-		double length   = httpDuration > 0.0 ? httpDuration :
+		double length   = gfx_videoProvider.httpDuration > 0.0 ? gfx_videoProvider.httpDuration :
 	           st_getTimeValue(res, "total");
 		if (position < length)
 		{
@@ -2880,7 +2879,8 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 		{
 			gfx_videoProvider.paused = !force;
 			gfx_videoProvider.active = 0;
-		} 
+			if (force) gfx_videoProvider.httpDuration = 0.0;
+		}
 		else 
 		{
 			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
@@ -3020,10 +3020,10 @@ double gfx_getVideoProviderLength (int videoLayer)
 		return 0.0;
 	}
 
-	if (httpDuration > 0.0)
+	if (gfx_videoProvider.httpDuration > 0.0)
 	{
-		pprintf("%s(%d): http %.2f\n", __FUNCTION__, videoLayer, httpDuration);
-		return httpDuration;
+		pprintf("%s(%d): http %.2f\n", __FUNCTION__, videoLayer, gfx_videoProvider.httpDuration);
+		return gfx_videoProvider.httpDuration;
 	}
 	
 	elcdRpcType_t type;
@@ -3057,6 +3057,8 @@ int gfx_getPosition (double *plength,double *pposition)
 	if (gfx_videoProvider.active == providerInit)
 	{
 		pprintf("%s: not ready\n", __FUNCTION__);
+		*plength   = gfx_videoProvider.httpDuration;
+		*pposition = 0.0;
 		return 0;
 	}
 
@@ -3068,7 +3070,7 @@ int gfx_getPosition (double *plength,double *pposition)
 	if (ret == 0 && type == elcdRpcResult && res && res->type == cJSON_Object)
 	{
 		position = st_getTimeValue(res, "current");
-		length   = httpDuration > 0.0 ? httpDuration :
+		length   = gfx_videoProvider.httpDuration > 0.0 ? gfx_videoProvider.httpDuration :
 		           st_getTimeValue(res, "total");
 	} else {
 		pprintf("%s: times failed\n", __FUNCTION__);

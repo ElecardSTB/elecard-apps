@@ -5645,6 +5645,7 @@ static void interface_displayPlayControl()
 					// Green cursor INTERFACE_HIGHLIGHT_BORDER_RED, INTERFACE_HIGHLIGHT_BORDER_GREEN, INTERFACE_HIGHLIGHT_BORDER_BLUE
 					gfx_drawRectangle(DRAWING_SURFACE, 231, 120, 23, INTERFACE_HIGHLIGHT_BORDER_ALPHA, rect.x+rect.w*value, rect.y-rect.h, interfaceInfo.borderWidth*2, rect.h+rect.h*2);
 				}
+				interface_addEvent(interface_playControlSliderUpdate, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
 			}
 
 		if ( interfacePlayControl.showState )
@@ -6413,7 +6414,6 @@ void interface_playControlRefresh(int redraw)
 	if ( interfacePlayControl.enabled || interfaceSlideshowControl.enabled )
 	{
 		interface_addEvent(interface_playControlSetVisible, (void*)0, 1000*interfacePlayControl.showTimeout, 1);
-		interface_addEvent(interface_playControlSliderUpdate, NULL, INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT, 1);
 		if ( redraw )
 		{
 			interface_displayMenu(1);
