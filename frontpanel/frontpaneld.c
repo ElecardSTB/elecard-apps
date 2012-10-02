@@ -62,14 +62,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PATH_CH7162				"/sys/devices/platform/ct1628/text"
 #define BRIGHTNESS_PROMSVYAZ	"/sys/devices/platform/tm1668/brightness"
 #define BRIGHTNESS_CH7162		"/sys/devices/platform/ct1628/brightness"
-#define MAX_TIMEOUT 60
-#define DELAY_TIMER_MIN 100
-#define DELAY_TIMER_MAX 5000
-#define TIME_FIRST_SLEEP_TEXT 2000
-#define TIME_OTHER_SLEEP_TEXT 800
-#define TIME_INTERVAL 1, 1000
-#define TIME_STOP 0, 0
-#define BUF_SIZE 256
+
+#define MAX_TIMEOUT				60
+#define DELAY_TIMER_MIN			100
+#define DELAY_TIMER_MAX			5000
+#define TIME_FIRST_SLEEP_TEXT	2000
+#define TIME_OTHER_SLEEP_TEXT	800
+#define TIME_INTERVAL			1000, 1000
+#define TIME_STOP				0, 0
+#define BUF_SIZE				256
 #define LITTLE_INTEVAL			60000
 #define ADDITION_INTERVAL		100000
 
@@ -90,13 +91,18 @@ do { \
 * LOCAL TYPEDEFS                               *
 ************************************************/
 
-typedef enum {NONE, TIME, STATUS, NOTIFY} MessageTypes;
-typedef enum {UNKNOWN, PROMSVYAZ, CH7162} BoardTypes;
+typedef enum {NONE, TIME, STATUS, NOTIFY} MessageType_t;
+typedef enum {UNKNOWN, PROMSVYAZ, CH7162} BoardTypes_t;
 typedef int (*ArgHandler)(char *, char *);
 struct argHandler_s {
 	char		*argName;
 	ArgHandler	handler;
 };
+typedef struct {
+	char	text[BUF_SIZE];
+	int32_t	textLength;
+	int32_t	textOffset;
+} rollTextInfo_t;
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -114,26 +120,21 @@ static int ArgHandler_Brightness(char *input, char *output);
 *******************************************************************/
 
 timer_t g_delayTimer;
-timer_t g_mainTimer;
+timer_t g_messageTimer;
 
-bool g_time_display = true;
 long g_t1 = TIME_FIRST_SLEEP_TEXT,
 	 g_t2 = TIME_OTHER_SLEEP_TEXT;
 
-BoardTypes g_board = UNKNOWN;
-static const char *g_frontpanelPath = NULL;
-static const char *g_frontpanelBrightness = NULL;
+BoardTypes_t g_board = UNKNOWN;
+char *g_frontpanelPath = NULL;
+char *g_frontpanelBrightness = NULL;
 
-char g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
-bool g_colon = true;
-char g_time_buffer[6] = "00000\0";
-int  g_textLength;
-int  g_textOffset = 0;
-char g_text[BUF_SIZE] = "";
-int  g_brightness = 4;
+const char		g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
+rollTextInfo_t	rollTextInfo;
+int32_t			g_brightness = 4;
+int32_t			g_timeEnabled = true;
 
-MessageTypes g_messageType = TIME;
-int g_statusId = -1;
+MessageType_t g_messageType;
 struct argHandler_s handlers[] = {
 	{"time",	ArgHandler_Time},
 	{"t",		ArgHandler_Time},
@@ -154,6 +155,30 @@ struct argHandler_s handlers[] = {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
+
+void CheckBoardType()
+{
+	char *boardName;
+	boardName = getenv("board_name");
+	if(boardName) {
+		if(strncmp(boardName, BOARD_NAME_PROMSVYAZ, sizeof(BOARD_NAME_PROMSVYAZ) - 1) == 0) {
+			g_board = PROMSVYAZ;
+			g_frontpanelPath = PATH_PROMSVYAZ;
+			g_frontpanelBrightness = BRIGHTNESS_PROMSVYAZ;
+		} else if(strncmp(boardName, BOARD_NAME_CH7162, sizeof(BOARD_NAME_CH7162) - 1) == 0) {
+			g_board = CH7162;
+			g_frontpanelPath = PATH_CH7162;
+			g_frontpanelBrightness = BRIGHTNESS_CH7162;
+		}
+	} else {
+		fputs("Variable board_name not setted!!!\n", stderr);
+	}
+	if(g_board == UNKNOWN) {
+		fputs("Unknown g_board\n", stderr);
+		exit(1);
+	}
+}
+
 
 timer_t CreateTimer(int signo)
 {
@@ -184,35 +209,48 @@ void SetTimer(timer_t timerid, int mcSecValue, int mcSecInterval)
 
 void StopTimer(timer_t timerid)
 {
-	struct itimerspec timervals;
-	timervals.it_value.tv_sec  = 0;
-	timervals.it_value.tv_nsec = 0;
+	struct itimerspec timervals = {{0, 0}, {0, 0}};
 	if(timer_settime(timerid, 0, &timervals, NULL) == -1) {
 		perror("Failed to stop timer");
 //		exit(-1);
 	}
 }
 
-void GetCurrentTime()
+void AddColon(char *buf)
 {
-	time_t t;
-	struct tm *area;
+	if(g_board == PROMSVYAZ) {
+		if(buf[1] >= '0' && buf[1] <= '9') {
+			buf[1] = g_digitsWithColon[buf[1] - '0'];
+		}
+	} else {//CH7162 board
+		int32_t	temp;
+		int32_t	textLen = strlen(buf);
+
+		for(temp = textLen - 1; temp <= 5; temp++) {
+			buf[temp] = ' ';
+		}
+		buf[4] = '8';
+	}
+}
+
+void GetCurrentTime(char *buf)
+{
+	time_t		t;
+	struct tm	*area;
+	static bool	colon = true;
+
 	t = time(NULL);
 	area = localtime(&t);
 
-	sprintf(g_time_buffer, "%02d", area->tm_hour);
-	if(g_time_buffer[0] == '0')
-		g_time_buffer[0] = ' ';
-	sprintf(g_time_buffer + 2, "%02d", area->tm_min);
+	sprintf(buf, "%02d", area->tm_hour);
+	if(buf[0] == '0')
+		buf[0] = ' ';
+	sprintf(buf + 2, "%02d", area->tm_min);
 
-	if(g_colon) {
-		if(g_board == PROMSVYAZ) {
-			g_time_buffer[1] = g_digitsWithColon[g_time_buffer[1] - '0'];
-			g_time_buffer[4] = 0; //promsvyaz
-		} else {
-			g_time_buffer[4] = '8'; //CH7162 g_board
-		}
+	if(colon) {
+		AddColon(buf);
 	}
+	colon = !colon;
 }
 
 void SetFrontpanelText(const char *buffer)
@@ -225,92 +263,49 @@ void SetFrontpanelText(const char *buffer)
 	}
 }
 
-void CheckBoardType()
+void DisplayCurentText()
 {
-	char *boardName;
-	boardName = getenv("board_name");
-	if(boardName) {
-		if(strncmp(boardName, BOARD_NAME_PROMSVYAZ, sizeof(BOARD_NAME_PROMSVYAZ) - 1) == 0) {
-			g_board = PROMSVYAZ;
-			g_frontpanelPath = PATH_PROMSVYAZ;
-			g_frontpanelBrightness = BRIGHTNESS_PROMSVYAZ;
-		} else if(strncmp(boardName, BOARD_NAME_CH7162, sizeof(BOARD_NAME_CH7162) - 1) == 0) {
-			g_board = CH7162;
-			g_frontpanelPath = PATH_CH7162;
-			g_frontpanelBrightness = BRIGHTNESS_CH7162;
-		}
-	} else {
-		fputs("Variable board_name not setted!!!\n", stderr);
-	}
-	if(g_board == UNKNOWN) {
-		fputs("Unknown g_board\n", stderr);
-		exit(1);
-	}
-}
-
-void DisplayText()
-{
-	DBG("%s: type %d g_text %s\n", __func__, g_messageType, g_text);
+	char tmpBuf[6];
+	
 	switch(g_messageType) {
 		case NOTIFY:
 		case STATUS:
-			if((g_textLength > 2) && (g_text[2] == ':') && (g_textLength < 6)) {
-				StopTimer(g_delayTimer);
-				strcpy(g_time_buffer, g_text);
-				strcpy(g_time_buffer + 2, g_time_buffer + 3);
-
-				if(g_board == PROMSVYAZ) {
-					if(g_time_buffer[1] >= '0' && g_time_buffer[1] <= '9') {
-						g_time_buffer[1] = g_digitsWithColon[g_time_buffer[1] - '0'];
-					}
-				} else {
-					int temp;
-					for(temp = g_textLength - 1; temp <= 5; temp++) {
-						g_time_buffer[temp] = ' ';
-					}
-					g_time_buffer[4] = '8';
-				}
-				SetFrontpanelText(g_time_buffer);
-			} else {
-				if(g_textOffset > g_textLength) {
-					g_textOffset = 0;
-				}
-
-				strncpy(g_time_buffer, g_text + g_textOffset, 4);
-				SetFrontpanelText(g_time_buffer);
-
-				if(g_textLength <= 4) { //dont roll the g_text if it seat in 4 indicator characters
-					StopTimer(g_delayTimer);
-				} else {
-					if(0 == g_textOffset) {
-						SetTimer(g_delayTimer, g_t1, g_t2);
-					}
-					g_textOffset++;
-				}
+			rollTextInfo.textOffset++;
+			if(rollTextInfo.textOffset > rollTextInfo.textLength) {
+				rollTextInfo.textOffset = 0;
 			}
+
+			strncpy(tmpBuf, rollTextInfo.text + rollTextInfo.textOffset, 4);
+			SetFrontpanelText(tmpBuf);
 			break;
 		case TIME:
-			GetCurrentTime();
-			SetFrontpanelText(g_time_buffer);
-			g_colon = !g_colon;
+			GetCurrentTime(tmpBuf);
+			SetFrontpanelText(tmpBuf);
+			break;
+		case NONE:
+			strncpy(tmpBuf, "     ", 4);
+			SetFrontpanelText(tmpBuf);
 			break;
 		default:
 			break;
 	}
 
+	tmpBuf[5] = 0;
+	DBG("%s: type %d text=\"%s\"\n", __func__, g_messageType, tmpBuf);
 }
 
-void DisplayTime()
+void ShowTime()
 {
-	if(g_time_display) {
+	if(g_timeEnabled) {
 		g_messageType = TIME;
 		SetTimer(g_delayTimer, TIME_INTERVAL);
 	} else {
 		g_messageType = NONE;
 		StopTimer(g_delayTimer);
-		SetFrontpanelText("     ");
 	}
+	DisplayCurentText();
 }
+
 
 void Quit()
 {
@@ -318,44 +313,7 @@ void Quit()
 	exit(0);
 }
 
-inline void StopMainTimer()
-{
-	g_textOffset = 0;
-	StopTimer(g_mainTimer);
-}
-
-void SetText(int timeout, const char *new_text)
-{
-	if(timeout > MAX_TIMEOUT) {
-		timeout = MAX_TIMEOUT;
-	}
-
-	g_textOffset = 0;
-	strcpy(g_text, new_text);
-	g_textLength = strlen(g_text);
-	DBG("%s: '%s' (%d)\n", __func__, g_text, g_textLength);
-
-	memset(g_time_buffer, 0, sizeof(g_time_buffer));
-	DisplayText();
-	SetTimer(g_mainTimer, timeout * 1000, 0);
-}
-
-void SetNotify(int timeout, const char *new_text)
-{
-	g_messageType = NOTIFY;
-
-	SetText(timeout, new_text);
-}
-
-void SetStatus(int id, int timeout, const char *new_text)
-{
-	g_statusId = id;
-	g_messageType = STATUS;
-
-	SetText(timeout, new_text);
-}
-
-void SetBrightness(int brightness)
+static void SetBrightness(int brightness)
 {
 	FILE *f;
 	f = fopen(g_frontpanelBrightness, "w");
@@ -364,6 +322,60 @@ void SetBrightness(int brightness)
 		fclose(f);
 	}
 }
+
+static int32_t SetMessage(char *newText, int32_t timeout)
+{
+	if(newText == NULL)
+		return -1;
+
+	StopTimer(g_delayTimer);
+	StopTimer(g_messageTimer);
+	if(timeout > 0) {
+		char	tmpBuf[6];
+		int32_t	textLen;
+		
+/*		if(newText && *newText) {
+			newText++;
+		} else {
+			newText = "";
+		}*/
+		while(*newText == ' ') {
+			newText++;
+		}
+
+		if(timeout > MAX_TIMEOUT) {
+			timeout = MAX_TIMEOUT;
+		}
+
+		textLen = strlen(newText);
+		DBG("%s: '%s' (%d)\n", __func__, newText, textLen);
+
+		SetTimer(g_messageTimer, timeout * 1000, 0);
+
+		if((textLen > 2) && (newText[2] == ':') && (textLen < 6)) {
+			memcpy(tmpBuf, newText, 2);
+			strcpy(tmpBuf + 2, newText + 3);
+
+			AddColon(tmpBuf);
+			SetFrontpanelText(tmpBuf);
+		} else {
+			strncpy(tmpBuf, newText, 4);
+			SetFrontpanelText(tmpBuf);
+
+			if(textLen > 4) { //roll the text if it contain more than 4 characters
+				rollTextInfo.textLength = textLen;
+				rollTextInfo.textOffset = 0;
+				strcpy(rollTextInfo.text, newText);
+				SetTimer(g_delayTimer, g_t1, g_t2);
+			}
+		}
+	} else if(timeout == 0) {
+		ShowTime();
+	}
+
+	return 0;
+}
+
 
 #define pthread_setcancelstate_my(flag) \
 	do { \
@@ -406,9 +418,10 @@ void *PulseThread(void *arg)
 static int ArgHandler_Time(char *input, char *output)
 {
 	(void)output;
-	g_time_display = atol(input);
+	g_timeEnabled = atol(input);
+
 	if(g_messageType != NOTIFY && g_messageType != STATUS) {
-		DisplayTime();
+		ShowTime();
 	}
 	return 0;
 }
@@ -445,7 +458,7 @@ static int ArgHandler_Busy(char *input, char *output)
 	(void)input;
 	if(g_messageType == STATUS) {
 		struct itimerspec timervals;
-		timer_gettime(g_mainTimer , &timervals);
+		timer_gettime(g_messageTimer , &timervals);
 		temp_time = (int)timervals.it_value.tv_sec * 1000 + (int)timervals.it_value.tv_nsec / 1000000;
 	}
 	sprintf(output, "%d", temp_time);
@@ -455,8 +468,9 @@ static int ArgHandler_Busy(char *input, char *output)
 
 static int ArgHandler_Notify(char *input, char *output)
 {
-	int		timeout;
-	char	*text_start = NULL;
+	int32_t		timeout;
+	int32_t		ret = 0;
+	char		*text_start = NULL;
 
 	(void)output;
 	if(g_messageType == STATUS) {
@@ -464,53 +478,35 @@ static int ArgHandler_Notify(char *input, char *output)
 	}
 
 	timeout = strtol(input, &text_start, 10);
-	if(timeout > 0) {
-		if(text_start && *text_start) {
-			text_start++;
-		} else {
-			text_start = "";
-		}
-		SetNotify(timeout, text_start);
-	} else if(timeout == 0) {
-		StopMainTimer();
-		DisplayTime();
-	}
+	g_messageType = NOTIFY;
+	ret = SetMessage(text_start, timeout);
 
-	return 0;
+	return ret;
 }
 
 static int ArgHandler_Status(char *input, char *output)
 {
-	int		timeout;
-	int		id;
-	char	*text_start = NULL;
+	int32_t			timeout;
+	int32_t			id;
+	int32_t			ret = 0;
+	char			*text_start = NULL;
+	static int32_t	statusId = -1;
 
 	(void)output;
 	id = strtol(input, &text_start, 10);
-	if((id < 0) || (g_messageType == STATUS && id != g_statusId)) {
+	if((id < 0) || (g_messageType == STATUS && id != statusId)) {
 		return -1;
 	}
 
 	timeout = MAX_TIMEOUT;
 	if(text_start && *text_start == ':') {
 		timeout = strtol(text_start + 1, &text_start, 10);
-		if(timeout < 0) {
-			return -1;
-		}
-		if(timeout == 0) {
-			StopMainTimer();
-			DisplayTime();
-			return -1;
-		}
 	}
-	if(text_start && *text_start) {
-		text_start++;
-	} else {
-		text_start = "";
-	}
-	SetStatus(id, timeout, text_start);
+	statusId = id;
+	g_messageType = STATUS;
+	ret = SetMessage(text_start, timeout);
 
-	return 0;
+	return ret;
 }
 
 static int ArgHandler_Pulse(char *input, char *output)
@@ -559,14 +555,14 @@ int MainLoop()
 	int len, socket_id;
 
 	g_delayTimer = CreateTimer(SIGUSR1);
-	g_mainTimer  = CreateTimer(SIGUSR2);
+	g_messageTimer = CreateTimer(SIGUSR2);
 
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGTERM, Quit);
 	signal(SIGQUIT, Quit);
 	signal(SIGINT,  Quit);
-	signal(SIGUSR1, DisplayText);
-	signal(SIGUSR2, DisplayTime);
+	signal(SIGUSR1, DisplayCurentText);
+	signal(SIGUSR2, ShowTime);
 
 	if((socket_id = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		perror("client: socket");
@@ -590,7 +586,7 @@ int MainLoop()
 
 	g_messageType = TIME;
 	SetBrightness(g_brightness);
-	SetTimer(g_delayTimer, TIME_INTERVAL);
+	ShowTime();
 
 	for(;;) {
 		int		accept_id;
@@ -610,8 +606,6 @@ int MainLoop()
 			continue;
 		}
 
-		DBG("%s: << '%s'\n", __func__, buffer);
-
 		{//we dont need CR and CN symbols
 			char	*ptr;
 			ptr = strchr(buffer, '\r');
@@ -622,16 +616,19 @@ int MainLoop()
 				*ptr = 0;
 		}
 
+		DBG("%s: << '%s'\n", __func__, buffer);
+
 		for(i = 0; i < sizeof(handlers)/sizeof(*handlers); i++) {
 			int argLen = strlen(handlers[i].argName);
 			if(strncmp(handlers[i].argName, buffer, argLen) == 0) {
 				char ch = buffer[argLen];
+
 				if(	(ch == '\t') ||
 					(ch == ' ') ||
 					(ch == '\n') ||
 					(ch == '\r') ||
 					(ch == '\0') ||
-					((ch > '0') && (ch < '9')) )
+					((ch >= '0') && (ch <= '9')) )
 				{
 					if(handlers[i].handler) {
 //						int		ret;
