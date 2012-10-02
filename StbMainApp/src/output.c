@@ -6082,6 +6082,9 @@ int output_readInterfacesFile(void)
 	inet_aton(buf, &addr);
 	networkInfo.wan.gw = addr;
 
+	if (helperParseLine(STB_RESOLV_CONF, NULL, "nameserver ", buf, ' '))
+		inet_aton(buf, &networkInfo.dns);
+
 	// LAN
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 	getParam(LAN_CONFIG_FILE, "MODE", "NAT", buf );
