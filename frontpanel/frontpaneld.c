@@ -66,22 +66,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAX_TIMEOUT				60
 #define DELAY_TIMER_MIN			100
 #define DELAY_TIMER_MAX			5000
-#define TIME_FIRST_SLEEP_TEXT	2000
-#define TIME_OTHER_SLEEP_TEXT	800
+#define TIME_FIRST_SLEEP_TEXT	600
+#define TIME_OTHER_SLEEP_TEXT	300
 #define TIME_INTERVAL			1000, 1000
 #define TIME_STOP				0, 0
 #define BUF_SIZE				256
 #define LITTLE_INTEVAL			60000
 #define ADDITION_INTERVAL		100000
 
-#define DBG(x...) \
+/*#define DBG(x...) \
 do { \
 	time_t ts = time(NULL); \
 	struct tm tsm; \
 	localtime_r(&ts, &tsm); \
 	printf("%02d:%02d:%02d: ", tsm.tm_hour, tsm.tm_min, tsm.tm_sec); \
 	printf(x); \
-} while (0)
+} while (0)*/
 
 #ifndef DBG
 #define DBG(x...)
@@ -130,11 +130,11 @@ char *g_frontpanelPath = NULL;
 char *g_frontpanelBrightness = NULL;
 
 const char		g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
-rollTextInfo_t	rollTextInfo;
 int32_t			g_brightness = 4;
 int32_t			g_timeEnabled = true;
+rollTextInfo_t	g_rollTextInfo;
+MessageType_t	g_messageType = TIME;
 
-MessageType_t g_messageType = TIME;
 struct argHandler_s handlers[] = {
 	{"time",	ArgHandler_Time},
 	{"t",		ArgHandler_Time},
@@ -270,12 +270,12 @@ void DisplayCurentText()
 	switch(g_messageType) {
 		case NOTIFY:
 		case STATUS:
-			rollTextInfo.textOffset++;
-			if(rollTextInfo.textOffset > rollTextInfo.textLength) {
-				rollTextInfo.textOffset = 0;
+			g_rollTextInfo.textOffset++;
+			if(g_rollTextInfo.textOffset > g_rollTextInfo.textLength) {
+				g_rollTextInfo.textOffset = 0;
 			}
 
-			strncpy(tmpBuf, rollTextInfo.text + rollTextInfo.textOffset, 4);
+			strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, 4);
 			SetFrontpanelText(tmpBuf);
 			break;
 		case TIME:
@@ -333,13 +333,8 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 	if(timeout > 0) {
 		char	tmpBuf[6];
 		int32_t	textLen;
-		
-/*		if(newText && *newText) {
-			newText++;
-		} else {
-			newText = "";
-		}*/
-		while(*newText == ' ') {
+
+		while((*newText == ' ') || (*newText == '\t')) {
 			newText++;
 		}
 
@@ -350,26 +345,25 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 		textLen = strlen(newText);
 		DBG("%s: '%s' (%d)\n", __func__, newText, textLen);
 
-		SetTimer(g_messageTimer, timeout * 1000, 0);
-
-		if((textLen > 2) && (newText[2] == ':') && (textLen < 6)) {
+		if((textLen > 2) && (newText[2] == ':') && (textLen < 6)) {//"xx:xx" format
 			memcpy(tmpBuf, newText, 2);
 			strcpy(tmpBuf + 2, newText + 3);
-
 			AddColon(tmpBuf);
-			SetFrontpanelText(tmpBuf);
 		} else {
 			strncpy(tmpBuf, newText, 4);
-			SetFrontpanelText(tmpBuf);
 
 			if(textLen > 4) { //roll the text if it contain more than 4 characters
-				rollTextInfo.textLength = textLen;
-				rollTextInfo.textOffset = 0;
-				strcpy(rollTextInfo.text, newText);
+				g_rollTextInfo.textLength = textLen;
+				g_rollTextInfo.textOffset = 0;
+				strcpy(g_rollTextInfo.text, newText);
 				SetTimer(g_delayTimer, g_t1, g_t2);
 			}
 		}
+		SetFrontpanelText(tmpBuf);
+		//set timer for disabling message
+		SetTimer(g_messageTimer, timeout * 1000, 0);
 	} else if(timeout == 0) {
+		//stop showing message, show time
 		ShowTime();
 	}
 
@@ -421,6 +415,7 @@ static int ArgHandler_Time(char *input, char *output)
 	g_timeEnabled = atol(input);
 
 	if(g_messageType != NOTIFY && g_messageType != STATUS) {
+		//apply enable/disable displaying time
 		ShowTime();
 	}
 	return 0;
@@ -539,12 +534,9 @@ static int ArgHandler_Pulse(char *input, char *output)
 
 static int ArgHandler_Brightness(char *input, char *output)
 {
-	int	bright;
-
 	(void)output;
-	bright = strtol(input, NULL, 10);
-	g_brightness = bright;
-	SetBrightness(bright);
+	g_brightness = strtol(input, NULL, 10);
+	SetBrightness(g_brightness);
 
 	return 0;
 }
@@ -605,7 +597,7 @@ int MainLoop()
 			continue;
 		}
 
-		{//we dont need CR and CN symbols
+		{//we dont need CR and CN symbols, that adds StbCommandClient
 			char	*ptr;
 			ptr = strchr(buffer, '\r');
 			if(ptr)
