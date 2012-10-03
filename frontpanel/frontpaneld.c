@@ -337,9 +337,18 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 		while((*newText == ' ') || (*newText == '\t')) {
 			newText++;
 		}
-
-		if(timeout > MAX_TIMEOUT) {
-			timeout = MAX_TIMEOUT;
+		//if message incapsulate into '' or "", skip this characters
+		if((*newText == '\'') || (*newText == '\"')) {
+			newText++;
+		}
+		{
+			char	*ptr;
+			ptr = strchr(newText, '\'');
+			if(ptr)
+				*ptr = 0;
+			ptr = strchr(newText, '\"');
+			if(ptr)
+				*ptr = 0;
 		}
 
 		textLen = strlen(newText);
@@ -360,6 +369,10 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 			}
 		}
 		SetFrontpanelText(tmpBuf);
+
+		if(timeout > MAX_TIMEOUT) {
+			timeout = MAX_TIMEOUT;
+		}
 		//set timer for disabling message
 		SetTimer(g_messageTimer, timeout * 1000, 0);
 	} else if(timeout == 0) {
