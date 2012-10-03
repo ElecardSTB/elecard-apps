@@ -323,6 +323,14 @@ static void SetBrightness(int brightness)
 	}
 }
 
+static void Helper_TerminateText(char *text, char terminateSymbol)
+{
+	char	*ptr;
+	ptr = strchr(text, terminateSymbol);
+	if(ptr)
+		*ptr = 0;
+}
+
 static int32_t SetMessage(char *newText, int32_t timeout)
 {
 	if(newText == NULL)
@@ -341,15 +349,8 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 		if((*newText == '\'') || (*newText == '\"')) {
 			newText++;
 		}
-		{
-			char	*ptr;
-			ptr = strchr(newText, '\'');
-			if(ptr)
-				*ptr = 0;
-			ptr = strchr(newText, '\"');
-			if(ptr)
-				*ptr = 0;
-		}
+		Helper_TerminateText(newText, '\'');
+		Helper_TerminateText(newText, '\"');
 
 		textLen = strlen(newText);
 		DBG("%s: '%s' (%d)\n", __func__, newText, textLen);
@@ -610,15 +611,9 @@ int MainLoop()
 			continue;
 		}
 
-		{//we dont need CR and CN symbols, that adds StbCommandClient
-			char	*ptr;
-			ptr = strchr(buffer, '\r');
-			if(ptr)
-				*ptr = 0;
-			ptr = strchr(buffer, '\n');
-			if(ptr)
-				*ptr = 0;
-		}
+		//we dont need CR and CN symbols, that adds StbCommandClient
+		Helper_TerminateText(buffer, '\r');
+		Helper_TerminateText(buffer, '\n');
 
 		DBG("%s: << '%s'\n", __func__, buffer);
 
