@@ -262,40 +262,39 @@ bmp_finish:;
 	int bmp_w = 0;
 	int bmp_h = 0;
 
-	bmpfile_magic    *bmp_magic;
-	bmpfile_header   *bmp_header;
-	BITMAPINFOHEADER *bmp_info;
+//Cant use bmp_header and bmp_info as pointers, because sizeof(bmpfile_magic) = 2, this provoke unaligned access
+//	bmpfile_magic    bmp_magic;
+//	bmpfile_header   bmp_header;
+	BITMAPINFOHEADER bmp_info;
 
-	size_t bmp_offset = sizeof(bmpfile_magic)+sizeof(bmpfile_header)+sizeof(BITMAPINFOHEADER);
+	size_t bmp_offset = sizeof(bmpfile_magic) + sizeof(bmpfile_header) + sizeof(BITMAPINFOHEADER);
 
 	if (sizeof(bmp_data) < bmp_offset)
 		goto bmp_finish;
 
-	bmp_magic  = (bmpfile_magic *) bmp_data;
-	bmp_header = (bmpfile_header *) ((char*)bmp_magic  + sizeof(bmpfile_magic));
-	bmp_info   = (BITMAPINFOHEADER*)((char*)bmp_header + sizeof(bmpfile_header));
+//	memcpy(&bmp_magic, bmp_data, sizeof(bmpfile_magic));
+//	memcpy(&bmp_header, bmp_data + sizeof(bmpfile_magic), sizeof(bmpfile_header));
+	memcpy(&bmp_info, bmp_data + sizeof(bmpfile_magic) + sizeof(bmpfile_header), sizeof(BITMAPINFOHEADER));
 
-	bmp_w = bmp_info->width  > 0 ? bmp_info->width  : -bmp_info->width;
-	bmp_h = bmp_info->height > 0 ? bmp_info->height : -bmp_info->height;
+	bmp_w = bmp_info.width  > 0 ? bmp_info.width  : -bmp_info.width;
+	bmp_h = bmp_info.height > 0 ? bmp_info.height : -bmp_info.height;
 
-	if (sizeof(bmp_data) < bmp_offset + (bmp_w*bmp_h*bmp_info->bitspp)/8)
-	{
+	if (sizeof(bmp_data) < bmp_offset + (bmp_w * bmp_h * bmp_info.bitspp) / 8) {
 		printf("Wrong bitmap size!\n");
 		goto bmp_finish;
 	}
 
-	printf("Bitmap logo: %dx%d @ %hu bbp\n", bmp_w, bmp_h, bmp_info->bitspp);
+	printf("Bitmap logo: %dx%d @ %hu bbp\n", bmp_w, bmp_h, bmp_info.bitspp);
 
 	x = vinfo.xoffset + (vinfo.xres - vinfo.xoffset - bmp_w) / 2;
 	y = vinfo.yoffset + (vinfo.yres - vinfo.yoffset - bmp_h) / 2;
 
-	size_t row_size = 3*bmp_w;
+	size_t row_size = 3 * bmp_w;
 
 	int row;
-	for (row = bmp_h-1; row >= 0; row--)
-	{
+	for (row = bmp_h - 1; row >= 0; row--) {
 		fb_offset = (x + vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (y + row + vinfo.yoffset) * finfo.line_length;
-		memcpy(fb_p+fb_offset, bmp_data+bmp_offset, row_size);
+		memcpy(fb_p + fb_offset, bmp_data + bmp_offset, row_size);
 		bmp_offset += row_size;
 	}
 bmp_finish:;
