@@ -28,6 +28,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/******************************************************************
+* INCLUDE FILES                                                   *
+*******************************************************************/
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -47,7 +50,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "logo.c"
 #endif
 
+
+/******************************************************************
+* LOCAL MACROS                                                    *
+*******************************************************************/
 #define PROGRESS_MAX 7
+
+#define COLOR_BLACK		0x00000000
+#define COLOR_RED		0x00FF0000
+#define COLOR_GREEN		0x0000FF00
+#define COLOR_BLUE		0x000000FF
+#define COLOR_ELC1		0x002A3F55
+#define COLOR_ELC2		0x00555FAA
+#define COLOR_ELC3		0x00101b27
+
+
+/******************************************************************
+* LOCAL TYPEDEFS                                                  *
+*******************************************************************/
+typedef struct {
+	int32_t	x;
+	int32_t	y;
+	int32_t	color;
+} squareInfo_t;
 
 typedef struct {
 	unsigned char magic[2];
@@ -74,8 +99,21 @@ typedef struct {
 	uint32_t nimpcolors;
 } BITMAPINFOHEADER;
 
-int g_keep_alive = 1;
 
+/******************************************************************
+* STATIC DATA                                                     *
+*******************************************************************/
+int g_keep_alive = 1;
+squareInfo_t squareInfo[] = {
+	{0,		20, COLOR_ELC1},	{20,	20, COLOR_ELC2},
+	{0,		40, COLOR_ELC1},	{20,	40, COLOR_ELC1},	{40,	40, COLOR_ELC2},
+	{0,		60, COLOR_ELC3},	{20,	60, COLOR_ELC1},	{40,	60, COLOR_ELC1},
+};
+
+
+/******************************************************************
+* FUNCTION IMPLEMENTATION                                         *
+*******************************************************************/
 void signal_handler(int signal)
 {
 	(void)signal;
@@ -104,27 +142,24 @@ void fill_square(char *dest, int x, int y,
 
 void draw_indicator(char *dest, int x, int y,
                     int xoffset, int yoffset, int bits_per_pixel, int line_length,
-                    const char *pixel, int progress)
+                    uint32_t erase, int progress)
 {
-	int square_x = 0;
-	int square_y = 0;
 	const int square_size = 12;
+	uint32_t color;
 
-	switch (progress) {
-		case 0: square_x = 0;  square_y = 20; break;
-		case 1: square_x = 20; square_y = 20; break;
-		case 2: square_x = 0;  square_y = 40; break;
-		case 3: square_x = 20; square_y = 40; break;
-		case 4: square_x = 40; square_y = 40; break;
-		case 5: square_x = 0;  square_y = 60; break;
-		case 6: square_x = 20; square_y = 60; break;
-		case 7: square_x = 40; square_y = 60; break;
-	}
+	if((progress < 0) || (progress > PROGRESS_MAX))
+		return;
+
+	if(erase)
+		color = COLOR_BLACK;
+	else
+		color = squareInfo[progress].color;
 
 	fill_square(dest, x, y,
-	            xoffset, yoffset,
-	            bits_per_pixel, line_length,
-	            pixel, square_size, square_x, square_y);
+				xoffset, yoffset,
+				bits_per_pixel, line_length,
+				(char *)&color, square_size,
+				squareInfo[progress].x, squareInfo[progress].y);
 }
 
 int main()
@@ -269,34 +304,31 @@ bmp_finish:;
 
 	// Draw load indicator
 {
-	char pixel[3] = { 255, 255, 255 };
-	int progress = 0;
+	uint32_t	progress = 0;
+	uint32_t	erase = 0;
 
 	while (g_keep_alive)
 	{
 		draw_indicator(fb_p, x, y,
 		               vinfo.xoffset, vinfo.yoffset,
 		               vinfo.bits_per_pixel, finfo.line_length,
-		               pixel, progress);
+		               erase, progress);
 
 		usleep (300*1000);
 
 		progress++;
 		if (progress > PROGRESS_MAX) {
 			progress = 0;
-			pixel[0] = 255-pixel[0]; 
-			pixel[1] = 255-pixel[1]; 
-			pixel[2] = 255-pixel[2];
+			erase = !erase;
 		}
 	}
 
 	// Finish load indicator
-	memset(pixel, 255, sizeof(pixel));
 	for (progress = 0; progress<=PROGRESS_MAX; progress++)
 		draw_indicator(fb_p, x, y,
 		               vinfo.xoffset, vinfo.yoffset,
 		               vinfo.bits_per_pixel, finfo.line_length,
-		               pixel, progress);
+		               0, progress);
 }
 
 	printf("Closing framebuffer\n");
