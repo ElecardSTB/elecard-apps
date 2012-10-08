@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -119,21 +120,22 @@ static int ArgHandler_Brightness(char *input, char *output);
 * STATIC DATA                                                     *
 *******************************************************************/
 
-timer_t g_delayTimer;
-timer_t g_messageTimer;
+timer_t			g_delayTimer;
+timer_t			g_messageTimer;
 
-long g_t1 = TIME_FIRST_SLEEP_TEXT,
-	 g_t2 = TIME_OTHER_SLEEP_TEXT;
+uint32_t		g_t1 = TIME_FIRST_SLEEP_TEXT;
+uint32_t		g_t2 = TIME_OTHER_SLEEP_TEXT;
 
-BoardTypes_t g_board = UNKNOWN;
-char *g_frontpanelPath = NULL;
-char *g_frontpanelBrightness = NULL;
+BoardTypes_t	g_board = UNKNOWN;
+char			*g_frontpanelPath = NULL;
+char			*g_frontpanelBrightness = NULL;
 
 const char		g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
 int32_t			g_brightness = 4;
 int32_t			g_timeEnabled = true;
 rollTextInfo_t	g_rollTextInfo;
 MessageType_t	g_messageType = TIME;
+MessageType_t	g_beQuiet = 0;
 
 struct argHandler_s handlers[] = {
 	{"time",	ArgHandler_Time},
@@ -309,7 +311,8 @@ void ShowTime()
 
 void Quit()
 {
-	SetFrontpanelText("byE");
+	if(!g_beQuiet)
+		SetFrontpanelText("byE");
 	exit(0);
 }
 
@@ -441,7 +444,7 @@ static int ArgHandler_Delays(char *input, char *output)
 	g_t1 = 0;
 	g_t2 = 0;
 
-	sscanf(input, " %ld %ld", &g_t1, &g_t2);
+	sscanf(input, " %d %d", &g_t1, &g_t2);
 
 	if(g_t1 < DELAY_TIMER_MIN) {
 		g_t1 = DELAY_TIMER_MIN;
@@ -654,10 +657,11 @@ int main(int argc, char **argv)
 	int32_t	opt;
 	int32_t	daemonize = 1;
 
-	while((opt = getopt(argc, argv, "td")) != -1) {
+	while((opt = getopt(argc, argv, "qd")) != -1) {
 		switch(opt) {
-			case 't':
+			case 'q':
 				g_timeEnabled = false;
+				g_beQuiet = 1;
 				break;
 			case 'd':
 				daemonize = 0;
