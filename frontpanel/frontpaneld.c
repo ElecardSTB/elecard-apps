@@ -228,10 +228,11 @@ void AddColon(char *buf)
 		int32_t	temp;
 		int32_t	textLen = strlen(buf);
 
-		for(temp = textLen - 1; temp <= 5; temp++) {
+		for(temp = textLen; temp < 4; temp++) {
 			buf[temp] = ' ';
 		}
 		buf[4] = '8';
+		buf[5] = 0;
 	}
 }
 
