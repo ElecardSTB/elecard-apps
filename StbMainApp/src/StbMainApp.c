@@ -550,6 +550,21 @@ static int helperIsEventValid(DFBEvent *event)
 	return valid;
 }
 
+static int32_t Helper_IsTimeGreater(struct timeval t1, struct timeval t2)
+{
+	if(t1.tv_sec > t2.tv_sec)
+		return 1;
+	if(t1.tv_sec < t2.tv_sec)
+		return 0;
+	if(t1.tv_usec > t2.tv_usec)
+		return 1;
+
+	return 0;
+}
+
+#define POWEROFF_TIMEOUT	3 //seconds
+#define STANDBY_TIMEOUT		3 //seconds
+
 static int PowerOff(void *pArg)
 {
 	interface_showMessageBox(_T("POWER_OFF"), thumbnail_warning, 0);
@@ -558,96 +573,83 @@ static int PowerOff(void *pArg)
 
 static int checkPowerOff(DFBEvent *pEvent)
 {
+	int isFrontpanelPower = 0;
 #ifdef STSDK
 	//for STB840 PromSvyaz frontpanel POWER button
-	int isFrontpanelPower = (pEvent->input.device_id == DIDID_KEYBOARD) && (pEvent->input.key_code == KEY_POWER);
+	isFrontpanelPower = (pEvent->input.device_id == DIDID_KEYBOARD) && (pEvent->input.key_code == KEY_POWER);
 #endif
+
 	//dprintf("%s: check power\n", __FUNCTION__);
 	// Power/Standby button. Go to standby.
-	if( (pEvent->input.key_symbol == DIKS_POWER)
-#ifdef STSDK
-		|| isFrontpanelPower
-#endif
-	  )
-	{
-		static struct timeval	lastChange = {0, 0},
-								firstPress = {0, 0};
-		struct timeval currentPress = {0, 0};
-		int repeat = 0;
+	if((pEvent->input.key_symbol == DIKS_POWER) || isFrontpanelPower) {
+		static struct timeval	validStandbySwitchTime = {0, 0};
+		static struct timeval	poweroffTriggerTime = {0, 0};
+		struct timeval			currentPress = {0, 0};
+		int						repeat = 0;
 #ifdef STSDK
 		static int isPowerReleased = 1;
 
 		gettimeofday(&currentPress, NULL);
 		if((pEvent->input.type == DIET_KEYRELEASE) || (pEvent->input.type == DIET_BUTTONRELEASE)) {
 			isPowerReleased = 1;
-			if(isFrontpanelPower) {
-				interface_removeEvent(PowerOff, NULL);
-			}
+			interface_removeEvent(PowerOff, NULL);
 		} else {
 			if(appControlInfo.inStandby)
 				return 0; //dont check pressed more than 3 seconds POWER button in standby
 			if(isPowerReleased) {
-				memcpy(&firstPress, &currentPress, sizeof(struct timeval));
+				memcpy(&poweroffTriggerTime, &currentPress, sizeof(struct timeval));
+				poweroffTriggerTime.tv_sec += POWEROFF_TIMEOUT;
 				isPowerReleased = 0;
-				if(isFrontpanelPower) {
-					interface_addEvent(PowerOff, NULL, 3000, 1);
-				}
+				interface_addEvent(PowerOff, NULL, POWEROFF_TIMEOUT * 1000, 1);
 			}
 			//try to check if button pressed more than 3 seconds
 			repeat = 1;
 		}
 #else
-		static struct timeval lastPress = {0, 0};
+		static struct timeval prevPressTime = {0, 0};
 		int timediff;
 
 		gettimeofday(&currentPress, NULL);
-		if (firstPress.tv_sec == 0 || lastPress.tv_sec == 0) {
+		if(poweroffTriggerTime.tv_sec == 0 || prevPressTime.tv_sec == 0) {
 			timediff = 0;
 		} else {
-			timediff = (currentPress.tv_sec - lastPress.tv_sec) * 1000000 + (currentPress.tv_usec - lastPress.tv_usec);
+			timediff = (currentPress.tv_sec - prevPressTime.tv_sec) * 1000000 + (currentPress.tv_usec - prevPressTime.tv_usec);
 		}
 
-		if (timediff == 0 || timediff > REPEAT_TIMEOUT) {
+		if(timediff == 0 || timediff > REPEAT_TIMEOUT) {
 			//dprintf("%s: reset\n, __FUNCTION__");
-			memcpy(&firstPress, &currentPress, sizeof(struct timeval));
+			memcpy(&poweroffTriggerTime, &currentPress, sizeof(struct timeval));
+			poweroffTriggerTime.tv_sec += POWEROFF_TIMEOUT;
 		} else {
 			//dprintf("%s: repeat detected\n", __FUNCTION__);
 			repeat = 1;
 		}
-		memcpy(&lastPress, &currentPress, sizeof(struct timeval));
+		memcpy(&prevPressTime, &currentPress, sizeof(struct timeval));
 #endif
 		//dprintf("%s: got DIKS_POWER\n", __FUNCTION__);
-		if (repeat && ((currentPress.tv_sec - firstPress.tv_sec) >= 3))
-		{
+		if(repeat && Helper_IsTimeGreater(currentPress, poweroffTriggerTime)) {
 			//dprintf("%s: repeat 3 sec - halt\n", __FUNCTION__);
 			/* Standby button has been held for 3 seconds. Power off. */
-#ifdef STSDK
-			isPowerReleased = 1; //mark it here, because system call (in test mode) can be long, so POWER release will skiped
-			PowerOff(NULL);
-#endif
-		} else if (!repeat && ((currentPress.tv_sec - lastChange.tv_sec) >= 3))
-		{
+//			PowerOff(NULL);
+		} else if(!repeat && Helper_IsTimeGreater(currentPress, validStandbySwitchTime)) {
 			int ret = 0;
 			interfaceCommandEvent_t cmd;
 
 			//dprintf("%s: switch standby\n", __FUNCTION__);
 			/* Standby button was pressed once. Switch standby mode.  */
-			if (appControlInfo.inStandby == 0)
-			{
+			if (appControlInfo.inStandby == 0) {
 				//dprintf("%s: go to standby\n", __FUNCTION__);
 				appControlInfo.inStandby = 1;
 
 #if (defined ENABLE_PVR && defined ENABLE_DVB && defined STBPNX)
-				if( pvr_isPlayingDVB(screenMain) )
-				{
+				if(pvr_isPlayingDVB(screenMain)) {
 					offair_stopVideo(screenMain, 1);
 				}
 #endif
 
 				inStandbyActiveVideo = gfx_videoProviderIsActive(screenMain);
 
-				if (inStandbyActiveVideo)
-				{
+				if(inStandbyActiveVideo) {
 					memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
 					cmd.source = DID_STANDBY;
 					cmd.command = interfaceCommandStop;
@@ -662,7 +664,7 @@ static int checkPowerOff(DFBEvent *pEvent)
 				interface_displayMenu(1);
 				system("standbyoff");
 
-				if (inStandbyActiveVideo) {
+				if(inStandbyActiveVideo) {
 					memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
 					cmd.command = interfaceCommandPlay;
 					interface_processCommand(&cmd);
@@ -677,12 +679,12 @@ static int checkPowerOff(DFBEvent *pEvent)
 #endif
 				ret = 2;
 			}
-			memcpy(&lastChange, &currentPress, sizeof(struct timeval));
+			memcpy(&validStandbySwitchTime, &currentPress, sizeof(struct timeval));
+			validStandbySwitchTime.tv_sec += STANDBY_TIMEOUT;
 			return ret;
 		}
-	} else if(pEvent->input.button == 9) // PSU button, just do power off
-	{
-		system("poweroff");
+	} else if(pEvent->input.button == 9) {// PSU button, just do power off
+		PowerOff(NULL);
 	}
 
 	return 0;
@@ -1557,7 +1559,7 @@ void *keyThread(void *pArg)
 				kprintf("%s: event %d\n", __FUNCTION__, cmd);
 				kprintf("%s: timediff %d\n", __FUNCTION__, timediff);
 
-				if (cmd == lastcmd && timediff < REPEAT_TIMEOUT * 2) {
+				if(cmd == lastcmd && timediff < REPEAT_TIMEOUT * 2) {
 					curcmd.repeat++;
 				} else {
 					curcmd.repeat = 0;
