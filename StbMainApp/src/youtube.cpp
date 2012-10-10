@@ -623,6 +623,18 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		str+=3;
 		memmove(str+6, str, url_len-(str-url)+1);
 		memcpy (str, "nature", 6);
+		url_len+=6;
+	}
+	str = strstr(url, "; codecs=\"");
+	if (str) {
+		// Remove '; codecs="..."' section from url
+		char *closing_marks = strchr(str+10, '"');
+		if (closing_marks) {
+			closing_marks++;
+			size_t codecs_len = closing_marks-str;
+			memmove(str, closing_marks, url_len-(closing_marks-url));
+			url_len -= codecs_len;
+		}
 	}
 
 	eprintf("Youtube: Playing (format %2d) '%s'\n", supported_formats[selected_fmt], url );
