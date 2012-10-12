@@ -1096,8 +1096,6 @@ static int output_toggleAuthMode(interfaceMenu_t *pMenu, void* pArg)
 int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STSDK
-	char buf[MENU_ENTRY_INFO_LENGTH];
-
 	if (wifiInfo.key[0])
 	{
 		switch (wifiInfo.auth)
@@ -1142,7 +1140,7 @@ int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg)
 	show_error = setParam(path, "AUTH", value);
 #endif
 #ifdef STSDK
-	buf[0] = 0;
+	char buf[MENU_ENTRY_INFO_LENGTH] = "";
 	switch (wifiInfo.auth)
 	{
 		case wifiAuthOpen:
@@ -6015,21 +6013,31 @@ int output_checkProfile(void)
 int output_readWpaSupplicantConf( const char *filename )
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
-	
 
 	getParam( filename, "ap_scan", "1", buf );
 	wifiInfo.mode = strtol(buf,NULL,10) == 2 ? wifiModeAdHoc : wifiModeManaged;
-	getParam( filename, "ssid", "\"" DEFAULT_ESSID "\"", buf );
-	strncpy( wifiInfo.essid, &buf[1], sizeof(wifiInfo.essid) );
+	getParam( filename, "ssid", "", buf );
+	if (buf[0] == '"') {
+		buf[strlen(buf)-1]=0;
+		strncpy( wifiInfo.essid, &buf[1], sizeof(wifiInfo.essid) );
+	} else
+		strcpy(wifiInfo.essid, DEFAULT_ESSID);
 	wifiInfo.essid[sizeof(wifiInfo.essid)-1]=0;
-	if (wifiInfo.essid[0])
-		wifiInfo.essid[strlen(wifiInfo.essid)-1]=0;
-	getParam( filename, "psk", "\"\"", buf );
-	strncpy( wifiInfo.key, &buf[1], sizeof(wifiInfo.key) );
-	wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
-	if (wifiInfo.key[0])
-		wifiInfo.key[strlen(wifiInfo.key)-1]=0;
-	else
+	getParam( filename, "key_mgmt", "", buf );
+	if (strcasecmp(buf, "NONE") == 0) {
+		wifiInfo.auth = wifiAuthWEP;
+		getParam( filename, "wep_key0", "", buf );
+	} else {
+		wifiInfo.auth = wifiAuthWPA2PSK;
+		getParam( filename, "psk"     , "", buf );
+	}
+	if (buf[0] == '"') {
+		buf[strlen(buf)-1]=0;
+		strncpy(wifiInfo.key, &buf[1], sizeof(wifiInfo.key));
+		wifiInfo.key[sizeof(wifiInfo.key)-1]=0;
+	} else
+		wifiInfo.key[0] =  0;
+	if (wifiInfo.key[0] == 0)
 		wifiInfo.auth = wifiAuthOpen;
 	return 0;
 }
@@ -6215,37 +6223,30 @@ int output_writeInterfacesFile(void)
 		setParam(WLAN_CONFIG_FILE, "DEFAULT_GATEWAY", inet_ntoa(wifiInfo.wlan.gw));
 
 	if (wifiInfo.wanMode)
-	{
 		return output_writeWpaSupplicantConf(STB_WPA_SUPPLICANT_CONF);
-	}
-	else
-	{
-		setParam( STB_HOSTAPD_CONF, "ssid", wifiInfo.essid );
-		output_setHostapdChannel(wifiInfo.currentChannel);
+
+	setParam( STB_HOSTAPD_CONF, "ssid", wifiInfo.essid );
+	output_setHostapdChannel(wifiInfo.currentChannel);
 #ifdef ENABLE_LAN
-		if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
-			setParam( STB_HOSTAPD_CONF, "bridge", "br0");
-		else
+	if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
+		setParam( STB_HOSTAPD_CONF, "bridge", "br0");
+	else
 #endif
-		setParam( STB_HOSTAPD_CONF, "bridge", NULL);
-		if (wifiInfo.auth <= wifiAuthWEP)
-		{
-			if (wifiInfo.auth == wifiAuthOpen)
-				setParam( STB_HOSTAPD_CONF, "wep_key0", NULL );
-			else
-				setParam( STB_HOSTAPD_CONF, "wep_key0", wifiInfo.key );
-			setParam( STB_HOSTAPD_CONF, "wpa", NULL );
-			setParam( STB_HOSTAPD_CONF, "wpa_key_mgmt",   NULL );
-			setParam( STB_HOSTAPD_CONF, "wpa_passphrase", NULL );
-			setParam( STB_HOSTAPD_CONF, "wpa_pairwise",   NULL );
-		} else
-		{
-			setParam( STB_HOSTAPD_CONF, "wep_key0", NULL );
-			setParam( STB_HOSTAPD_CONF, "wpa", wifiInfo.auth == wifiAuthWPA2PSK ? "2" : "1" );
-			setParam( STB_HOSTAPD_CONF, "wpa_key_mgmt", "WPA-PSK" );
-			setParam( STB_HOSTAPD_CONF, "wpa_passphrase", wifiInfo.key );
-			setParam( STB_HOSTAPD_CONF, "wpa_pairwise", wifiInfo.encryption == wifiEncAES ? "CCMP TKIP" : "TKIP" );
-		}
+	setParam( STB_HOSTAPD_CONF, "bridge", NULL);
+	if (wifiInfo.auth <= wifiAuthWEP)
+	{
+		setParam( STB_HOSTAPD_CONF, "wep_key0", wifiInfo.auth == wifiAuthOpen ? NULL : wifiInfo.key );
+		setParam( STB_HOSTAPD_CONF, "wpa", NULL );
+		setParam( STB_HOSTAPD_CONF, "wpa_key_mgmt",   NULL );
+		setParam( STB_HOSTAPD_CONF, "wpa_passphrase", NULL );
+		setParam( STB_HOSTAPD_CONF, "wpa_pairwise",   NULL );
+	} else
+	{
+		setParam( STB_HOSTAPD_CONF, "wep_key0", NULL );
+		setParam( STB_HOSTAPD_CONF, "wpa", wifiInfo.auth == wifiAuthWPA2PSK ? "2" : "1" );
+		setParam( STB_HOSTAPD_CONF, "wpa_key_mgmt", "WPA-PSK" );
+		setParam( STB_HOSTAPD_CONF, "wpa_passphrase", wifiInfo.key );
+		setParam( STB_HOSTAPD_CONF, "wpa_pairwise", wifiInfo.encryption == wifiEncAES ? "CCMP TKIP" : "TKIP" );
 	}
 #endif
 
