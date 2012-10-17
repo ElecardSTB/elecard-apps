@@ -1687,9 +1687,9 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 			return;
 		}
 	}
-
+	// Always use 0 index for Linux tuners
 	sprintf(filename, "dvb://%d@%d", offair_services[appControlInfo.dvbInfo.channel].service->common.service_id, 
-	        param->vmsp < VMSP_COUNT ? param->vmsp : param->vmsp-VMSP_COUNT);
+	        param->vmsp < VMSP_COUNT ? 0 : param->vmsp-VMSP_COUNT);
 	qualifier[0]=0;
 #endif
 
