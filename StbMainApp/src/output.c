@@ -96,6 +96,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define WAN_CONFIG_FILE             IFACE_CONFIG_PREFIX "eth0"
 #define LAN_CONFIG_FILE             IFACE_CONFIG_PREFIX "eth1"
 #define WLAN_CONFIG_FILE            IFACE_CONFIG_PREFIX "wlan0"
+#define XWORKS_INIT_SCRIPT          "/usr/local/etc/init.d/S94xworks"
 #endif
 #ifdef STSDK
 #define PPP_CHAP_SECRETS_FILE       "/var/etc/ppp/chap-secrets"
@@ -104,6 +105,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define WAN_CONFIG_FILE             "/var/etc/ifcfg-wan"
 #define LAN_CONFIG_FILE             "/var/etc/ifcfg-lan"
 #define WLAN_CONFIG_FILE            "/var/etc/ifcfg-wlan0"
+#define XWORKS_INIT_SCRIPT          "/etc/init.d/S94xworks"
 #endif
 
 #define TEMP_CONFIG_FILE            "/var/tmp/cfg.tmp"
@@ -5207,11 +5209,12 @@ int output_setHostapdChannel(int channel)
 #endif // ENABLE_WIFI
 
 #if (defined ENABLE_IPTV) && (defined ENABLE_XWORKS)
+#ifdef STBPNX
 static int output_togglexWorks(interfaceMenu_t *pMenu, void* pArg)
 {
 	return output_saveAndRedraw(setParam( STB_CONFIG_FILE, "XWORKS", pArg ? "ON" : "OFF" ), pMenu);
 }
-
+#endif
 static int output_togglexWorksProto(interfaceMenu_t *pMenu, void* pArg)
 {
 	char *str;
@@ -5234,7 +5237,7 @@ static int output_togglexWorksProto(interfaceMenu_t *pMenu, void* pArg)
 		output_warnIfFailed(1);
 		return 1;
 	}
-	system("/usr/local/etc/init.d/S94xworks config");
+	system(XWORKS_INIT_SCRIPT " config");
 	output_redrawMenu(pMenu);
 	return 0;
 }
@@ -5243,7 +5246,7 @@ static int output_restartxWorks(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showMessageBox(_T("LOADING"), settings_renew, 0);
 
-	system("/usr/local/etc/init.d/S94xworks restart");
+	system(XWORKS_INIT_SCRIPT " restart");
 
 	output_refillMenu(pMenu);
 	interface_hideMessageBox();
@@ -5331,15 +5334,15 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVtimeout, pArg, thumbnail_configure);
 
 #ifdef ENABLE_XWORKS
-	int xworks_enabled;
+	int xworks_enabled = 1;
 	media_proto proto;
 	char *str;
-
+#ifdef STBPNX
 	getParam( STB_CONFIG_FILE, "XWORKS", "OFF", buf );
 	xworks_enabled = strcasecmp( "ON", buf ) == 0;
 	snprintf(buf, sizeof(buf), "%s: %s", _T("XWORKS"), xworks_enabled ? _T("ON") : _T("OFF"));
 	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_togglexWorks, SET_NUMBER(!xworks_enabled), thumbnail_configure);
-
+#endif
 	getParam( STB_CONFIG_FILE, "XWORKS_PROTO", "http", buf );
 	if( strcasecmp( buf, "rtsp" ) == 0 )
 	{
