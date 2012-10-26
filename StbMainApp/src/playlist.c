@@ -833,7 +833,8 @@ int playlist_getFromURL(const char *url, xspfEntryHandler pEntryCallback, void *
 		ret = curl_easy_perform(hnd);
 		if(ret != CURLE_OK && ret != CURLE_WRITE_ERROR)
 		{
-			eprintf("%s: Failed to get playlist from '%s' (no proxy) with message:\n%s\n", __FUNCTION__, url, errbuff);
+			eprintf("%s: Failed to get playlist from '%s' (no proxy): code %d message:\n%s\n", __FUNCTION__, url, code, errbuff);
+			dprintf(">>\n%s\n<<\n", data);
 			ret = PLAYLIST_ERR_DOWNLOAD;
 			goto finish;
 		}
@@ -842,7 +843,8 @@ int playlist_getFromURL(const char *url, xspfEntryHandler pEntryCallback, void *
 	}
 	if (code != 200)
 	{
-		eprintf("%s: Failed to get playlist from '%s' with message:\n%s\n", __FUNCTION__, url, errbuff);
+		eprintf("%s: Failed to get playlist from '%s': code %d message:\n%s\n", __FUNCTION__, url, code, errbuff);
+		dprintf(">>\n%s\n<<\n", data);
 		//interface_showMessageBox(_T("ERR_SERVICE_UNAVAILABLE"), thumbnail_error, 0);
 		ret = PLAYLIST_ERR_DOWNLOAD;
 		goto finish;
