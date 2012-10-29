@@ -1414,6 +1414,8 @@ static void rtp_urlHandler(void *pArg, const char *location, const char *desc, x
 	rtp_info[streams.count].audio_type = 0;
 	rtp_info[streams.count].video_pid  = 0;
 	rtp_info[streams.count].video_type = 0;
+	FREE( rtp_info[streams.count].thumb );
+	FREE( rtp_info[streams.count].poster );
 	memset(&streams.items[streams.count], 0, sizeof(sdp_desc));
 	switch(url.protocol)
 	{
@@ -1510,40 +1512,32 @@ static void rtp_urlHandler(void *pArg, const char *location, const char *desc, x
 
 		ptr = (char*)xmlConfigGetText(track, "thumb");
 		if( ptr && *ptr )
-		{
 			helperSafeStrCpy( &rtp_info[streams.count].thumb, ptr );
-		} else
-		{
-			FREE( rtp_info[streams.count].thumb );
-		}
 
 		ptr = (char*)xmlConfigGetText(track, "poster");
 		if( ptr && *ptr )
-		{
 			helperSafeStrCpy( &rtp_info[streams.count].poster, ptr );
-		} else
-		{
-			FREE( rtp_info[streams.count].poster );
-		}
 
+		char *rel  = NULL;
 		for( meta = xmlConfigGetElement(track, "meta", 0); meta != NULL; meta = xmlConfigGetNextElement( meta, "meta" ) )
 		{
-			ptr = (char*)xmlConfigGetAttribute( meta, "rel" );
-			if( ptr && strcasecmp(ptr, "genre") == 0 )
-			{
-				ptr = (char*)xmlConfigGetElementText(meta);
-				if( ptr )
-				{
-					if( sscanf( ptr, "0x%hhX",   &content ) != 1 )
-						sscanf( ptr, "\"%hhu\"", &content );
-				}
-				break;
-			}
+			rel = (char*)xmlConfigGetAttribute  (meta, "rel");
+			ptr = (char*)xmlConfigGetElementText(meta);
+			if (rel == NULL || ptr == NULL)
+				continue;
+			if (strcasecmp(rel, "genre") == 0) {
+				if (sscanf(ptr, "0x%hhX",   &content ) != 1)
+					sscanf(ptr, "\"%hhu\"", &content );
+			} else
+			if (strcasecmp(rel, "thumb") == 0)
+				helperSafeStrCpy( &rtp_info[streams.count].thumb,  ptr);
+			else
+			if (strcasecmp(rel, "poster") == 0)
+				helperSafeStrCpy( &rtp_info[streams.count].poster, ptr);
+			else
+			if (strcasecmp(rel, "channel_id") == 0)
+				id = strtoul(ptr, NULL, 10);
 		}
-	} else
-	{
-		FREE( rtp_info[streams.count].thumb );
-		FREE( rtp_info[streams.count].poster );
 	}
 
 	if( id == 0 || id != rtp_info[streams.count].id )
