@@ -2331,7 +2331,7 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifndef STBPNX
 						unsigned char *str_end;
 						for( str_end = (unsigned char*)&str[strlen(str)-1]; str_end > (unsigned char*)str && *str_end <= ' '; *str_end--=0 );
-						snprintf(mount_cmd, sizeof(mount_cmd), "mount %s %s%s", str, sambaRoot, showPath);
+						snprintf(mount_cmd, sizeof(mount_cmd), "mount %s '%s%s'", str, sambaRoot, showPath);
 #endif
 						sprintf(str, "%s%s", sambaRoot, showPath);
 						time_t start = time(NULL);

@@ -639,7 +639,7 @@ static int samba_mountShare(const char *machine, const char *share, const char *
 		fprintf( f, "%s;-fstype=cifs,ro,username=%s,password=%s :%s\n", mountPoint, username, passwd, share_addr );
 #else
 		// manual mount command
-		fprintf( f, "%s;-t cifs -o rw,username=%s,password=%s %s\n", mountPoint, username, passwd, share_addr );
+		fprintf( f, "%s;-t cifs -o rw,username=%s,password=%s '%s'\n", mountPoint, username, passwd, share_addr );
 #endif
 		fclose(f);
 		dprintf("%s: Added new record to samba.auto:\n%s;-fstype=cifs,ro,username='%s',password='%s' :%s\n", __FUNCTION__, mountPoint, username, passwd, share_addr );
