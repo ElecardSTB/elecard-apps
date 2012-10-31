@@ -1165,21 +1165,9 @@ static void offair_displayMultiviewControl()
 
 void offair_displayPlayControl()
 {
-	int x, y, w, h, fh, fa, sfh, adv, color;
-	DFBRectangle clip, rect;
-	float value;
-	uint16_t snr, signal;
-	uint32_t ber, uncorrected_blocks;
-	int stepsize;
-	int step;
-	int cindex;
+	int x, y, w, h, fh, fa, sfh;
+	DFBRectangle rect;
 	char buffer[MAX_MESSAGE_BOX_LENGTH] = "";
-	int colors[4][4] =	{
-		{0xFF, 0x00, 0x00, 0xFF},
-		{0xFF, 0xFF, 0x00, 0xFF},
-		{0x00, 0xFF, 0x00, 0xFF},
-		{0x00, 0xFF, 0x00, 0xFF},
-	};
 
 	if( interfaceChannelControl.pSet != NULL && interfaceChannelControl.showingLength > 0 )
 	{
@@ -1243,10 +1231,23 @@ void offair_displayPlayControl()
 		rect.w = 0;
 		rect.h = fh;
 		
-#ifdef STSDK
-		if (appControlInfo.dvbInfo.tuner < VMSP_COUNT && dvb_getType(0) != FE_QAM)
+#ifndef STSDK
 		{
-#endif
+		int adv, color;
+		float value;
+		uint16_t snr, signal;
+		uint32_t ber, uncorrected_blocks;
+		int stepsize;
+		int step;
+		int cindex;
+		DFBRectangle clip;
+		int colors[4][4] =	{
+			{0xFF, 0x00, 0x00, 0xFF},
+			{0xFF, 0xFF, 0x00, 0xFF},
+			{0x00, 0xFF, 0x00, 0xFF},
+			{0x00, 0xFF, 0x00, 0xFF},
+		};
+
 		dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
 
 		signal &= 0xFF;
@@ -1290,10 +1291,8 @@ void offair_displayPlayControl()
 		color = 0x00; //signal*2/MAX_SIGNAL > 0 ? 0x00 : 0xFF;
 
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, color, color, color, 0xFF, rect.x+rect.w/2-adv/2, rect.y+fa, buffer, 0, 0);
-
-#ifdef STSDK
-		} // tuner < VMSP_COUNT
-#endif
+		}
+#endif // !STSDK
 
 
 		//interface_drawOuterBorder(DRAWING_SURFACE, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+rect.w+interfaceInfo.paddingSize, rect.y, w-rect.w-interfaceInfo.paddingSize*2, rect.h, 2, interfaceBorderSideAll);
