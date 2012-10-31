@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define RPC_SETSTREAM_TIMEOUT (7)
 #define RPC_TIMEOUT (3)
+#define RPC_SCAN_TIMEOUT      (20)
 
 /***********************************************
 * EXPORTED TYPEDEFS                            *

@@ -161,6 +161,8 @@ void dvb_init(void);
  */
 void dvb_terminate(void);
 
+tunerFormat dvb_getTuner(void);
+
 /**  @ingroup dvb
  *   @brief Returns the fe_type of the FrontEnd device
  *

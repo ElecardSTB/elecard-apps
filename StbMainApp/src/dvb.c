@@ -1173,10 +1173,26 @@ int dvb_readServicesFromDump(char* filename)
 	return res;
 }
 
+tunerFormat dvb_getTuner(void)
+{
+	tunerFormat tuner;
+	for ( tuner = inputTuner0; tuner < inputTuners; tuner++ )
+		if (appControlInfo.tunerInfo[tuner].status > tunerNotPresent)
+			return tuner;
+#ifdef STSDK
+	tuner = st_getDvbTuner();
+	if ((signed)tuner < 0)
+		tuner = inputTuner0;
+	else
+		tuner += VMSP_COUNT;
+#endif
+	return tuner;
+}
+
 int dvb_getType(tunerFormat tuner)
 {
 #ifdef STSDK
-	if ((tuner >= VMSP_COUNT) || (appControlInfo.tunerInfo[tuner].status == tunerNotPresent))
+	if ((tuner >= inputTuners) || (appControlInfo.tunerInfo[tuner].status == tunerNotPresent))
 		return st_getDvbTunerType(-1 /* current tuner */);
 #endif
 	return (gFE_type);
@@ -1313,7 +1329,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 		st_setTuneParams(tuner-VMSP_COUNT, params);
 		eprintf("%s: scanning %6u-%6u\n", __FUNCTION__, low_freq/KHZ, high_freq/KHZ);
-		res = st_rpcSyncTimeout(elcmd_dvbscan, params, 30, &type, &result );
+		res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
 		cJSON_Delete(params);
 		cJSON_Delete(result);
 		if (res != 0 || type != elcdRpcResult)
@@ -1340,13 +1356,13 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 				dprintf("%s[%d]: aborted by user\n", __FUNCTION__, tuner);
 				break;
 			}
-			res = st_rpcSyncTimeout(elcmd_dvbtune, params, 3, &type, &result );
+			res = st_rpcSync(elcmd_dvbtune, params, &type, &result );
 			if (result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0)
 			{
 				cJSON_Delete(result);
 				result = NULL;
 				dprintf("%s[%d]: Found something on %u, search channels!\n", __FUNCTION__, tuner, frequency);
-				res = st_rpcSyncTimeout(elcmd_dvbscan, NULL, 15, &type, &result );
+				res = st_rpcSyncTimeout(elcmd_dvbscan, NULL, RPC_SCAN_TIMEOUT, &type, &result );
 				dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 			}
 			cJSON_Delete(result);
@@ -1436,11 +1452,12 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 				/* Scan for channels within this frequency / transport stream */
 #ifdef STSDK
 				p_freq->valueint = f/KHZ;
+				p_freq->valuedouble = (double)p_freq->valueint;
 				res = st_rpcSync(elcmd_dvbtune, params, &type, &result );
 				cJSON_Delete(result); // ignore
 				result = NULL;
 				eprintf("%s[%d]: scanning %6u\n", __FUNCTION__, tuner, f);
-				res = st_rpcSync(elcmd_dvbscan, NULL, &type, &result );
+				res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
 				cJSON_Delete(result);
 				if (res != 0 || type != elcdRpcResult)
 					eprintf("%s[%d]: scan failed\n", __FUNCTION__, tuner);
@@ -1548,7 +1565,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 
 	{
 		eprintf("%s[%d]: scanning %6u\n", __FUNCTION__, tuner, frequency / KHZ);
-		int res = st_rpcSyncTimeout(elcmd_dvbscan, params, 20, &type, &result );
+		int res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
 		cJSON_Delete(params);
 		cJSON_Delete(result);
 		if (frontend_fd != 0) close(frontend_fd);

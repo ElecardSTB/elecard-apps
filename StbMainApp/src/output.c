@@ -2391,11 +2391,11 @@ static int output_toggleDvbExtScan(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static stb810_dvbfeInfo* getDvbRange(void)
+static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 {
 	stb810_dvbfeInfo *fe = NULL;
 
-	switch (dvb_getType(0))
+	switch (dvb_getType(tuner))
 	{
 		case FE_OFDM:
 			fe = &appControlInfo.dvbtInfo.fe;
@@ -2436,7 +2436,7 @@ static char *output_getDvbRange(int field, void* pArg)
 		static char buffer[32];
 		int id = GET_NUMBER(pArg);
 		buffer[0] = 0;
-		stb810_dvbfeInfo *fe = getDvbRange();
+		stb810_dvbfeInfo *fe = getDvbRange(dvb_getTuner());
 		__u32 *symbolRate = getDvbSymbolRange();
 		if (!fe || !symbolRate)
 			return buffer;
@@ -2463,7 +2463,7 @@ static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return 1;
 
 	val = strtol(value, NULL, 10);
-	fe = getDvbRange();
+	fe = getDvbRange(dvb_getTuner());
 	__u32 *symbolRate = getDvbSymbolRange();
 	if (!fe || !symbolRate)
 		return 0;
@@ -2511,10 +2511,7 @@ static int output_changeDvbRange(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	int id = GET_NUMBER(pArg);
-//SergA: can we use offair_getTuner()??? because this stops play/record
-	//int tunerType = dvb_getType(offair_getTuner());
-	int tunerType = dvb_getType(0);
-
+	int tunerType = dvb_getType(dvb_getTuner());
 	switch (id)
 	{
 		case optionLowFreq:    sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"), get_HZprefix(tunerType)); break;
@@ -2535,9 +2532,9 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
-	stb810_dvbfeInfo	*fe = getDvbRange();
-	tunerFormat			tuner = offair_getTuner();
-	int					tunerType = dvb_getType(tuner);
+	tunerFormat tuner = dvb_getTuner();
+	stb810_dvbfeInfo *fe = getDvbRange(tuner);
+	int tunerType = dvb_getType(tuner);
 
 	// assert (dvbMenu == (interfaceMenu_t*)&DVBSubMenu);
 	interface_clearMenuEntries(dvbMenu);
@@ -2590,7 +2587,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
 
 #ifdef STSDK
-	if( offair_getTuner() < VMSP_COUNT ) {
+	if (dvb_getTuner() < VMSP_COUNT ) {
 #endif
 	sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
@@ -2604,7 +2601,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	if ((tunerType == FE_QAM) || (tunerType == FE_QPSK)) //dvb-c or dvb-s needs symbol rate option
 	{
 		sprintf(buf, "%s: %u %s", _T("DVB_SYMBOL_RATE"), getDvbSymbolRange()?*(getDvbSymbolRange()):0, _T("KHZ"));
-		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)3, thumbnail_configure);
+		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionSymbolRate), thumbnail_configure);
 	}
 	if (tunerType == FE_OFDM)
 	{
@@ -2636,13 +2633,13 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	}
 
 	sprintf(buf, "%s: %ld %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, get_HZprefix(tunerType));
-	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)0, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionLowFreq), thumbnail_configure);
 
 	sprintf(buf, "%s: %ld %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, get_HZprefix(tunerType));
-	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)1, thumbnail_configure);
+	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionHighFreq), thumbnail_configure);
 
 #ifdef STSDK
-	if( offair_getTuner() < VMSP_COUNT ) {
+	if (dvb_getTuner() < VMSP_COUNT ) {
 #endif
 	if (appControlInfo.dvbCommonInfo.adapterSpeed > 0)
 	{
