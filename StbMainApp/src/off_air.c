@@ -575,6 +575,8 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	memset(&DVBTChannelMenu[1], 0, sizeof(interfaceListMenu_t));*/
 	appControlInfo.dvbInfo.channel = 0;//dvb_getChannelNumber(0);
 
+	if (pMenu->pActivatedAction)
+		pMenu->pActivatedAction(pMenu, pMenu->pArg);
 	output_showDVBMenu(pMenu, NULL);
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
@@ -686,6 +688,8 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	memset(&nit, 0, sizeof(NIT_table_t));
 	if (dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay, appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL) == 0)
 	{
+		if (pMenu->pActivatedAction)
+			pMenu->pActivatedAction(pMenu, pMenu->pArg);
 		output_showDVBMenu(pMenu, NULL);
 		offair_fillDVBTMenu();
 		offair_fillDVBTOutputMenu(which);
