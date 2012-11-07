@@ -926,9 +926,16 @@ void appInfo_init(void)
 	appControlInfo.dvbtInfo.fe.inversion          = 0;
 	appControlInfo.dvbtInfo.bandwidth             = BANDWIDTH_8_MHZ;
 
+#ifndef STSDK
 	appControlInfo.dvbcInfo.fe.lowFrequency       = 410000;
 	appControlInfo.dvbcInfo.fe.highFrequency      = 850000;
 	appControlInfo.dvbcInfo.fe.frequencyStep      =   8000;
+#else
+	// STB 840 Avit
+	appControlInfo.dvbcInfo.fe.lowFrequency       =  51000;
+	appControlInfo.dvbcInfo.fe.highFrequency      = 860000;
+	appControlInfo.dvbcInfo.fe.frequencyStep      =   8000;
+#endif
 	appControlInfo.dvbcInfo.fe.inversion          = 0;
 	appControlInfo.dvbcInfo.modulation            = QAM_64;
 	appControlInfo.dvbcInfo.symbolRate            = 6875;
