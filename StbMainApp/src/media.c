@@ -197,7 +197,7 @@ static const mediaFormatInfo_t media_videoFormats[] =
 {
 	{ "MPEG-1",              ".m1v" },
 	{ "MPEG-1",              ".mpv" },
-	{ "MPEG-1",              ".dat" },
+//	{ "MPEG-1",              ".dat" },
 	{ "MPEG-2",              ".vob" },
 	{ "MPEG-2",              ".mpg" },
 	{ "MPEG-2",              ".mpeg" },
