@@ -73,9 +73,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define SCALE_FACTOR       (10000)
 
+#ifdef STBPNX
+#define SIGNAL_MASK        (0xff)
 #define MAX_SIGNAL         (180)
 #define AVG_SIGNAL         (150)
 #define BAD_SIGNAL         (70)
+#else
+#define SIGNAL_MASK        (0xffff)
+#define MAX_SIGNAL         (0xffff)
+#define AVG_SIGNAL         (0x7fff)
+#define BAD_SIGNAL         (0x4fff)
+#endif
 
 #define MAX_BER            (50000)
 #define BAD_BER            (20000)

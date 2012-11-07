@@ -431,7 +431,7 @@ int offair_sliderCallback(int id, interfaceCustomSlider_t *info, void *pArg)
 	case 0:
 		info->min = 0;
 		info->max = MAX_SIGNAL;
-		info->value = info->max > (signal&0xFF) ? (signal&0xFF) : info->max;
+		info->value = info->max > (signal&SIGNAL_MASK) ? (signal&SIGNAL_MASK) : info->max;
 		info->steps = 3;
 		sprintf(info->caption, _T("DVB_SIGNAL_INFO"), info->value*100/(info->max-info->min), _T(status == 1 ? "LOCKED" : "NO_LOCK"));
 		break;
@@ -1254,7 +1254,7 @@ void offair_displayPlayControl()
 
 		dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
 
-		signal &= 0xFF;
+		signal &= SIGNAL_MASK;
 
 		rect.w = w/4;
 
