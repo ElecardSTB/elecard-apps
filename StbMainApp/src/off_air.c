@@ -4394,11 +4394,13 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 #ifdef ENABLE_MULTI_VIEW
 		case interfaceCommandTV:
 			 
+			if (
 #ifdef ENABLE_PVR
-			if( appControlInfo.pvrInfo.dvb.channel < 0 &&
+				appControlInfo.pvrInfo.dvb.channel < 0 &&
 #endif
-			    (dvb_getScrambled( offair_services[channelNumber].service ) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY) && dvb_hasMediaType(offair_services[channelNumber].service, mediaTypeVideo) > 0
-			  )
+			    (appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY || dvb_getScrambled(offair_services[channelNumber].service) == 0) &&
+			     dvb_hasMediaType(offair_services[channelNumber].service, mediaTypeVideo) > 0
+			   )
 				offair_multiviewPlay(pMenu, pArg);
 			return 0;
 #endif

@@ -63,7 +63,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define VMSP_COUNT         (4)
+#define VMSP_COUNT         (2)
 
 #define MIN_FREQUENCY_KHZ  (  40000)
 #define MAX_FREQUENCY_KHZ  ( 860000)
@@ -111,7 +111,6 @@ typedef struct __dvb_playParam {
 	int videoPid;
 	int textPid;
 	int pcrPid;
-	int *pEndOfFile;
 	DvbFilePosition_t position;
 } DvbPlayParam_t;
 
@@ -122,7 +121,7 @@ typedef struct __dvb_liveParam {
 
 #ifdef ENABLE_MULTI_VIEW
 typedef struct __dvb_multiParam {
-	int channels[4];
+	uint16_t channels[4];
 } DvbMultiParam_t;
 #endif
 
@@ -208,10 +207,9 @@ int dvb_startDVB(DvbParam_t *pParam);
  *   @param[in]  vmsp      DVB tuner/vmsp to be used
  *   @param[in]  reset     Flag to indicate if the tuner will be put into sleep mode
  *
- *   @return 0 on success
  *   @sa dvb_startDVB()
  */
-int dvb_stopDVB(int vmsp, int force);
+void dvb_stopDVB(int vmsp, int force);
 
 /**  @ingroup dvb_instance
  *   @brief Change audio PID of currently running channel
@@ -390,7 +388,7 @@ int dvb_getServiceURL(EIT_service_t *service, char* URL);
  *
  *   @return 0 on success
  */
-int dvb_getPIDs(EIT_service_t *service, int audio, int* pVideo, int* pAudio, int* pText, int* pPcr);
+int dvb_getPIDs(EIT_service_t *service, int audio, uint16_t* pVideo, uint16_t* pAudio, uint16_t* pText, uint16_t* pPcr);
 
 /**  @ingroup dvb_service
  *   @brief Function checks stream has specified payload type

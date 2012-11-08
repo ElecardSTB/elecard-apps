@@ -79,10 +79,8 @@ typedef enum
 {
 	DvbMode_Watch,  /**< Watching the output of a tuner */
 	DvbMode_Record, /**< Recording the output of a tuner */
-	DvbMode_Play    /**< Playing back a recorded file */
-#ifdef ENABLE_MULTI_VIEW
-	, DvbMode_Multi /**< Watching four channels simultaneously */
-#endif
+	DvbMode_Play,   /**< Playing back a recorded file */
+	DvbMode_Multi,  /**< Watching four channels simultaneously */
 } DvbMode_t;
 
 #endif /* __DVB_TYPES_H      Do not add any thing below this line */
