@@ -4459,10 +4459,15 @@ int gfx_getVideoProviderAudioCount (int videoLayer)
 	provEvent.user.data = &audioCount;
 
 	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
-	{
 		return -1;
-	}
-
+#endif
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON        *res = NULL;
+	st_rpcSync (elcmd_getaudio, NULL, &type, &res);
+	if (type == elcdRpcResult)
+		audioCount = objGetInt(res, "total", 0);
+	cJSON_Delete(res);
 #endif
 	return audioCount;
 }
@@ -4480,10 +4485,15 @@ int gfx_getVideoProviderAudioStream (int videoLayer)
 	provEvent.user.data = &audioStream;
 
 	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
-	{
 		return -1;
-	}
-	
+#endif
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON        *res = NULL;
+	st_rpcSync (elcmd_getaudio, NULL, &type, &res);
+	if (type == elcdRpcResult)
+		audioStream = objGetInt(res, "current", 0);
+	cJSON_Delete(res);
 #endif
 	return audioStream;
 }
@@ -4500,9 +4510,22 @@ int gfx_setVideoProviderAudioStream (int videoLayer, int audioStream)
 	provEvent.user.data = &audioStream;
 
 	if (gfx_videoProvider.instance->SendEvent(gfx_videoProvider.instance, &provEvent) != DFB_OK)
-	{
+		return -1;
+#endif
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON        *res = NULL;
+	cJSON        *params = cJSON_CreateNumber(audioStream);
+	if (!params)
+		return -1;
+	int ret = st_rpcSync (elcmd_setaudio, params, &type, &res);
+	cJSON_Delete(params);
+	if (ret != 0 || type != elcdRpcResult) {
+		eprintf("%s: failed: %s\n", __FUNCTION__, jsonGetString(res, ""));
+		cJSON_Delete(res);
 		return -1;
 	}
+	cJSON_Delete(res);
 #endif
 	return 0;
 }
