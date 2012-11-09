@@ -132,4 +132,40 @@ char* rpc_request( const char *cmd, int id, cJSON *value);
 char* rpc_result ( int id, cJSON *result);
 char* rpc_error  ( int id, cJSON *err );
 
+static inline int32_t jsonGetInt(cJSON *param, int32_t defaultValue)
+{
+	return (param && param->type == cJSON_Number) ? param->valueint : defaultValue;
+}
+static inline int32_t objGetInt(cJSON *params, const char *name, int32_t defaultValue)
+{
+	return params ? jsonGetInt(cJSON_GetObjectItem(params, name), defaultValue) : defaultValue;
+}
+
+static inline double jsonGetDouble(cJSON *param, double defaultValue)
+{
+	return (param && param->type == cJSON_Number) ? param->valuedouble : defaultValue;
+}
+static inline double objGetDouble(cJSON *params, const char *name, double defaultValue)
+{
+	return params ? jsonGetDouble(cJSON_GetObjectItem(params, name), defaultValue) : defaultValue;
+}
+
+static inline char* jsonGetString(cJSON *param, char *defaultValue)
+{
+	return (param && param->type == cJSON_String) ? param->valuestring : defaultValue;
+}
+static inline char* objGetString(cJSON *params, const char *name, char *defaultValue)
+{
+	return params ? jsonGetString(cJSON_GetObjectItem(params, name), defaultValue) : defaultValue;
+}
+
+static inline int jsonCheckIfTrue(cJSON *param)
+{
+	return (param && param->type == cJSON_True) ? 1 : 0;
+}
+static inline int objCheckIfTrue(cJSON *params, const char *name)
+{
+	return params ? jsonCheckIfTrue(cJSON_GetObjectItem(params, name)) : 0;
+}
+
 #endif // __ELCD_RPC_H
