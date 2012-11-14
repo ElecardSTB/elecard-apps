@@ -3212,7 +3212,7 @@ static int dvb_getPvrFileLength(struct dvb_instance *dvb, int file)
 	char filename[PATH_MAX];
 	int filePtr;
 	int offset;
-	sprintf(filename, sizeof(filename), "%s/part%02d.spts", dvb->directory, file);
+	snprintf(filename, sizeof(filename), "%s/part%02d.spts", dvb->directory, file);
 
 	if ((filePtr = open(filename, O_RDONLY)) <0)
 		return 0;
