@@ -123,6 +123,10 @@ typedef enum
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Return read-only static string */
 const char* rpc_cmd_name(elcdRpcCommand_t cmd);
 
@@ -131,6 +135,10 @@ const char* rpc_cmd_name(elcdRpcCommand_t cmd);
 char* rpc_request( const char *cmd, int id, cJSON *value);
 char* rpc_result ( int id, cJSON *result);
 char* rpc_error  ( int id, cJSON *err );
+
+#ifdef __cplusplus
+}
+#endif
 
 static inline int32_t jsonGetInt(cJSON *param, int32_t defaultValue)
 {
