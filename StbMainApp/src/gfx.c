@@ -188,7 +188,6 @@ static DFBEnumerationResult gfx_display_layer_callback( DFBDisplayLayerID       
 static void gfx_setVideoProviderName(const char *videoSource);
 #ifdef STSDK
 static inline float st_getTimeValue (cJSON *object, const char *value_name);
-static void gfx_videoProviderCreated(elcdRpcType_t type, cJSON *result, void* pArg);
 static void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *result, void* pArg);
 #endif
 
@@ -1642,7 +1641,7 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 
 		if (gfx_videoProvider.savedPos > 0)
 		{
-			pprintf("%s: elcmd_setstream %s, posInSec = %d\n",
+			pprintf("%s: elcmd_play %s, posInSec = %d\n",
 			    __func__, videoSource, (int)gfx_videoProvider.savedPos);
 			param = cJSON_CreateArray();
 
@@ -1650,11 +1649,11 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 			cJSON_AddItemToArray (param, cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
 		} else
 		{
-			pprintf("%s: elcmd_setstream %s\n",
+			pprintf("%s: elcmd_play %s\n",
 				__func__, videoSource);
 			param = cJSON_CreateString(videoSource);
 		}
-		gfx_videoProvider.waiting = st_rpcAsync( elcmd_setstream, param, gfx_videoProviderCreated, NULL);
+		gfx_videoProvider.waiting = st_rpcAsync( elcmd_play, param, gfx_videoProviderStarted, NULL);
 
 		if (gfx_videoProvider.waiting >= 0)
 		{
@@ -1739,24 +1738,6 @@ static int st_checkSuccess(elcdRpcType_t type, cJSON *res, const char *msg)
 	}
 
 	return 1;
-}
-
-void gfx_videoProviderCreated(elcdRpcType_t type, cJSON *res, void* pArg)
-{
-#ifdef TRACE_PROVIDERS
-	char *res_str = cJSON_Print(res);
-	pprintf("%s: %s %s\n", __FUNCTION__, type==elcdRpcResult?"result":"error", res_str);
-	FREE(res_str);
-#endif
-	gfx_videoProvider.waiting = -1;
-
-	if (st_checkSuccess(type, res, __FUNCTION__) &&
-	    gfx_resumeVideoProvider(screenMain))
-	{
-		gfx_videoProvider.active = 0;
-	}
-
-	cJSON_Delete(res);
 }
 
 void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
