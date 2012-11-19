@@ -107,6 +107,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define INTERFACE_PLAYCONTROL_SLIDER_TIMEOUT (1000)
 
+#define MENU_DEFAULT_CAPACITY (0)
+#define MENU_CAPACITY_INCREMENT (4)
+
 //#define INTERFACE_DRAW_ARROW
 
 /***********************************************
@@ -5103,6 +5106,9 @@ interfaceMenu_t *createBasicMenu( interfaceMenu_t *pMenu,
 
 	pMenu->pArg = pArg;
 
+#ifndef INTERFACE_STATIC_MENUS
+	pMenu->menuEntryCapacity = MENU_DEFAULT_CAPACITY;
+#endif
 	pMenu->menuEntryCount = 0;
 
 	pMenu->pParentMenu = pParent;
@@ -5125,7 +5131,14 @@ interfaceMenu_t *createBasicMenu( interfaceMenu_t *pMenu,
 			pMenu->statusBarIcons[i] = statusIcons[i];
 		}
 	}
-	
+
+#ifndef INTERFACE_STATIC_MENUS
+	if (pMenu->menuEntryCapacity > 0 &&
+	  !(pMenu->menuEntry = calloc(pMenu->menuEntryCapacity, sizeof(interfaceMenuEntry_t)))) {
+		eprintf("%s: (!) failed to allocate %d entries for %s\n", __FUNCTION__, pMenu->menuEntryCapacity, pMenu->name);
+		pMenu->menuEntryCapacity = 0;
+	}
+#endif
 	interface_clearMenuEntries(pMenu);
 
 	interface_menuReset(pMenu);
@@ -5161,6 +5174,26 @@ interfaceListMenu_t * createListMenu( interfaceListMenu_t *pMenu,
 	return pMenu;
 }
 
+int  interface_setMenuCapacity(interfaceMenu_t *pMenu, int newCapacity)
+{
+#ifndef INTERFACE_STATIC_MENUS
+	if (newCapacity < pMenu->menuEntryCount) {
+		eprintf("%s: can't set %s capacity to %d while there are %d entries used\n", __FUNCTION__, pMenu->name, newCapacity, pMenu->menuEntryCount);
+		return -2;
+	}
+	interfaceMenuEntry_t *newEntries = realloc(pMenu->menuEntry, newCapacity*sizeof(interfaceMenuEntry_t));
+	if (!newEntries) {
+		eprintf("%s: can't change %s capacity from %d to %d\n", __FUNCTION__, pMenu->name, pMenu->menuEntryCapacity, newCapacity);
+		return -1;
+	}
+	pMenu->menuEntry         = newEntries;
+	pMenu->menuEntryCapacity = newCapacity;
+	return newCapacity;
+#else
+	return MENU_MAX_ENTRIES;
+#endif
+}
+
 int interface_addMenuEntryCustom(interfaceMenu_t *pMenu, 
 							interfaceMenuEntryType_t type, 
 							const void *data, 
@@ -5173,7 +5206,13 @@ int interface_addMenuEntryCustom(interfaceMenu_t *pMenu,
 							void *pArg, 
 							int thumbnail)
 {
+#ifndef INTERFACE_STATIC_MENUS
+	if (pMenu->menuEntryCount == pMenu->menuEntryCapacity &&
+	    interface_setMenuCapacity(pMenu, pMenu->menuEntryCapacity + MENU_CAPACITY_INCREMENT) < 0)
+		return -1;
+#else
 	if ( pMenu->menuEntryCount < MENU_MAX_ENTRIES )
+#endif
 	{
 		dataSize = dataSize > MENU_ENTRY_INFO_LENGTH-1 ? MENU_ENTRY_INFO_LENGTH-1 : dataSize;
 		memcpy(pMenu->menuEntry[pMenu->menuEntryCount].info, data, dataSize );

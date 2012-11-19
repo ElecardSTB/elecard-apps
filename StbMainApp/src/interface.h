@@ -623,7 +623,12 @@ typedef struct __interfaceMenu_t
 	int maxEntryTextWidth;
 
 	int menuEntryCount;
-	interfaceMenuEntry_t menuEntry[MENU_MAX_ENTRIES];
+#ifndef INTERFACE_STATIC_MENUS
+	int menuEntryCapacity;
+	interfaceMenuEntry_t *menuEntry;
+#else
+	interfaceMenuEntry_t  menuEntry[MENU_MAX_ENTRIES];
+#endif
 
 	menuProcessCommandFunction processCommand;
 	menuConfirmFunction pCustomKeysCallback;
@@ -1645,6 +1650,8 @@ menuActionFunction interface_getMenuEntryAction(interfaceMenu_t *pMenu, int entr
 void interface_setMenuEntryImage(interfaceMenu_t *pMenu, int entryIndex, char* image);
 
 void interface_setMenuName(interfaceMenu_t *pMenu, const char* name, size_t nameLength);
+
+int  interface_setMenuCapacity(interfaceMenu_t *pMenu, int newCapacity);
 
 int  interface_getSelectedItem(interfaceMenu_t *pMenu);
 
