@@ -23,7 +23,7 @@ C_SOURCES = $(wildcard src/*.c)
 
 all: $(PROGRAM)
 
-$(PROGRAM):
+$(PROGRAM): $(C_SOURCES)
 	$(CC) -o $@ $(CFLAGS) -fPIC $(C_SOURCES)
 
 clean:
