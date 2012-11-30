@@ -2349,10 +2349,10 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 
 	switch( dvb_getType(0) )
 	{
-		case FE_OFDM:
+		case DVBT:
 			fe = &appControlInfo.dvbtInfo.fe;
 			break;
-		case FE_QAM:
+		case DVBC:
 			fe = &appControlInfo.dvbcInfo.fe;
 			break;
 		default:
@@ -2395,15 +2395,14 @@ static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 {
 	stb810_dvbfeInfo *fe = NULL;
 
-	switch (dvb_getType(tuner))
-	{
-		case FE_OFDM:
+	switch (dvb_getType(tuner)) {
+		case DVBT:
 			fe = &appControlInfo.dvbtInfo.fe;
 			break;
-		case FE_QAM:
+		case DVBC:
 			fe = &appControlInfo.dvbcInfo.fe;
 			break;
-		case FE_QPSK:
+		case DVBS:
 			if (appControlInfo.dvbsInfo.band == dvbsBandC)
 				fe = &appControlInfo.dvbsInfo.c_band;
 			else
@@ -2415,24 +2414,17 @@ static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 
 static __u32* getDvbSymbolRange(void)
 {
-	switch (dvb_getType(0))
-	{
-		case FE_QAM:
-			return &appControlInfo.dvbcInfo.symbolRate;
-			break;
-		case FE_QPSK:
-			return &appControlInfo.dvbsInfo.symbolRate;
-			break;
-		default:
-			break;
+	switch (dvb_getType(0)) {
+		case DVBC: return &appControlInfo.dvbcInfo.symbolRate;
+		case DVBS: return &appControlInfo.dvbsInfo.symbolRate;
+		default:   break;
 	}
 	return NULL;
 }
 
 static char *output_getDvbRange(int field, void* pArg)
 {
-	if( field == 0 )
-	{
+	if (field == 0) {
 		static char buffer[32];
 		int id = GET_NUMBER(pArg);
 		buffer[0] = 0;
@@ -2499,12 +2491,9 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static char *get_HZprefix(int tunerType)
+static inline char *get_HZprefix(int tunerType)
 {
-	if(tunerType == FE_QPSK) //if dvb-s, use MHz
-		return _T("MHZ");
-	else
-		return _T("KHZ");
+	return _T(tunerType == DVBS ? "MHZ" : "KHZ");
 }
 
 static int output_changeDvbRange(interfaceMenu_t *pMenu, void* pArg)
@@ -2545,7 +2534,6 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 #ifdef STSDK
 	if( tuner < VMSP_COUNT ) {
 #endif
-
 	sprintf(buf, PROFILE_LOCATIONS_PATH "/%s", appControlInfo.offairInfo.profileLocation);
 	if (getParam(buf, "LOCATION_NAME", NULL, NULL))
 	{
@@ -2598,12 +2586,12 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
 #endif
-	if ((tunerType == FE_QAM) || (tunerType == FE_QPSK)) //dvb-c or dvb-s needs symbol rate option
+	if (tunerType == DVBC || tunerType == DVBS)
 	{
 		sprintf(buf, "%s: %u %s", _T("DVB_SYMBOL_RATE"), getDvbSymbolRange()?*(getDvbSymbolRange()):0, _T("KHZ"));
 		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionSymbolRate), thumbnail_configure);
 	}
-	if (tunerType == FE_OFDM)
+	if (tunerType == DVBT)
 	{
 		switch (appControlInfo.dvbtInfo.bandwidth)
 		{
@@ -2614,7 +2602,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 				sprintf(buf, "%s: Auto", _T("DVB_BANDWIDTH") );
 		}
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
-	} else if (tunerType == FE_QAM)
+	} else if (tunerType == DVBC)
 	{
 		char *mod;
 

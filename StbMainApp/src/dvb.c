@@ -87,7 +87,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define MAX_OFFSETS   (1)
 #define FE_TYPE_COUNT (4)
-#define FE_MAX_SUPPORTED (FE_OFDM)
+#define FE_MAX_SUPPORTED (DVBT)
 
 #define MAX_RUNNING   (32)
 
@@ -264,12 +264,12 @@ static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
 static struct dvb_instance dvbInstances[VMSP_COUNT];
 static __u32 currentFrequency[VMSP_COUNT];
 static char * gFE_Type_Names[FE_TYPE_COUNT] = {
-	"QPSK",
-	"FE_QAM",
-	"FE_OFDM",
-	"FE_ATSC" };
+	"DVB-S",
+	"DVB-C",
+	"DVB-T",
+	"ATSC" };
 
-static fe_type_t gFE_type=FE_OFDM;    //will be used as if all FEs are of identical type.
+static fe_type_t gFE_type = DVBT;    //will be used as if all FEs are of identical type.
 
 static pmysem_t dvb_semaphore;
 static pmysem_t dvb_fe_semaphore;
@@ -504,13 +504,13 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 
 	switch(gFE_type)
 	{
-		case FE_OFDM:
+		case DVBT:
 			media.type = serviceMediaDVBT;
 			media.dvb_t.centre_frequency = frequency;
 			media.dvb_t.inversion = appControlInfo.dvbtInfo.fe.inversion;
 			media.dvb_t.bandwidth = appControlInfo.dvbtInfo.bandwidth;
 			break;
-		case FE_QAM:
+		case DVBC:
 			media.type = serviceMediaDVBC;
 			media.dvb_c.frequency = frequency;
 			media.dvb_c.inversion = appControlInfo.dvbcInfo.fe.inversion;
@@ -941,7 +941,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, i
 	p.frequency = frequency;
 	if (media && media->type == serviceMediaNone)
 		media = NULL;
-	if (type == FE_OFDM && (media == NULL || media->type == serviceMediaDVBT))
+	if (type == DVBT && (media == NULL || media->type == serviceMediaDVBT))
 	{
 		p.u.ofdm.bandwidth = media != NULL ? media->dvb_t.bandwidth :
 		                     appControlInfo.dvbtInfo.bandwidth;
@@ -953,7 +953,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, i
 		p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
 		p.inversion = appControlInfo.dvbtInfo.fe.inversion;
 	} else
-	if (type == FE_QAM && (media == NULL || media->type == serviceMediaDVBC))
+	if (type == DVBC && (media == NULL || media->type == serviceMediaDVBC))
 	{
 		if (media != NULL) {
 			p.u.qam.modulation  = media->dvb_c.modulation;
@@ -967,7 +967,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, i
 		eprintf("   C: Symbol rate %u, modulation %u invertion %u\n",
 				p.u.qam.symbol_rate, p.u.qam.modulation, p.inversion);
 	} else
-	if (type == FE_QPSK && (media == NULL || media->type == serviceMediaDVBS))
+	if (type == DVBS && (media == NULL || media->type == serviceMediaDVBS))
 	{
 		p.u.qpsk.symbol_rate = media != NULL ? media->dvb_s.symbol_rate :
 		                       appControlInfo.dvbsInfo.symbolRate*1000;
@@ -1216,17 +1216,17 @@ int dvb_getType(tunerFormat tuner)
 int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, __u32 * freq_step)
 {
 	switch (dvb_getType(tuner)) {
-		case FE_OFDM:
+		case DVBT:
 			*low_freq  = ( appControlInfo.dvbtInfo.fe.lowFrequency * KHZ);
 			*high_freq = (appControlInfo.dvbtInfo.fe.highFrequency * KHZ);
 			*freq_step = (appControlInfo.dvbtInfo.fe.frequencyStep * KHZ);
 			break;
-		case FE_QAM:
+		case DVBC:
 			*low_freq  = ( appControlInfo.dvbcInfo.fe.lowFrequency * KHZ);
 			*high_freq = (appControlInfo.dvbcInfo.fe.highFrequency * KHZ);
 			*freq_step = (appControlInfo.dvbcInfo.fe.frequencyStep * KHZ);
 			break;
-		case FE_QPSK:
+		case DVBS:
 			if (appControlInfo.dvbsInfo.band == dvbsBandC)
 			{
 				*low_freq  = (appControlInfo.dvbsInfo.c_band.lowFrequency  * KHZ);
@@ -1541,7 +1541,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 	if (tuner >= VMSP_COUNT)
 	{
 		cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber( tuner-VMSP_COUNT ) );
-		if (st_getDvbTunerType(tuner-VMSP_COUNT) == FE_QPSK)
+		if (st_getDvbTunerType(tuner-VMSP_COUNT) == DVBS)
 		{
 			cJSON_AddItemToObject(params, "start", cJSON_CreateNumber( frequency ) );
 			//cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( frequency ) );
