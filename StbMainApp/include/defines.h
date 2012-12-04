@@ -76,6 +76,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define ENABLE_DVB
 
+#ifndef STSDK
+#define LINUX_DVB_API_DEMUX
+#endif
+
 /** @def ENABLE_IPTV Enable IPTV menu and features
  */
 #define ENABLE_IPTV
@@ -133,8 +137,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_DVB
 	/** @def ENABLE_TELETEXT Enable DVB Teletext
 	 */
-// STAPI uses it's own demuxer, incompatible with StbMainApp's teletext implementation
-#ifndef STSDK
+#ifdef LINUX_DVB_API_DEMUX
 	#define ENABLE_TELETEXT
 #endif
 

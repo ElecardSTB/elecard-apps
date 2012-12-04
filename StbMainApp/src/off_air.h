@@ -284,11 +284,9 @@ time_t offair_getEventDuration(EIT_event_t *event);
 int offair_findCurrentEvent(list_element_t *schedule, time_t now, EIT_event_t **pevent, time_t *event_start, time_t *event_length, struct tm *start);
 
 #ifdef ENABLE_PVR
-#ifdef STBPNX
 int  offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg);
 
 int  offair_startPvrVideo(int which);
-#endif
 #endif
 
 #endif /* __OFF_AIR_H      Do not add any thing below this line */

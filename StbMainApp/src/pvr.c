@@ -113,7 +113,7 @@ typedef struct
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
 
-#ifdef STBPNX
+#ifdef STBPVR
 static int pvr_jobcmp(pvrJob_t *x, pvrJob_t *y);
 static void* pvr_jobcpy(pvrJob_t *dest, pvrJob_t *src);
 static char* pvr_jobGetName(pvrJob_t *job);
@@ -126,7 +126,7 @@ static int pvr_fillLocationMenu(interfaceMenu_t *pMenu, void* pArg);
 static int pvr_leavingLocationMenu(interfaceMenu_t *pMenu, void* pArg);
 static int pvr_browseRecords( interfaceMenu_t *pMenu, void* pArg );
 
-#ifdef STBPNX
+#ifdef STBPVR
 static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg);
 static int pvr_clearManageMenu(interfaceMenu_t *pMenu, void* pArg);
 static void *pvrThread(void *pArg);
@@ -171,7 +171,7 @@ static int pvr_manageMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 
 static interfaceListMenu_t PvrLocationMenu;
 
-#ifdef STBPNX
+#ifdef STBPVR
 static const time_t notifyTimeout = 10;
 
 static interfaceListMenu_t PvrEditMenu;
@@ -188,14 +188,14 @@ static int        pvr_storageReady = 0;
 #ifdef ENABLE_DVB
 static int        pvr_requestedDvbChannel;
 #endif
-#endif // STBPNX
+#endif // STBPVR
 
 /*********************************************************(((((((**********
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
 ***************************************************************************/
 
 interfaceListMenu_t PvrMenu;
-#ifdef STBPNX
+#ifdef STBPVR
 list_element_t *pvr_jobs = NULL;
 #endif
 
@@ -204,7 +204,7 @@ list_element_t *pvr_jobs = NULL;
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
 ********************************************************************************/
 
-#ifdef STBPNX
+#ifdef STBPVR
 static int pvr_get_status(socketClient_t *s)
 {
 	return client_write(s, "?", 2);
@@ -213,7 +213,7 @@ static int pvr_get_status(socketClient_t *s)
 
 void pvr_init()
 {
-#ifdef STBPNX
+#ifdef STBPVR
 	appControlInfo.pvrInfo.http.url = pvr_httpUrl;
 	appControlInfo.pvrInfo.http.url[0] = 0;
 
@@ -233,7 +233,7 @@ void pvr_init()
 void pvr_cleanup()
 {
 	appControlInfo.pvrInfo.active = 0;
-#ifdef STBPNX
+#ifdef STBPVR
 	client_destroy(&pvr_socket);
 #endif
 }
@@ -248,7 +248,7 @@ int pvr_getActive()
 		(appControlInfo.pvrInfo.http.url != NULL && appControlInfo.pvrInfo.http.url[0] != 0);
 }
 
-#ifdef STBPNX
+#ifdef STBPVR
 static void *pvrThread(void *pArg)
 {
 	char buf[MAX_URL];
@@ -304,6 +304,7 @@ static void *pvrThread(void *pArg)
 							}
 							interface_showMenu( 1, 1);
 							break;
+#ifdef STBPNX
 						case 'p': // recording & playing
 							displayedWarning = 0;
 							pvr_requestedDvbChannel = STBPVR_DVB_CHANNEL_NONE;
@@ -313,6 +314,7 @@ static void *pvrThread(void *pArg)
 								offair_startPvrVideo(screenMain); // restart playback
 							}
 							break;
+#endif
 						case 'o': // starts soon
 							channel = atoi( value );
 							if( appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 && 
@@ -465,7 +467,7 @@ static void *pvrThread(void *pArg)
 	dprintf("%s: Stopping PVR Thread\n", __FUNCTION__);
 	return NULL;
 }
-#endif // STBPNX
+#endif // STBPVR
 
 /* Functions used to control the PVR recording */
 
@@ -504,18 +506,18 @@ int  pvr_isRecordingDVB()
 {
 	return appControlInfo.pvrInfo.dvb.channel != STBPVR_DVB_CHANNEL_NONE;
 }
-
 #endif // ENABLE_DVB
 
 void pvr_stopRecordingRTP(int which)
 {
 	dprintf("%s: %d\n", __FUNCTION__, which);
 
-#ifdef STBPNX
+#ifdef STBPVR
 	client_write(&pvr_socket, "us",3);
-#endif
+#else
 #ifdef STSDK
 	pvr_stopRecordingST(which);
+#endif
 #endif
 }
 
@@ -523,11 +525,12 @@ void pvr_stopRecordingHTTP(int which)
 {
 	dprintf("%s: %d\n", __FUNCTION__, which);
 
-#ifdef STBPNX
+#ifdef STBPVR
 	client_write(&pvr_socket, "hs",3);
-#endif
+#else
 #ifdef STSDK
 	pvr_stopRecordingST(which);
+#endif
 #endif
 }
 
@@ -550,15 +553,16 @@ void pvr_stopPlayback(int which)
 }
 
 #ifdef ENABLE_DVB
-#ifdef STBPNX
 void pvr_startPlaybackDVB(int which)
 {
+#ifdef STBPNX
 	char buf[24];
 	sprintf(buf, "dp%d", appControlInfo.pvrInfo.dvb.channel );
 	if( client_write(&pvr_socket,  buf, strlen(buf)+1 ) <= 0 )
 	{
 		interface_showMessageBox( _T("ERR_PVR_RECORD"), thumbnail_error, 5000);
 	}
+#endif
 }
 
 int  pvr_isPlayingDVB(int which)
@@ -607,7 +611,7 @@ void pvr_purgeDVBRecords(void)
 
 	pvr_exportJobList();
 }
-#endif // STBPNX
+#endif // STBPVR
 #endif // ENABLE_DVB
 
 static int pvr_selectStorage(interfaceMenu_t *pMenu, void* pArg)
@@ -692,7 +696,7 @@ void pvr_storagesChanged()
 	}
 }
 
-#ifdef STBPNX
+#ifdef STBPVR
 static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	int i;
@@ -1013,7 +1017,7 @@ static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
-#endif // STBPNX
+#endif // STBPVR
 
 void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 {
@@ -1022,7 +1026,7 @@ void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
 		pvr_fillPvrMenu, NULL, NULL);
 
-#ifdef STBPNX
+#ifdef STBPVR
 	int pvr_icons[4] = { 0, 0, 0, 0 };
 	char *str;
 	char  buf[10];
@@ -1059,13 +1063,13 @@ void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
 		NULL, pvr_leavingEditMenu, NULL);
 	interface_setCustomKeysCallback((interfaceMenu_t*)&PvrEditMenu, pvr_editKeyCallback);
-#endif // STBPNX
+#endif // STBPVR
 	createListMenu(&PvrLocationMenu, _T("RECORDED_LOCATION"), thumbnail_usb, NULL, (interfaceMenu_t*)&PvrMenu,
 		/* interfaceInfo.clientX, interfaceInfo.clientY,
 		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
 		pvr_fillLocationMenu, pvr_leavingLocationMenu, NULL);
 
-#ifdef STBPNX
+#ifdef STBPVR
 	pvrEditInfo.start_entry.info.time.type    = interfaceEditTime24;
 	pvrEditInfo.duration_entry.info.time.type = interfaceEditTimeCommon;
 #endif
@@ -1076,7 +1080,7 @@ static int pvr_fillPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 	char *str;
 
 	interface_clearMenuEntries((interfaceMenu_t *)&PvrMenu);
-#ifdef STBPNX
+#ifdef STBPVR
 	switch( pvrEditInfo.job.type )
 	{
 		case pvrJobTypeUnknown: break;
@@ -1097,7 +1101,7 @@ static int pvr_fillPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&PvrLocationMenu, thumbnail_usb);
 			break;
 	}
-#endif // STBPNX
+#endif // STBPVR
 #ifdef STSDK
 	str = _T("RECORDED_LOCATION");
 	interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&PvrLocationMenu, thumbnail_usb);
@@ -1107,7 +1111,7 @@ static int pvr_fillPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 
 int pvr_initPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 {
-#ifdef STBPNX
+#ifdef STBPVR
 	pvrJobType_t new_type = (pvrJobType_t)pArg;
 	if( new_type != pvrEditInfo.job.type )
 	{
@@ -1133,7 +1137,7 @@ int pvr_initPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 		}
 		pvrEditInfo.job.type = new_type;
 	}
-#endif // STBPNX
+#endif // STBPVR
 	interface_menuActionShowMenu(pMenu, (void*)&PvrMenu);
 
 	return 0;
@@ -1149,11 +1153,10 @@ void pvr_recordNow(void)
 	}
 
 #ifdef ENABLE_DVB
-
 	if( appControlInfo.dvbInfo.active )
 	{
 		int channel = offair_getCurrentServiceIndex(screenMain);
-#ifdef STBPNX
+#ifdef STBPVR
 		char buf[10];
 
 		offair_stopVideo(screenMain, 1);
@@ -1173,7 +1176,7 @@ void pvr_recordNow(void)
 		pvrEditInfo.job.type = pvrJobTypeDVB;
 		pvrEditInfo.job.info.dvb.channel = channel;
 		pvrEditInfo.job.info.dvb.service = NULL;
-#endif // STBPNX
+#endif // STBPVR
 #ifdef STSDK
 		//offair_stopVideo( screenMain, 1 );
 
@@ -1223,7 +1226,7 @@ int pvr_record(int which, char *url, char *desc )
 	    strncmp( url, "https://", 8 ) == 0 ||
 	    strncmp( url, "ftp://", 6 ) == 0 )
 	{
-#ifdef STBPNX
+#ifdef STBPVR
 		char *str;
 		snprintf(buf, sizeof(buf), "hr%s", url);
 		buf[sizeof(buf)-1] = 0;
@@ -1247,7 +1250,7 @@ int pvr_record(int which, char *url, char *desc )
 		{
 			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
 		}
-#endif // STBPNX
+#endif // STBPVR
 		return 0;
 	}
 
@@ -1271,7 +1274,7 @@ int pvr_record(int which, char *url, char *desc )
 			memcpy(buf, url, url_len);
 			buf[url_len] = 0;
 			eprintf("PVR: Recording '%s' (%s)\n", buf, desc);
-#ifdef STBPNX
+#ifdef STBPVR
 			if( (size_t)url_len + 3 < sizeof(buf) )
 			{
 				buf[0] = 'u';
@@ -1295,7 +1298,7 @@ int pvr_record(int which, char *url, char *desc )
 				return 0;
 			} else
 				eprintf("%s: RTP URL '%s' is too long\n", __FUNCTION__, url);
-#endif // STBPNX
+#endif // STBPVR
 			return 1;
 		}
 		default:
@@ -1305,7 +1308,7 @@ int pvr_record(int which, char *url, char *desc )
 	return 1;
 }
 
-#ifdef STBPNX
+#ifdef STBPVR
 int pvr_manageRecord(int which, char *url, char *desc )
 {
 	url_desc_t url_desc;
@@ -1356,7 +1359,7 @@ int pvr_manageRecord(int which, char *url, char *desc )
 			return 1;
 	}
 }
-#endif // STBPNX
+#endif // STBPVR
 
 void pvr_toggleRecording()
 {
@@ -1380,7 +1383,7 @@ void pvr_toggleRecording()
 
 int pvr_updateSettings()
 {
-#ifdef STBPNX
+#ifdef STBPVR
 	FILE* f;
 	pid_t app_pid;
 	char buf[24];
@@ -1400,11 +1403,11 @@ int pvr_updateSettings()
 		fclose(f);
 	}
 	eprintf("PVR: Record service seems to not running\n");
-#endif // STBPNX
+#endif // STBPVR
 	return 1;
 }
 
-#ifdef STBPNX
+#ifdef STBPVR
 static char* pvr_jobGetName(pvrJob_t *job)
 {
 	switch(job->type)
@@ -2101,7 +2104,7 @@ static int pvr_setChannelValue(interfaceMenu_t *pMenu, char *value, void* pArg)
 	pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
 	return 0;
 }
-#endif
+#endif // PVR_CAN_EDIT_SOURCE
 
 static int pvr_setRTPName(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
@@ -2777,7 +2780,7 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 		x = interfaceInfo.clientX+interfaceInfo.paddingSize*2;//+INTERFACE_ARROW_SIZE;
 		y = interfaceInfo.clientY+interfaceInfo.paddingSize+fh;
 
-		tprintf("%c%c%s\t\t\t|%d\n", i == pvrMenu->baseMenu.selectedItem ? '>' : ' ', pvrMenu->baseMenu.menuEntry[0].isSelectable ? ' ' : '-', pvrMenu->baseMenu.menuEntry[0].info, pvrMenu->baseMenu.menuEntry[0].thumbnail);
+		tprintf("%c%c%s\t\t\t|%d\n", 0 == pvrMenu->baseMenu.selectedItem ? '>' : ' ', pvrMenu->baseMenu.menuEntry[0].isSelectable ? ' ' : '-', pvrMenu->baseMenu.menuEntry[0].info, pvrMenu->baseMenu.menuEntry[0].thumbnail);
 
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pvrMenu->baseMenu.menuEntry[0].info, 0, 0 == pvrMenu->baseMenu.selectedItem);
 
@@ -2995,5 +2998,4 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	}
 }
 
-#endif // STBPNX
 #endif // ENABLE_PVR

@@ -533,6 +533,7 @@ void dvb_clearServiceList(int permanent);
  *  @{
  */
 
+#ifdef LINUX_DVB_API_DEMUX
 /** Function used to obtain the length of the given PVR stream
  *
  *   @param[in]  which     PVR stream being played
@@ -554,6 +555,7 @@ void dvb_getPvrPosition(int which, DvbFilePosition_t *pPosition);
  *   @return Bit rate in bytes per second
  */
 int dvb_getPvrRate(int which);
+#endif // LINUX_DVB_API_DEMUX
 
 /** @} */
 

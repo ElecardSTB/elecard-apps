@@ -64,9 +64,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PVR_CELL_BORDER_BLUE  175
 #define PVR_CELL_BORDER_ALPHA 0x88
 
-/*********************
-* EXPORTED TYPEDEFS  *
-**********************/
+#if (defined STBPNX) || (defined STSDK)
+#define STBPVR
+#endif
 
 #define PVR_RES_ADDED     (0)
 #define PVR_RES_COLLISION (1)
@@ -144,7 +144,6 @@ int  pvr_record(int which, char *url, char *desc );
 int  pvr_manageRecord(int which, char *url, char *desc );
 
 #ifdef ENABLE_DVB
-#ifdef STBPNX
 /**
 *   @brief Start simultanious playback and recording of a DVB channel on a given screen
 * 
@@ -168,7 +167,6 @@ int  pvr_hasDVBRecords(void);
 /** Cancel current and all scheduled DVB records and update job list
  */
 void pvr_purgeDVBRecords(void);
-#endif // STBPNX
 
 /**
 *   @brief Function used to stop Pvr recording from a given tuner

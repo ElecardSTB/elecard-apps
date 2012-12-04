@@ -1846,10 +1846,10 @@ static void offair_getServiceDescription(EIT_service_t *service, char *desc, cha
 }
 
 #ifdef ENABLE_PVR
-#ifdef STBPNX
 int offair_startPvrVideo( int which )
 {
-	int ret;
+	int ret = 0;
+#ifdef STBPNX
 	char desc[BUFFER_SIZE];
 	int buttons;
 
@@ -1892,9 +1892,9 @@ int offair_startPvrVideo( int which )
 		ret = -1;
 		eprintf("offair: %s do not exist\n", STBPVR_PIPE_FILE ".dummy");
 	}
+#endif // STBPNX
 	return ret;
 }
-#endif // STBPNX
 #endif // ENABLE_PVR
 
 int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)

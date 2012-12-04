@@ -186,9 +186,7 @@ static int rtp_menuEntryDisplay(interfaceMenu_t *pMenu, DFBRectangle *rect, int 
 
 static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #ifdef ENABLE_PVR
-#ifdef STBPNX
 static int rtp_epgEntryDisplay(interfaceMenu_t *pMenu, DFBRectangle *rect, int i);
-#endif
 #endif
 
 #ifdef ENABLE_MULTI_VIEW
@@ -2092,7 +2090,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 			} else
 				interface_showMessageBox(URL, thumbnail_info, 0);
 			return 0;
-#if (defined ENABLE_PVR) && (defined STBPNX)
+#ifdef ENABLE_PVR
 		case interfaceCommandRecord:
 #if 1
 			{
@@ -2116,7 +2114,7 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 			{
 				pvr_record(which, rtp_info[streamNumber].url, streams.items[streamNumber].session_name );
 			}
-#endif // ENABLE_PVR && STBPNX
+#endif // ENABLE_PVR
 			return 0;
 #endif
 #ifdef ENABLE_MULTI_VIEW
@@ -2692,7 +2690,7 @@ int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg)
 		strncpy(&text[strlen(text)], (char*)event->description.event_name, sizeof(text)-6);
 		text[sizeof(text)-1] = 0;
 		interface_addMenuEntryCustom( (interfaceMenu_t *)&rtpEpgMenu, interfaceMenuEntryText, text, strlen(text)+1, 1, NULL, NULL, NULL,
-#if (defined ENABLE_PVR) && (defined STBPNX)
+#ifdef ENABLE_PVR
 			rtp_epgEntryDisplay,
 #else
 			NULL,
@@ -2705,7 +2703,6 @@ int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 
 #ifdef ENABLE_PVR
-#ifdef STBPNX
 static EIT_event_t* rtp_findEvent( int channelNumber, unsigned int event_id )
 {
 	list_element_t *element;
@@ -2775,7 +2772,6 @@ int rtp_recordNow()
 		return pvr_record( screenMain, appControlInfo.rtpMenuInfo.lastUrl, appControlInfo.playbackInfo.description );
 	}
 }
-#endif //STBPNX
 #endif //ENABLE_PVR
 
 static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
@@ -2792,7 +2788,7 @@ static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 				interface_showMenu(0, 1);
 			return 0;
 #ifdef ENABLE_PVR
-#ifdef STBPNX
+#ifdef STBPVR
 		case interfaceCommandRecord:
 			if( rtpEpgMenu.baseMenu.selectedItem < 0 )
 				return 1;
@@ -2879,7 +2875,7 @@ static int rtp_epgKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			interface_displayMenu(1);
 		}
 			return 0;
-#endif // STBPNX
+#endif // STBPVR
 #endif // ENABLE_PVR
 		default:
 			return 1;
