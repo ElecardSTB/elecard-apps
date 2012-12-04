@@ -611,7 +611,6 @@ void pvr_purgeDVBRecords(void)
 
 	pvr_exportJobList();
 }
-#endif // STBPVR
 #endif // ENABLE_DVB
 
 static int pvr_selectStorage(interfaceMenu_t *pMenu, void* pArg)
@@ -2997,5 +2996,6 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 	}
 }
+#endif // STBPVR
 
 #endif // ENABLE_PVR
