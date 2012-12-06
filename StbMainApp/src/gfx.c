@@ -2134,7 +2134,8 @@ static void *gfx_getDimensionsThread(void *pArg)
 
 		if (strstr(appControlInfo.mediaInfo.filename, ".m3u8") && (notifyHls == 2))
 		{
-			media_notifyHlsReady();
+			interface_hideLoading();
+			interface_displayMenu(1);
 			notifyHls = 0;
 		}
 

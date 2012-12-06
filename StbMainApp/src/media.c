@@ -1038,13 +1038,6 @@ static int media_onStop()
 	return 0;
 }
 
-void media_notifyHlsReady()
-{
-	interface_hideLoading();
-	interface_displayMenu(1);
-	return;
-}
-
 int media_check_status(void *pArg)
 {
 	DFBVideoProviderStatus status;
