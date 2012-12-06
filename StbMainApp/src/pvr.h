@@ -178,11 +178,17 @@ void pvr_purgeDVBRecords(void);
 void pvr_stopRecordingDVB(int which);
 
 int  pvr_isRecordingDVB(void);
+
+void pvr_toogleRecordingDVB(void);
 #endif // ENABLE_DVB
 
 int  pvr_showStopPvr( interfaceMenu_t *pMenu, void* pArg );
 
+int  pvr_isRecordingRTP(void);
+
 void pvr_stopRecordingRTP(int which);
+
+int  pvr_isRecordingHTTP(void);
 
 void pvr_stopRecordingHTTP(int which);
 

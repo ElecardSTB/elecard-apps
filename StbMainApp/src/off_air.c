@@ -773,10 +773,8 @@ void offair_stopVideo(int which, int reset)
 		gfx_stopVideoProvider(which, reset, 1);
 #endif
 #ifdef ENABLE_PVR
-		if( appControlInfo.pvrInfo.dvb.channel >=0 )
-		{
+		if (pvr_isRecordingDVB())
 			pvr_stopPlayback(screenMain);
-		}
 #endif
 
 		dprintf("%s: Stop video \n", __FUNCTION__);
@@ -889,28 +887,21 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	} else if ( button == interfacePlayControlPlay )
 	{
 		dprintf("%s: play\n", __FUNCTION__);
-		if ( !appControlInfo.dvbInfo.active )
-		{
+		if (!appControlInfo.dvbInfo.active)
 			offair_startVideo(which);
-		}
 	} else if ( button == interfacePlayControlStop )
 	{
 		dprintf("%s: stop\n", __FUNCTION__);
 #ifdef ENABLE_PVR
-		if( appControlInfo.pvrInfo.dvb.channel >= 0 && appControlInfo.pvrInfo.dvb.channel == offair_getCurrentServiceIndex(which) )
-		{
+		if (pvr_isPlayingDVB(which)) {
 			pvr_stopRecordingDVB(which);
-			if( appControlInfo.dvbInfo.channel > 0 )
-			{
+			if (appControlInfo.dvbInfo.channel > 0) {
 				offair_getServiceDescription(offair_services[appControlInfo.dvbInfo.channel].service,desc,_T("DVB_CHANNELS"));
 				interface_playControlUpdateDescriptionThumbnail(desc, offair_services[appControlInfo.dvbInfo.channel].service->service_descriptor.service_type == 2 ? thumbnail_radio : thumbnail_channels);
 			}
 		}
 #endif
-		if ( appControlInfo.dvbInfo.active )
-		{
-			offair_stopVideo(which, 1);
-		}
+		offair_stopVideo(which, 1);
 	} else if (button == interfacePlayControlInfo)
 	{
 #ifdef ENABLE_DVB_DIAG
@@ -953,15 +944,9 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 	}
 #ifdef ENABLE_PVR
-	else if (button == interfaceCommandRecord)
+	else if (button == interfacePlayControlRecord)
 	{
-		if( appControlInfo.pvrInfo.dvb.channel >= 0 )
-		{
-			pvr_stopRecordingDVB(which);
-		} else
-		{
-			pvr_recordNow();
-		}
+		pvr_toogleRecordingDVB();
 	}
 #endif
 	else
@@ -1308,10 +1293,8 @@ void offair_displayPlayControl()
 		buffer[getMaxStringLengthForFont(pgfx_font, buffer, w-rect.w-DVBPC_STATUS_ICON_SIZE-interfaceInfo.paddingSize*3)] = 0;
 
 #ifdef ENABLE_PVR
-		if( appControlInfo.pvrInfo.dvb.channel >= 0 )
-		{
+		if (pvr_isRecordingDVB())
 			interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "icon_record.png", rect.x+rect.w+interfaceInfo.paddingSize, rect.y+fh/2, DVBPC_STATUS_ICON_SIZE, DVBPC_STATUS_ICON_SIZE, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignLeft|interfaceAlignMiddle, NULL, NULL);
-		}
 #endif
 
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+rect.w+DVBPC_STATUS_ICON_SIZE+interfaceInfo.paddingSize*2, rect.y+fa, buffer, 0, 0);
@@ -1460,15 +1443,9 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 	}
 #endif // #ifdef ENABLE_TELETEXT
 #ifdef ENABLE_PVR
-	if(cmd->command == interfaceCommandRecord)
+	if (cmd->command == interfaceCommandRecord)
 	{
-		if( appControlInfo.pvrInfo.dvb.channel >= 0 )
-		{
-			pvr_stopRecordingDVB(screenMain);
-		} else
-		{
-			pvr_recordNow();
-		}
+		pvr_toogleRecordingDVB();
 		return 0;
 	}
 #endif
@@ -1519,12 +1496,12 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		if( cmd->command == interfaceCommandTV)
 		{
 			int which = CHANNEL_INFO_GET_SCREEN(pArg);
-			if( 
+			if (
 #ifdef ENABLE_PVR
-			    appControlInfo.pvrInfo.dvb.channel < 0 &&
+			    !pvr_isRecordingDVB() &&
 #endif
 			    dvb_hasMediaType(offair_services[appControlInfo.dvbInfo.channel].service, mediaTypeVideo) == 1 && (dvb_getScrambled(offair_services[appControlInfo.dvbInfo.channel].service) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY)
-			  )
+			   )
 			{
 				offair_multiviewPlay(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, appControlInfo.dvbInfo.channel));
 				return 0;
@@ -1918,15 +1895,12 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 #if (defined ENABLE_PVR) && (defined STBPNX)
-	if ( appControlInfo.pvrInfo.dvb.channel >= 0 )
+	if (pvr_isRecordingDVB())
 	{
-		if( offair_getIndex(appControlInfo.pvrInfo.dvb.channel) == channelNumber )
-		{
+		if (offair_getIndex(appControlInfo.pvrInfo.dvb.channel) == channelNumber)
 			pvr_startPlaybackDVB(screenMain);
-		} else
-		{
-			pvr_showStopPvr( pMenu, (void*)channelNumber );
-		}
+		else
+			pvr_showStopPvr(pMenu, (void*)channelNumber);
 		return 0;
 	}
 #endif
@@ -2676,9 +2650,6 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 	int i, service_index, service_count;
 	time_t eventOffset = 0, eventEnd = 0, end_tt;
 	struct tm t;
-#ifdef ENABLE_PVR
-	list_element_t *job_element = NULL;
-#endif
 
 	switch(cmd->command)
 	{
@@ -3056,6 +3027,7 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		{
 		case MENU_ITEM_EVENT:
 			{
+				list_element_t *job_element = NULL;
 				pvrJob_t job;
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
@@ -3218,13 +3190,11 @@ void offair_fillDVBTMenu()
 	offair_initServices();
 
 #ifdef ENABLE_PVR
-	if ( appControlInfo.pvrInfo.dvb.channel >= 0 )
+	if (pvr_isRecordingDVB())
 	{
 		str = dvb_getTempServiceName(appControlInfo.pvrInfo.dvb.channel);
-		if( str == NULL )
-		{
+		if (str == NULL)
 			str = _T("NOT_AVAILABLE_SHORT");
-		}
 		sprintf(buf, "%s: %s", _T("RECORDING"), str);
 		interface_addMenuEntry((interfaceMenu_t*)&DVBTMenu, buf, offair_stopRecording, NULL, thumbnail_recording);
 	} else
@@ -4106,11 +4076,18 @@ void offair_playURL(char* URL, int which)
 
 	dprintf("%s: '%s'\n", __FUNCTION__, URL);
 
-	if( (i = parseURL(URL,&ud)) != 0 )
-	{
+	i = parseURL(URL,&ud);
+	if (i != 0) {
 		eprintf("offair: Error %d parsing '%s'\n",i,URL);
 		return;
 	}
+#if (defined ENABLE_PVR) && (defined STBPNX)
+	if (pvr_isRecordingDVB()) {
+		pvr_showStopPvr( interfaceInfo.currentMenu, (void*)-1 );
+		return;
+	}
+#endif
+
 	frequency = atol(ud.address);
 	ts_id = atoi(ud.source);
 	srv_id = ud.port;
@@ -4261,15 +4238,6 @@ parsing_done:
 	dprintf("%s: dvb url parsing done: freq=%ld srv_id=%d ts_id=%d vpid=%d apid=%d vtype=%d atype=%d pcr=%d\n", __FUNCTION__,
 		frequency,srv_id,ts_id,vpid,apid,vt,at,pcr);
 
-
-#if (defined ENABLE_PVR) && (defined STBPNX)
-	if ( appControlInfo.pvrInfo.dvb.channel >= 0 )
-	{
-		pvr_showStopPvr( interfaceInfo.currentMenu, (void*)-1 );
-		return;
-	}
-#endif
-
 	if ( appControlInfo.dvbInfo.active != 0 )
 	{
 		// force showState to NOT be triggered
@@ -4396,7 +4364,7 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			 
 			if (
 #ifdef ENABLE_PVR
-				appControlInfo.pvrInfo.dvb.channel < 0 &&
+				!pvr_isRecordingDVB() &&
 #endif
 			    (appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY || dvb_getScrambled(offair_services[channelNumber].service) == 0) &&
 			     dvb_hasMediaType(offair_services[channelNumber].service, mediaTypeVideo) > 0

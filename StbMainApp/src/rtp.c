@@ -2107,13 +2107,10 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 					interface_showMessageBox(_T("ERR_INCORRECT_PROTO"), thumbnail_error, 0);
 			}
 #else
-			if( appControlInfo.pvrInfo.rtp.desc.fmt != payloadTypeUnknown )
-			{
+			if (pvr_isRecordingRTP())
 				pvr_stopRecordingRTP(which);
-			} else
-			{
+			else
 				pvr_record(which, rtp_info[streamNumber].url, streams.items[streamNumber].session_name );
-			}
 #endif // ENABLE_PVR
 			return 0;
 #endif

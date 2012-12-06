@@ -244,8 +244,8 @@ int pvr_getActive()
 #ifdef ENABLE_DVB
 		pvr_isRecordingDVB() ||
 #endif
-		(appControlInfo.pvrInfo.rtp.desc.fmt != payloadTypeUnknown) ||
-		(appControlInfo.pvrInfo.http.url != NULL && appControlInfo.pvrInfo.http.url[0] != 0);
+		pvr_isRecordingRTP() ||
+		pvr_isRecordingHTTP();
 }
 
 #ifdef STBPVR
@@ -317,7 +317,7 @@ static void *pvrThread(void *pArg)
 #endif
 						case 'o': // starts soon
 							channel = atoi( value );
-							if( appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 && 
+							if (appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 &&
 							    channel != appControlInfo.pvrInfo.dvb.channel && (appControlInfo.pvrInfo.dvb.channel >= 0 || appControlInfo.dvbInfo.active ))
 							{
 								pvr_showStopPvr( interfaceInfo.currentMenu, (void*)(-pvrJobTypeDVB) );
@@ -360,8 +360,8 @@ static void *pvrThread(void *pArg)
 						}
 						case 'o': // starts soon
 							channel = atoi( value );
-							if( appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 && 
-							    appControlInfo.pvrInfo.rtp.desc.fmt != payloadTypeUnknown)
+							if (appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 &&
+							    pvr_isRecordingRTP())
 							{
 								pvr_showStopPvr( interfaceInfo.currentMenu, (void*)(-pvrJobTypeRTP) );
 							}
@@ -506,7 +506,20 @@ int  pvr_isRecordingDVB()
 {
 	return appControlInfo.pvrInfo.dvb.channel != STBPVR_DVB_CHANNEL_NONE;
 }
+
+void pvr_toogleRecordingDVB(void)
+{
+	if (pvr_isRecordingDVB())
+		pvr_stopRecordingDVB(screenMain);
+	else
+		pvr_recordNow();
+}
 #endif // ENABLE_DVB
+
+int  pvr_isRecordingRTP(void)
+{
+	return appControlInfo.pvrInfo.rtp.desc.fmt != payloadTypeUnknown;
+}
 
 void pvr_stopRecordingRTP(int which)
 {
@@ -519,6 +532,11 @@ void pvr_stopRecordingRTP(int which)
 	pvr_stopRecordingST(which);
 #endif
 #endif
+}
+
+int  pvr_isRecordingHTTP(void)
+{
+	return appControlInfo.pvrInfo.http.url != NULL && appControlInfo.pvrInfo.http.url[0] != 0;
 }
 
 void pvr_stopRecordingHTTP(int which)
@@ -572,7 +590,7 @@ int  pvr_isPlayingDVB(int which)
 
 int  pvr_hasDVBRecords(void)
 {
-	if( pvr_isRecordingDVB() )
+	if (pvr_isRecordingDVB())
 		return 1;
 	list_element_t *job_element;
 	for( job_element = pvr_jobs; job_element != NULL; job_element = job_element->next )
@@ -1367,12 +1385,12 @@ void pvr_toggleRecording()
 	if( active )
 	{
 #ifdef ENABLE_DVB
-		if( pvr_isRecordingDVB() )
+		if (pvr_isRecordingDVB())
 			pvr_stopRecordingDVB(screenMain);
 #endif
-		if(appControlInfo.pvrInfo.rtp.desc.fmt != payloadTypeUnknown)
+		if (pvr_isRecordingRTP())
 			pvr_stopRecordingRTP(screenMain);
-		if(appControlInfo.pvrInfo.http.url[0] != 0 )
+		if (pvr_isRecordingHTTP())
 			pvr_stopRecordingHTTP(screenMain);
 	} else
 	{
@@ -1630,7 +1648,7 @@ int pvr_deleteJob(list_element_t* job_element)
 		prev_element->next = job_element->next;
 	}
 	job = (pvrJob_t *)job_element->data;
-	if( job->type == pvrJobTypeHTTP )
+	if (job->type == pvrJobTypeHTTP)
 		free(job->info.http.url);
 	free_element(job_element);
 	return 0;
