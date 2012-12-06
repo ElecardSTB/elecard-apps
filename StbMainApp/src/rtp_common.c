@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "debug.h"
 
 #include <sdp.h>
+#include <service.h>
 
 #ifdef STB225
 #include <phStbSbmSink.h>
@@ -84,7 +85,7 @@ void rtp_common_get_pids(pStreamsPIDs streamPIDs, int *vFormat, int *vPID, int *
 		if ( streamPIDs->pStream[i].stream_type == 0x2 )
 		{ //mpeg2
 			dprintf("%s: got mpeg2 with pid 0x%X\n", __FUNCTION__, streamPIDs->pStream[i].elementary_PID);
-			*vFormat = MPEG2;
+			*vFormat = streamTypeVideoMPEG2;
 			*vPID = streamPIDs->pStream[i].elementary_PID;
 			progid = streamPIDs->pStream[i].ProgID;
 			*pPID = streamPIDs->pStream[i].PCR_PID;
@@ -92,7 +93,7 @@ void rtp_common_get_pids(pStreamsPIDs streamPIDs, int *vFormat, int *vPID, int *
 		} else if ( streamPIDs->pStream[i].stream_type == 0x1b )
 		{ //h264
 			dprintf("%s: got h264 with pid 0x%X\n", __FUNCTION__, streamPIDs->pStream[i].elementary_PID);
-			*vFormat = H264;
+			*vFormat = streamTypeVideoH264;
 			*vPID = streamPIDs->pStream[i].elementary_PID;
 			progid = streamPIDs->pStream[i].ProgID;
 			*pPID = streamPIDs->pStream[i].PCR_PID;
@@ -108,7 +109,7 @@ void rtp_common_get_pids(pStreamsPIDs streamPIDs, int *vFormat, int *vPID, int *
 			dprintf("%s: got mp3 with pid 0x%X\n", __FUNCTION__, streamPIDs->pStream[i].elementary_PID);
 			if (*aPID == 0)
 			{
-				*aFormat = MP3;
+				*aFormat = streamTypeAudioMPEG1;
 				*aPID = streamPIDs->pStream[i].elementary_PID;
 			}
 			if (audio != NULL)
@@ -125,7 +126,7 @@ void rtp_common_get_pids(pStreamsPIDs streamPIDs, int *vFormat, int *vPID, int *
 			dprintf("%s: got aac with pid 0x%X\n", __FUNCTION__, streamPIDs->pStream[i].elementary_PID);
 			if (*aPID == 0)
 			{
-				*aFormat = AAC;
+				*aFormat = streamTypeAudioAAC;
 				*aPID = streamPIDs->pStream[i].elementary_PID;
 			}
 			if (audio != NULL)
@@ -142,7 +143,7 @@ void rtp_common_get_pids(pStreamsPIDs streamPIDs, int *vFormat, int *vPID, int *
 		{ //ac3
 			if (*aPID == 0)
 			{
-				*aFormat = AC3;
+				*aFormat = streamTypeAudioAC3;
 				*aPID = streamPIDs->pStream[i].elementary_PID;
 			}
 			if (audio != NULL)

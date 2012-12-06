@@ -2426,51 +2426,20 @@ char* dvb_getServiceName(EIT_service_t *service)
 
 payload_type dvb_getStreamType( PID_info_t* stream )
 {
-	switch( stream->stream_type )
+	switch (stream->stream_type)
 	{
-		case 0x01:
-		case 0x02:
+		case 0x01: // streamTypeVideoMPEG1
+		case 0x02: // streamTypeVideoMPEG2
 			return payloadTypeMpeg2;
-		case 0x1b:
+		case 0x1b: // streamTypeVideoH264
 			return payloadTypeH264;
-		case 0x03:
-		case 0x04:
+		case 0x03: // streamTypeAudioMPEG1
+		case 0x04: // streamTypeAudioMPEG2
 			return payloadTypeMpegAudio;
-		case 0x12:
+		case 0x81: // streamTypeAudioAC3
 			return payloadTypeAC3;
 		case 0x06:
 			return payloadTypeText;
-//	case 0x06:
-// 			if (find_descriptor(0x56, buf + 5, ES_info_len, NULL, NULL)) {
-// 				info("  TELETEXT  : PID 0x%04x\n", elementary_pid);
-// 				s->teletext_pid = elementary_pid;
-// 				break;
-// 			}
-// 			else if (find_descriptor(0x59, buf + 5, ES_info_len, NULL, NULL)) {
-// 				/* Note: The subtitling descriptor can also signal
-// 				 * teletext subtitling, but then the teletext descriptor
-// 				 * will also be present; so we can be quite confident
-// 				 * that we catch DVB subtitling streams only here, w/o
-// 				 * parsing the descriptor. */
-// 				info("  SUBTITLING: PID 0x%04x\n", elementary_pid);
-// 				s->subtitling_pid = elementary_pid;
-// 				break;
-// 			}
-// 			else if (find_descriptor(0x6a, buf + 5, ES_info_len, NULL, NULL)) {
-// 				info("  AC3       : PID 0x%04x\n", elementary_pid);
-// 				if (s->audio_num < AUDIO_CHAN_MAX) {
-// 					s->audio_tracks[s->audio_num].pid = elementary_pid;
-// 					s->audio_tracks[s->audio_num].type = AC3;
-// 					s->audio_tracks[s->audio_num].lang[0] = 0;
-// 					s->audio_num++;
-// 				}
-// 				else
-// 				{
-// 					info("more than %i audio channels, truncating\n",
-// 						 AUDIO_CHAN_MAX);
-// 				}
-// 				break;
-// 	}
 		default:
 			return payloadTypeUnknown;
 	}

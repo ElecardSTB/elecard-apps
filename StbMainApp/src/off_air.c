@@ -154,7 +154,7 @@ static int  offair_startNextChannel(int direction, void* pArg);
 static int  offair_setChannel(int channel, void* pArg);
 static int  offair_infoTimerEvent(void *pArg);
 static int  offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, int ts_id, int audio_type, int video_type, int text_type);
+static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, int ts_id, int audio_type, int video_type);
 static void offair_initDVBTOutputMenu(interfaceMenu_t *pParent, int which);
 static int  offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg);
 static void offair_sortEvents(list_element_t **event_list);
@@ -1032,7 +1032,7 @@ static int offair_multiviewPlay( interfaceMenu_t *pMenu, void *pArg)
 	appControlInfo.dvbInfo.showInfo = 0;
 	offair_setInfoUpdateTimer(screenMain, 0);
 
-	offair_startDvbVideo(screenMain, &param, 0,0,0,payload[0],TXT);
+	offair_startDvbVideo(screenMain, &param, 0,0,0,payload[0]);
 	return 0;
 }
 
@@ -1572,16 +1572,16 @@ void offair_startVideo(int which)
 		appControlInfo.dvbInfo.audio_track) )
 	{
 	case payloadTypeAC3:
-		audio_type = AC3;
+		audio_type = streamTypeAudioAC3;
 		break;
 	case payloadTypeAAC:
-		audio_type = AAC;
+		audio_type = streamTypeAudioAAC;
 		break;
 	default:
-		audio_type = MP3;
+		audio_type = streamTypeAudioMPEG1;
 	}
 	video_type = dvb_hasMediaType(offair_services[appControlInfo.dvbInfo.channel].service, mediaTypeVideo) ?
-		( dvb_hasPayloadType( offair_services[appControlInfo.dvbInfo.channel].service, payloadTypeH264 ) ? H264 : MPEG2 ) : 0;
+		( dvb_hasPayloadType( offair_services[appControlInfo.dvbInfo.channel].service, payloadTypeH264 ) ? streamTypeVideoH264 : streamTypeVideoMPEG2 ) : 0;
 
 #ifdef ENABLE_DVB_DIAG
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
@@ -1593,10 +1593,10 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
 #endif
 
-	offair_startDvbVideo(which,&param,0,0,audio_type, video_type, TXT);
+	offair_startDvbVideo(which,&param,0,0,audio_type, video_type);
 }
 
-static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, int ts_id, int audio_type, int video_type, int text_type)
+static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, int ts_id, int audio_type, int video_type)
 {
 	char filename[256];
 	char qualifier[64];
@@ -1629,9 +1629,9 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 #endif
 	sprintf(qualifier, "%s%s%s%s%s",
 		"", // (which==screenPip) ? ":SD:NoSpdif:I2S1" : "",
-		audio_type == AC3 ? ":AC3" : "",
-		video_type == H264 ? ":H264" : ( video_type == MPEG2 ? ":MPEG2" : ""),
-		audio_type == AAC ? ":AAC" : AUDIO_MPEG,
+		audio_type == streamTypeAudioAC3 ? ":AC3" : "",
+		video_type == streamTypeVideoH264 ? ":H264" : ( video_type == streamTypeVideoMPEG2 ? ":MPEG2" : ""),
+		audio_type == streamTypeAudioAAC ? ":AAC" : AUDIO_MPEG,
 		(appControlInfo.soundInfo.rcaOutput==1) ? "" : ":I2S0");
 
 	dprintf("%s: Qualifier: %s\n", __FUNCTION__, qualifier);
@@ -4128,12 +4128,12 @@ void offair_playURL(char* URL, int which)
 					i += 3;
 					if( strncasecmp(&ud.stream[i],"MPEG2",5)==0 )
 					{
-						vt = MPEG2;
+						vt = streamTypeVideoMPEG2;
 						i += 5;
 					}
 					else if ( strncasecmp(&ud.stream[i],"H264",4)==0 )
 					{
-						vt = H264;
+						vt = streamTypeVideoH264;
 						i += 4;
 					}
 					else
@@ -4189,17 +4189,17 @@ void offair_playURL(char* URL, int which)
 					i += 3;
 					if( strncasecmp(&ud.stream[i],"MP3",3)==0 )
 					{
-						at = MP3;
+						at = streamTypeAudioMPEG1;
 						i += 3;
 					}
 					else if ( strncasecmp(&ud.stream[i],"AAC",3)==0 )
 					{
-						at = AAC;
+						at = streamTypeAudioAAC;
 						i += 3;
 					}
 					else if ( strncasecmp(&ud.stream[i],"AC3",3)==0 )
 					{
-						at = AC3;
+						at = streamTypeAudioAC3;
 						i += 3;
 					}
 					else
@@ -4262,7 +4262,7 @@ parsing_done:
 	interface_playControlSetProcessCommand(offair_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, appControlInfo.playbackInfo.playlistMode == playlistModeFavorites ? playlist_setChannel : offair_setChannel);
 
-	offair_startDvbVideo(which, &param, srv_id, ts_id,  at, vt, TXT);
+	offair_startDvbVideo(which, &param, srv_id, ts_id,  at, vt);
 
 	playlist_setLastUrl(URL);
 

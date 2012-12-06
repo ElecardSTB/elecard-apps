@@ -51,13 +51,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define BER_THRESHOLD (30000)
 
-#define H264             (0x1b)
-#define MPEG2            (0x01)
-#define MP3              (0x03)
-#define AAC              (0x0f)
-#define AC3              (0x6a)
-#define TXT              (0x06)
-
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
