@@ -6,7 +6,7 @@ OUT = $(BUILD_TARGET)libelcdrpc
 SRC = $(wildcard src/*.c)
 HDR = $(wildcard include/*.h)
 OBJ = $(addsuffix .o, $(notdir $(basename $(SRC))))
-MYCFLAGS = -I../StbMainApp/src -Iinclude -O3 -g -s -Wall -Wextra -Wno-unused-parameter -Wno-multichar
+MYCFLAGS = -I../StbMainApp/src -I../cJSON/include -Iinclude -O3 -g -s -Wall -Wextra -Wno-unused-parameter -Wno-multichar
 
 ifneq ($(BUILD_TARGET),)
     CC=${CROSS_COMPILE}gcc

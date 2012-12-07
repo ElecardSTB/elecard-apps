@@ -123,6 +123,7 @@ LOCAL_CXXFLAGS = \
 LOCAL_LDFLAGS = \
 	-lnet \
 	-lcommon \
+	-lcjson \
 	-Xlinker -rpath -Xlinker /opt/elecard/lib \
 	-L$(ROOTFS)/opt/elecard/lib \
 	-lrt -lpthread -Xlinker -z -Xlinker muldefs
@@ -528,6 +529,7 @@ LOCAL_CFLAGS  += \
 	-DSTSDK=1 \
 	-Isrc \
 	-I$(DVD_ROOT)/st2fx/src/DirectFB-1.4.12/source/src \
+	-I$(PRJROOT)/src/apps/cJSON/include \
 	-I$(PRJROOT)/src/apps/elcdRpcLib/include \
 	-I$(STAGINGDIR)/usr/include/glib-2.0 -I$(STAGINGDIR)/usr/lib/glib-2.0/include
 
@@ -686,7 +688,6 @@ endif
 ifneq ($(STAPISDK_VERSION),)
 copy_nfs: $(PROGRAM)
 	$(Q)mkdir -p $(ROOTFS_NFS)/opt/elecard/lib $(ROOTFS_NFS)/opt/elecard/bin $(ROOTFS_NFS)/opt/elecard/share
-	$(Q)install -m0755 $(ROOTFS)/opt/elecard/lib/libelcdrpc.so $(ROOTFS_NFS)/opt/elecard/lib
 	$(Q)install -m0755 $(PROGRAM) $(ROOTFS_NFS)/opt/elecard/bin
 	rm -rf  $(ROOTFS_NFS)/opt/elecard/share/StbMainApp
 	$(Q)cp -r $(DATA_DIR) $(ROOTFS_NFS)/opt/elecard/share/
