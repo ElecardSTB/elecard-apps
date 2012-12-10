@@ -3083,7 +3083,7 @@ static int output_setNTP(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 		
 		interface_hideLoading();
-		output_refillMenu(pMenu);
+		output_redrawMenu(pMenu);
 	}
 #endif
 
