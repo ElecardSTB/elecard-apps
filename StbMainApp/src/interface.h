@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <limits.h>
 #include <directfb.h>
 
+#include <string.h>
 #ifdef WCHAR_SUPPORT
 #include <wchar.h>
 #include <wctype.h>
@@ -1200,6 +1201,7 @@ int  interface_addMenuEntryCustom (interfaceMenu_t *pMenu, interfaceMenuEntryTyp
  *
  *  @param[in]  pMenu               Pointer to interfaceMenu_t for entry to be added to
  *  @param[in]  text
+ *  @param[in]  enabled             If set to 1, menu entry can be highlighted and toggles callbacks
  *  @param[in]  pActivate           Called when user activates menu item
  *  @param[in]  pArg                Custom data, associated with menu
  *  @param[in]  thumbnail           Index of icon used for this entry
@@ -1208,8 +1210,19 @@ int  interface_addMenuEntryCustom (interfaceMenu_t *pMenu, interfaceMenuEntryTyp
  *  @sa interface_addMenuEntryCustom()
  *  @sa interface_addMenuEntryDisabled()
  */
-int  interface_addMenuEntry(interfaceMenu_t *pMenu, const char *text,
-                           menuActionFunction pActivate, void *pArg, int thumbnail);
+static inline int  interface_addMenuEntry2(interfaceMenu_t *pMenu, const char *text, int enabled,
+	menuActionFunction pActivate, void *pArg, int thumbnail)
+{
+	return interface_addMenuEntryCustom (pMenu,
+		interfaceMenuEntryText, text, strlen(text)+1, enabled,
+		pActivate, NULL, NULL, NULL, pArg, thumbnail);
+}
+
+static inline int  interface_addMenuEntry(interfaceMenu_t *pMenu, const char *text,
+	menuActionFunction pActivate, void *pArg, int thumbnail)
+{
+	return interface_addMenuEntry2(pMenu, text, 1, pActivate, pArg, thumbnail);
+}
 
 /**
  *  @brief Adds new disabled text entry to specified menu
@@ -1222,7 +1235,10 @@ int  interface_addMenuEntry(interfaceMenu_t *pMenu, const char *text,
  *  @sa interface_addMenuEntry()
  *  @sa interface_addMenuEntryCustom()
  */
-int  interface_addMenuEntryDisabled(interfaceMenu_t *pMenu, const char *text, int thumbnail);
+static inline int interface_addMenuEntryDisabled(interfaceMenu_t *pMenu, const char *text, int thumbnail)
+{
+	return interface_addMenuEntry2(pMenu, text, 0, NULL, NULL, thumbnail);
+}
 
 /**
  *  @brief Adds new edit date entry to specified menu

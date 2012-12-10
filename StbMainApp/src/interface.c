@@ -5249,28 +5249,6 @@ int interface_addMenuEntryCustom(interfaceMenu_t *pMenu,
 	return -1;
 }
 
-inline int interface_addMenuEntry(interfaceMenu_t *pMenu, 
-								const char *text, 
-								menuActionFunction pFunc, 
-								void *pArg, 
-								int thumbnail)
-{
-	return interface_addMenuEntryCustom (pMenu,
-						interfaceMenuEntryText, text, strlen(text)+1,
-						1 /* selectable */,
-						pFunc, NULL, NULL, NULL, pArg,
-						thumbnail);
-}
-
-inline int interface_addMenuEntryDisabled(interfaceMenu_t *pMenu, const char *text, int thumbnail)
-{
-	return interface_addMenuEntryCustom (pMenu, 
-						interfaceMenuEntryText, text, strlen(text)+1, 
-						0 /* not selectable */, 
-						NULL, NULL, NULL, NULL, NULL, 
-						thumbnail);
-}
-
 void interface_clearMenuEntries(interfaceMenu_t *pMenu)
 {
 	pMenu->menuEntryCount = 0;
