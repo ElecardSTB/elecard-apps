@@ -79,9 +79,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PVR_LOCATION_UPDATE_INTERVAL (3000)
 
 #define PVR_JOB_NEW                 (0xFFFF)
-#define PVR_INFO_SET(type, index) ((type << 16) | (index))
-#define PVR_INFO_GET_TYPE(info)     ((pvrJobType_t)(((int)info) >> 16))
-#define PVR_INFO_GET_INDEX(info)  (((int)info) & 0xFFFF)
+#define PVR_INFO_SET(type, index)   ((void*)((intptr_t)(type << 16) | (index)))
+#define PVR_INFO_GET_TYPE(info)     ((pvrJobType_t)(((intptr_t)info) >> 16))
+#define PVR_INFO_GET_INDEX(info)    ((int)(((intptr_t)info) & 0xFFFF))
+
+#define interfaceMenuPvr (interfaceMenuCustom+2)
 
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
@@ -119,20 +121,21 @@ static void* pvr_jobcpy(pvrJob_t *dest, pvrJob_t *src);
 static char* pvr_jobGetName(pvrJob_t *job);
 #endif
 
-static int pvr_fillPvrMenu(interfaceMenu_t *pMenu, void *pArg);
+static int pvr_enterPvrMenu(interfaceMenu_t *pMenu, void *pArg);
 
 static int pvr_checkLocations(void *pArg);
-static int pvr_fillLocationMenu(interfaceMenu_t *pMenu, void* pArg);
-static int pvr_leavingLocationMenu(interfaceMenu_t *pMenu, void* pArg);
+static int pvr_fillLocationMenu(interfaceMenu_t *locationMenu, void* pArg);
+static int pvr_leavingLocationMenu(interfaceMenu_t *locationMenu, void* pArg);
 static int pvr_browseRecords( interfaceMenu_t *pMenu, void* pArg );
 
 #ifdef STBPVR
-static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg);
-static int pvr_clearManageMenu(interfaceMenu_t *pMenu, void* pArg);
+static int pvr_enterManageMenu(interfaceMenu_t *manageMenu, void* pArg);
+static int pvr_clearManageMenu(interfaceMenu_t *manageMenu, void* pArg);
 static void *pvrThread(void *pArg);
 static int pvr_manageKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg);
-static int pvr_fillEditMenu(interfaceMenu_t *pMenu, void* pArg);
+static int pvr_enterEditMenu(interfaceMenu_t *pMenu, void* pArg);
+static int pvr_enterPvrMenu(interfaceMenu_t *pvrMenu, void *pArg);
 static int pvr_editKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int pvr_saveJobEntry(interfaceMenu_t *pMenu, void* pArg);
 static int pvr_openRecord( interfaceMenu_t *pMenu, void* pArg );
@@ -156,7 +159,6 @@ static int pvr_defaultActionEvent(void *pArg);
 static int pvr_setDate(interfaceMenu_t *pMenu, void* pArg);
 static int pvr_setStart(interfaceMenu_t *pMenu, void* pArg);
 static int pvr_setDuration(interfaceMenu_t *pMenu, void* pArg);
-static int pvr_resetEditMenu(interfaceMenu_t *pMenu, void* pArg);
 
 static int pvr_confirmSaveJob(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int pvr_leavingEditMenu(interfaceMenu_t *pMenu, void* pArg);
@@ -256,7 +258,8 @@ static void *pvrThread(void *pArg)
 	char *cmd   = &buf[1];
 	char *value = &buf[2];
 	ssize_t readbytes;
-	
+	int redraw = 0;
+
 	int channel;
 
 	dprintf("%s: in\n", __FUNCTION__);
@@ -265,6 +268,7 @@ static void *pvrThread(void *pArg)
 	{
 		if( (readbytes = client_read(&pvr_socket, buf, sizeof(buf))) > 0)
 		{
+			redraw = 0;
 			do
 			{
 			dprintf("%s: recieved '%s' (%d)\n", __FUNCTION__, buf, readbytes);
@@ -281,38 +285,34 @@ static void *pvrThread(void *pArg)
 							interface_playControlRefresh(0);
 							if( pvr_requestedDvbChannel != STBPVR_DVB_CHANNEL_NONE )
 							{
-								offair_channelChange( interfaceInfo.currentMenu, (void*)CHANNEL_INFO_SET(screenMain, pvr_requestedDvbChannel));
+								offair_channelChange( interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, pvr_requestedDvbChannel));
 							} else if( appControlInfo.dvbInfo.active && offair_getIndex( channel ) == appControlInfo.dvbInfo.channel )
 							{
-								offair_channelChange( interfaceInfo.currentMenu, (void*)CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel)); // restart normal playback
+								offair_channelChange( interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel)); // restart normal playback
 							}
 							pvr_requestedDvbChannel = STBPVR_DVB_CHANNEL_NONE;
 							if( channel  != STBPVR_DVB_CHANNEL_NONE )
 							{
 								pvr_importJobList(); // if there was a timed job, it can be cancelled by StbPvr
-								pvr_fillManageMenu( (interfaceMenu_t*)&pvrManageMenu, NULL );
-								interface_displayMenu(1);
+								redraw = 1;
 							}
 							break;
 						case 'r': // recording
 							displayedWarning = 0;
 							pvr_requestedDvbChannel = STBPVR_DVB_CHANNEL_NONE;
 							appControlInfo.pvrInfo.dvb.channel = atoi( value );
-							if( pvr_isPlayingDVB(screenMain) )
-							{
+							if (pvr_isPlayingDVB(screenMain)) {
 								offair_stopVideo(screenMain, 1); // stop playback if on the same channel
+								interface_showMenu(1, 1);
 							}
-							interface_showMenu( 1, 1);
 							break;
 #ifdef STBPNX
 						case 'p': // recording & playing
 							displayedWarning = 0;
 							pvr_requestedDvbChannel = STBPVR_DVB_CHANNEL_NONE;
 							appControlInfo.pvrInfo.dvb.channel = atoi( value );
-							if( appControlInfo.dvbInfo.active == 0 )
-							{
+							if (appControlInfo.dvbInfo.active == 0)
 								offair_startPvrVideo(screenMain); // restart playback
-							}
 							break;
 #endif
 						case 'o': // starts soon
@@ -320,7 +320,7 @@ static void *pvrThread(void *pArg)
 							if (appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 &&
 							    channel != appControlInfo.pvrInfo.dvb.channel && (appControlInfo.pvrInfo.dvb.channel >= 0 || appControlInfo.dvbInfo.active ))
 							{
-								pvr_showStopPvr( interfaceInfo.currentMenu, (void*)(-pvrJobTypeDVB) );
+								pvr_showStopPvr( interfaceInfo.currentMenu, SET_NUMBER(-pvrJobTypeDVB) );
 							}
 							displayedWarning = 1;
 							break;
@@ -338,8 +338,7 @@ static void *pvrThread(void *pArg)
 							if( channel )
 							{
 								pvr_importJobList(); // if there was a timed job, it can be cancelled by StbPvr
-								pvr_fillManageMenu( (interfaceMenu_t*)&pvrManageMenu, NULL );
-								interface_displayMenu(1);
+								redraw = 1;
 							}
 							break;
 						case 'r':
@@ -354,7 +353,6 @@ static void *pvrThread(void *pArg)
 								appControlInfo.pvrInfo.rtp.desc.port  = url.port;
 								appControlInfo.pvrInfo.rtp.desc.proto = url.protocol;
 								appControlInfo.pvrInfo.rtp.ip.s_addr  = inet_addr(url.address);
-								interface_displayMenu(1);
 							}
 							break;
 						}
@@ -363,7 +361,7 @@ static void *pvrThread(void *pArg)
 							if (appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 &&
 							    pvr_isRecordingRTP())
 							{
-								pvr_showStopPvr( interfaceInfo.currentMenu, (void*)(-pvrJobTypeRTP) );
+								pvr_showStopPvr( interfaceInfo.currentMenu, SET_NUMBER(-pvrJobTypeRTP) );
 							}
 							displayedWarning = 1;
 							break;
@@ -376,11 +374,10 @@ static void *pvrThread(void *pArg)
 						case 'i':
 							channel = appControlInfo.pvrInfo.http.url[0] != 0;
 							appControlInfo.pvrInfo.http.url[0] = 0;
-							if( channel )
+							if (channel)
 							{
 								pvr_importJobList(); // if there was a timed job, it can be cancelled by StbPvr
-								pvr_fillManageMenu( (interfaceMenu_t*)&pvrManageMenu, NULL );
-								interface_displayMenu(1);
+								redraw = 1;
 							}
 							break;
 						case 'r':
@@ -402,7 +399,7 @@ static void *pvrThread(void *pArg)
 							if( appControlInfo.pvrInfo.directory[0] != 0 && displayedWarning == 0 && 
 							    appControlInfo.pvrInfo.http.url[0] != 0 )
 							{
-								pvr_showStopPvr( interfaceInfo.currentMenu, (void*)(-pvrJobTypeHTTP) );
+								pvr_showStopPvr( interfaceInfo.currentMenu, SET_NUMBER(-pvrJobTypeHTTP) );
 							}
 							break;
 					}
@@ -410,17 +407,14 @@ static void *pvrThread(void *pArg)
 				case 'e':
 					displayedWarning = 0;
 #ifdef ENABLE_DVB
-					if( pvr_isPlayingDVB(screenMain) )
+					if (pvr_isPlayingDVB(screenMain))
 						offair_stopVideo(screenMain, 1);
 					appControlInfo.pvrInfo.dvb.channel = STBPVR_DVB_CHANNEL_NONE;
 #endif
 					appControlInfo.pvrInfo.rtp.desc.fmt = payloadTypeUnknown;
 					pvr_importJobList(); // if there was a timed job, it can be cancelled by StbPvr
-					//if( interfaceInfo.showMenu )
-					{
-						interface_showMenu(1, 0);
-						interface_menuActionShowMenu(interfaceInfo.currentMenu, &PvrLocationMenu);
-					}
+					interface_showMenu(1, 0);
+					interface_switchMenu(interfaceInfo.currentMenu, _M &PvrLocationMenu);
 					switch(*cmd)
 					{
 						case 'd': // dir not accessable
@@ -439,24 +433,17 @@ static void *pvrThread(void *pArg)
 				default:; //ignore
 			}
 			ssize_t len = strlen(buf)+1;
-			if( len < readbytes )
-			{
+			if (len < readbytes)
 				memmove( buf, &buf[len], readbytes-len );
-			}
 			readbytes -= len;
 			} while( readbytes > 0 );
-			if( interfaceInfo.showMenu && interfaceInfo.currentMenu == (interfaceMenu_t*)&pvrManageMenu)
-			{
-				pvr_fillManageMenu(interfaceInfo.currentMenu, NULL);
-				interface_displayMenu(1);
-			}
+			if (redraw && interfaceInfo.currentMenu == _M &pvrManageMenu)
+				pvr_enterManageMenu(interfaceInfo.currentMenu, NULL);
 #ifdef ENABLE_DVB
 			offair_fillDVBTMenu();
-			if( interfaceInfo.showMenu && interfaceInfo.currentMenu == (interfaceMenu_t*)&DVBTMenu)
-			{
-				interface_displayMenu(1);
-			}
 #endif
+			if (redraw)
+				interface_displayMenu(1);
 		} else
 		{
 			//dprintf("%s: can't read socket\n");
@@ -637,7 +624,7 @@ static int pvr_selectStorage(interfaceMenu_t *pMenu, void* pArg)
 	int storageIndex = (int)pArg;
 	if(storageIndex > 0)
 	{
-		interface_getMenuEntryInfo( (interfaceMenu_t*)&PvrLocationMenu,storageIndex,storagePath,MENU_ENTRY_INFO_LENGTH);
+		interface_getMenuEntryInfo( _M &PvrLocationMenu,storageIndex,storagePath,MENU_ENTRY_INFO_LENGTH);
 		sprintf(appControlInfo.pvrInfo.directory,"%s%s", usbRoot, storagePath);
 		saveAppSettings();
 		pvr_updateSettings();
@@ -649,45 +636,44 @@ static int pvr_selectStorage(interfaceMenu_t *pMenu, void* pArg)
 static int pvr_browseRecords( interfaceMenu_t *pMenu, void* pArg )
 {
 #ifdef ENABLE_USB
-		sprintf( currentPath, "%s" STBPVR_FOLDER "/", appControlInfo.pvrInfo.directory );
-		return media_initUSBBrowserMenu( pMenu, (void*)NULL );
-	
+	sprintf( currentPath, "%s" STBPVR_FOLDER "/", appControlInfo.pvrInfo.directory );
+	return media_initUSBBrowserMenu( pMenu, NULL );
 #endif
 	return 1;
 }
 
 static int pvr_checkLocations(void *pArg)
 {
-	pvr_fillLocationMenu((interfaceMenu_t *)&PvrLocationMenu, NULL);
+	pvr_fillLocationMenu(_M &PvrLocationMenu, NULL);
 	interface_displayMenu(1);
 	interface_addEvent( pvr_checkLocations, NULL, PVR_LOCATION_UPDATE_INTERVAL, 1 );
 	return 0;
 }
 
-static int pvr_fillLocationMenu(interfaceMenu_t *pMenu, void* pArg)
+static int pvr_fillLocationMenu(interfaceMenu_t *locationMenu, void* pArg)
 {
 	int i,storageCount;
 	struct dirent **usb_storages;
 	char *str;
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
-	interface_clearMenuEntries((interfaceMenu_t *)&PvrLocationMenu);
+	interface_clearMenuEntries(locationMenu);
 
 	str = appControlInfo.pvrInfo.directory[0] == 0 ? _T("NONE") : &appControlInfo.pvrInfo.directory[strlen(usbRoot)];
 	snprintf(buf,MENU_ENTRY_INFO_LENGTH,"%s: %s", _T("RECORDS_PATH"), str);
 	str = buf;
-	interface_addMenuEntryCustom((interfaceMenu_t *)&PvrLocationMenu, interfaceMenuEntryText, str, strlen(str)+1, appControlInfo.pvrInfo.directory[0] != 0 && appControlInfo.pvrInfo.directory[1] != 'p', pvr_browseRecords, NULL, NULL, NULL, NULL, thumbnail_folder);
+	interface_addMenuEntry2(locationMenu, str, appControlInfo.pvrInfo.directory[0] != 0 && appControlInfo.pvrInfo.directory[1] != 'p', pvr_browseRecords, NULL, thumbnail_folder);
 
 	if( media_scanStorages() <= 0 )
 	{
 		str = _T("USB_NOTFOUND");
-		interface_addMenuEntryDisabled((interfaceMenu_t *)&PvrLocationMenu, str, thumbnail_info);
+		interface_addMenuEntryDisabled(locationMenu, str, thumbnail_info);
 	} else
 	{
 		storageCount = scandir(usbRoot, &usb_storages, media_select_usb, alphasort);
 		for( i = 0 ; i < storageCount; ++i )
 		{
-			interface_addMenuEntry((interfaceMenu_t *)&PvrLocationMenu, usb_storages[i]->d_name, pvr_selectStorage, (void*)interface_getMenuEntryCount((interfaceMenu_t *)&PvrLocationMenu), thumbnail_usb);
+			interface_addMenuEntry(locationMenu, usb_storages[i]->d_name, pvr_selectStorage, SET_NUMBER(interface_getMenuEntryCount(_M &PvrLocationMenu)), thumbnail_usb);
 			free(usb_storages[i]);
 		}
 		free(usb_storages);
@@ -706,7 +692,7 @@ static int pvr_leavingLocationMenu(interfaceMenu_t *pMenu, void* pArg)
 
 void pvr_storagesChanged()
 {
-	if( interfaceInfo.currentMenu == (interfaceMenu_t *)&PvrLocationMenu )
+	if (interfaceInfo.currentMenu == _M &PvrLocationMenu )
 	{
 		pvr_fillLocationMenu( interfaceInfo.currentMenu, NULL );
 		interface_displayMenu(1);
@@ -716,16 +702,12 @@ void pvr_storagesChanged()
 #ifdef STBPVR
 static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 {
-	int i;
-	int          jobIndex = PVR_INFO_GET_INDEX(pArg);
-	list_element_t *job_element;
-	time_t cur_tt;
-	int ret;
+	int jobIndex = PVR_INFO_GET_INDEX(pArg);
 
 	pvrEditInfo.dirty = 0;
-
 	if( PVR_JOB_NEW == jobIndex )
 	{
+		time_t cur_tt;
 		time(&cur_tt);
 		pvrEditInfo.job.start_time = cur_tt;
 		pvrEditInfo.job.end_time   = cur_tt;
@@ -739,15 +721,10 @@ static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif
 	} else
 	{
-		job_element = pvr_jobs;
-		for( i = 0; i < jobIndex && job_element != NULL; i++ )
-		{
-			job_element = job_element->next;
-		}
-		if( i == jobIndex && job_element != NULL )
-		{
-			memcpy( &pvrEditInfo.job, job_element->data, sizeof(pvrJob_t) );
-			switch( pvrEditInfo.job.type )
+		pvrJob_t *job = pvr_getJob(jobIndex);
+		if (job) {
+			memcpy(&pvrEditInfo.job, job, sizeof(pvrJob_t));
+			switch (pvrEditInfo.job.type )
 			{
 				case pvrJobTypeUnknown:
 				case pvrJobTypeDVB:
@@ -755,7 +732,7 @@ static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 					break;
 				case pvrJobTypeHTTP:
 					pvrEditInfo.job.info.http.url = pvrEditInfo.url;
-					strcpy( pvrEditInfo.url, ((pvrJob_t*)job_element->data)->info.http.url );
+					strcpy( pvrEditInfo.url, job->info.http.url );
 					break;
 			}
 		} else
@@ -769,37 +746,29 @@ static int pvr_initEditMenu(interfaceMenu_t *pMenu, void* pArg)
 		case pvrJobTypeUnknown: break;
 		case pvrJobTypeDVB:
 #ifdef ENABLE_DVB
-			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&DVBTMenu;
+			PvrMenu.baseMenu.pParentMenu = _M &DVBTMenu;
 #endif
 			break;
-		case pvrJobTypeRTP:  PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu; break;
-		case pvrJobTypeHTTP: PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&interfaceMainMenu; break;
+		case pvrJobTypeRTP:  PvrMenu.baseMenu.pParentMenu = _M &rtpStreamMenu; break;
+		case pvrJobTypeHTTP: PvrMenu.baseMenu.pParentMenu = _M &interfaceMainMenu; break;
 	}
 
-	PvrEditMenu.baseMenu.pArg = pArg;
-	//if( jobIndex != PVR_JOB_NEW )
-	{
-		interface_setSelectedItem((interfaceMenu_t*)&PvrEditMenu, 2); // start time
-		pvrEditInfo.start_entry.active = 1;                           // edit now
-	}
-	ret = pvr_fillEditMenu(pMenu, pArg);
-	return ret;
+	interfaceMenu_t *editMenu = _M &PvrEditMenu;
+	editMenu->pArg = pArg;
+	interface_setSelectedItem(editMenu, 2); // start time
+	pvrEditInfo.start_entry.active = 1;     // edit now
+	return interface_menuActionShowMenu(pMenu, editMenu);
 }
 
-static int pvr_resetEditMenu(interfaceMenu_t *pMenu, void* pArg)
-{
-	interfaceEditEntry_t *pEditEntry = (interfaceEditEntry_t *)pArg;
-	return pvr_fillEditMenu( pMenu, pEditEntry->pArg );
-}
-
-static int pvr_fillEditMenu(interfaceMenu_t *pMenu, void* pArg)
+static int pvr_enterEditMenu(interfaceMenu_t *editMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	struct tm *t;
 	time_t     duration;
-	interface_clearMenuEntries((interfaceMenu_t *)&PvrEditMenu);
 
-	switch( pvrEditInfo.job.type )
+	interface_clearMenuEntries(editMenu);
+
+	switch ( pvrEditInfo.job.type )
 	{
 		case pvrJobTypeUnknown:
 			break;
@@ -807,52 +776,51 @@ static int pvr_fillEditMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_DVB
 			snprintf(buf, sizeof(buf), "%s: %s", _T("CHANNEL"), dvb_getTempServiceName(pvrEditInfo.job.info.dvb.channel));
 #ifdef PVR_CAN_EDIT_SOURCE
-			interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, buf, pvr_editDVBChannel, pArg, thumbnail_channels);
+			interface_addMenuEntry(editMenu, buf, pvr_editDVBChannel, pArg, thumbnail_channels);
 #else
-			interface_addMenuEntryDisabled((interfaceMenu_t *)&PvrEditMenu, buf, thumbnail_channels);
+			interface_addMenuEntryDisabled(editMenu, buf, thumbnail_channels);
 #endif
 #endif // ENABLE_DVB
 			break;
 		case pvrJobTypeRTP:
 			snprintf(buf, sizeof(buf), "%s: %s", _T("CHANNEL"), pvr_getRTPChannel(0, NULL) );
 #ifdef PVR_CAN_EDIT_SOURCE
-			interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, buf, pvr_editRTPChannel, pArg, thumbnail_channels);
+			interface_addMenuEntry(editMenu, buf, pvr_editRTPChannel, pArg, thumbnail_channels);
 #else
-			interface_addMenuEntryDisabled((interfaceMenu_t *)&PvrEditMenu, buf, thumbnail_channels);
+			interface_addMenuEntryDisabled(editMenu, buf, thumbnail_channels);
 #endif
 			break;
 		case pvrJobTypeHTTP:
 			snprintf(buf, sizeof(buf), "%s: %s", _T("URL"), pvr_getHTTPURL(0, NULL) );
 			buf[sizeof(buf)-1] = 0;
 #ifdef PVR_CAN_EDIT_SOURCE
-			interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, buf, strlen(pvr_httpUrl) < MAX_FIELD_PATTERN_LENGTH ? pvr_editHTTPURL : pvr_showHTTPURL, pArg, thumbnail_channels);
+			interface_addMenuEntry(editMenu, buf, strlen(pvr_httpUrl) < MAX_FIELD_PATTERN_LENGTH ? pvr_editHTTPURL : pvr_showHTTPURL, pArg, thumbnail_channels);
 #else
-			interface_addMenuEntryDisabled((interfaceMenu_t *)&PvrEditMenu, buf, thumbnail_channels);
+			interface_addMenuEntryDisabled(editMenu, buf, thumbnail_channels);
 #endif
 			break;
 	}
 
 /*
-	str = _T("SAVE");
-	interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, str, pvr_saveJobEntry, pArg, thumbnail_file);
+	interface_addMenuEntry(editMenu, _T("SAVE"), pvr_saveJobEntry, pArg, thumbnail_file);
 
 	sprintf(buf, "%s: ", _T("RECORD_DATE"));
 	str = &buf[ strlen(buf) ];
 	strftime(str, 25, "%D", t);
 	str = buf;
-	interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, str, pvr_editDate, pArg, thumbnail_account);
+	interface_addMenuEntry(editMenu, str, pvr_editDate, pArg, thumbnail_account);
 
 	sprintf(buf, "%s: ", _T("RECORD_START_TIME"));
 	str = &buf[ strlen(buf) ];
 	strftime(str, 15, "%H:%M", t);
 	str = buf;
-	interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, str, pvr_editTime, (void*)0, thumbnail_account);
+	interface_addMenuEntry(editMenu, str, pvr_editTime, (void*)0, thumbnail_account);
 */
 	t = &pvrEditInfo.start_tm;
 	strftime( pvrEditInfo.date_entry.info.date.value, sizeof(pvrEditInfo.date_entry.info.date.value), "%d%m%Y", t);
-	interface_addEditEntryDate((interfaceMenu_t *)&PvrEditMenu, _T("RECORD_DATE"), pvr_setDate, pvr_resetEditMenu, pArg, thumbnail_account, &pvrEditInfo.date_entry);
+	interface_addEditEntryDate(editMenu, _T("RECORD_DATE"), pvr_setDate, pvr_enterEditMenu, pArg, thumbnail_account, &pvrEditInfo.date_entry);
 	strftime( pvrEditInfo.start_entry.info.time.value, sizeof(pvrEditInfo.start_entry.info.time.value), "%H%M", t);
-	interface_addEditEntryTime((interfaceMenu_t *)&PvrEditMenu, _T("RECORD_START_TIME"), pvr_setStart, pvr_resetEditMenu, pArg, thumbnail_account, &pvrEditInfo.start_entry);
+	interface_addEditEntryTime(editMenu, _T("RECORD_START_TIME"), pvr_setStart, pvr_enterEditMenu, pArg, thumbnail_account, &pvrEditInfo.start_entry);
 
 /*
 	t = localtime(&pvrEditInfo.job.end_time);
@@ -860,44 +828,38 @@ static int pvr_fillEditMenu(interfaceMenu_t *pMenu, void* pArg)
 	str = &buf[ strlen(buf) ];
 	strftime(str, 15, "%H:%M", t);
 	str = buf;
-	interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, str, pvr_editTime, (void*)1, thumbnail_account);
+	interface_addMenuEntry(editMenu, str, pvr_editTime, (void*)1, thumbnail_account);
 */
 	duration = pvrEditInfo.job.end_time - pvrEditInfo.job.start_time;
 	duration -= duration % 60;
 	t = gmtime(&duration);
 	strftime( pvrEditInfo.duration_entry.info.time.value, sizeof(pvrEditInfo.duration_entry.info.time.value), "%H%M", t);
-	interface_addEditEntryTime((interfaceMenu_t *)&PvrEditMenu, _T("DURATION"), pvr_setDuration, pvr_resetEditMenu, pArg, thumbnail_account, &pvrEditInfo.duration_entry);
+	interface_addEditEntryTime(editMenu, _T("DURATION"), pvr_setDuration, pvr_enterEditMenu, pArg, thumbnail_account, &pvrEditInfo.duration_entry);
 
-	switch( pvrEditInfo.job.type )
+	switch ( pvrEditInfo.job.type )
 	{
 		case pvrJobTypeUnknown:
 		case pvrJobTypeDVB:
 			break;
 		case pvrJobTypeRTP:
 			sprintf(buf, "%s: %s", _T("TITLE"), pvrEditInfo.job.info.rtp.session_name);
-			interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, buf, pvr_editRTPName, pArg, thumbnail_channels);
+			interface_addMenuEntry(editMenu, buf, pvr_editRTPName, pArg, thumbnail_channels);
 			break;
 		case pvrJobTypeHTTP:
 			sprintf(buf, "%s: %s", _T("TITLE"), pvrEditInfo.job.info.http.session_name);
-			interface_addMenuEntry((interfaceMenu_t *)&PvrEditMenu, buf, pvr_editHTTPName, pArg, thumbnail_channels);
+			interface_addMenuEntry(editMenu, buf, pvr_editHTTPName, pArg, thumbnail_channels);
 			break;
 	}
-
-	interface_menuActionShowMenu(pMenu, &PvrEditMenu);
-
 	return 0;
 }
 
 static int pvr_leavingEditMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	dprintf("%s: in\n", __FUNCTION__);
-
-	if(pvrEditInfo.dirty)
-	{
+	if (pvrEditInfo.dirty) {
 		interface_showConfirmationBox(_T("CONFIRM_SAVE_CHANGES"), thumbnail_question, pvr_confirmSaveJob, pArg);
 		return 1;
 	}
-
 	return 0;
 }
 
@@ -905,7 +867,7 @@ static int pvr_editKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 {
 	int channelNumber;
 
-	switch( cmd->command )
+	switch ( cmd->command )
 	{
 		case interfaceCommandRed:
 			pvrEditInfo.dirty = 0;
@@ -915,7 +877,7 @@ static int pvr_editKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 			pvr_saveJobEntry(pMenu, PvrEditMenu.baseMenu.pArg);
 			return 0;
 		case interfaceCommandBlue:
-			switch( pvrEditInfo.job.type )
+			switch ( pvrEditInfo.job.type )
 			{
 				case pvrJobTypeUnknown:
 					return 0;
@@ -968,16 +930,17 @@ static int pvr_confirmSaveJob(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 	}
 }
 
-static int pvr_clearManageMenu(interfaceMenu_t *pMenu, void* pArg)
+static int pvr_clearManageMenu(interfaceMenu_t *manageMenu, void* pArg)
 {
 	pvr_clearJobList();
+	pvr_exportJobList();
 	pvr_updateSettings();
-	pvr_fillManageMenu(pMenu, pArg);
+	pvr_enterManageMenu(manageMenu, pArg);
 	interface_displayMenu(1);
 	return 0;
 }
 
-static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg)
+static int pvr_enterManageMenu(interfaceMenu_t *manageMenu, void* pArg)
 {
 	list_element_t *job_element;
 	pvrJob_t *job;
@@ -990,23 +953,23 @@ static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	pvr_storageReady = appControlInfo.pvrInfo.directory[0] != 0 && helperCheckDirectoryExsists(appControlInfo.pvrInfo.directory);
 
-	interface_clearMenuEntries((interfaceMenu_t *)&pvrManageMenu);
+	interface_clearMenuEntries(manageMenu);
 
 	if( pvr_jobs == NULL )
 	{
 		str = _T("NO_RECORDS");
-		interface_addMenuEntryDisabled((interfaceMenu_t *)&pvrManageMenu, str, thumbnail_info);
-		interface_setSelectedItem((interfaceMenu_t *)&pvrManageMenu, MENU_ITEM_MAIN);
+		interface_addMenuEntryDisabled(manageMenu, str, thumbnail_info);
+		interface_setSelectedItem(manageMenu, MENU_ITEM_MAIN);
 	} else
 	{
 		time(&current_time);
 
 		str = _T("CLEARLIST");
-		interface_addMenuEntry((interfaceMenu_t *)&pvrManageMenu, str, pvr_clearManageMenu, (void*)-1, thumbnail_file);
-		interface_addMenuEntryCustom((interfaceMenu_t *)&pvrManageMenu, interfaceMenuEntryHeading, "", 1, 0, NULL, NULL, NULL, NULL, (void*)-1, 0);
+		interface_addMenuEntry(manageMenu, str, pvr_clearManageMenu, SET_NUMBER(-1), thumbnail_file);
+		interface_addMenuEntryDisabled(manageMenu, "", 0);
 
 		jobIndex = 0;
-		for( job_element = pvr_jobs; job_element != NULL; job_element = job_element->next )
+		for (job_element = pvr_jobs; job_element != NULL; job_element = job_element->next)
 		{
 			job = (pvrJob_t*)job_element->data;
 			str = buf;
@@ -1027,7 +990,7 @@ static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg)
 				icon = thumbnail_recording;
 			else
 				icon = thumbnail_recorded_epg;
-			interface_addMenuEntry((interfaceMenu_t *)&pvrManageMenu, str, pvr_openRecord, (void*)jobIndex, icon);
+			interface_addMenuEntry(manageMenu, str, pvr_openRecord, SET_NUMBER(jobIndex), icon);
 			jobIndex++;
 		}
 	}
@@ -1039,9 +1002,7 @@ static int pvr_fillManageMenu(interfaceMenu_t *pMenu, void* pArg)
 void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 {
 	createListMenu(&PvrMenu, _T("RECORDING"), thumbnail_recording, NULL, pParent,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		pvr_fillPvrMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, pvr_enterPvrMenu, NULL, NULL);
 
 #ifdef STBPVR
 	int pvr_icons[4] = { 0, 0, 0, 0 };
@@ -1056,12 +1017,12 @@ void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 	pvr_icons[1] = statusbar_f2_add_record;
 	pvr_icons[2] = statusbar_f3_edit_record;
 	pvr_icons[3] = statusbar_f4_schedule;
-	
-	//createListMenu(&pvrManageMenu, str, thumbnail_recording, pvr_icons, (interfaceMenu_t*)&PvrMenu,
-	// interfaceListMenuIconThumbnail, pvr_fillManageMenu, NULL, NULL);
-	//interface_setCustomKeysCallback((interfaceMenu_t*)&pvrManageMenu, pvr_manageKeyCallback);
 
-	createBasicMenu((interfaceMenu_t*)&pvrManageMenu, interfaceMenuCustom, _T("RECORDS_MANAGE"), thumbnail_recording, pvr_icons, (interfaceMenu_t *)&PvrMenu, pvr_manageMenuProcessCommand, pvr_manageMenuDisplay, NULL, pvr_fillManageMenu, NULL, NULL);
+	createBasicMenu(_M &pvrManageMenu, interfaceMenuPvr, _T("RECORDS_MANAGE"), thumbnail_recording, pvr_icons, _M &PvrMenu,
+		pvr_manageMenuProcessCommand, pvr_manageMenuDisplay, NULL, pvr_enterManageMenu, NULL, NULL);
+	// Should be set manually for non-list menus
+	pvrManageMenu.baseMenu.maxEntryTextWidth = interfaceInfo.clientWidth - 4*interfaceInfo.paddingSize;
+
 	pvrManageMenu.channel_w = ERM_CHANNEL_NAME_LENGTH;
 	strcpy(buf,"00:00");
 	DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rect, NULL) );
@@ -1069,22 +1030,18 @@ void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 	strcpy(buf,"00.00.00");
 	DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rect, NULL) );
 	pvrManageMenu.date_w = rect.w;
-	interface_setCustomKeysCallback((interfaceMenu_t*)&pvrManageMenu, pvr_manageKeyCallback);
+	interface_setCustomKeysCallback(_M &pvrManageMenu, pvr_manageKeyCallback);
 
 	pvr_icons[0] = statusbar_f1_cancel;
 	pvr_icons[1] = statusbar_f2_ok;
 	pvr_icons[2] = 0;
 	pvr_icons[3] = statusbar_f4_schedule;
-	createListMenu(&PvrEditMenu, str, thumbnail_recording, pvr_icons, (interfaceMenu_t*)&pvrManageMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		NULL, pvr_leavingEditMenu, NULL);
-	interface_setCustomKeysCallback((interfaceMenu_t*)&PvrEditMenu, pvr_editKeyCallback);
+	createListMenu(&PvrEditMenu, str, thumbnail_recording, pvr_icons, _M &pvrManageMenu,
+		interfaceListMenuIconThumbnail, pvr_enterEditMenu, pvr_leavingEditMenu, SET_NUMBER(PVR_JOB_NEW));
+	interface_setCustomKeysCallback(_M &PvrEditMenu, pvr_editKeyCallback);
 #endif // STBPVR
-	createListMenu(&PvrLocationMenu, _T("RECORDED_LOCATION"), thumbnail_usb, NULL, (interfaceMenu_t*)&PvrMenu,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		pvr_fillLocationMenu, pvr_leavingLocationMenu, NULL);
+	createListMenu(&PvrLocationMenu, _T("RECORDED_LOCATION"), thumbnail_usb, NULL, _M &PvrMenu,
+		interfaceListMenuIconThumbnail, pvr_fillLocationMenu, pvr_leavingLocationMenu, NULL);
 
 #ifdef STBPVR
 	pvrEditInfo.start_entry.info.time.type    = interfaceEditTime24;
@@ -1092,37 +1049,22 @@ void pvr_buildPvrMenu(interfaceMenu_t* pParent)
 #endif
 }
 
-static int pvr_fillPvrMenu(interfaceMenu_t *pMenu, void *pArg)
+static int pvr_enterPvrMenu(interfaceMenu_t *pvrMenu, void *pArg)
 {
-	char *str;
-
-	interface_clearMenuEntries((interfaceMenu_t *)&PvrMenu);
+	interface_clearMenuEntries(pvrMenu);
 #ifdef STBPVR
-	switch( pvrEditInfo.job.type )
-	{
-		case pvrJobTypeUnknown: break;
-		case pvrJobTypeDVB:
 #ifdef ENABLE_DVB
-			{
-				int epg_enabled = offair_epgEnabled();
-				str = _T( epg_enabled ? "EPG_RECORD" : "EPG_UNAVAILABLE");
-				interface_addMenuEntryCustom((interfaceMenu_t*)&PvrMenu, interfaceMenuEntryText, str, strlen(str)+1, epg_enabled, interface_menuActionShowMenu, NULL, NULL, NULL, &EPGRecordMenu, thumbnail_recorded_epg);
-			}
-#endif
-		case pvrJobTypeHTTP:
-		case pvrJobTypeRTP:
-			str = _T("RECORDS_MANAGE");
-			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, interface_menuActionShowMenu, &pvrManageMenu, thumbnail_schedule_record);
-
-			str = _T("RECORDED_LOCATION");
-			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, interface_menuActionShowMenu, &PvrLocationMenu, thumbnail_usb);
-			break;
+	if (pvrEditInfo.job.type == pvrJobTypeDVB) {
+		if (offair_epgEnabled())
+			interface_addMenuEntry(pvrMenu, _T("EPG_RECORD"), interface_menuActionShowMenu, &EPGRecordMenu, thumbnail_recorded_epg);
+		else
+			interface_addMenuEntryDisabled(pvrMenu, _T("EPG_UNAVAILABLE"), thumbnail_recorded_epg);
 	}
-#endif // STBPVR
-#ifdef STSDK
-	str = _T("RECORDED_LOCATION");
-	interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, interface_menuActionShowMenu, &PvrLocationMenu, thumbnail_usb);
 #endif
+	interface_addMenuEntry(pvrMenu, _T("RECORDS_MANAGE"), interface_menuActionShowMenu, &pvrManageMenu, thumbnail_schedule_record);
+#endif // STBPVR
+	interface_addMenuEntry(pvrMenu, _T("RECORDED_LOCATION"), interface_menuActionShowMenu, &PvrLocationMenu, thumbnail_usb);
+
 	return 0;
 }
 
@@ -1221,7 +1163,7 @@ void pvr_recordNow(void)
 			offair_fillDVBTMenu();
 		}
 #endif
-		PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&DVBTMenu;
+		PvrMenu.baseMenu.pParentMenu = _M &DVBTMenu;
 	} else
 #endif
 	if (appControlInfo.rtpInfo.active)// || appControlInfo.playbackInfo.streamSource == streamSourceIPTV )
@@ -1265,7 +1207,7 @@ int pvr_record(int which, char *url, char *desc )
 		strcpy(pvrEditInfo.job.info.http.url, url);
 		if( appControlInfo.playbackInfo.playlistMode == playlistModeIPTV )
 		{
-			PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
+			PvrMenu.baseMenu.pParentMenu = _M &rtpStreamMenu;
 		}
 #endif // STBPVR
 		return 0;
@@ -1311,7 +1253,7 @@ int pvr_record(int which, char *url, char *desc )
 					interface_showMessageBox( _T("ERR_PVR_RECORD"), thumbnail_error, 5000);
 				}
 				pvrEditInfo.job.type = pvrJobTypeRTP;
-				PvrMenu.baseMenu.pParentMenu = (interfaceMenu_t*)&rtpStreamMenu;
+				PvrMenu.baseMenu.pParentMenu = _M &rtpStreamMenu;
 				return 0;
 			} else
 				eprintf("%s: RTP URL '%s' is too long\n", __FUNCTION__, url);
@@ -1342,7 +1284,7 @@ int pvr_manageRecord(int which, char *url, char *desc )
 			strcpy(pvrEditInfo.job.info.http.session_name, desc);
 		} else
 			pvrEditInfo.job.info.http.session_name[0] = 0;
-		pvr_initEditMenu((interfaceMenu_t*)&pvrManageMenu, (void*)PVR_INFO_SET(pvrJobTypeHTTP,PVR_JOB_NEW));
+		pvr_initEditMenu(interfaceInfo.currentMenu, PVR_INFO_SET(pvrJobTypeHTTP,PVR_JOB_NEW));
 		return 0;
 	}
 
@@ -1357,7 +1299,7 @@ int pvr_manageRecord(int which, char *url, char *desc )
 		case mediaProtoRTP:
 		case mediaProtoUDP:
 		{
-			//pvr_initPvrMenu( (interfaceMenu_t*)&PvrMenu, (void*)pvrJobTypeRTP );
+			//pvr_initPvrMenu( _M &PvrMenu, (void*)pvrJobTypeRTP );
 			pvrEditInfo.job.type = pvrJobTypeRTP;
 			pvrEditInfo.job.info.rtp.desc.proto = url_desc.protocol;
 			pvrEditInfo.job.info.rtp.desc.fmt   = payloadTypeMpegTS;
@@ -1368,7 +1310,7 @@ int pvr_manageRecord(int which, char *url, char *desc )
 				strcpy(pvrEditInfo.job.info.rtp.session_name, desc);
 			} else
 				pvrEditInfo.job.info.rtp.session_name[0] = 0;
-			pvr_initEditMenu((interfaceMenu_t*)&pvrManageMenu, (void*)PVR_INFO_SET(pvrJobTypeRTP,PVR_JOB_NEW));
+			pvr_initEditMenu(interfaceInfo.currentMenu, PVR_INFO_SET(pvrJobTypeRTP,PVR_JOB_NEW));
 			return 0;
 		}
 		default:
@@ -1541,6 +1483,23 @@ ssize_t pvr_jobprint(char *buf, size_t buf_size, pvrJob_t *job)
 	strncpy(str, name, buf_size-(str-buf));
 	buf[buf_size-1] = 0;
 	return strlen(buf)+1;
+}
+
+list_element_t *pvr_getJobElement(int job_index)
+{
+	int i;
+	list_element_t *job_element = pvr_jobs;
+	for (i = 0; i < job_index && job_element; i++)
+		job_element = job_element->next;
+	if (job_element && i == job_index)
+		return job_element;
+	return NULL;
+}
+
+pvrJob_t *pvr_getJob(int job_index)
+{
+	list_element_t *job_element = pvr_getJobElement(job_index);
+	return job_element ? job_element->data : NULL;
 }
 
 int pvr_findOrInsertJob(pvrJob_t *job, list_element_t **jobListEntry)
@@ -1974,7 +1933,7 @@ static int pvr_setStart(interfaceMenu_t *pMenu, void* pArg)
 		pvrEditInfo.job.start_time   += time_diff;
 		pvrEditInfo.job.end_time     += time_diff;
 		pvr_adjustEndTime();
-		pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
+		interface_refreshMenu(pMenu);
 	}
 	return 0;
 }
@@ -2004,7 +1963,7 @@ static int pvr_setDuration(interfaceMenu_t *pMenu, void* pArg)
 		pvrEditInfo.dirty        = 1;
 		pvrEditInfo.job.end_time = pvrEditInfo.job.start_time + duration;
 		localtime_r(&pvrEditInfo.job.end_time, &pvrEditInfo.end_tm);
-		pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
+		interface_refreshMenu(pMenu);
 	}
 	return 0;
 }
@@ -2026,7 +1985,7 @@ static int pvr_setDate(interfaceMenu_t *pMenu, void* pArg)
 	year = atoi(temp);
 	year -= 1900;
 	mon -= 1;
-	if( year < 0 || mon < 0 || mon > 11 || day < 0 || day > 31 )
+	if ( year < 0 || mon < 0 || mon > 11 || day < 0 || day > 31 )
 	{
 		interface_showMessageBox(_T("ERR_INCORRECT_DATE"), thumbnail_error, 0);
 		return 2;
@@ -2042,7 +2001,7 @@ static int pvr_setDate(interfaceMenu_t *pMenu, void* pArg)
 		pvrEditInfo.start_tm.tm_isdst = -1;
 		pvrEditInfo.job.start_time    = gmktime(&pvrEditInfo.start_tm);
 		pvr_adjustEndTime();
-		pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
+		interface_refreshMenu(pMenu);
 	}
 	return 0;
 }
@@ -2052,9 +2011,9 @@ static int pvr_setChannelValue(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	url_desc_t url;
 	in_addr_t ip;
-	if( value == NULL )
+	if (value == NULL)
 		return 1;
-	switch( pvrEditInfo.job.type )
+	switch (pvrEditInfo.job.type)
 	{
 		case pvrJobTypeUnknown:
 			break;
@@ -2066,27 +2025,28 @@ static int pvr_setChannelValue(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 			service = offair_getService( atoi(value) );
 			dvb_channel = dvb_getServiceIndex( service );
-			if( pvrEditInfo.job.info.dvb.channel != dvb_channel )
+			if (pvrEditInfo.job.info.dvb.channel != dvb_channel)
 			{
 				pvrEditInfo.dirty = 1;
 				pvrEditInfo.job.info.dvb.service = service;
 				pvrEditInfo.job.info.dvb.channel = dvb_channel;
+				interface_refreshMenu(pMenu);
 			}
 		}
 			break;
 #endif
 		case pvrJobTypeRTP:
-			if( parseURL(value, &url) == 0 )
+			if (parseURL(value, &url) == 0)
 			{
 				if(url.protocol == mediaProtoRTP || url.protocol == mediaProtoUDP)
 				{
 					ip = inet_addr(url.address);
-					if( ip == INADDR_NONE || ip == INADDR_ANY )
+					if (ip == INADDR_NONE || ip == INADDR_ANY)
 					{
 						interface_showMessageBox(_T("ERR_INCORRECT_URL"), thumbnail_error, 0);
 						break;
 					}
-					if( pvrEditInfo.job.info.rtp.desc.proto != url.protocol ||
+					if (pvrEditInfo.job.info.rtp.desc.proto != url.protocol ||
 					    pvrEditInfo.job.info.rtp.desc.port  != url.port ||
 					    pvrEditInfo.job.info.rtp.ip.s_addr  != ip )
 					{
@@ -2095,52 +2055,47 @@ static int pvr_setChannelValue(interfaceMenu_t *pMenu, char *value, void* pArg)
 						pvrEditInfo.job.info.rtp.desc.proto = url.protocol;
 						pvrEditInfo.job.info.rtp.desc.port  = url.port;
 						pvrEditInfo.job.info.rtp.ip.s_addr  = ip;
+						interface_refreshMenu(pMenu);
 					}
 				} else
-				{
 					interface_showMessageBox(_T("ERR_INCORRECT_PROTO"), thumbnail_error, 0);
-				}
 			} else
-			{
 				interface_showMessageBox(_T("ERR_INCORRECT_URL"), thumbnail_error, 0);
-			}
 			break;
 		case pvrJobTypeHTTP:
-			if( strncmp( url, "http://", 7 ) == 0  ||
+			if (strncmp( url, "http://",  7 ) == 0 ||
 			    strncmp( url, "https://", 8 ) == 0 ||
-			    strncmp( url, "ftp://", 6 ) == 0 )
+			    strncmp( url, "ftp://",   6 ) == 0)
 			{
+				pvrEditInfo.dirty = 1;
 				strcpy(pvrEditInfo.url, value);
 				pvrEditInfo.job.info.http.url = pvrEditInfo.url;
+				interface_refreshMenu(pMenu);
 			} else
-			{
 				interface_showMessageBox(_T("ERR_INCORRECT_URL"), thumbnail_error, 0);
-			}
 			break;
 	}
-	pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
 	return 0;
 }
 #endif // PVR_CAN_EDIT_SOURCE
 
 static int pvr_setRTPName(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if( value == NULL )
+	if (value == NULL)
 		return 1;
 	switch( pvrEditInfo.job.type )
 	{
 		case pvrJobTypeRTP:
-			if( strcmp( pvrEditInfo.job.info.rtp.session_name, value ) )
-			{
+			if (strcmp(pvrEditInfo.job.info.rtp.session_name, value ) ) {
 				pvrEditInfo.dirty = 1;
 				strcpy(pvrEditInfo.job.info.rtp.session_name, value);
+				interface_refreshMenu(pMenu);
 			}
 			break;
 		default:
 			eprintf("%s: invalid job type %d\n", __FUNCTION__, pvrEditInfo.job.type);
 			return 0;
 	}
-	pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
 	return 0;
 }
 
@@ -2240,17 +2195,16 @@ static int pvr_setHTTPName(interfaceMenu_t *pMenu, char *value, void* pArg)
 	switch( pvrEditInfo.job.type )
 	{
 		case pvrJobTypeHTTP:
-			if( strcmp( pvrEditInfo.job.info.http.session_name, value ) )
-			{
+			if (strcmp(pvrEditInfo.job.info.http.session_name, value)) {
 				pvrEditInfo.dirty = 1;
 				strcpy(pvrEditInfo.job.info.http.session_name, value);
+				interface_refreshMenu(pMenu);
 			}
 			break;
 		default:
 			eprintf("%s: invalid job type %d\n", __FUNCTION__, pvrEditInfo.job.type);
 			return 0;
 	}
-	pvr_fillEditMenu(pMenu, PvrEditMenu.baseMenu.pArg);
 	return 0;
 }
 
@@ -2326,72 +2280,59 @@ static int pvr_saveJobEntry(interfaceMenu_t *pMenu, void* pArg)
 	return interface_menuActionShowMenu(pMenu, &pvrManageMenu);
 }
 
-static int pvr_manageKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
+static int pvr_manageKeyCallback(interfaceMenu_t *manageMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	list_element_t *job_element;
 	pvrJob_t *job;
-#ifdef ENABLE_DVB
-	EIT_service_t* service;
-#endif
 	int i;
-	int jobIndex = interface_getSelectedItem((interfaceMenu_t*)&pvrManageMenu)-2; // clear all and header
+	int jobIndex = interface_getSelectedItem(manageMenu)-2; // clear all and header
 
-	if (cmd->command == interfaceCommandGreen)
-	{
-		pvr_initEditMenu(pMenu, (void*)PVR_INFO_SET(pvrEditInfo.job.type,PVR_JOB_NEW));
+	if (cmd->command == interfaceCommandGreen) {
+		pvr_initEditMenu(manageMenu, PVR_INFO_SET(pvrEditInfo.job.type,PVR_JOB_NEW));
 		return 0;
 	}
 	
-	if(jobIndex < 0)
-	{
+	if (jobIndex < 0)
 		return 1;
-	}
 
-	switch(cmd->command)
+	switch (cmd->command)
 	{
 		case interfaceCommandRed:
-			for( i = 0, job_element = pvr_jobs; i < jobIndex && job_element != NULL; i++, job_element = job_element->next );
-			if( i == jobIndex && job_element != NULL )
+			job_element = pvr_getJobElement(jobIndex);
+			if (job_element)
 			{
 				char buf[BUFFER_SIZE];
 				pvr_jobprint( buf, sizeof(buf), job_element->data );
 				eprintf("PVR: deleting job %d: %s\n", jobIndex, buf);
 				pvr_deleteJob(job_element);
 				pvr_exportJobList();
-				pvr_fillManageMenu( pMenu, pArg );
-				if( pvrManageMenu.baseMenu.selectedItem >= pvrManageMenu.baseMenu.menuEntryCount )
-				{
-					pvrManageMenu.baseMenu.selectedItem = pvrManageMenu.baseMenu.menuEntryCount <= 1 ? MENU_ITEM_BACK : pvrManageMenu.baseMenu.menuEntryCount - 1;
-				}
+				pvr_enterManageMenu( manageMenu, pArg );
+				if (manageMenu->selectedItem >= manageMenu->menuEntryCount)
+					manageMenu->selectedItem =  manageMenu->menuEntryCount <= 1 ? MENU_ITEM_BACK : manageMenu->menuEntryCount - 1;
 				interface_displayMenu(1);
 			}
 			return 0;
 		case interfaceCommandYellow:
-			pvr_initEditMenu(pMenu, (void*)PVR_INFO_SET(pvrEditInfo.job.type,jobIndex));
+			pvr_initEditMenu(manageMenu, PVR_INFO_SET(pvrEditInfo.job.type,jobIndex));
 			return 0;
 		case interfaceCommandBlue:
-			job_element = pvr_jobs;
-			for( i = 0; i < jobIndex && job_element != NULL; i++ )
-			{
-				job_element = job_element->next;
-			}
-			if( i == jobIndex && job_element != NULL )
-			{
-				job = (pvrJob_t*)job_element->data;
-				switch( job->type )
+			job = pvr_getJob(jobIndex);
+			if (job) {
+				switch (job->type)
 				{
-					case pvrJobTypeUnknown: job_element = NULL; break;
+					case pvrJobTypeUnknown: job = NULL; break;
 					case pvrJobTypeDVB:
-#ifdef ENABLE_DVB
-						service = dvb_getService(job->info.dvb.channel);
-						if( service != NULL && service->schedule != NULL && (i = offair_getServiceIndex(service)) >= 0 )
 						{
-							EPGRecordMenu.baseMenu.pArg = (void*)i;
-							return interface_menuActionShowMenu(interfaceInfo.currentMenu, &EPGRecordMenu);
+#ifdef ENABLE_DVB
+						EIT_service_t* service = dvb_getService(job->info.dvb.channel);
+						if (service != NULL && service->schedule != NULL && (i = offair_getServiceIndex(service)) >= 0)
+						{
+							EPGRecordMenu.baseMenu.pArg = SET_NUMBER(i);
+							return interface_menuActionShowMenu(manageMenu, &EPGRecordMenu);
 						} else
-#else
-							job_element = NULL;
 #endif
+							job = NULL;
+						}
 						break;
 					case pvrJobTypeRTP:
 						{
@@ -2402,27 +2343,23 @@ static int pvr_manageKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_
 								job->info.rtp.desc.port);
 							i = rtp_getChannelNumber( rtpurl );
 						}
-						if( i != CHANNEL_CUSTOM )
-						{
-							rtp_initEpgMenu( pMenu, (void*)i );
-						} else
-							job_element = NULL;
+						if (i != CHANNEL_CUSTOM)
+							rtp_initEpgMenu( manageMenu, SET_NUMBER(i) );
+						else
+							job = NULL;
 						break;
 					case pvrJobTypeHTTP:
 						i = rtp_getChannelNumber( job->info.http.url );
-						if( i != CHANNEL_CUSTOM )
-						{
-							rtp_initEpgMenu( pMenu, (void*)i );
-						} else
-							job_element = NULL;
+						if (i != CHANNEL_CUSTOM)
+							rtp_initEpgMenu( manageMenu, SET_NUMBER(i) );
+						else
+							job = NULL;
 						break;
 				}
 			}
-			return 0;
-			if( job_element == NULL )
-			{
+			if (job == NULL)
 				interface_showMessageBox(_T("EPG_UNAVAILABLE"), thumbnail_info, 3000);
-			}
+			return 0;
 		default: ;
 	}
 
@@ -2532,24 +2469,17 @@ static int pvr_defaultActionEvent(void *pArg)
 static int pvr_openRecord( interfaceMenu_t *pMenu, void* pArg )
 {
 	int job_index = (int)pArg;
-	list_element_t *job_element;
-	pvrJob_t *job;
+	if (job_index < 0)
+		return 1;
+
+	pvrJob_t *job = pvr_getJob(job_index);
+	if (job == NULL)
+		return 1;
+
 	char buf[PATH_MAX];
 	char *str, *name;
 	int i,st;
 	struct tm *t;
-
-	if( job_index < 0 )
-		return 1;
-
-	job_element = pvr_jobs;
-	for( i = 0; i < job_index && job_element != NULL; i++ )
-	{
-		job_element = job_element->next;
-	}
-	if( job_element == NULL )
-		return 1;
-	job = (pvrJob_t *)job_element->data;
 
 	sprintf(buf, "%s" STBPVR_FOLDER "/", appControlInfo.pvrInfo.directory);
 	str = &buf[strlen(buf)];
@@ -2558,17 +2488,16 @@ static int pvr_openRecord( interfaceMenu_t *pMenu, void* pArg )
 		strcpy( str, name );
 	st = strlen(str);
 	/* FAT16/32 character case insensitivity workaround */
-	for( i = 0; i < st; i++)
-	{
+	for (i = 0; i < st; i++)
 		str[i] = tolower(str[i]);
-	}
+
 	str = &str[strlen(str)];
 	*str = '/';
 	str++;
 	t = localtime(&job->start_time);
 	strftime(str, 30, "%Y-%m-%d/%H-%M/part00.ts", t);
 	dprintf("%s: opening '%s'\n", __FUNCTION__, buf);
-	if( helperFileExists( buf ) )
+	if (helperFileExists( buf ))
 	{
 		gfx_stopVideoProviders(screenMain);
 		strcpy(appControlInfo.mediaInfo.filename, buf);
@@ -2581,116 +2510,105 @@ static int pvr_openRecord( interfaceMenu_t *pMenu, void* pArg )
 	}
 }
 
-static void pvr_manageMenuGetItemsInfo(pvrManageMenu_t* pvrMenu, int *fh, int *itemHeight, int *maxVisibleItems)
+static void pvr_manageMenuGetItemsInfo(interfaceMenu_t* pMenu, int *fh, int *itemHeight, int *maxVisibleItems)
 {
 	pgfx_font->GetHeight(pgfx_font, fh);
 
 	*itemHeight = interfaceInfo.paddingSize+ *fh;
-	if ( (*itemHeight) * pvrMenu->baseMenu.menuEntryCount > interfaceInfo.clientHeight-interfaceInfo.paddingSize*2 )
-	{
+	if ( (*itemHeight) * pMenu->menuEntryCount > interfaceInfo.clientHeight-interfaceInfo.paddingSize*2 )
 		*maxVisibleItems = interfaceInfo.clientHeight/(*itemHeight);
-	} else
-	{
-		*maxVisibleItems = pvrMenu->baseMenu.menuEntryCount;
-	}
+	else
+		*maxVisibleItems = pMenu->menuEntryCount;
 }
 
 static int pvr_manageMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd)
 {
-	pvrManageMenu_t *pvrMenu = (pvrManageMenu_t*)pMenu;
 	int fh, itemHeight, maxVisibleItems, n;
 
 	if ( cmd->command == interfaceCommandPageUp )
 	{
 		//dprintf("%s: up\n", __FUNCTION__);
-		pvr_manageMenuGetItemsInfo(pvrMenu, &fh, &itemHeight,&maxVisibleItems);
-		if ( pvrMenu->baseMenu.selectedItem == MENU_ITEM_BACK && pvrMenu->baseMenu.pParentMenu != NULL && pvrMenu->baseMenu.pParentMenu->pParentMenu != NULL )
+		pvr_manageMenuGetItemsInfo(pMenu, &fh, &itemHeight,&maxVisibleItems);
+		if ( pMenu->selectedItem == MENU_ITEM_BACK && pMenu->pParentMenu != NULL && pMenu->pParentMenu->pParentMenu != NULL )
 		{
 			n = MENU_ITEM_MAIN;
-		} else if ( pvrMenu->baseMenu.menuEntryCount <= maxVisibleItems )
+		} else if ( pMenu->menuEntryCount <= maxVisibleItems )
 		{
 			n = 0;
 		}else
 		{
-			n = pvrMenu->baseMenu.selectedItem-(maxVisibleItems-1);
+			n = pMenu->selectedItem-(maxVisibleItems-1);
 			if(n < 0)
 				n = 0;
 		}
-		while ( n >= 0 && pvrMenu->baseMenu.menuEntry[n].isSelectable == 0 )
+		while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 )
 		{
 			n--;
 		};
 		//printf("%s: n=%d\n", __FUNCTION__, n);
-		if ((pvrMenu->baseMenu.pParentMenu != NULL && n < MENU_ITEM_MAIN) ||
-			(pvrMenu->baseMenu.pParentMenu == NULL && n < 0))
+		if (n < MENU_ITEM_MAIN)
 		{
 			//printf("%s: loop\n", __FUNCTION__);
-			n = pvrMenu->baseMenu.menuEntryCount-1;
-			while ( n >= 0 && pvrMenu->baseMenu.menuEntry[n].isSelectable == 0 )
+			n = pMenu->menuEntryCount-1;
+			while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 )
 			{
 				//printf("%s: loop n=%d\n", __FUNCTION__, n);
 				n--;
 			};
 		}
-		if ( pvrMenu->baseMenu.pParentMenu != NULL )
+		//pMenu->selectedItem = pMenu->selectedItem > MENU_ITEM_MAIN ? n : pMenu->selectedItem;
+		pMenu->selectedItem = n;
+		if ( pMenu->selectedItem == MENU_ITEM_BACK && pMenu->pParentMenu->pParentMenu == NULL )
 		{
-			//pvrMenu->baseMenu.selectedItem = pvrMenu->baseMenu.selectedItem > MENU_ITEM_MAIN ? n : pvrMenu->baseMenu.selectedItem;
-			pvrMenu->baseMenu.selectedItem = n;
-			if ( pvrMenu->baseMenu.selectedItem == MENU_ITEM_BACK && pvrMenu->baseMenu.pParentMenu->pParentMenu == NULL )
-			{
-				pvrMenu->baseMenu.selectedItem = MENU_ITEM_MAIN;
-			}
-		} else
-		{
-			pvrMenu->baseMenu.selectedItem = n >= 0 ? n : pvrMenu->baseMenu.selectedItem;
+			pMenu->selectedItem = MENU_ITEM_MAIN;
 		}
 		interface_displayMenu(1);
 	} else if ( cmd->command == interfaceCommandPageDown )
 	{
-		pvr_manageMenuGetItemsInfo(pvrMenu, &fh, &itemHeight,&maxVisibleItems);
+		pvr_manageMenuGetItemsInfo(pMenu, &fh, &itemHeight,&maxVisibleItems);
 		//dprintf("%s: down\n", __FUNCTION__);
-		if ( pvrMenu->baseMenu.selectedItem == MENU_ITEM_MAIN && pvrMenu->baseMenu.pParentMenu != NULL && pvrMenu->baseMenu.pParentMenu->pParentMenu != NULL )
+		if ( pMenu->selectedItem == MENU_ITEM_MAIN && pMenu->pParentMenu != NULL && pMenu->pParentMenu->pParentMenu != NULL )
 		{
 			n = MENU_ITEM_BACK;
 		} else
 		{
-			if ( pvrMenu->baseMenu.menuEntryCount <= maxVisibleItems )
+			if ( pMenu->menuEntryCount <= maxVisibleItems )
 			{
-				n = pvrMenu->baseMenu.menuEntryCount-1;
+				n = pMenu->menuEntryCount-1;
 			}else
 			{
-				n = pvrMenu->baseMenu.selectedItem+(maxVisibleItems-1);
-				if( n >= pvrMenu->baseMenu.menuEntryCount )
-					n = pvrMenu->baseMenu.menuEntryCount-1;
+				n = pMenu->selectedItem+(maxVisibleItems-1);
+				if( n >= pMenu->menuEntryCount )
+					n = pMenu->menuEntryCount-1;
 			}
-			while ( n < pvrMenu->baseMenu.menuEntryCount && pvrMenu->baseMenu.menuEntry[n].isSelectable == 0 )
+			while ( n < pMenu->menuEntryCount && pMenu->menuEntry[n].isSelectable == 0 )
 			{
 				n++;
 			};
 		}
-		if (n >= pvrMenu->baseMenu.menuEntryCount)
+		if (n >= pMenu->menuEntryCount)
 		{
 			//dprintf("%s: loop\n", __FUNCTION__);
-			if ( pvrMenu->baseMenu.pParentMenu != NULL )
+			if ( pMenu->pParentMenu != NULL )
 			{
 				n = MENU_ITEM_MAIN;
 			} else
 			{
 				//dprintf("%s: zero\n", __FUNCTION__);
 				n = 0;
-				while ( n < pvrMenu->baseMenu.menuEntryCount && pvrMenu->baseMenu.menuEntry[n].isSelectable == 0 )
+				while ( n < pMenu->menuEntryCount && pMenu->menuEntry[n].isSelectable == 0 )
 				{
 					n++;
 				};
 			}
 		}
-		//dprintf("%s: new n = %d of %d\n", __FUNCTION__, n, pvrMenu->baseMenu.menuEntryCount);
-		//dprintf("%s: n = %d of %d\n", __FUNCTION__, n, pvrMenu->baseMenu.menuEntryCount);
-		pvrMenu->baseMenu.selectedItem = n;
+		//dprintf("%s: new n = %d of %d\n", __FUNCTION__, n, pMenu->menuEntryCount);
+		//dprintf("%s: n = %d of %d\n", __FUNCTION__, n, pMenu->menuEntryCount);
+		pMenu->selectedItem = n;
 		interface_displayMenu(1);
 	} else
 	{
-		interface_MenuDefaultProcessCommand(&pvrMenu->baseMenu, cmd);
+		interface_MenuDefaultProcessCommand(pMenu, cmd);
 	}
 	return 0;
 }
@@ -2702,7 +2620,6 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	int itemHeight, maxVisibleItems, itemOffset, itemDisplayIndex;
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
-	int job_index;
 	list_element_t *job_element;
 	pvrJob_t *job;
 	struct tm *t;
@@ -2737,15 +2654,14 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	itemHeight = interfaceInfo.paddingSize+fh;
 
 	/* Check if menu is empty */
-	if( pvrMenu->baseMenu.menuEntryCount < 3 )
+	if( pMenu->menuEntryCount < 3 )
 	{
-		//if ( pvrMenu->listMenuType == interfaceListMenuBigThumbnail || pvrMenu->listMenuType == interfaceListMenuNoThumbnail )
 		x = interfaceInfo.clientX+interfaceInfo.paddingSize*2;//+INTERFACE_ARROW_SIZE;
 		y = interfaceInfo.clientY+fh+interfaceInfo.paddingSize;
 
-		tprintf("%c%c%s\t\t\t|%d\n", ' ', '-', pvrMenu->baseMenu.menuEntry[0].info, pvrMenu->baseMenu.menuEntry[0].thumbnail);
+		tprintf("%c%c%s\t\t\t|%d\n", ' ', '-', pMenu->menuEntry[0].info, pMenu->menuEntry[0].thumbnail);
 
-		gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_DISABLED_RED, INTERFACE_BOOKMARK_DISABLED_GREEN, INTERFACE_BOOKMARK_DISABLED_BLUE, INTERFACE_BOOKMARK_DISABLED_ALPHA, x, y, pvrMenu->baseMenu.menuEntry[0].info, 0, 0);
+		gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_DISABLED_RED, INTERFACE_BOOKMARK_DISABLED_GREEN, INTERFACE_BOOKMARK_DISABLED_BLUE, INTERFACE_BOOKMARK_DISABLED_ALPHA, x, y, pMenu->menuEntry[0].info, 0, 0);
 		return;
 	}
 
@@ -2757,18 +2673,18 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	* and so on.
 	* Header is always visible on the screen
 	*/
-	if ( itemHeight * pvrMenu->baseMenu.menuEntryCount > interfaceInfo.clientHeight-interfaceInfo.paddingSize*2 )
+	if ( itemHeight * pMenu->menuEntryCount > interfaceInfo.clientHeight-interfaceInfo.paddingSize*2 )
 	{
 		maxVisibleItems = interfaceInfo.clientHeight/itemHeight;
 	} else
 	{
-		maxVisibleItems = pvrMenu->baseMenu.menuEntryCount;
+		maxVisibleItems = pMenu->menuEntryCount;
 	}
 
-	if ( pvrMenu->baseMenu.selectedItem > maxVisibleItems/2 )
+	if ( pMenu->selectedItem > maxVisibleItems/2 )
 	{
-		itemOffset = pvrMenu->baseMenu.selectedItem - maxVisibleItems/2;
-		itemOffset = itemOffset > (pvrMenu->baseMenu.menuEntryCount-maxVisibleItems+(itemOffset>1)) ? pvrMenu->baseMenu.menuEntryCount-maxVisibleItems+(itemOffset>1) : itemOffset;
+		itemOffset = pMenu->selectedItem - maxVisibleItems/2;
+		itemOffset = itemOffset > (pMenu->menuEntryCount-maxVisibleItems+(itemOffset>1)) ? pMenu->menuEntryCount-maxVisibleItems+(itemOffset>1) : itemOffset;
 	} else
 	{
 		itemOffset = 0;
@@ -2782,13 +2698,13 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	if( itemOffset == 0 )
 	{
 		/* Clear all entry */
-		if ( 0 == pvrMenu->baseMenu.selectedItem )
+		if ( 0 == pMenu->selectedItem )
 		{
 			DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 			// selection rectangle
 			x = interfaceInfo.clientX+interfaceInfo.paddingSize;
 			y = interfaceInfo.clientY+interfaceInfo.paddingSize;
-			gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, x, y, interfaceInfo.clientWidth - 2 * interfaceInfo.paddingSize - (maxVisibleItems < pvrMenu->baseMenu.menuEntryCount ? INTERFACE_SCROLLBAR_WIDTH + interfaceInfo.paddingSize : 0), fh + interfaceInfo.paddingSize);
+			gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, x, y, interfaceInfo.clientWidth - 2 * interfaceInfo.paddingSize - (maxVisibleItems < pMenu->menuEntryCount ? INTERFACE_SCROLLBAR_WIDTH + interfaceInfo.paddingSize : 0), fh + interfaceInfo.paddingSize);
 		}
 		r = INTERFACE_BOOKMARK_RED;
 		g = INTERFACE_BOOKMARK_GREEN;
@@ -2797,9 +2713,9 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 		x = interfaceInfo.clientX+interfaceInfo.paddingSize*2;//+INTERFACE_ARROW_SIZE;
 		y = interfaceInfo.clientY+interfaceInfo.paddingSize+fh;
 
-		tprintf("%c%c%s\t\t\t|%d\n", 0 == pvrMenu->baseMenu.selectedItem ? '>' : ' ', pvrMenu->baseMenu.menuEntry[0].isSelectable ? ' ' : '-', pvrMenu->baseMenu.menuEntry[0].info, pvrMenu->baseMenu.menuEntry[0].thumbnail);
+		tprintf("%c%c%s\t\t\t|%d\n", 0 == pMenu->selectedItem ? '>' : ' ', pMenu->menuEntry[0].isSelectable ? ' ' : '-', pMenu->menuEntry[0].info, pMenu->menuEntry[0].thumbnail);
 
-		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pvrMenu->baseMenu.menuEntry[0].info, 0, 0 == pvrMenu->baseMenu.selectedItem);
+		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pMenu->menuEntry[0].info, 0, 0 == pMenu->selectedItem);
 
 		itemDisplayIndex = 1;
 	}
@@ -2846,24 +2762,19 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 	}
 
 	i = itemOffset > 2 ? itemOffset - 2 : 0;
-	job_element = pvr_jobs;
-	for( job_index = 0; job_index < i; job_index++ )
-	{
-		job_element = job_element->next;
-	}
-
+	job_element = pvr_getJobElement(i);
 	for ( i = itemOffset > 2 ? itemOffset : 2; job_element != NULL && i<itemOffset+maxVisibleItems-(itemOffset>1); i++ )
 	{
-		if ( pvrMenu->baseMenu.menuEntry[i].type == interfaceMenuEntryText )
+		if ( pMenu->menuEntry[i].type == interfaceMenuEntryText )
 		{
 			itemDisplayIndex++;
-			if ( i == pvrMenu->baseMenu.selectedItem )
+			if ( i == pMenu->selectedItem )
 			{
 				DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 				// selection rectangle
 				x = interfaceInfo.clientX;
 				y = interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*itemDisplayIndex + interfaceInfo.paddingSize;
-				gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, x, y, interfaceInfo.clientWidth - (maxVisibleItems < pvrMenu->baseMenu.menuEntryCount ? INTERFACE_SCROLLBAR_WIDTH + interfaceInfo.paddingSize : 0), fh + interfaceInfo.paddingSize);
+				gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, x, y, interfaceInfo.clientWidth - (maxVisibleItems < pMenu->menuEntryCount ? INTERFACE_SCROLLBAR_WIDTH + interfaceInfo.paddingSize : 0), fh + interfaceInfo.paddingSize);
 			}
 			job = (pvrJob_t *)job_element->data;
 			//dprintf("%s: draw text\n", __FUNCTION__);
@@ -2964,9 +2875,9 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 			x = interfaceInfo.clientX+interfaceInfo.paddingSize*2;
 			y = interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*(itemDisplayIndex+1);
 
-			tprintf("%c%c%s\t\t\t|%d\n", i == pvrMenu->baseMenu.selectedItem ? '>' : ' ', pvrMenu->baseMenu.menuEntry[i].isSelectable ? ' ' : '-', pvrMenu->baseMenu.menuEntry[i].info, pvrMenu->baseMenu.menuEntry[i].thumbnail);
+			tprintf("%c%c%s\t\t\t|%d\n", i == pMenu->selectedItem ? '>' : ' ', pMenu->menuEntry[i].isSelectable ? ' ' : '-', pMenu->menuEntry[i].info, pMenu->menuEntry[i].thumbnail);
 
-			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pvrMenu->baseMenu.menuEntry[i].info, 0, i == pvrMenu->baseMenu.selectedItem);*/
+			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pMenu->menuEntry[i].info, 0, i == pMenu->selectedItem);*/
 			job_element = job_element->next;
 		}
 	}
@@ -2977,7 +2888,7 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 		int width, height;
 		float step;
 
-		step = (float)(interfaceInfo.clientHeight - interfaceInfo.paddingSize*2 - INTERFACE_SCROLLBAR_WIDTH*2)/(float)(pvrMenu->baseMenu.menuEntryCount);
+		step = (float)(interfaceInfo.clientHeight - interfaceInfo.paddingSize*2 - INTERFACE_SCROLLBAR_WIDTH*2)/(float)(pMenu->menuEntryCount);
 
 		x = interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH;
 		y = interfaceInfo.clientY + interfaceInfo.paddingSize + INTERFACE_SCROLLBAR_WIDTH + step*itemOffset;
@@ -2988,7 +2899,7 @@ static void pvr_manageMenuDisplay(interfaceMenu_t *pMenu)
 
 		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 
-		//gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 200, 200, x, interfaceInfo.clientY + interfaceInfo.paddingSize*2 + INTERFACE_SCROLLBAR_WIDTH, width, step*pvrMenu->baseMenu.menuEntryCount);
+		//gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 200, 200, x, interfaceInfo.clientY + interfaceInfo.paddingSize*2 + INTERFACE_SCROLLBAR_WIDTH, width, step*pMenu->menuEntryCount);
 
 		gfx_drawRectangle(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_RED, INTERFACE_SCROLLBAR_COLOR_GREEN, INTERFACE_SCROLLBAR_COLOR_BLUE, INTERFACE_SCROLLBAR_COLOR_ALPHA, x, y, width, height);
 		interface_drawInnerBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, x, y, width, height, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideLeft);

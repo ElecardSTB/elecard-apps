@@ -324,8 +324,7 @@ typedef enum
 	interfaceMenuEntryCustom = 0,
 	interfaceMenuEntryImage,
 	interfaceMenuEntryText,
-	interfaceMenuEntryHeading,
-	interfaceMenuEntryEdit
+	interfaceMenuEntryEdit,
 } interfaceMenuEntryType_t;
 
 typedef enum

@@ -219,6 +219,10 @@ int  pvr_getActive(void);
  */
 ssize_t pvr_jobprint(char *buf, size_t buf_size, pvrJob_t *job);
 
+list_element_t *pvr_getJobElement(int job_index);
+
+pvrJob_t *pvr_getJob(int job_index);
+
 int  pvr_deleteJob(list_element_t* job);
 
 int  pvr_clearJobList(void);
