@@ -629,6 +629,12 @@ typedef struct __interfaceMenu_t
 	menuEventFunction displayMenu;
 	menuEventFunction reinitializeMenu;
 
+	/** If set, called each time on entering menu by call to
+	 *  interface_menuActionShowMenu.
+	 *  If this function returns non-zero, user is prohibited to enter menu.
+	 *
+	 * Call interface_refreshMenu to trigger this callback.
+	 */
 	menuActionFunction pActivatedAction;
 	menuActionFunction pDeactivatedAction;
 
@@ -1292,6 +1298,9 @@ int  interface_menuActionShowMenu(interfaceMenu_t *pMenu, void *pArg);
  * @sa interface_menuActionShowMenu()
  */
 int  interface_switchMenu(interfaceMenu_t *pMenu, interfaceMenu_t *pTargetMenu);
+
+/** Calls pActivatedAction menu if specified */
+int  interface_refreshMenu(interfaceMenu_t *pMenu);
 
 /**
  *  @brief Enables and configures play control.

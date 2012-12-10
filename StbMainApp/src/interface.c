@@ -4237,6 +4237,12 @@ int interface_switchMenu(interfaceMenu_t *pMenu, interfaceMenu_t *pTargetMenu)
 	return ret;
 }
 
+int  interface_refreshMenu(interfaceMenu_t *pMenu)
+{
+	return pMenu->pActivatedAction ?
+	       pMenu->pActivatedAction(pMenu, pMenu->pArg) : 0;
+}
+
 void interface_listMenuGetItemInfo(interfaceListMenu_t *pListMenu, int* itemHeight, int* maxVisibleItems)
 {
 	int fh;
