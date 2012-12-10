@@ -341,12 +341,6 @@ typedef enum
 
 typedef enum
 {
-	menuDefaultActionShowMenu = 1,
-	menuDefaultActionCount
-} interfaceMenuActionType_t;
-
-typedef enum
-{
 	interfaceCommandNone =                       0,
 	interfaceCommandUp =                         DIKS_CURSOR_UP,
 	interfaceCommandDown =                       DIKS_CURSOR_DOWN,

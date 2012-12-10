@@ -2307,7 +2307,7 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif
 
 			str = _T("NETWORK_BROWSING");
-			interface_addMenuEntry((interfaceMenu_t*)&BrowseFilesMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &SambaMenu, thumbnail_workstation);
+			interface_addMenuEntry((interfaceMenu_t*)&BrowseFilesMenu, str, interface_menuActionShowMenu, &SambaMenu, thumbnail_workstation);
 			str = _T("NETWORK_PLACES");
 			interface_setMenuName((interfaceMenu_t *)&BrowseFilesMenu,str, strlen(str)+1);
 			interface_showLoading();

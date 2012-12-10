@@ -3241,12 +3241,12 @@ void offair_fillDVBTMenu()
 	{
 		sprintf(buf,"%s", _T("MAIN_LAYER"));
 	}
-	interface_addMenuEntryCustom((interfaceMenu_t*)&DVBTMenu, interfaceMenuEntryText, buf, strlen(buf)+1, dvb_getNumberOfServices() > 0, (menuActionFunction)menuDefaultActionShowMenu, NULL, NULL, NULL, (void*)&DVBTOutputMenu, thumbnail_channels);
+	interface_addMenuEntryCustom((interfaceMenu_t*)&DVBTMenu, interfaceMenuEntryText, buf, strlen(buf)+1, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, NULL, NULL, NULL, (void*)&DVBTOutputMenu, thumbnail_channels);
 
 	if ( offair_epgEnabled() )
 	{
 		str = _T("EPG_MENU");
-		interface_addMenuEntryCustom((interfaceMenu_t*)&DVBTMenu, interfaceMenuEntryText, str, strlen(str)+1, dvb_services != NULL, (menuActionFunction)menuDefaultActionShowMenu, NULL, NULL, NULL, (void*)&EPGMenu, thumbnail_epg);
+		interface_addMenuEntryCustom((interfaceMenu_t*)&DVBTMenu, interfaceMenuEntryText, str, strlen(str)+1, dvb_services != NULL, interface_menuActionShowMenu, NULL, NULL, NULL, (void*)&EPGMenu, thumbnail_epg);
 	} else
 	{
 		str = _T("EPG_UNAVAILABLE");
@@ -3652,7 +3652,7 @@ static int offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg)
 
 #ifndef ENABLE_PVR
 	str = _T("SCHEDULE");
-	interface_addMenuEntry((interfaceMenu_t*)&EPGMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&EPGRecordMenu, thumbnail_epg);
+	interface_addMenuEntry((interfaceMenu_t*)&EPGMenu, str, interface_menuActionShowMenu, (void*)&EPGRecordMenu, thumbnail_epg);
 #endif
 
 	for( i = 0; i < offair_serviceCount; ++i )

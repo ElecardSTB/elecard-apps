@@ -877,7 +877,7 @@ static int rtp_fillStreamMenu(int which)
 				}
 				if( str != NULL )
 				{
-					interface_addMenuEntry(rtpMenu, str, (menuActionFunction)menuDefaultActionShowMenu, &rtpGenreMenu, -1);
+					interface_addMenuEntry(rtpMenu, str, interface_menuActionShowMenu, &rtpGenreMenu, -1);
 				}
 			}
 			//dprintf("%s: Check-add stream 0 (fmt %d): %d: %s %s:%d\n", __FUNCTION__, streams.items[streamNumber].media[0].fmt, position, streams.items[streamNumber].session_name, inet_ntoa(streams.items[streamNumber].connection.address.IPv4), streams.items[streamNumber].media[0].port);

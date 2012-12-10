@@ -883,7 +883,7 @@ static int pvr_fillEditMenu(interfaceMenu_t *pMenu, void* pArg)
 			break;
 	}
 
-	interface_menuActionShowMenu(pMenu,(void*)&PvrEditMenu);
+	interface_menuActionShowMenu(pMenu, &PvrEditMenu);
 
 	return 0;
 }
@@ -909,7 +909,7 @@ static int pvr_editKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 	{
 		case interfaceCommandRed:
 			pvrEditInfo.dirty = 0;
-			interface_menuActionShowMenu(pMenu, (void*)&pvrManageMenu);
+			interface_menuActionShowMenu(pMenu, &pvrManageMenu);
 			return 0;
 		case interfaceCommandGreen:
 			pvr_saveJobEntry(pMenu, PvrEditMenu.baseMenu.pArg);
@@ -936,7 +936,7 @@ static int pvr_editKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 					if( CHANNEL_CUSTOM != channelNumber && channelNumber >= 0 )
 					{
 						EPGRecordMenu.baseMenu.pArg = (void*)channelNumber;
-						interface_menuActionShowMenu( pMenu, (void*)&EPGRecordMenu );
+						interface_menuActionShowMenu( pMenu, &EPGRecordMenu );
 					} else
 						eprintf("%s: Can't find %d channel\n", __FUNCTION__, pvrEditInfo.job.info.dvb.channel);
 #endif
@@ -957,7 +957,7 @@ static int pvr_confirmSaveJob(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		case interfaceCommandLeft:
 		case interfaceCommandRed:
 			pvrEditInfo.dirty = 0;
-			interface_menuActionShowMenu(pMenu, (void*)&pvrManageMenu);
+			interface_menuActionShowMenu(pMenu, &pvrManageMenu);
 			return 0;
 		case interfaceCommandGreen:
 		case interfaceCommandOk:
@@ -1106,22 +1106,22 @@ static int pvr_fillPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 			{
 				int epg_enabled = offair_epgEnabled();
 				str = _T( epg_enabled ? "EPG_RECORD" : "EPG_UNAVAILABLE");
-				interface_addMenuEntryCustom((interfaceMenu_t*)&PvrMenu, interfaceMenuEntryText, str, strlen(str)+1, epg_enabled, (menuActionFunction)menuDefaultActionShowMenu, NULL, NULL, NULL, (void*)&EPGRecordMenu, thumbnail_recorded_epg);
+				interface_addMenuEntryCustom((interfaceMenu_t*)&PvrMenu, interfaceMenuEntryText, str, strlen(str)+1, epg_enabled, interface_menuActionShowMenu, NULL, NULL, NULL, &EPGRecordMenu, thumbnail_recorded_epg);
 			}
 #endif
 		case pvrJobTypeHTTP:
 		case pvrJobTypeRTP:
 			str = _T("RECORDS_MANAGE");
-			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&pvrManageMenu, thumbnail_schedule_record);
+			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, interface_menuActionShowMenu, &pvrManageMenu, thumbnail_schedule_record);
 
 			str = _T("RECORDED_LOCATION");
-			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&PvrLocationMenu, thumbnail_usb);
+			interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, interface_menuActionShowMenu, &PvrLocationMenu, thumbnail_usb);
 			break;
 	}
 #endif // STBPVR
 #ifdef STSDK
 	str = _T("RECORDED_LOCATION");
-	interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, (menuActionFunction)menuDefaultActionShowMenu, (void*)&PvrLocationMenu, thumbnail_usb);
+	interface_addMenuEntry((interfaceMenu_t*)&PvrMenu, str, interface_menuActionShowMenu, &PvrLocationMenu, thumbnail_usb);
 #endif
 	return 0;
 }
@@ -1155,7 +1155,7 @@ int pvr_initPvrMenu(interfaceMenu_t *pMenu, void *pArg)
 		pvrEditInfo.job.type = new_type;
 	}
 #endif // STBPVR
-	interface_menuActionShowMenu(pMenu, (void*)&PvrMenu);
+	interface_menuActionShowMenu(pMenu, &PvrMenu);
 
 	return 0;
 }
@@ -2323,7 +2323,7 @@ static int pvr_saveJobEntry(interfaceMenu_t *pMenu, void* pArg)
 	}
 	pvr_exportJobList();
 	pvrEditInfo.dirty = 0;
-	return interface_menuActionShowMenu(pMenu, (void*)&pvrManageMenu);
+	return interface_menuActionShowMenu(pMenu, &pvrManageMenu);
 }
 
 static int pvr_manageKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
@@ -2387,7 +2387,7 @@ static int pvr_manageKeyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_
 						if( service != NULL && service->schedule != NULL && (i = offair_getServiceIndex(service)) >= 0 )
 						{
 							EPGRecordMenu.baseMenu.pArg = (void*)i;
-							return interface_menuActionShowMenu(interfaceInfo.currentMenu, (void*)&EPGRecordMenu);
+							return interface_menuActionShowMenu(interfaceInfo.currentMenu, &EPGRecordMenu);
 						} else
 #else
 							job_element = NULL;

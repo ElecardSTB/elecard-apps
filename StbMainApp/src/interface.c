@@ -5225,21 +5225,7 @@ int interface_addMenuEntryCustom(interfaceMenu_t *pMenu,
 
 		pMenu->menuEntry[pMenu->menuEntryCount].infoReplacedChar = 0;
 
-		if ( pFunc != NULL && (unsigned int)(intptr_t)pFunc < menuDefaultActionCount )
-		{
-			switch ( (interfaceMenuActionType_t)pFunc )
-			{
-				case menuDefaultActionShowMenu:
-					pMenu->menuEntry[pMenu->menuEntryCount].pAction = interface_menuActionShowMenu;
-					break;
-				default:
-					pMenu->menuEntry[pMenu->menuEntryCount].pAction = pFunc;
-			}
-		} else
-		{
-			pMenu->menuEntry[pMenu->menuEntryCount].pAction = pFunc;
-		}
-
+		pMenu->menuEntry[pMenu->menuEntryCount].pAction = pFunc;
 		pMenu->menuEntry[pMenu->menuEntryCount].pSelectedAction = pSelectedFunc;
 		pMenu->menuEntry[pMenu->menuEntryCount].pDeselectedAction = pDeselectedFunc;
 		pMenu->menuEntry[pMenu->menuEntryCount].pDisplay = pDisplay ? pDisplay : interface_menuEntryDisplay;

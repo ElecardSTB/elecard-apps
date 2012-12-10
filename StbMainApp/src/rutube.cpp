@@ -336,11 +336,11 @@ void rutube_buildMenu(interfaceMenu_t* pParent)
 
 /* creates menu of subcategories */
 	createListMenu(&RutubeSubCategories, _T("TITLE"), thumbnail_rutube, NULL, (interfaceMenu_t*)&RutubeCategories,
-		interfaceListMenuIconThumbnail,  (menuActionFunction)menuDefaultActionShowMenu, rutube_exitMenu, SET_NUMBER(1));
+		interfaceListMenuIconThumbnail,  interface_menuActionShowMenu, rutube_exitMenu, SET_NUMBER(1));
 
 /* creates menu of movies */
 	createListMenu(&MoviesMenu, _T("TITLE"), thumbnail_rutube, rutube_icons, (interfaceMenu_t*)&RutubeCategories,
-		interfaceListMenuIconThumbnail, (menuActionFunction)menuDefaultActionShowMenu, rutube_exitMenu, SET_NUMBER(1));
+		interfaceListMenuIconThumbnail, interface_menuActionShowMenu, rutube_exitMenu, SET_NUMBER(1));
 
 	interface_setCustomKeysCallback((interfaceMenu_t*)&MoviesMenu, movie_infoCallback);
 }
