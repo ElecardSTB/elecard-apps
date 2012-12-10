@@ -3181,9 +3181,10 @@ int offair_epgEnabled()
 void offair_fillDVBTMenu()
 {
 	char *str;
-	char  buf[PATH_MAX];
+	char  buf[MENU_ENTRY_INFO_LENGTH];
 
-	interface_clearMenuEntries((interfaceMenu_t*)&DVBTMenu);
+	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
+	interface_clearMenuEntries(dvbtMenu);
 
 	offair_initServices();
 
@@ -3193,21 +3194,19 @@ void offair_fillDVBTMenu()
 		str = dvb_getTempServiceName(appControlInfo.pvrInfo.dvb.channel);
 		if (str == NULL)
 			str = _T("NOT_AVAILABLE_SHORT");
-		sprintf(buf, "%s: %s", _T("RECORDING"), str);
-		interface_addMenuEntry((interfaceMenu_t*)&DVBTMenu, buf, offair_stopRecording, NULL, thumbnail_recording);
+		snprintf(buf, sizeof(buf), "%s: %s", _T("RECORDING"), str);
+		interface_addMenuEntry(dvbtMenu, buf, offair_stopRecording, NULL, thumbnail_recording);
 	} else
 #endif
 	{
-		sprintf(buf, "%s: ", _T("SELECTED_CHANNEL"));
-		if ( appControlInfo.dvbInfo.channel <= 0 || appControlInfo.dvbInfo.channel == CHANNEL_CUSTOM || appControlInfo.dvbInfo.channel > offair_serviceCount || offair_services[appControlInfo.dvbInfo.channel].service == NULL )
-		{
-			strcat(buf, _T("NONE"));
-			interface_addMenuEntryDisabled((interfaceMenu_t*)&DVBTMenu, buf, thumbnail_not_selected);
-		} else
-		{
-			strcat(buf, dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
-			interface_addMenuEntry((interfaceMenu_t*)&DVBTMenu, buf, offair_channelChange, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel), thumbnail_selected);
-		}
+		int no_channel =  appControlInfo.dvbInfo.channel <= 0 || appControlInfo.dvbInfo.channel == CHANNEL_CUSTOM ||
+			appControlInfo.dvbInfo.channel > offair_serviceCount || offair_services[appControlInfo.dvbInfo.channel].service == NULL;
+		snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"),
+			no_channel ? _T("NONE") : dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
+		if (no_channel)
+			interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_not_selected);
+		else
+			interface_addMenuEntry(dvbtMenu, buf, offair_channelChange, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel), thumbnail_selected);
 	}
 
 #ifndef HIDE_EXTRA_FUNCTIONS
@@ -3229,36 +3228,26 @@ void offair_fillDVBTMenu()
 		break;
 	}
 
-	interface_addMenuEntryDisabled((interfaceMenu_t*)&DVBTMenu, buf, thumbnail_channels);
+	interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_channels);
 #endif
 
 	if (offair_indexCount > 0)
-	{
 		sprintf(buf, "%s (%d)", _T("MAIN_LAYER"), offair_indexCount);
-	} else
-	{
+	else
 		sprintf(buf,"%s", _T("MAIN_LAYER"));
-	}
-	interface_addMenuEntryCustom((interfaceMenu_t*)&DVBTMenu, interfaceMenuEntryText, buf, strlen(buf)+1, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, NULL, NULL, NULL, (void*)&DVBTOutputMenu, thumbnail_channels);
+	interface_addMenuEntry2(dvbtMenu, buf, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, &DVBTOutputMenu, thumbnail_channels);
 
 	if ( offair_epgEnabled() )
-	{
-		str = _T("EPG_MENU");
-		interface_addMenuEntryCustom((interfaceMenu_t*)&DVBTMenu, interfaceMenuEntryText, str, strlen(str)+1, dvb_services != NULL, interface_menuActionShowMenu, NULL, NULL, NULL, (void*)&EPGMenu, thumbnail_epg);
-	} else
-	{
-		str = _T("EPG_UNAVAILABLE");
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&DVBTMenu, str, thumbnail_not_selected);
-	}
+		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_services != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
+	else
+		interface_addMenuEntryDisabled(dvbtMenu, _T("EPG_UNAVAILABLE"), thumbnail_not_selected);
 #ifdef ENABLE_PVR
-		str = _T("RECORDING");
-		interface_addMenuEntry((interfaceMenu_t*)&DVBTMenu, str, pvr_initPvrMenu, SET_NUMBER(pvrJobTypeDVB), thumbnail_recording);
-	
+	interface_addMenuEntry(dvbtMenu, _T("RECORDING"), pvr_initPvrMenu, SET_NUMBER(pvrJobTypeDVB), thumbnail_recording);
 #endif
 
 #ifndef HIDE_EXTRA_FUNCTIONS
 	str = appControlInfo.offairInfo.tunerDebug ? _T("DVB_DEBUG_ENABLE") : _T("DVB_DEBUG_DISABLE");
-	interface_addMenuEntry((interfaceMenu_t*)&DVBTMenu, str, offair_debugToggle, NULL, appControlInfo.offairInfo.tunerDebug ? thumbnail_yes : thumbnail_no);
+	interface_addMenuEntry(dvbtMenu, str, offair_debugToggle, NULL, appControlInfo.offairInfo.tunerDebug ? thumbnail_yes : thumbnail_no);
 #endif
 }
 

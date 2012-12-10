@@ -79,7 +79,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PARAM_PASSWD   (3)
 #define PARAM_REALM    (4)
 
-#define ENTRY_INFO_SET(list, index) ((list << 16) | (index))
+#define ENTRY_INFO_SET(list, index)   (void*)((list << 16) | (index))
 #define ENTRY_INFO_GET_LIST(info)     (info >> 16)
 #define ENTRY_INFO_GET_INDEX(info)    (info & 0xFFFF)
 
@@ -392,7 +392,7 @@ int voip_fillMenu(interfaceMenu_t *pMenu, void *pArg)
 		{
 			str = _T("REDIAL");
 		}
-		interface_addMenuEntryCustom((interfaceMenu_t*)&VoIPMenu, interfaceMenuEntryText, str, strlen(str)+1, redial_available, voip_dialNumber, NULL, NULL, NULL, (void*)ENTRY_INFO_SET(-1,LAST_DIALED), thumbnail_redial);
+		interface_addMenuEntry2((interfaceMenu_t*)&VoIPMenu, str, redial_available, voip_dialNumber, ENTRY_INFO_SET(-1,LAST_DIALED), thumbnail_redial);
 	
 		str = _T("ADDRESS_BOOK");
 		interface_addMenuEntry((interfaceMenu_t*)&VoIPMenu, str, voip_fillAddressBookMenu, NULL, thumbnail_address_book);
@@ -616,10 +616,10 @@ static int voip_fillAccountMenu(interfaceMenu_t *pMenu, void *pArg)
 		//snprintf(buf,MENU_ENTRY_INFO_LENGTH, "SIP: %s", appControlInfo.voipInfo.sip);
 		//interface_addMenuEntry((interfaceMenu_t*)&AccountMenu, interfaceMenuEntryText, buf, strlen(buf), 0, voip_toggleParam, NULL, NULL, (void*)PARAM_SIP, thumbnail_account);
 		str = _T( voip_loggingIn ? "SERVER_QUERY" : (appControlInfo.voipInfo.connected || appControlInfo.voipInfo.server[0] == 0 ? "DISCONNECT" : "LOGIN_TO_SERVER") );
-		interface_addMenuEntryCustom((interfaceMenu_t*)&AccountMenu, interfaceMenuEntryText,
-			str, strlen(str), appControlInfo.voipInfo.connected || appControlInfo.voipInfo.server[0] != 0,
-			appControlInfo.voipInfo.connected || appControlInfo.voipInfo.server[0] == 0 ? voip_logoutFromServer : voip_reloginToServer,
-			NULL, NULL, NULL, NULL, appControlInfo.voipInfo.connected ? thumbnail_account_active : thumbnail_account_inactive);
+		interface_addMenuEntry2((interfaceMenu_t*)&AccountMenu, str,
+			appControlInfo.voipInfo.connected || appControlInfo.voipInfo.server[0] != 0,
+			appControlInfo.voipInfo.connected || appControlInfo.voipInfo.server[0] == 0 ? voip_logoutFromServer : voip_reloginToServer, NULL,
+			appControlInfo.voipInfo.connected ? thumbnail_account_active : thumbnail_account_inactive);
 		snprintf(buf,MENU_ENTRY_INFO_LENGTH, "%s: %s", _T("SERVER"), appControlInfo.voipInfo.server[0] != 0 ? appControlInfo.voipInfo.server : _T("NONE") );
 		interface_addMenuEntry((interfaceMenu_t*)&AccountMenu, buf, voip_toggleParam, (void*)PARAM_SERVER, thumbnail_account);
 		if( appControlInfo.voipInfo.server[0] != 0 )

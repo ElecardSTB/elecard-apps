@@ -367,10 +367,8 @@ static void DMP_OnFB_Results (void *fbObj, struct FB_ResultsInfo* results)
 					media_icon = thumbnail_workstation_video;
 			}
 		}
-		icount = interface_addMenuEntryCustom((interfaceMenu_t *)&BrowseServersMenu, interfaceMenuEntryText,
-			str, strlen(str)+1, !is_media || cdsObj->Res != NULL,
-			is_media ? dlna_stream_change : dlna_fillServerBrowserMenu,
-			NULL, NULL, NULL, cdsObj,
+		icount = interface_addMenuEntry2(_M &BrowseServersMenu, str, !is_media || cdsObj->Res != NULL,
+			is_media ? dlna_stream_change : dlna_fillServerBrowserMenu, cdsObj,
 			FB_ContextIsAllRoots(DMP_Browser) ? thumbnail_workstation : media_icon);
 		
 		if ((strcmp(cdsObj->ID, "0") == 0 && strcmp(cdsObj->CpInfo.ServiceObject->Parent->UDN, parentObjectID) == 0) ||

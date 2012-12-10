@@ -3183,8 +3183,8 @@ static void output_fillFormatMenu(void)
 				{
 					selected = position;
 				}
-				interface_addMenuEntryCustom((interfaceMenu_t*)&FormatMenu, interfaceMenuEntryText, signalName, strlen(signalName)+1,
-				                             signalEnable, output_setFormat, NULL, NULL, NULL, (void*) signals[n].signal,
+				interface_addMenuEntry2(_M &FormatMenu, signalName, signalEnable,
+				                             output_setFormat, SET_NUMBER(signals[n].signal),
 				                             signals[n].signal == appControlInfo.outputInfo.encConfig[0].out_signals ? thumbnail_selected : thumbnail_channels);
 				position++;
 			}
@@ -4933,12 +4933,10 @@ static int output_enterWifiMenu(interfaceMenu_t *wifiMenu, void* pArg)
 		char path[MAX_CONFIG_PATH];
 
 		sprintf(buf, "%s: %s", _T("MODE"), wifiInfo.mode == wifiModeAdHoc ? "Ad-Hoc" : "Managed");
-		interface_addMenuEntryCustom(wifiMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
-		                             wifiInfo.wanMode, output_toggleWifiMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
+		interface_addMenuEntry2(wifiMenu, buf, wifiInfo.wanMode, output_toggleWifiMode, SET_NUMBER(i), thumbnail_configure);
 
 		sprintf(buf, "%s: %s", _T("ADDR_MODE"), wifiInfo.dhcp ? _T("ADDR_MODE_DHCP") : _T("ADDR_MODE_STATIC"));
-		interface_addMenuEntryCustom(wifiMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
-		                             wifiInfo.wanMode, output_toggleMode, NULL, NULL, NULL, SET_NUMBER(i), thumbnail_configure);
+		interface_addMenuEntry2(wifiMenu, buf, wifiInfo.wanMode, output_toggleMode, SET_NUMBER(i), thumbnail_configure);
 
 		if (wifiInfo.dhcp == 0 || wifiInfo.wanMode == 0)
 		{
@@ -5273,11 +5271,11 @@ int output_changeIPTVtimeout(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterIPTVMenu(interfaceMenu_t *iptvMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
-	interface_clearMenuEntries((interfaceMenu_t*)&IPTVSubMenu);
+	interface_clearMenuEntries(iptvMenu);
 
 	{
 	char *str = NULL;
@@ -5288,25 +5286,27 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 		default: str = "SAP"; break;
 	}
 	snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_PLAYLIST"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVPlaylist, NULL, thumbnail_configure);
+	interface_addMenuEntry(iptvMenu, buf, output_changeIPTVPlaylist, NULL, thumbnail_configure);
 	}
 
 	if (appControlInfo.rtpMenuInfo.usePlaylistURL == iptvPlaylistUrl)
 	{
-	snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_PLAYLIST"), appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
-	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
-	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionRtpPlaylist), thumbnail_enterurl);
+		snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_PLAYLIST"),
+			appControlInfo.rtpMenuInfo.playlist[0] != 0 ? appControlInfo.rtpMenuInfo.playlist : _T("NONE"));
+		interface_addMenuEntry2(iptvMenu, buf, appControlInfo.rtpMenuInfo.usePlaylistURL,
+			output_changeURL, SET_NUMBER(optionRtpPlaylist), thumbnail_enterurl);
 	}
 
 	if (appControlInfo.rtpMenuInfo.usePlaylistURL != iptvPlaylistSap)
 	{
-	snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_EPG"), appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
-	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1,
-	                             appControlInfo.rtpMenuInfo.usePlaylistURL, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionRtpEpg), thumbnail_enterurl);
+		snprintf(buf, sizeof(buf), "%s: %s", _T("IPTV_EPG"),
+			appControlInfo.rtpMenuInfo.epg[0] != 0 ? appControlInfo.rtpMenuInfo.epg : _T("NONE"));
+		interface_addMenuEntry2(iptvMenu, buf, appControlInfo.rtpMenuInfo.usePlaylistURL,
+			output_changeURL, SET_NUMBER(optionRtpEpg), thumbnail_enterurl);
 	}
 
 	snprintf(buf, sizeof(buf), "%s: %ld", _T("IPTV_WAIT_TIMEOUT"), appControlInfo.rtpMenuInfo.pidTimeout);
-	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_changeIPTVtimeout, pArg, thumbnail_configure);
+	interface_addMenuEntry(iptvMenu, buf, output_changeIPTVtimeout, pArg, thumbnail_configure);
 
 #ifdef ENABLE_XWORKS
 	int xworks_enabled = 1;
@@ -5316,7 +5316,7 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 	getParam( STB_CONFIG_FILE, "XWORKS", "OFF", buf );
 	xworks_enabled = strcasecmp( "ON", buf ) == 0;
 	snprintf(buf, sizeof(buf), "%s: %s", _T("XWORKS"), xworks_enabled ? _T("ON") : _T("OFF"));
-	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_togglexWorks, SET_NUMBER(!xworks_enabled), thumbnail_configure);
+	interface_addMenuEntry(iptvMenu, buf, output_togglexWorks, SET_NUMBER(!xworks_enabled), thumbnail_configure);
 #endif
 	getParam( STB_CONFIG_FILE, "XWORKS_PROTO", "http", buf );
 	if( strcasecmp( buf, "rtsp" ) == 0 )
@@ -5331,12 +5331,12 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	snprintf(buf, sizeof(buf), "%s: %s", _T("USE_PROTOCOL"), str);
 	if( xworks_enabled )
-		interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_togglexWorksProto, (void*)proto, thumbnail_configure);
+		interface_addMenuEntry(iptvMenu, buf, output_togglexWorksProto, (void*)proto, thumbnail_configure);
 	else
-		interface_addMenuEntryDisabled((interfaceMenu_t*)&IPTVSubMenu, buf, thumbnail_configure);
+		interface_addMenuEntryDisabled(iptvMenu, buf, thumbnail_configure);
 
 	snprintf(buf, sizeof(buf), "%s: %s", _T("XWORKS"), _T("RESTART"));
-	interface_addMenuEntry((interfaceMenu_t*)&IPTVSubMenu, buf, output_restartxWorks, NULL, settings_renew);
+	interface_addMenuEntry(iptvMenu, buf, output_restartxWorks, NULL, settings_renew);
 
 	if( xworks_enabled && appControlInfo.rtpMenuInfo.usePlaylistURL )
 	{
@@ -5345,21 +5345,21 @@ static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg)
 		if (helperParseLine(INFO_TEMP_FILE, buf, "inet addr:", temp, ' ')) //           inet addr:192.168.200.15  Bcast:192.168.200.255  Mask:255.255.255.0
 		{
 			sprintf(buf, "http://%s:1080/xworks.xspf", temp );
-			interface_addMenuEntryDisabled((interfaceMenu_t*)&IPTVSubMenu, buf, thumbnail_enterurl);
+			interface_addMenuEntryDisabled(iptvMenu, buf, thumbnail_enterurl);
 		}
 	}
 
-	if( interface_getSelectedItem( (interfaceMenu_t*)&IPTVSubMenu ) >= interface_getMenuEntryCount( (interfaceMenu_t*)&IPTVSubMenu ) )
+	if( interface_getSelectedItem( iptvMenu ) >= interface_getMenuEntryCount( iptvMenu ) )
 	{
-		interface_setSelectedItem( (interfaceMenu_t*)&IPTVSubMenu, 0 );
+		interface_setSelectedItem( iptvMenu, 0 );
 	}
 #endif
 #ifdef ENABLE_PROVIDER_PROFILES
-	interface_addMenuEntry( (interfaceMenu_t*)&IPTVSubMenu, _T("PROFILE"), interface_menuActionShowMenu, (void*)&ProfileMenu, thumbnail_account );
+	interface_addMenuEntry( iptvMenu, _T("PROFILE"), interface_menuActionShowMenu, (void*)&ProfileMenu, thumbnail_account );
 #endif
 #ifdef ENABLE_TELETES
 	snprintf(buf, sizeof(buf), "%s: %s", "Teletes playlist", appControlInfo.rtpMenuInfo.teletesPlaylist[0] != 0 ? appControlInfo.rtpMenuInfo.teletesPlaylist : _T("NONE"));
-	interface_addMenuEntryCustom((interfaceMenu_t*)&IPTVSubMenu, interfaceMenuEntryText, buf, strlen(buf)+1, 1, output_changeURL, NULL, NULL, NULL, SET_NUMBER(optionTeletesPlaylist), thumbnail_enterurl);
+	interface_addMenuEntry(iptvMenu, buf, output_changeURL, SET_NUMBER(optionTeletesPlaylist), thumbnail_enterurl);
 #endif
 
 	return 0;
