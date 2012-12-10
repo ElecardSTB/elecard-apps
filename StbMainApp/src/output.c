@@ -4385,7 +4385,7 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 			if (temp[0] != 0)
 			{
 				sprintf(buf, "%s: %s", _T("VERIMATRIX_COMPANY"), temp);
-				interface_addMenuEntry(networkMenu, path, output_changeVMCompany, NULL, thumbnail_enterurl);
+				interface_addMenuEntry(networkMenu, buf, output_changeVMCompany, NULL, thumbnail_enterurl);
 			}
 			getParam(VERIMATRIX_INI_FILE, "SERVERADDRESS", "", temp);
 			if (temp[0] != 0)
