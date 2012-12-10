@@ -156,15 +156,21 @@ static int power_callback(interfaceMenu_t *pMenu, void* pArg)
 }
 
 static int menu_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
-{	
-#ifdef ENABLE_FAVORITES
-	if (cmd->command == interfaceCommandBlue)
+{
+	switch (cmd->command)
 	{
-		interface_menuActionShowMenu(pMenu, (void*)&playlistMenu);
-		return 0;
-	}
+#ifdef ENABLE_FAVORITES
+		case interfaceCommandBlue:
+			interface_menuActionShowMenu(pMenu, &playlistMenu);
+			return 0;
 #endif
-
+#ifdef ENABLE_PVR
+		case interfaceCommandRecord:
+			pvr_initPvrMenu(pMenu, SET_NUMBER(pvrJobTypeRTP));
+			return 0;
+#endif
+		default:;
+	}
 	return 1;
 }
 
