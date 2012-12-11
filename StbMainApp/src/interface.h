@@ -936,6 +936,8 @@ extern "C" {
 /* MUST be called after gfx_init() */
 void interface_init(void);
 
+void interface_resize(void);
+
 void interface_destroy(void);
 
 /* Tools */

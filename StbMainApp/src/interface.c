@@ -6573,20 +6573,7 @@ void interface_init()
 {
 	int err;
 
-	DFBCHECK(DRAWING_SURFACE->GetSize(DRAWING_SURFACE, &interfaceInfo.screenWidth, &interfaceInfo.screenHeight));
-
-	interfaceInfo.borderWidth = INTERFACE_BORDER_WIDTH;
-	interfaceInfo.paddingSize = INTERFACE_PADDING;
-	interfaceInfo.marginSize = INTERFACE_MARGIN_SIZE;
-	interfaceInfo.thumbnailSize = INTERFACE_THUMBNAIL_SIZE;
-
-	/*interfaceInfo.screenWidth = 720;
-	interfaceInfo.screenHeight = 576;*/
-
-	interfaceInfo.clientX = interfaceInfo.marginSize;
-	interfaceInfo.clientY = interfaceInfo.marginSize;
-	interfaceInfo.clientWidth = interfaceInfo.screenWidth-interfaceInfo.marginSize*2;
-	interfaceInfo.clientHeight = interfaceInfo.screenHeight-interfaceInfo.marginSize*2;
+	interface_resize();
 
 	interfaceInfo.showMenu = 0;
 
@@ -6618,7 +6605,6 @@ void interface_init()
 
 	interface_playControlReset();
 	interfacePlayControl.activeButton = interfacePlayControlStop;
-	DFBCHECK(pgfx_font->GetStringWidth(pgfx_font, "44:44:44", -1, &interfacePlayControl.sliderTimeWidth));
 
 	interfaceSlideshowControl.enabled = 0;
 	interfaceSlideshowControl.highlightedButton = interfacePlayControlMode;
@@ -6754,6 +6740,26 @@ void interface_init()
 	pthread_detach(interfaceEventThread);
 
 	//dprintf("%s: dimensions: %dx%d\n", __FUNCTION__, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
+}
+
+void interface_resize(void)
+{
+	DFBCHECK(DRAWING_SURFACE->GetSize(DRAWING_SURFACE, &interfaceInfo.screenWidth, &interfaceInfo.screenHeight));
+
+	interfaceInfo.borderWidth = INTERFACE_BORDER_WIDTH;
+	interfaceInfo.paddingSize = INTERFACE_PADDING;
+	interfaceInfo.marginSize = INTERFACE_MARGIN_SIZE;
+	interfaceInfo.thumbnailSize = INTERFACE_THUMBNAIL_SIZE;
+
+	/*interfaceInfo.screenWidth = 720;
+	interfaceInfo.screenHeight = 576;*/
+
+	interfaceInfo.clientX = interfaceInfo.marginSize;
+	interfaceInfo.clientY = interfaceInfo.marginSize;
+	interfaceInfo.clientWidth = interfaceInfo.screenWidth-interfaceInfo.marginSize*2;
+	interfaceInfo.clientHeight = interfaceInfo.screenHeight-interfaceInfo.marginSize*2;
+
+	DFBCHECK(pgfx_font->GetStringWidth(pgfx_font, "44:44:44", -1, &interfacePlayControl.sliderTimeWidth));
 }
 
 void interface_destroy()

@@ -650,6 +650,7 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
 		stHelper_waitForFBdevice("/dev/fb0");
 		gfx_init(0, NULL);
+		interface_resize();
 		gfx_startEventThread();
 		needRestart = 1;
 	} else {
