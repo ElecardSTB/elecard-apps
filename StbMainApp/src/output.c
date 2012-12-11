@@ -264,7 +264,11 @@ static int output_enterLANMenu (interfaceMenu_t *lanMenu, void* pArg);
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static int output_fillLANMenu(interfaceMenu_t *lanMenu, void* pIface);
 static int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce);
-static int output_showGatewayMenu(interfaceMenu_t *pMenu, void* ignored);
+#ifdef STBPNX
+static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
+static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
+static int output_enterGatewayMenu(interfaceMenu_t *pMenu, void* ignored);
+#endif
 #endif
 
 #ifdef ENABLE_WIFI
@@ -322,10 +326,6 @@ static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #endif
-#ifdef ENABLE_LAN
-static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
-#endif
 
 #ifdef ENABLE_3D
 static interfaceListMenu_t Video3DSubMenu;
@@ -344,10 +344,14 @@ static int output_askPassword(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterPassword(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg);
 #endif
-static void output_fillStandardMenu(void);
 static void output_fillFormatMenu(void);
-static void output_fillBlankingMenu(void);
 static void output_fillTimeZoneMenu(void);
+#if (defined STB6x8x) || (defined STB225)
+static void output_fillStandardMenu(void);
+#endif
+#ifdef STB82
+static void output_fillBlankingMenu(void);
+#endif
 
 #ifdef STSDK
 static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
@@ -409,8 +413,10 @@ static interfaceListMenu_t PPPSubMenu;
 #ifdef ENABLE_LAN
 static interfaceListMenu_t LANSubMenu;
 #endif
+#ifdef STBPNX
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
 static interfaceListMenu_t GatewaySubMenu;
+#endif
 #endif
 #ifdef ENABLE_WIFI
 interfaceListMenu_t WifiSubMenu;
@@ -542,100 +548,95 @@ char* inet_addr_prepare( char *value)
 
 /* -------------------------- OUTPUT SETTING --------------------------- */
 
+#if (defined STB6x8x) || (defined STB225)
 static int output_setStandard(interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STB6x8x
-    DFBScreenEncoderTVStandards tv_standard;
-    tv_standard = GET_NUMBER(pArg);
+	DFBScreenEncoderTVStandards tv_standard;
+	tv_standard = GET_NUMBER(pArg);
 
-    /* Check to see if the standard actually needs changing */
-    /*if (tv_standard==appControlInfo.outputInfo.encConfig[0].tv_standard)
-    {
-        return 0;
-    }*/
+	/* Check to see if the standard actually needs changing */
+	/*if (tv_standard==appControlInfo.outputInfo.encConfig[0].tv_standard)
+	{
+		return 0;
+	}*/
 
-    appControlInfo.outputInfo.encConfig[0].tv_standard = tv_standard;
-    appControlInfo.outputInfo.encConfig[0].flags = DSECONF_TV_STANDARD;
+	appControlInfo.outputInfo.encConfig[0].tv_standard = tv_standard;
+	appControlInfo.outputInfo.encConfig[0].flags = DSECONF_TV_STANDARD;
 
-    /* What if we have 2 encoders like PNX8510 + TDA9982 */
-    if(appControlInfo.outputInfo.numberOfEncoders == 2)
-    {
-        appControlInfo.outputInfo.encConfig[1].tv_standard = tv_standard;
-        appControlInfo.outputInfo.encConfig[1].flags = DSECONF_TV_STANDARD;
-    }
+	/* What if we have 2 encoders like PNX8510 + TDA9982 */
+	if(appControlInfo.outputInfo.numberOfEncoders == 2)
+	{
+		appControlInfo.outputInfo.encConfig[1].tv_standard = tv_standard;
+		appControlInfo.outputInfo.encConfig[1].flags = DSECONF_TV_STANDARD;
+	}
 
-    switch(tv_standard)
-    {
-        case DSETV_NTSC:
+	switch(tv_standard)
+	{
+		case DSETV_NTSC:
 #ifdef STBPNX
-        case DSETV_NTSC_M_JPN:
+		case DSETV_NTSC_M_JPN:
 #endif
-			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 0);
+			interface_setSelectedItem(pMenu, 0);
 			system("/config.templates/scripts/dispmode ntsc");
-            break;
+			break;
 
-        case DSETV_SECAM:
-			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 1);
+		case DSETV_SECAM:
+			interface_setSelectedItem(pMenu, 1);
 			system("/config.templates/scripts/dispmode secam");
-            break;
+			break;
 
-        case DSETV_PAL:
+		case DSETV_PAL:
 #ifdef STBPNX
-        case DSETV_PAL_BG:
-        case DSETV_PAL_I:
-        case DSETV_PAL_N:
-        case DSETV_PAL_NC:
+		case DSETV_PAL_BG:
+		case DSETV_PAL_I:
+		case DSETV_PAL_N:
+		case DSETV_PAL_NC:
 #endif
-			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 2);
+			interface_setSelectedItem(pMenu, 2);
 			system("/config.templates/scripts/dispmode pal");
-            break;
+			break;
 
 #ifdef STB82
-        case DSETV_PAL_60:
+		case DSETV_PAL_60:
 #endif //#ifdef STB82
 #ifdef STBPNX
-        case DSETV_PAL_M:
-			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 3);
+		case DSETV_PAL_M:
+			interface_setSelectedItem(pMenu, 3);
 			system("/config.templates/scripts/dispmode pal60");
-            break;
-        case DSETV_DIGITAL:
-            appControlInfo.outputInfo.encConfig[0].out_signals = DSOS_YCBCR;
-            appControlInfo.outputInfo.encConfig[0].out_connectors = DSOC_COMPONENT;
-            appControlInfo.outputInfo.encConfig[0].flags = (DSECONF_OUT_SIGNALS | DSECONF_CONNECTORS );
-			interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, 0);
-            break;
+			break;
+		case DSETV_DIGITAL:
+			appControlInfo.outputInfo.encConfig[0].out_signals = DSOS_YCBCR;
+			appControlInfo.outputInfo.encConfig[0].out_connectors = DSOC_COMPONENT;
+			appControlInfo.outputInfo.encConfig[0].flags = (DSECONF_OUT_SIGNALS | DSECONF_CONNECTORS );
+			interface_setSelectedItem(pMenu, 0);
+			break;
 #endif
-        default:
-            break;
-    }
-
-    //gfx_setOutputFormat(1);
-
+		default:
+			break;
+	}
 	appControlInfo.outputInfo.standart = tv_standard;
-
 	output_warnIfFailed(saveAppSettings());
-#else //#ifdef STB6x8x
+#endif //#ifdef STB6x8x
+#ifdef STB225
 //	system("mount -o rw,remount /");
 //	setParam("/etc/init.d/S35pnxcore.sh", "resolution", GET_NUMBER(pArg) == 720 ? "1280x720x60p" : "1920x1080x60i");
 //	system("mount -o ro,remount /");
-#endif //#ifdef STB6x8x
+#endif // STB225
 
 	system("sync");
 	system("reboot");
 
-    output_fillStandardMenu();
+	output_fillStandardMenu();
 	interface_displayMenu(1);
-
 #ifdef ENABLE_DVB
-    /* Re-start DVB - if possible */
-    if ( offair_tunerPresent() && dvb_getNumberOfServices() > 0 )
-    {
-        offair_startVideo(screenMain);
-    }
+	/* Re-start DVB - if possible */
+	if (offair_tunerPresent() && dvb_getNumberOfServices() > 0)
+		offair_startVideo(screenMain);
 #endif
-
-    return 0;
+	return 0;
 }
+#endif // STB6x8x || STB225
 
 int output_warnIfFailed(int failed)
 {
@@ -743,7 +744,7 @@ static int output_outputModesToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
-#endif
+#endif // STSDK
 
 /**
  * This function now uses the Encoder API to set the output format instead of the Output API.
@@ -754,28 +755,8 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
 	int format = GET_NUMBER(pArg);
 
 	gfx_changeOutputFormat(format);
-
 	appControlInfo.outputInfo.format = format;
-
 	output_warnIfFailed(saveAppSettings());
-
-    /*switch(format)
-    {
-        case(DSOS_YCBCR) :
-			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 3);
-            break;
-        case(DSOS_YC) :
-			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 0);
-            break;
-        case(DSOS_CVBS) :
-			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 1);
-            break;
-        case(DSOS_RGB) :
-			interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, 2);
-            break;
-        default:
-            break;
-    }*/
     output_fillFormatMenu();
 	interface_displayMenu(1);
 #endif // STB82
@@ -785,34 +766,47 @@ static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
     return 0;
 }
 
+#ifdef STB82
 /**
  * This function now uses the Encoder API to set the slow blanking instead of the Output API.
  */
 static int output_setBlanking(interfaceMenu_t *pMenu, void* pArg)
 {
-    int blanking = GET_NUMBER(pArg);
+	int blanking = GET_NUMBER(pArg);
 
-    appControlInfo.outputInfo.encConfig[0].slow_blanking = blanking;
-    appControlInfo.outputInfo.encConfig[0].flags = DSECONF_SLOW_BLANKING;
-
-    switch(blanking)
-    {
-        case(DSOSB_4x3) :
-			interface_setSelectedItem((interfaceMenu_t*)&BlankingMenu, 0);
-            break;
-        case(DSOSB_16x9) :
-			interface_setSelectedItem((interfaceMenu_t*)&BlankingMenu, 1);
-            break;
-        case(DSOSB_OFF) :
-			interface_setSelectedItem((interfaceMenu_t*)&BlankingMenu, 2);
-            break;
-        default:
-            break;
-    }
+	appControlInfo.outputInfo.encConfig[0].slow_blanking = blanking;
+	appControlInfo.outputInfo.encConfig[0].flags = DSECONF_SLOW_BLANKING;
+	switch(blanking)
+	{
+		case(DSOSB_4x3) : interface_setSelectedItem(pMenu, 0); break;
+		case(DSOSB_16x9): interface_setSelectedItem(pMenu, 1); break;
+		case(DSOSB_OFF) : interface_setSelectedItem(pMenu, 2); break;
+		default: break;
+	}
 	gfx_setOutputFormat(0);
 	interface_displayMenu(1);
 	return 0;
 }
+
+static void output_fillBlankingMenu(void)
+{
+	interfaceMenu_t *blankingMenu = _M &BlankingMenu;
+	interface_clearMenuEntries(blankingMenu);
+	interface_addMenuEntry(blankingMenu, "4 x 3",  output_setBlanking, (void*)DSOSB_4x3,  thumbnail_configure);
+	interface_addMenuEntry(blankingMenu, "16 x 9", output_setBlanking, (void*)DSOSB_16x9, thumbnail_configure);
+	interface_addMenuEntry(blankingMenu, "None",   output_setBlanking, (void*)DSOSB_OFF,  thumbnail_configure);
+}
+
+static int output_toggleInterfaceAnimation(interfaceMenu_t *pMenu, void* pArg)
+{
+	interfaceInfo.animation = (interfaceInfo.animation + 1) % interfaceAnimationCount;
+	if (interfaceInfo.animation > 0) {
+		interfaceInfo.currentMenu = _M &interfaceMainMenu; // toggles animation
+		saveAppSettings();
+	}
+	return interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
+}
+#endif // STB82
 
 #ifndef HIDE_EXTRA_FUNCTIONS
 static int output_toggleAudio(interfaceMenu_t *pMenu, void* pArg)
@@ -841,20 +835,7 @@ static int output_toggleBufferTracking(interfaceMenu_t *pMenu, void* pArg)
 	appControlInfo.bUseBufferModel = !appControlInfo.bUseBufferModel;
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
-#endif
-
-#ifdef STB82
-static int output_toggleInterfaceAnimation(interfaceMenu_t *pMenu, void* pArg)
-{
-	interfaceInfo.animation = (interfaceInfo.animation + 1) % interfaceAnimationCount;
-	if( interfaceInfo.animation > 0 )
-	{
-		interfaceInfo.currentMenu = (interfaceMenu_t*)&interfaceMainMenu; // toggles animation
-		interface_displayMenu(1);
-	}
-	return output_saveAndRedraw(saveAppSettings(), pMenu);
-}
-#endif
+#endif // HIDE_EXTRA_FUNCTIONS
 
 static int output_toggleHighlightColor(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -1649,6 +1630,7 @@ static int output_changeGatewayBandwidth(interfaceMenu_t *pMenu, void* pArg)
 #endif // ENABLE_LAN
 
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
+#ifdef STBPNX
 static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	lanMode_t mode = GET_NUMBER(pArg);
@@ -1720,8 +1702,8 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 #endif
 
 		networkInfo.changed = 0;
-		output_showGatewayMenu(pMenu, NULL);
 		interface_hideMessageBox();
+		output_redrawMenu(pMenu);
 
 		return 0;
 	}
@@ -1733,6 +1715,17 @@ static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg)
 	interface_showConfirmationBox(_T("GATEWAY_MODE_CONFIRM"), thumbnail_question, output_confirmGatewayMode, pArg);
 	return 1;
 }
+
+int output_enterGatewayMenu(interfaceMenu_t *gatewayMenu, void* ignored)
+{
+	interface_clearMenuEntries(gatewayMenu);
+	for (lanMode_t mode = 0; mode < lanModeCount; mode++)
+		interface_addMenuEntry(gatewayMenu, output_getLanModeName(mode),
+			mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode, (void*)mode,
+			mode == networkInfo.lanMode ? radiobtn_filled : radiobtn_empty);
+	return 0;
+}
+#endif // STBPNX
 #endif // ENABLE_LAN || ENABLE_WIFI
 
 static int output_applyNetworkSettings(interfaceMenu_t *pMenu, void* pArg)
@@ -2538,7 +2531,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	stb810_dvbfeInfo *fe = getDvbRange(tuner);
 	int tunerType = dvb_getType(tuner);
 
-	// assert (dvbMenu == (interfaceMenu_t*)&DVBSubMenu);
+	// assert (dvbMenu == _M &DVBSubMenu);
 	interface_clearMenuEntries(dvbMenu);
 
 	if (fe == NULL)
@@ -2849,7 +2842,7 @@ static int output_toggleAspectRatio(interfaceMenu_t *pMenu, void* pArg)
 		appControlInfo.outputInfo.aspectRatio = aspectRatio_16x9;
 	else
 		appControlInfo.outputInfo.aspectRatio = aspectRatio_4x3;
-    return output_saveAndRedraw(saveAppSettings(), pMenu);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int output_toggleAutoScale(interfaceMenu_t *pMenu, void* pArg)
@@ -2872,55 +2865,51 @@ static int output_toggleScreenFiltration(interfaceMenu_t *pMenu, void* pArg)
 
 /* -------------------------- MENU DEFINITION --------------------------- */
 
-
+#if (defined STB6x8x) || (defined STB225)
 static void output_fillStandardMenu(void)
 {
-    int selected = MENU_ITEM_BACK;
+	int selected = MENU_ITEM_BACK;
 	char *str;
 
-    //StandardMenu.prev = &OutputMenu;
-	interface_clearMenuEntries((interfaceMenu_t*)&StandardMenu);
+	interfaceMenu_t *standardMenu = _M &StandardMenu;
+	interface_clearMenuEntries(standardMenu);
 #ifdef STB6x8x
-    /*Add menu items automatically*/
-    if (appControlInfo.outputInfo.encDesc[0].caps & DSECAPS_TV_STANDARDS)
-    {
-        int n;
-        int position = 0;
-        for (n=0; tv_standards[n].standard; n++)
-        {
-            /* the following will only work if the supported resolutions is only one value when you have a DIGITAL (HD) output.*/
-            if (appControlInfo.outputInfo.encDesc[0].tv_standards & tv_standards[n].standard)
-            {
-                if (tv_standards[n].standard == appControlInfo.outputInfo.encConfig[0].tv_standard)
-                {
-                    selected = position;
-                }
+	if (appControlInfo.outputInfo.encDesc[0].caps & DSECAPS_TV_STANDARDS)
+	{
+		int position = 0;
+		for (int n=0; tv_standards[n].standard; n++) {
+			/* the following will only work if the supported resolutions is only one value when you have a DIGITAL (HD) output.*/
+			if (appControlInfo.outputInfo.encDesc[0].tv_standards & tv_standards[n].standard)
+			{
+				if (tv_standards[n].standard == appControlInfo.outputInfo.encConfig[0].tv_standard)
+					selected = position;
 #ifdef STBPNX
 				str = (tv_standards[n].standard == DSETV_DIGITAL) ? (char*)resolutions[0].name : (char*) tv_standards[n].name;
 #else
 				str = (char*) tv_standards[n].name;
 #endif
-				interface_addMenuEntry((interfaceMenu_t*)&StandardMenu, str, output_setStandard, (void*) tv_standards[n].standard,
+				interface_addMenuEntry(standardMenu, str, output_setStandard, (void*) tv_standards[n].standard,
 				                       tv_standards[n].standard == appControlInfo.outputInfo.encConfig[0].tv_standard ? thumbnail_selected : thumbnail_tvstandard);
 				position++;
-            }
-        }
-    }
-#else
+			}
+		}
+	}
+#endif // STB6x8x
+#ifdef STB225
 	{
 		char buf[128];
 		getParam("/etc/init.d/S35pnxcore.sh", "resolution", "1280x720x60p", buf);
 
 		str = "1280x720x60p";
-		interface_addMenuEntry((interfaceMenu_t*)&StandardMenu, str, output_setStandard, (void*) 720, strstr(buf, str) != 0 ? thumbnail_selected : thumbnail_tvstandard);
+		interface_addMenuEntry(standardMenu, str, output_setStandard, (void*) 720, strstr(buf, str) != 0 ? thumbnail_selected : thumbnail_tvstandard);
 		str = "1920x1080x60i";
-		interface_addMenuEntry((interfaceMenu_t*)&StandardMenu, str, output_setStandard, (void*) 1080, strstr(buf, str) != 0 ? thumbnail_selected : thumbnail_tvstandard);
+		interface_addMenuEntry(standardMenu, str, output_setStandard, (void*) 1080, strstr(buf, str) != 0 ? thumbnail_selected : thumbnail_tvstandard);
 		selected = strstr(buf, str) != 0;
 	}
-#endif
-    /* Ensure that the correct entry is selected */
-	interface_setSelectedItem((interfaceMenu_t*)&StandardMenu, selected);
+#endif // STB225
+	interface_setSelectedItem(standardMenu, selected);
 }
+#endif // STB6x8x || STB225
 
 static int output_setDate(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -2928,8 +2917,7 @@ static int output_setDate(interfaceMenu_t *pMenu, void* pArg)
 	struct tm *lt;
 	time_t t;
 	char temp[5];
-	if( pArg != &DateEntry )
-	{
+	if ( pArg != &DateEntry ) {
 		eprintf("%s: wrong edit entry %p (should be %p)\n", __FUNCTION__, pArg, &DateEntry);
 		return 1;
 	}
@@ -2948,15 +2936,17 @@ static int output_setDate(interfaceMenu_t *pMenu, void* pArg)
 	temp[4] = 0;
 	memcpy(temp, &DateEntry.info.date.value[4], 4);
 	newtime.tm_year = atoi(temp) - 1900;
-	if( newtime.tm_year < 0 || newtime.tm_mon < 0 || newtime.tm_mon > 11 || newtime.tm_mday < 0 || newtime.tm_mday > 31 )
+	if ( newtime.tm_year < 0 ||
+	     newtime.tm_mon  < 0 || newtime.tm_mon  > 11 ||
+	     newtime.tm_mday < 0 || newtime.tm_mday > 31 )
 	{
 		interface_showMessageBox(_T("ERR_INCORRECT_DATE"), thumbnail_error, 0);
 		return 2;
 	}
 
-	if( lt->tm_mday != newtime.tm_mday ||
-	    lt->tm_mon  != newtime.tm_mon  ||
-	    lt->tm_year != newtime.tm_year )
+	if ( lt->tm_mday != newtime.tm_mday ||
+	     lt->tm_mon  != newtime.tm_mon  ||
+	     lt->tm_year != newtime.tm_year )
 	{
 		struct timeval tv;
 
@@ -2990,7 +2980,8 @@ static int output_setTime(interfaceMenu_t *pMenu, void* pArg)
 	temp[0] = TimeEntry.info.time.value[2];
 	temp[1] = TimeEntry.info.time.value[3];
 	newtime.tm_min = atoi(temp);
-	if( newtime.tm_hour < 0 || newtime.tm_hour > 23 || newtime.tm_min  < 0 || newtime.tm_min  > 59 )
+	if( newtime.tm_hour < 0 || newtime.tm_hour > 23 ||
+	    newtime.tm_min  < 0 || newtime.tm_min  > 59 )
 	{
 		interface_showMessageBox(_T("ERR_INCORRECT_TIME"), thumbnail_error, 0);
 		return 2;
@@ -3014,8 +3005,7 @@ static int output_setTimeZone(interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STBxx
 	FILE *f = fopen("/config/timezone", "w");
-	if (f != NULL)
-	{
+	if (f != NULL) {
 		fprintf(f, "/usr/share/zoneinfo/%s", (char*)pArg);
 		fclose(f);
 
@@ -3034,18 +3024,14 @@ static int output_setTimeZone(interfaceMenu_t *pMenu, void* pArg)
 	{
 		output_warnIfFailed(1);
 	}
-
 	tzset();
-
 	interface_menuActionShowMenu(pMenu, &TimeSubMenu);
-
 	return 0;
 }
 
 static char* output_getNTP(int field, void* pArg)
 {
-	if( field == 0 )
-	{
+	if ( field == 0 ) {
 		static char ntp[MENU_ENTRY_INFO_LENGTH] = {0};
 #ifdef STBxx
 		getParam(STB_CONFIG_FILE, "NTPSERVER", "", ntp);
@@ -3060,34 +3046,28 @@ static char* output_getNTP(int field, void* pArg)
 
 static int output_setNTP(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if( value == NULL )
+	if ( value == NULL )
 		return 1;
 
 #ifdef STBxx
-	if ( setParam(STB_CONFIG_FILE, "NTPSERVER", value) != 0 )
-	{
+	if ( setParam(STB_CONFIG_FILE, "NTPSERVER", value) != 0 ) {
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	} else
-	{
+	} else {
 		system("/usr/sbin/ntpupdater");
 		output_refillMenu(pMenu);
 	}
 #endif
 #ifdef STSDK
-	if ( setParam(NTP_CONFIG_FILE, "NTPSERVERS", value) != 0 )
-	{
+	if ( setParam(NTP_CONFIG_FILE, "NTPSERVERS", value) != 0 ) {
 		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-	} else
-	{
+	} else {
 		interface_showLoading();
 		interface_hideMessageBox();
 
-		if (*value)
-		{
+		if (*value) {
 			setParam(NTP_CONFIG_FILE, "NTPD",    "yes");
 			setParam(NTP_CONFIG_FILE, "NTPDATE", "yes");
-		} else
-		{
+		} else {
 			setParam(NTP_CONFIG_FILE, "NTPD",    "no");
 			setParam(NTP_CONFIG_FILE, "NTPDATE", "no");
 		}
@@ -3110,12 +3090,12 @@ static int output_changeNTP(interfaceMenu_t *pMenu, void* pArg)
 
 static void output_fillTimeZoneMenu(void)
 {
-	int i;
 	char *str;
 	char buf[BUFFER_SIZE];
-	int found = 12;
+	int selected = 21; // GMT+0
 
-	interface_clearMenuEntries((interfaceMenu_t*)&TimeZoneMenu);
+	interfaceMenu_t *tzMenu = _M &TimeZoneMenu;
+	interface_clearMenuEntries(tzMenu);
 
 #ifdef STBxx
 	if (!helperParseLine(INFO_TEMP_FILE, "cat /config/timezone",    "zoneinfo/", buf, 0))
@@ -3127,17 +3107,14 @@ static void output_fillTimeZoneMenu(void)
 		buf[0] = 0;
 	}
 
-	for (i=0; i<(int)(sizeof(timezones)/sizeof(timezones[0])); i++)
-	{
+	for (size_t i=0; i<(sizeof(timezones)/sizeof(timezones[0])); i++) {
 		str = timezones[i].desc;
-		interface_addMenuEntry((interfaceMenu_t*)&TimeZoneMenu, str, output_setTimeZone, (void*)timezones[i].file, thumbnail_log);
+		interface_addMenuEntry(tzMenu, str, output_setTimeZone, (void*)timezones[i].file, thumbnail_log);
 		if (strcmp(timezones[i].file, buf) == 0)
-		{
-			found = i;
-		}
+			selected = i;
 	}
 
-	interface_setSelectedItem((interfaceMenu_t*)&TimeZoneMenu, found);
+	interface_setSelectedItem(tzMenu, selected);
 }
 
 /**
@@ -3146,9 +3123,8 @@ static void output_fillTimeZoneMenu(void)
 static void output_fillFormatMenu(void)
 {
 	int selected = MENU_ITEM_BACK;
-
-	interface_clearMenuEntries((interfaceMenu_t*)&FormatMenu);
-
+	interfaceMenu_t *formatMenu = _M &FormatMenu;
+	interface_clearMenuEntries(formatMenu);
 #ifdef STB82
 	int n = 0;
 	int position = 0;
@@ -3156,10 +3132,8 @@ static void output_fillFormatMenu(void)
 	int signalEnable;
 
 	/*Add menu items automatically*/
-	if (appControlInfo.outputInfo.encDesc[0].caps & DSECAPS_OUT_SIGNALS)
-	{
-		for (n=0; signals[n].signal; n++)
-		{
+	if (appControlInfo.outputInfo.encDesc[0].caps & DSECAPS_OUT_SIGNALS) {
+		for (n=0; signals[n].signal; n++) {
 			if (appControlInfo.outputInfo.encDesc[0].out_signals & signals[n].signal)
 			{
 				switch( signals[n].signal )
@@ -3269,7 +3243,7 @@ static void output_fillFormatMenu(void)
 				else
 					icon = supported ? thumbnail_channels : thumbnail_not_selected;
 
-				interface_addMenuEntry((interfaceMenu_t*)&FormatMenu, name, output_setFormat, NULL, icon);
+				interface_addMenuEntry(formatMenu, name, output_setFormat, NULL, icon);
 				n++;
 			} else {
 				if (!supported)
@@ -3300,19 +3274,19 @@ static void output_fillFormatMenu(void)
 							icon = thumbnail_channels;
 						if (current)
 							selected = j;
-						interface_addMenuEntry((interfaceMenu_t*)&FormatMenu, commonOutputModes[j].displayName, output_setFormat, commonModeNames[j], icon);
+						interface_addMenuEntry(formatMenu, commonOutputModes[j].displayName, output_setFormat, commonModeNames[j], icon);
 					}
 				}
-				interface_addMenuEntry((interfaceMenu_t*)&FormatMenu, _T("SHOW_ADVANCED"), output_outputModesToggleAdvanced, &showAdvanced, thumbnail_configure);
+				interface_addMenuEntry(formatMenu, _T("SHOW_ADVANCED"), output_outputModesToggleAdvanced, &showAdvanced, thumbnail_configure);
 			} else {
-				interface_addMenuEntry((interfaceMenu_t*)&FormatMenu, _T("HIDE_ADVANCED"), output_outputModesToggleAdvanced, &showAdvanced, thumbnail_configure);
+				interface_addMenuEntry(formatMenu, _T("HIDE_ADVANCED"), output_outputModesToggleAdvanced, &showAdvanced, thumbnail_configure);
 			}
 		}
 	} else if( type == elcdRpcError && list && list->type == cJSON_String )
 		eprintf("%s: failed to get video mode list: %s\n", list->valuestring);
 	cJSON_Delete(list);
-#endif
-	interface_setSelectedItem((interfaceMenu_t*)&FormatMenu, selected);
+#endif // STSDK
+	interface_setSelectedItem(formatMenu, selected);
 }
 
 #ifdef STSDK
@@ -3323,20 +3297,6 @@ int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg)
 	return 0;
 }
 #endif
-
-static void output_fillBlankingMenu(void)
-{
-	//int position = 0;
-	char *str;
-	interface_clearMenuEntries((interfaceMenu_t*)&BlankingMenu);
-	//BlankingMenu.prev = &OutputMenu;
-	str = "4 x 3";
-	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_4x3, thumbnail_configure);
-	str = "16 x 9";
-	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_16x9, thumbnail_configure);
-	str = "None";
-	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_OFF, thumbnail_configure);
-}
 
 static int output_applyGraphicsMode(void *notused)
 {
@@ -3417,8 +3377,7 @@ static void show_ip(stb810_networkInterface_t i, const char *iface_name, char *i
 	{
 		snprintf(temp, sizeof(temp), "/sys/class/net/%s/address", helperEthDevice(i));
 		fd = open(temp, O_RDONLY);
-		if (fd > 0)
-		{
+		if (fd > 0) {
 			ssize_t len = read(fd, temp, sizeof(temp)-1)-1;
 			close(fd);
 			if (len<0) len = 0;
@@ -3427,23 +3386,20 @@ static void show_ip(stb810_networkInterface_t i, const char *iface_name, char *i
 			sprintf(info_text, "%s %s: ", iface_name, _T("MAC_ADDRESS"));
 			strcat(info_text, temp);
 			strcat(info_text, "\n");
-		} else
-		{
+		} else {
 			sprintf(temp, "%s %s: %s\n", iface_name, _T("MAC_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
 			strcat(info_text, temp);
 		}
 	}
 #ifdef STBPNX
-	if (i == ifaceLAN && output_isBridge())
-	{
+	if (i == ifaceLAN && output_isBridge()) {
 		snprintf(temp, sizeof(temp), "%s: %s", iface_name, _T("GATEWAY_BRIDGE"));
 		strcat(info_text, temp);
 		return;
 	}
 #endif
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd < 0)
-	{
+	if (fd < 0) {
 		snprintf(temp, sizeof(temp), "%s %s: %s\n%s %s: %s\n",
 			iface_name, _T("IP_ADDRESS"), _T("NOT_AVAILABLE_SHORT"),
 			iface_name, _T("NETMASK"),    _T("NOT_AVAILABLE_SHORT"));
@@ -3456,26 +3412,20 @@ static void show_ip(stb810_networkInterface_t i, const char *iface_name, char *i
 	/* I want IP address attached to "eth0" */
 	strncpy(ifr.ifr_name, helperEthDevice(i), IFNAMSIZ-1);
 	if (ioctl(fd, SIOCGIFADDR, &ifr) < 0)
-	{
 		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("IP_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
-	} else
-	{
+	else
 		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("IP_ADDRESS"), inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-	}
 	strcat(info_text, temp);
 
 #ifdef ENABLE_PPP
 	if (i != ifacePPP) // PPP netmask is 255.255.255.255
 #endif
 	{
-	if (ioctl(fd, SIOCGIFNETMASK, &ifr) < 0)
-	{
-		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("NETMASK"), _T("NOT_AVAILABLE_SHORT"));
-	} else
-	{
-		snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("NETMASK"), inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-	}
-	strcat(info_text, temp);
+		if (ioctl(fd, SIOCGIFNETMASK, &ifr) < 0)
+			snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("NETMASK"), _T("NOT_AVAILABLE_SHORT"));
+		else
+			snprintf(temp, sizeof(temp), "%s %s: %s\n", iface_name, _T("NETMASK"), inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+		strcat(info_text, temp);
 	}
 
 	close(fd);
@@ -3507,61 +3457,46 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	char buf[256];
 	char temp[256];
 	char info_text[4096];
-	char *iface_name;
 	int i;
 	int fd;
 
 	info_text[0] = 0;
-
 	info_progress = 0;
 
 	eprintf("output: Start collecting info...\n");
-
 	interface_sliderSetText( _T("COLLECTING_INFO"));
 	interface_sliderSetMinValue(0);
 	interface_sliderSetMaxValue(9);
 	interface_sliderSetCallbacks(get_info_progress, NULL, NULL);
 	interface_sliderSetDivisions(100);
 	interface_sliderShow(1, 1);
-
 #ifdef STBxx
 	char *vendor;
-
 	fd = open("/proc/nxp/drivers/pnx8550/video/renderer0/output_resolution", O_RDONLY);
-	if (fd > 0)
-	{
+	if (fd > 0) {
 		vendor = "nxp";
 		close(fd);
 	} else
-	{
 		vendor = "philips";
-	}
-
 #ifdef STB82
 	systemId_t sysid;
 	systemSerial_t serial;
 	unsigned long stmfw;
 
 	if (helperParseLine(INFO_TEMP_FILE, "cat /dev/sysid", "SERNO: ", buf, ',')) // SYSID: 04044020, SERNO: 00000039, VER: 0107
-	{
 		serial.SerialFull = strtoul(buf, NULL, 16);
-	} else {
+	else
 		serial.SerialFull = 0;
-	}
 
 	if (helperParseLine(INFO_TEMP_FILE, NULL, "SYSID: ", buf, ',')) // SYSID: 04044020, SERNO: 00000039, VER: 0107
-	{
 		sysid.IDFull = strtoul(buf, NULL, 16);
-	} else {
+	else
 		sysid.IDFull = 0;
-	}
 
 	if (helperParseLine(INFO_TEMP_FILE, NULL, "VER: ", buf, ',')) // SYSID: 04044020, SERNO: 00000039, VER: 0107
-	{
 		stmfw = strtoul(buf, NULL, 16);
-	} else {
+	else
 		stmfw = 0;
-	}
 
 	get_composite_serial(sysid, serial, temp);
 	sprintf(info_text,"%s: %s\n",_T("SERIAL_NUMBER"),temp);
@@ -3570,9 +3505,8 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 		char mac[6];
 		sscanf(buf, "%02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
 		sprintf(temp, "%s 1: %02hhX%02hhX%02hhX%02hhX%02hhX%02hhX\n", _T("MAC_ADDRESS"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	} else {
+	} else
 		sprintf(temp, "%s 1: %s\n", _T("MAC_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
-	}
 	strcat(info_text, temp);
 
 	if (stmfw > 0x0106 && helperParseLine(INFO_TEMP_FILE, "stmclient 8", "MAC: ", buf, ' ')) // MAC: 02:EC:D0:00:00:39
@@ -3580,52 +3514,41 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 		char mac[6];
 		sscanf(buf, "%02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
 		sprintf(temp, "%s 2: %02hhX%02hhX%02hhX%02hhX%02hhX%02hhX\n", _T("MAC_ADDRESS"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	} else {
+	} else
 		sprintf(temp, "%s 2: %s\n", _T("MAC_ADDRESS"), _T("NOT_AVAILABLE_SHORT"));
-	}
 	strcat(info_text, temp);
 
 	strcat(info_text,_T("STM_VERSION"));
 	strcat(info_text,": ");
-	if (stmfw != 0)
-	{
+	if (stmfw != 0) {
 		sprintf(temp, "%lu.%lu", (stmfw >> 8)&0xFF, (stmfw)&0xFF);
 		strcat(info_text, temp);
 	} else
-	{
 		strcat(info_text, _T("NOT_AVAILABLE_SHORT"));
-	}
 	strcat(info_text, "\n");
 
 	strcat(info_text, _T("SERIAL_NUMBER_OLD"));
 	strcat(info_text,": ");
 	if (serial.SerialFull != 0)
-	{
 		sprintf(temp, "%u\n", serial.SerialFull);
-	} else
-	{
+	else
 		sprintf(temp, "%s\n", _T("NOT_AVAILABLE_SHORT"));
-	}
 	strcat(info_text, temp);
 
 	strcat(info_text, _T("SYSID"));
 	strcat(info_text,": ");
-	if (sysid.IDFull != 0)
-	{
+	if (sysid.IDFull != 0) {
 		get_system_id(sysid, temp);
 		strcat(temp,"\n");
 	} else
-	{
 		sprintf(temp, "%s\n", _T("NOT_AVAILABLE_SHORT"));
-	}
+
 	strcat(info_text, temp);
 	info_progress++;
 	interface_displayMenu(1);
 #endif // STB82
-
 	sprintf(temp, "%s: %s\n%s: %s\n%s: %s\n", _T("APP_RELEASE"), RELEASE_TYPE, _T("APP_VERSION"), REVISION, _T("COMPILE_TIME"), COMPILE_TIME);
 #endif // STBxx
-
 #ifdef STSDK
 	sprintf(temp, "%s: %s\n%s: %s\n", _T("APP_RELEASE"), RELEASE_TYPE, _T("COMPILE_TIME"), COMPILE_TIME);
 #endif
@@ -3635,14 +3558,10 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	sprintf(buf, "%s: %d MB\n", _T("MEMORY_SIZE"), appControlInfo.memSize);
 	strcat(info_text, buf);
 #endif
-
 	if (helperParseLine(INFO_TEMP_FILE, "date -R", "", buf, '\r'))
-	{
 		sprintf(temp, "%s: %s\n\n",_T("CURRENT_TIME"), buf);
-	} else
-	{
+	else
 		sprintf(temp, "%s: %s\n\n",_T("CURRENT_TIME"), _T("NOT_AVAILABLE_SHORT"));
-	}
 	strcat(info_text, temp);
 
 	info_progress++;
@@ -3651,16 +3570,14 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	show_ip(ifaceWAN, "Ethernet", &info_text[strlen(info_text)]);
 	strcat(info_text, "\n");
 #ifdef ENABLE_LAN
-	if (helperCheckDirectoryExsists("/sys/class/net/eth1"))
-	{
+	if (helperCheckDirectoryExsists("/sys/class/net/eth1")) {
 		show_ip(ifaceLAN, "Ethernet 2", &info_text[strlen(info_text)]);
 		strcat(info_text, "\n");
 	}
 #endif
 #ifdef ENABLE_WIFI
-	if (helperCheckDirectoryExsists("/sys/class/net/wlan0"))
-	{
-		iface_name = _T("WIRELESS");
+	if (helperCheckDirectoryExsists("/sys/class/net/wlan0")) {
+		char *iface_name = _T("WIRELESS");
 		show_wireless(iface_name, &info_text[strlen(info_text)]);
 		show_ip(ifaceWireless, iface_name, &info_text[strlen(info_text)]);
 		strcat(info_text, "\n");
@@ -3668,8 +3585,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 #endif
 #ifdef ENABLE_PPP
 	sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifacePPP));
-	if (helperCheckDirectoryExsists(temp))
-	{
+	if (helperCheckDirectoryExsists(temp)) {
 		show_ip(ifacePPP, "PPP", &info_text[strlen(info_text)]);
 		strcat(info_text, "\n");
 	}
@@ -3687,8 +3603,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	} */
 	i = -1;
 	fd = open( "/etc/resolv.conf", O_RDONLY );
-	if( fd > 0 )
-	{
+	if ( fd > 0 ) {
 		char *ptr;
 		while( helperReadLine( fd, buf ) == 0 && buf[0] )
 		{
@@ -3702,8 +3617,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 		}
 		close(fd);
 	}
-	if( i < 0 )
-	{
+	if ( i < 0 ) {
 		sprintf(temp, "%s: %s\n", _T("DNS_SERVER"), _T("NOT_AVAILABLE_SHORT"));
 		strcat(info_text, temp);
 	}
@@ -3733,9 +3647,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 		strcat(info_text, buf);
 		strcat(info_text, "\n");
 	} else
-	{
 		strcat(info_text, LANG_TM0_IMAGE ": " LANG_NOT_AVAILABLE_SHORT "\n");
-	}
 
 	info_progress++;
 	interface_displayMenu(1);
@@ -3746,9 +3658,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	{
 		strcat(info_text, LANG_TM0_STATUS ": " LANG_FAIL "\n");
 	} else
-	{
 		strcat(info_text, LANG_TM0_STATUS ": " LANG_OK "\n");
-	}
 
 	info_progress++;
 	interface_displayMenu(1);
@@ -3759,9 +3669,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 		strcat(info_text, buf);
 		strcat(info_text, "\n");
 	} else
-	{
 		strcat(info_text, LANG_TM1_IMAGE ": " LANG_NOT_AVAILABLE_SHORT "\n");
-	}
 
 	info_progress++;
 	interface_displayMenu(1);
@@ -3772,9 +3680,7 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 	{
 		strcat(info_text, LANG_TM1_STATUS ": " LANG_FAIL "\n");
 	} else
-	{
 		strcat(info_text, LANG_TM1_STATUS ": " LANG_OK "\n");
-	}
 
 	info_progress++;
 	interface_displayMenu(1);
@@ -3785,23 +3691,14 @@ int show_info(interfaceMenu_t* pMenu, void* pArg)
 		strcat(info_text, LANG_RESOLUTION ": ");
 		strcat(info_text, buf);
 	} else
-	{
 		strcat(info_text, LANG_RESOLUTION ": " LANG_NOT_AVAILABLE_SHORT);
-	}
 #endif // #if 0
-
 	info_progress++;
 	interface_displayMenu(1);
-
 	interface_sliderShow(0, 0);
-
 	eprintf("output: Done collecting info.\n---------------------------------------------------\n%s\n---------------------------------------------------\n", info_text);
-
 	helperFlushEvents();
-
 	interface_showScrollingBox( info_text, thumbnail_info, NULL, NULL );
-	//interface_showMessageBox(info_text, thumbnail_info, 0);
-
 	return 0;
 }
 
@@ -3816,16 +3713,11 @@ long output_getColorValue(void *pArg)
 
 	switch (iarg)
 	{
-		case colorSettingContrast:
-			return adj.contrast;
-		case colorSettingBrightness:
-			return adj.brightness;
-		case colorSettingHue:
-			return adj.hue;
-		default:
-			return adj.saturation;
+		case colorSettingContrast:   return adj.contrast;
+		case colorSettingBrightness: return adj.brightness;
+		case colorSettingHue:        return adj.hue;
+		default:                     return adj.saturation;
 	}
-
 	return 0;
 }
 
@@ -3835,10 +3727,6 @@ void output_setColorValue(long value, void *pArg)
 	int iarg = GET_NUMBER(pArg);
 	DFBColorAdjustment adj;
 	IDirectFBDisplayLayer *layer = gfx_getLayer(gfx_getMainVideoLayer());
-
-	/*adj.flags = DCAF_ALL;
-	layer->GetColorAdjustment(layer, &adj);*/
-
 	switch (iarg)
 	{
 		case colorSettingContrast:
@@ -3860,7 +3748,6 @@ void output_setColorValue(long value, void *pArg)
 			adj.saturation = value;
 			appControlInfo.pictureInfo.saturation = value;
 	}
-
 	layer->SetColorAdjustment(layer, &adj);
 }
 
@@ -3971,73 +3858,60 @@ static int output_askPassword(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_enterPassword(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	char passwd[MAX_PASSWORD_LENGTH];
-	unsigned char passwdsum[16];
-	char inpasswd[MAX_PASSWORD_LENGTH];
-	FILE *file;
-	unsigned long id, i, intpwd;
-	menuActionFunction pAction = (menuActionFunction)pArg;
-
-	if( value == NULL )
+	if ( value == NULL || pArg == NULL )
 		return 1;
 
-	if( pArg != NULL)
+	menuActionFunction pAction = (menuActionFunction)pArg;
+	char passwd[MAX_PASSWORD_LENGTH];
+
+	FILE *file = popen("hwconfigManager a -1 PASSWORD 2>/dev/null | grep \"VALUE:\" | sed 's/VALUE: \\(.*\\)/\\1/'","r");
+	if ( file != NULL && fgets(passwd, MAX_PASSWORD_LENGTH, file) != NULL && passwd[0] != 0 && passwd[0] != '\n' )
 	{
-		file = popen("hwconfigManager a -1 PASSWORD 2>/dev/null | grep \"VALUE:\" | sed 's/VALUE: \\(.*\\)/\\1/'","r");
-		if( file != NULL && fgets(passwd, MAX_PASSWORD_LENGTH, file) != NULL && passwd[0] != 0 && passwd[0] != '\n' )
+		char inpasswd[MAX_PASSWORD_LENGTH];
+		unsigned char passwdsum[16];
+
+		fclose(file);
+		if( passwd[strlen(passwd)-1] == '\n')
+			passwd[strlen(passwd)-1] = 0;
+		/* Get MD5 sum of input and convert it to hex string */
+		md5((unsigned char*)value, strlen(value), passwdsum);
+		for (int i=0;i<16;i++)
+			sprintf(&inpasswd[i*2], "%02hhx", passwdsum[i]);
+		dprintf("%s: Passwd #1: %s/%s\n", __FUNCTION__,passwd, inpasswd);
+		if (strcmp( passwd, inpasswd ) != 0) {
+			interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
+			return 1;
+		}
+	} else
+	{
+		if (file != NULL)
+			fclose(file);
+
+		file = popen("cat /dev/sysid | sed 's/.*SERNO: \\(.*\\), .*/\\1/'","r");
+		if ( file != NULL && fgets(passwd, MAX_PASSWORD_LENGTH, file) != NULL && passwd[0] != 0 && passwd[0] != '\n' )
 		{
+			unsigned long id, intpwd;
+
 			fclose(file);
 			if( passwd[strlen(passwd)-1] == '\n')
-			{
 				passwd[strlen(passwd)-1] = 0;
-			}
-			/* Get MD5 sum of input and convert it to hex string */
-			md5((unsigned char*)value, strlen(value), passwdsum);
-			for (i=0;i<16;i++)
-			{
-				sprintf(&inpasswd[i*2], "%02hhx", passwdsum[i]);
-			}
-			dprintf("%s: Passwd #1: %s/%s\n", __FUNCTION__,passwd, inpasswd);
-			if(strcmp( passwd, inpasswd ) != 0)
-			{
+
+			id = strtoul(passwd, NULL, 16);
+			intpwd = strtoul(value, NULL, 10);
+			dprintf("%s: Passwd #2: %lu/%lu\n", __FUNCTION__, id, intpwd);
+
+			if( intpwd != id ) {
 				interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
 				return 1;
 			}
-		} else
-		{
-			if( file != NULL)
-			{
+		} else {
+			if (file != NULL)
 				fclose(file);
-			}
-			file = popen("cat /dev/sysid | sed 's/.*SERNO: \\(.*\\), .*/\\1/'","r");
-			if( file != NULL && fgets(passwd, MAX_PASSWORD_LENGTH, file) != NULL && passwd[0] != 0 && passwd[0] != '\n' )
-			{
-				fclose(file);
-				if( passwd[strlen(passwd)-1] == '\n')
-				{
-					passwd[strlen(passwd)-1] = 0;
-				}
-				id = strtoul(passwd, NULL, 16);
-				intpwd = strtoul(value, NULL, 10);
-				dprintf("%s: Passwd #2: %lu/%lu\n", __FUNCTION__, id, intpwd);
 
-				if( intpwd != id )
-				{
-					interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
-					return 1;
-				}
-			} else
-			{
-				if( file != NULL)
-				{
-					fclose(file);
-				}
-				dprintf("%s: Warning: can't determine system password!\n", __FUNCTION__);
-			}
+			dprintf("%s: Warning: can't determine system password!\n", __FUNCTION__);
 		}
-		return pAction(pMenu, NULL);
 	}
-	return 1;
+	return pAction(pMenu, NULL);
 }
 
 int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
@@ -4048,36 +3922,24 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 
 int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 {
-	char *str;
-
 	// assert (videoMenu == (interfaceMenu_t*)&VideoSubMenu);
 	interface_clearMenuEntries(videoMenu);
-
 #ifdef STB82
-    {
-		str = _T("TV_STANDARD");
-		interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &StandardMenu, thumbnail_tvstandard);
-    }
-
-    /* We only enable this menu when we are outputting SD and we do not only have the HD denc. (HDMI is not denc[0])*/
-    if(!(gfx_isHDoutput()) && !(appControlInfo.outputInfo.encDesc[0].all_connectors & DSOC_HDMI))
+	interface_addMenuEntry(videoMenu, _T("TV_STANDARD"), interface_menuActionShowMenu, &StandardMenu, thumbnail_tvstandard);
+	/* We only enable this menu when we are outputting SD and we do not only have the HD denc. (HDMI is not denc[0])*/
+	if (!(gfx_isHDoutput()) && !(appControlInfo.outputInfo.encDesc[0].all_connectors & DSOC_HDMI))
 #endif
 	{
-		str = _T("TV_FORMAT");
-		interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &FormatMenu, thumbnail_channels);
+		interface_addMenuEntry(videoMenu, _T("TV_FORMAT"), interface_menuActionShowMenu, &FormatMenu, thumbnail_channels);
 #ifdef STB82
-        /*Only add slow blanking if we have the capability*/
-        if(appControlInfo.outputInfo.encDesc[0].caps & DSOCAPS_SLOW_BLANKING)
-        {
-			str = _T("TV_BLANKING");
-			interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &BlankingMenu, thumbnail_configure);
-            output_fillBlankingMenu();
-        }
+		/*Only add slow blanking if we have the capability*/
+		if (appControlInfo.outputInfo.encDesc[0].caps & DSOCAPS_SLOW_BLANKING)
+			interface_addMenuEntry(videoMenu, _T("TV_BLANKING"), interface_menuActionShowMenu, &BlankingMenu, thumbnail_configure);
 #endif
 	}
 	interface_addMenuEntry(videoMenu, _T("INTERFACE_SIZE"), interface_menuActionShowMenu, &GraphicsModeMenu, settings_interface);
-
 #ifdef STB82
+	char *str;
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
 	str = appControlInfo.outputInfo.aspectRatio == aspectRatio_16x9 ? "16:9" : "4:3";
@@ -4180,7 +4042,7 @@ static int output_change3DOffset(interfaceMenu_t *pMenu, void* pArg) {
 	return interface_getText(pMenu, _T("3D_OFFSET"), "\\d{3}", output_set3DOffset, output_get3DOffset, inputModeDirect, pArg);
 }
 
-int output_enter3DMenu(interfaceMenu_t *pMenu, void* pArg)
+int output_enter3DMenu(interfaceMenu_t *video3dMenu, void* pArg)
 {
 	char *str;
 	char buf[MENU_ENTRY_INFO_LENGTH];
@@ -4188,30 +4050,30 @@ int output_enter3DMenu(interfaceMenu_t *pMenu, void* pArg)
 	char *chContent[] = {_T("VIDEO"), _T("3D_SIGNAGE"), _T("3D_STILLS")};
 	char *chFormat [] = {_T("3D_2dZ"), _T("3D_DECLIPSE_RD"), _T("3D_DECLIPSE_FULL")};
 
-	interface_clearMenuEntries((interfaceMenu_t*)&Video3DSubMenu);
+	interface_clearMenuEntries(video3dMenu);
 
 	sprintf(buf, "%s: %s", _T("3D_MONITOR"), _T( interfaceInfo.enable3d ? "ON" : "OFF" ));
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggle3DMonitor, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_toggle3DMonitor, NULL, thumbnail_channels);
 
 	str = chContent[appControlInfo.outputInfo.content3d];
 	sprintf(buf, "%s: %s", _T("3D_CONTENT"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggle3DContent, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_toggle3DContent, NULL, thumbnail_channels);
 
 	str = chFormat[appControlInfo.outputInfo.format3d];
 	sprintf(buf, "%s: %s", _T("3D_FORMAT"), str);
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggle3DFormat, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_toggle3DFormat, NULL, thumbnail_channels);
 
 	sprintf(buf, "%s: %s", _T("3D_FACTOR_FLAG"), _T( appControlInfo.outputInfo.use_factor ? "ON" : "OFF" ));
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggleUseFactor, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_toggleUseFactor, NULL, thumbnail_channels);
 
 	sprintf(buf, "%s: %s", _T("3D_OFFSET_FLAG"), _T( appControlInfo.outputInfo.use_offset ? "ON" : "OFF" ));
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_toggleUseOffset, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_toggleUseOffset, NULL, thumbnail_channels);
 
 	sprintf(buf, "%s: %d", _T("3D_FACTOR"), appControlInfo.outputInfo.factor);
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_change3DFactor, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_change3DFactor, NULL, thumbnail_channels);
 
 	sprintf(buf, "%s: %d", _T("3D_OFFSET"), appControlInfo.outputInfo.offset);
-	interface_addMenuEntry((interfaceMenu_t*)&Video3DSubMenu, buf, output_change3DOffset, NULL, thumbnail_channels);
+	interface_addMenuEntry(video3dMenu, buf, output_change3DOffset, NULL, thumbnail_channels);
 
 	return 0;
 }
@@ -4331,7 +4193,7 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 	char  buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
 
-	// assert (networkMenu == (interfaceMenu_t*)&NetworkSubMenu);
+	// assert (networkMenu == _M &NetworkSubMenu);
 	interface_clearMenuEntries(networkMenu);
 
 	// Read required network settings
@@ -4755,7 +4617,6 @@ static int output_enterPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char *str;
-	pMenu = (interfaceMenu_t*)&PPPSubMenu;
 
 	interface_clearMenuEntries(pMenu);
 
@@ -4816,7 +4677,7 @@ static int output_enterPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_LAN
 int output_enterLANMenu(interfaceMenu_t *lanMenu, void* pArg)
 {
-	// assume (lanMenu == (interfaceMenu_t*)&LANSubMenu);
+	// assume (lanMenu == _M &LANSubMenu);
 	output_setIfaceMenuName(lanMenu, "Ethernet 2", 0, networkInfo.lanMode);
 
 	interface_clearMenuEntries(lanMenu);
@@ -4859,7 +4720,7 @@ int output_fillLANMenu(interfaceMenu_t *lanMenu, void* iFace)
 	if (!helperFileExists(STB_CONFIG_OVERRIDE_FILE))
 	{
 		sprintf(buf,"%s: %s", _T("GATEWAY_MODE"), output_getLanModeName(networkInfo.lanMode));
-		interface_addMenuEntry(lanMenu, buf, output_showGatewayMenu, NULL, thumbnail_configure);
+		interface_addMenuEntry(lanMenu, buf, interface_menuActionShowMenu, &GatewaySubMenu, thumbnail_configure);
 		if (networkInfo.lanMode != lanStatic)
 		{
 			char temp[MENU_ENTRY_INFO_LENGTH];
@@ -5443,47 +5304,41 @@ static int output_enterIPTVMenu(interfaceMenu_t *iptvMenu, void* pArg)
 #endif
 
 #ifdef ENABLE_VOD
-static int output_enterVODMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterVODMenu(interfaceMenu_t *vodMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
-
-	interface_clearMenuEntries((interfaceMenu_t*)&VODSubMenu);
+	interface_clearMenuEntries(vodMenu);
 
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_PLAYLIST"), appControlInfo.rtspInfo.usePlaylistURL ? "URL" : _T("IP_ADDRESS") );
-	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_toggleVODPlaylist, NULL, thumbnail_configure);
+	interface_addMenuEntry(vodMenu, buf, output_toggleVODPlaylist, NULL, thumbnail_configure);
 
-	if( appControlInfo.rtspInfo.usePlaylistURL )
-	{
+	if (appControlInfo.rtspInfo.usePlaylistURL) {
 		snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_PLAYLIST"),
 			appControlInfo.rtspInfo.streamInfoUrl != 0 ? appControlInfo.rtspInfo.streamInfoUrl : _T("NONE"));
-		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeURL, SET_NUMBER(optionVodPlaylist), thumbnail_enterurl);
-	}
-	else
-	{
+		interface_addMenuEntry(vodMenu, buf, output_changeURL, SET_NUMBER(optionVodPlaylist), thumbnail_enterurl);
+	} else {
 		snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_INFO_IP_ADDRESS"), appControlInfo.rtspInfo.streamInfoIP);
-		interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeVODINFOIP, NULL, thumbnail_enterurl);
+		interface_addMenuEntry(vodMenu, buf, output_changeVODINFOIP, NULL, thumbnail_enterurl);
 	}
-
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOD_IP_ADDRESS"), appControlInfo.rtspInfo.streamIP);
-	interface_addMenuEntry((interfaceMenu_t*)&VODSubMenu, buf, output_changeVODIP, NULL, thumbnail_enterurl);
-
+	interface_addMenuEntry(vodMenu, buf, output_changeVODIP, NULL, thumbnail_enterurl);
 	return 0;
 }
 #endif
 
-static int output_enterWebMenu(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterWebMenu(interfaceMenu_t *webMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 
-	interface_clearMenuEntries((interfaceMenu_t*)&WebSubMenu);
+	interface_clearMenuEntries(webMenu);
 	sprintf(buf, "%s: %s", _T("PROXY_ADDR"), appControlInfo.networkInfo.proxy[0] != 0 ? appControlInfo.networkInfo.proxy : _T("NONE"));
-	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeProxyAddress, pArg, thumbnail_enterurl);
+	interface_addMenuEntry(webMenu, buf, output_changeProxyAddress, pArg, thumbnail_enterurl);
 
 	sprintf(buf, "%s: %s", _T("PROXY_LOGIN"), appControlInfo.networkInfo.login[0] != 0 ? appControlInfo.networkInfo.login : _T("NONE"));
-	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeProxyLogin, pArg, thumbnail_enterurl);
+	interface_addMenuEntry(webMenu, buf, output_changeProxyLogin, pArg, thumbnail_enterurl);
 
 	sprintf(buf, "%s: ***", _T("PROXY_PASSWD"));
-	interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeProxyPassword, pArg, thumbnail_enterurl);
+	interface_addMenuEntry(webMenu, buf, output_changeProxyPassword, pArg, thumbnail_enterurl);
 
 #ifdef ENABLE_BROWSER
 #ifdef STBPNX
@@ -5491,18 +5346,18 @@ static int output_enterWebMenu(interfaceMenu_t *pMenu, void* pArg)
 
 		getParam(BROWSER_CONFIG_FILE, "HomeURL", "", temp);
 		sprintf(buf, "%s: %s", _T("MW_ADDR"), temp);
-		interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_changeMiddlewareUrl, pArg, thumbnail_enterurl);
+		interface_addMenuEntry(webMenu, buf, output_changeMiddlewareUrl, pArg, thumbnail_enterurl);
 
 		getParam(BROWSER_CONFIG_FILE, "AutoLoadingMW", "", temp);
 		if (temp[0] != 0)
 		{
 			sprintf(buf, "%s: %s", _T("MW_AUTO_MODE"), strcmp(temp,"ON")==0 ? _T("ON") : _T("OFF"));
-			interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleMWAutoLoading, pArg, thumbnail_configure);
+			interface_addMenuEntry(webMenu, buf, output_toggleMWAutoLoading, pArg, thumbnail_configure);
 		}else
 		{
 			setParam(BROWSER_CONFIG_FILE, "AutoLoadingMW","OFF");
 			sprintf(buf, "%s: %s", _T("MW_AUTO_MODE"), _T("OFF"));
-			interface_addMenuEntry((interfaceMenu_t*)&WebSubMenu, buf, output_toggleMWAutoLoading, pArg, thumbnail_configure);
+			interface_addMenuEntry(webMenu, buf, output_toggleMWAutoLoading, pArg, thumbnail_configure);
 		}
 #endif
 #endif
@@ -5545,19 +5400,6 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 #ifdef STBPNX
 	return output_toggleGatewayMode(pMenu, SET_NUMBER(networkInfo.lanMode == lanDhcpServer ? lanStatic : lanDhcpServer));
 #endif
-	return 0;
-}
-
-int output_showGatewayMenu(interfaceMenu_t *pMenu, void* ignored)
-{
-	interface_clearMenuEntries((interfaceMenu_t*)&GatewaySubMenu);
-
-	lanMode_t mode;
-	for (mode = 0; mode < lanModeCount; mode++) {
-		interface_addMenuEntry((interfaceMenu_t*)&GatewaySubMenu, output_getLanModeName(mode), mode == networkInfo.lanMode ? NULL : output_toggleGatewayMode,
-		                       (void*)mode,  mode == networkInfo.lanMode ? radiobtn_filled : radiobtn_empty);
-	}
-	interface_menuActionShowMenu(pMenu, (void*)&GatewaySubMenu);
 	return 0;
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
@@ -5636,7 +5478,7 @@ int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 void output_fillOutputMenu(void)
 {
 	char *str;
-	interfaceMenu_t *outputMenu = (interfaceMenu_t*)&OutputMenu;
+	interfaceMenu_t *outputMenu = _M &OutputMenu;
 
 	interface_clearMenuEntries(outputMenu);
 
@@ -5706,10 +5548,6 @@ void output_fillOutputMenu(void)
 #else
 	interface_addMenuEntry(outputMenu, str, output_askPassword, (void*)output_resetSettings, thumbnail_warning);
 #endif
-
-	output_fillStandardMenu();
-	output_fillFormatMenu();
-	output_fillTimeZoneMenu();
 }
 
 void output_buildMenu(interfaceMenu_t *pParent)
@@ -5728,101 +5566,107 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&OutputMenu, _T("SETTINGS"), thumbnail_configure, NULL, pParent,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
-	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 
 #ifdef ENABLE_3D
-	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enter3DMenu, NULL, NULL);
 #endif // #ifdef STB225
 
-	createListMenu(&TimeSubMenu, _T("TIME_DATE_CONFIG"), settings_datetime, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&TimeSubMenu, _T("TIME_DATE_CONFIG"), settings_datetime, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterTimeMenu, NULL, NULL);
 #ifdef ENABLE_DVB
-	createListMenu(&DVBSubMenu, _T("DVB_CONFIG"), settings_dvb, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&DVBSubMenu, _T("DVB_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
 #endif
-	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterNetworkMenu, output_leaveNetworkMenu, NULL);
 
-	createListMenu(&StandardMenu, _T("TV_STANDARD"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
+	createListMenu(&StandardMenu, _T("TV_STANDARD"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
-	createListMenu(&FormatMenu, _T("TV_FORMAT"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
+	createListMenu(&FormatMenu, _T("TV_FORMAT"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail,
 #ifdef STSDK
 		output_enterFormatMenu, NULL, NULL);
 #else
 		NULL, NULL, NULL);
 #endif
-	createListMenu(&GraphicsModeMenu, _T("INTERFACE_SIZE"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
+	createListMenu(&GraphicsModeMenu, _T("INTERFACE_SIZE"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, output_enterGraphicsModeMenu, NULL, NULL);
 
-	createListMenu(&BlankingMenu, _T("TV_BLANKING"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
+	createListMenu(&BlankingMenu, _T("TV_BLANKING"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
-	createListMenu(&TimeZoneMenu, _T("TIME_ZONE"), settings_datetime, NULL, (interfaceMenu_t*)&TimeSubMenu,
+	createListMenu(&TimeZoneMenu, _T("TIME_ZONE"), settings_datetime, NULL, _M &TimeSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
-	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
 
-	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterPlaybackMenu, NULL, NULL);
 
-	createListMenu(&WANSubMenu, "WAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&WANSubMenu, "WAN", settings_network, NULL, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterWANMenu, output_leaveNetworkMenu, SET_NUMBER(ifaceWAN));
 
 #ifdef ENABLE_PPP
-	createListMenu(&PPPSubMenu, _T("PPP"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&PPPSubMenu, _T("PPP"), settings_network, NULL, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterPPPMenu, output_leavePPPMenu, SET_NUMBER(ifaceWAN));
 #endif
 #ifdef ENABLE_LAN
-	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterLANMenu, output_leaveNetworkMenu, SET_NUMBER(ifaceLAN));
 #endif
+#ifdef STBPNX
 #if (defined ENABLE_LAN) || (defined ENABLE_WIFI)
-	createListMenu(&GatewaySubMenu, _T("GATEWAY_MODE"), settings_network, NULL, (interfaceMenu_t*)&NetworkSubMenu,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+	createListMenu(&GatewaySubMenu, _T("GATEWAY_MODE"), settings_network, NULL, _M &NetworkSubMenu,
+		interfaceListMenuIconThumbnail, output_enterGatewayMenu, NULL, NULL);
+#endif
 #endif
 #ifdef ENABLE_WIFI
 	int wifi_icons[4] = { 0, 0, 0, statusbar_f4_enterurl };
-	createListMenu(&WifiSubMenu, _T("WIRELESS"), settings_network, wifi_icons, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&WifiSubMenu, _T("WIRELESS"), settings_network, wifi_icons, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterWifiMenu, output_leaveNetworkMenu, SET_NUMBER(ifaceWireless));
 	interface_setCustomKeysCallback(_M &WifiSubMenu, output_wifiKeyCallback);
 
 	wireless_buildMenu(_M &WifiSubMenu);
 #endif
 #ifdef ENABLE_IPTV
-	createListMenu(&IPTVSubMenu, _T("TV_CHANNELS"), thumbnail_multicast, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&IPTVSubMenu, _T("TV_CHANNELS"), thumbnail_multicast, NULL, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterIPTVMenu, NULL, NULL);
 #ifdef ENABLE_PROVIDER_PROFILES
-	createListMenu(&ProfileMenu, _T("PROFILE"), thumbnail_account, NULL, (interfaceMenu_t*)&IPTVSubMenu,
+	createListMenu(&ProfileMenu, _T("PROFILE"), thumbnail_account, NULL, _M &IPTVSubMenu,
 		interfaceListMenuIconThumbnail, output_enterProfileMenu, output_leaveProfileMenu, NULL);
 #endif
 #endif
 #ifdef ENABLE_VOD
-	createListMenu(&VODSubMenu, _T("MOVIES"), thumbnail_vod, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&VODSubMenu, _T("MOVIES"), thumbnail_vod, NULL, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterVODMenu, NULL, NULL);
 #endif
-	createListMenu(&WebSubMenu, _T("INTERNET_BROWSING"), thumbnail_internet, NULL, (interfaceMenu_t*)&NetworkSubMenu,
+	createListMenu(&WebSubMenu, _T("INTERNET_BROWSING"), thumbnail_internet, NULL, _M &NetworkSubMenu,
 		interfaceListMenuIconThumbnail, output_enterWebMenu, NULL, NULL);
 
 #ifdef STSDK
-	createListMenu(&UpdateMenu, _T("UPDATES"), settings_updates, NULL, (interfaceMenu_t*)&OutputMenu,
+	createListMenu(&UpdateMenu, _T("UPDATES"), settings_updates, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterUpdateMenu, NULL, NULL);
 #endif
 
 #ifdef ENABLE_MESSAGES
-	messages_buildMenu((interfaceMenu_t*)&OutputMenu);
+	messages_buildMenu(_M &OutputMenu);
 #endif
 
 	TimeEntry.info.time.type    = interfaceEditTime24;
 
+#if (defined STB6x8x) || (defined STB225)
 	output_fillStandardMenu();
+#endif
+#if (defined STB82)
+	output_fillBlankingMenu();
+#endif
 	output_fillOutputMenu();
 	output_fillFormatMenu();
-	output_fillBlankingMenu();
 	output_fillTimeZoneMenu();
 }
 
