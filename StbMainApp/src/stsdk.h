@@ -111,6 +111,10 @@ fe_type_t st_getDvbTunerType(int tuner);
  */
 void st_changeOutputMode(char *selectedFormat, char *previousFormat);
 
+void st_getFormatResolution(const char *format, int *width, int *height);
+
+void st_reinitFb(char *currentFormat);
+
 /** Is need restart.
  * 
  * @return >0 if needed restart after hdmi output mode changes.

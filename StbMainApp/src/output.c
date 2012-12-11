@@ -247,6 +247,7 @@ static int output_enterNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_leaveNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterGraphicsModeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
@@ -391,6 +392,7 @@ static interfaceListMenu_t DVBSubMenu;
 #endif
 static interfaceListMenu_t StandardMenu;
 static interfaceListMenu_t FormatMenu;
+static interfaceListMenu_t GraphicsModeMenu;
 static interfaceListMenu_t BlankingMenu;
 static interfaceListMenu_t TimeZoneMenu;
 static interfaceListMenu_t InterfaceMenu;
@@ -451,6 +453,17 @@ static interfaceListMenu_t UpdateMenu;
 static char output_currentFormat[64] = "";
 static char output_originalFormat[64] = "";
 #endif
+
+#define GRAPHICS_MODE_COUNT 4
+static struct {
+	const char *name;
+	const char *mode;
+} output_graphicsModes[GRAPHICS_MODE_COUNT] = {
+	{ "AUTOMATIC", "" },
+	{ "LARGE",  "720x480" },
+	{ "MEDIUM", "1280x720" },
+	{ "SMALL",  "1920x1080" },
+};
 
 /**
  * @brief Useful DFB macros to have Strings and Values in an array.
@@ -649,18 +662,18 @@ static void output_applyFormat(void)
 {
 	if (st_needRestart()) {
 		interface_showMessageBox(_T("RESTARTING"), thumbnail_warning, 0);
-		helperStartApp("");
+		raise(SIGQUIT);
 	}
 }
 
-static int output_cancelFormat(void *formatMenu)
+static int output_cancelFormat(void *notused)
 {
 	interface_hideMessageBox();
 	st_changeOutputMode(output_originalFormat, output_currentFormat);
 	strcpy(output_currentFormat, output_originalFormat);
-	output_refillMenu(formatMenu);
+	output_refillMenu(_M &FormatMenu);
 	output_applyFormat();
-
+	interface_displayMenu(1);
 	return 0;
 }
 
@@ -3325,6 +3338,68 @@ static void output_fillBlankingMenu(void)
 	interface_addMenuEntry((interfaceMenu_t*)&BlankingMenu, str, output_setBlanking, (void*)DSOSB_OFF, thumbnail_configure);
 }
 
+static int output_applyGraphicsMode(void *notused)
+{
+	gfx_stopEventThread();
+	gfx_terminate();
+#ifdef STSDK
+	st_reinitFb(output_currentFormat);
+#endif
+	interface_hideLoading();
+	gfx_init(0, NULL);
+	interface_resize();
+	gfx_startEventThread();
+	interface_displayMenu(1);
+	return 0;
+}
+
+static int output_setGraphicsMode(interfaceMenu_t *pMenu, void *pModeStr)
+{
+	strncpy(appControlInfo.outputInfo.graphicsMode, pModeStr, sizeof(appControlInfo.outputInfo.graphicsMode)-1);
+	appControlInfo.outputInfo.graphicsMode[sizeof(appControlInfo.outputInfo.graphicsMode)-1] = 0;
+	saveAppSettings();
+	output_refillMenu(pMenu);
+
+	int width = 720, height = 576;
+	if (sscanf(pModeStr, "%dx%d", &width, &height) != 2) {
+#ifdef STSDK
+		st_getFormatResolution(output_currentFormat, &width, &height);
+#endif
+	}
+	if (width  == interfaceInfo.screenWidth &&
+	    height == interfaceInfo.screenHeight) {
+		interface_displayMenu(1);
+		return 0;
+	}
+	interface_showLoading();
+	interface_displayMenu(1);
+	interface_addEvent(output_applyGraphicsMode, NULL, 0, 1);
+	return 0;
+}
+
+static int output_enterGraphicsModeMenu(interfaceMenu_t *graphicsMenu, void *pArg)
+{
+#ifdef STSDK
+	int new_height, height;
+	st_getFormatResolution(output_currentFormat, &new_height, &height);
+#endif
+	interface_clearMenuEntries(graphicsMenu);
+	for (int i = 0; i < GRAPHICS_MODE_COUNT; i++) {
+		int selected = !strcmp(appControlInfo.outputInfo.graphicsMode, output_graphicsModes[i].mode);
+#ifdef STSDK
+		new_height = 0;
+		// setting 1080p mode on SD resolutions cause application to crash
+		sscanf(output_graphicsModes[i].mode, "%*dx%d", &new_height);
+		if (height < 720 && new_height > 720)
+			continue;
+#endif
+		interface_addMenuEntry(graphicsMenu, _T(output_graphicsModes[i].name), output_setGraphicsMode, (void*)output_graphicsModes[i].mode, selected ? radiobtn_filled : radiobtn_empty);
+		if (selected)
+			interface_setSelectedItem(graphicsMenu, i);
+	}
+	return 0;
+}
+
 static long get_info_progress()
 {
 	return info_progress;
@@ -4000,6 +4075,7 @@ int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
         }
 #endif
 	}
+	interface_addMenuEntry(videoMenu, _T("INTERFACE_SIZE"), interface_menuActionShowMenu, &GraphicsModeMenu, settings_interface);
 
 #ifdef STB82
 	char buf[MENU_ENTRY_INFO_LENGTH];
@@ -5679,6 +5755,8 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #else
 		NULL, NULL, NULL);
 #endif
+	createListMenu(&GraphicsModeMenu, _T("INTERFACE_SIZE"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
+		interfaceListMenuIconThumbnail, output_enterGraphicsModeMenu, NULL, NULL);
 
 	createListMenu(&BlankingMenu, _T("TV_BLANKING"), settings_video, NULL, (interfaceMenu_t*)&VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);

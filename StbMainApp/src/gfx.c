@@ -3875,6 +3875,9 @@ void gfx_init (int argc, char* argv[])
 	/*Set the background colour to be black Otherwise it will be a nice shade of blue*/
 	DFBCHECK (DirectFBSetOption("bg-color", "00000000"));
 
+	if (appControlInfo.outputInfo.graphicsMode[0])
+		DFBCHECK(DirectFBSetOption("mode", appControlInfo.outputInfo.graphicsMode));
+
 	dprintf("%s[%d]: DirectFBCreate\n", __FILE__, __LINE__);
 	/* Create the DirectFB root interface. */
 	DFBCHECK (DirectFBCreate(&pgfx_dfb));

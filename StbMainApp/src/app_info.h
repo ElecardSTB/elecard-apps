@@ -73,6 +73,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define BUFFER_SIZE      (1024)
 #define MAX_SIP_STRING   (78)
+#define MAX_GRAPHICS_MODE_STRING (24)
 #define MAX_URL          (PATH_MAX+7)
 /* 7 == strlen("file://"); */
 
@@ -481,6 +482,7 @@ typedef struct __stb810_outputInfo
 #endif
 	DFBScreenEncoderConfig      encConfig[4];
 	DFBScreenEncoderDescription encDesc[4];
+	char                 graphicsMode[MAX_GRAPHICS_MODE_STRING];
 
 #ifdef ENABLE_3D
 	int                  content3d;

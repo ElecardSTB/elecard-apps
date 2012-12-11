@@ -200,6 +200,11 @@ int loadAppSettings()
 			} else
 				appControlInfo.outputInfo.aspectRatio = aspectRatio_4x3;
 			//dprintf("%s: aspectRatio %d\n", __FUNCTION__, appControlInfo.outputInfo.aspectRatio);
+		} else if (sscanf(buf, "GRAPHICS_MODE=%[^\r\n ]", val) == 1)
+		{
+			strncpy(appControlInfo.outputInfo.graphicsMode, val, sizeof(appControlInfo.outputInfo.graphicsMode)-1);
+			appControlInfo.outputInfo.graphicsMode[sizeof(appControlInfo.outputInfo.graphicsMode)-1]=0;
+			//dprintf("%s: graphics mode %s\n", __FUNCTION__, appControlInfo.outputInfo.graphicsMode);
 		}
 #ifdef ENABLE_3D
 		else if (sscanf(buf, "3D_MONITOR=%d", &interfaceInfo.enable3d) == 1)	{}
@@ -714,6 +719,8 @@ int saveAppSettings()
 			break;
 		}
 	fprintf(fd, "ASPECTRATIO=%s\n",               appControlInfo.outputInfo.aspectRatio == aspectRatio_16x9 ? "16:9" : "4:3");
+	if (appControlInfo.outputInfo.graphicsMode[0])
+	fprintf(fd, "GRAPHICS_MODE=%s\n",              appControlInfo.outputInfo.graphicsMode);
 	fprintf(fd, "VOLUME=%d\n",                    appControlInfo.soundInfo.volumeLevel);
 	fprintf(fd, "FADEIN_VOLUME=%d\n",               appControlInfo.soundInfo.fadeinVolume);
 #ifdef ENABLE_DVB
@@ -890,6 +897,7 @@ void appInfo_init(void)
 	appControlInfo.outputInfo.format              = 0xFFFFFFFF;
 	appControlInfo.outputInfo.standart            = 0xFFFFFFFF;
 	appControlInfo.outputInfo.bScreenFiltration   = 0;
+	appControlInfo.outputInfo.graphicsMode[0]     = 0;
 #ifdef ENABLE_3D
 	interfaceInfo.enable3d	                  = 0;
 	appControlInfo.outputInfo.content3d	      = 0; 

@@ -555,6 +555,24 @@ static int stHelper_getFormatHeight(const char *format)
 	return strtol(s, NULL, 10);
 }
 
+static int stHelper_getFormatWidth(int height)
+{
+	switch (height) {
+		case 1080: return 1920;
+		case  768: return 1024;
+		case  720:
+		case 1024: return 1280;
+	}
+	return 720;
+}
+
+static void stHelper_setDirectFBMode(int width, int height)
+{
+	char mode[MAX_GRAPHICS_MODE_STRING];
+	snprintf(mode, sizeof(mode), "%dx%d", width, height);
+	DirectFBSetOption("mode", mode);
+}
+
 static int stHelper_waitForFBdevice(const char *fb_name)
 {
 	int i;
@@ -641,7 +659,6 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 	old_height = stHelper_getFormatHeight(previousFormat);
 	new_height = stHelper_getFormatHeight(selectedFormat);
 
-//printf("%s[%d]: old_height=%d, new_height=%d\n", __FILE__, __LINE__, old_height, new_height);
 	if (old_height != new_height) {
 		gfx_stopEventThread();
 		gfx_terminate();
@@ -649,6 +666,13 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 		st_setVideoFormat(selectedFormat);
 		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
 		stHelper_waitForFBdevice("/dev/fb0");
+		if (new_height < 720 && interfaceInfo.screenHeight >= 720) {
+			// Reset graphics mode for small resolutions
+			appControlInfo.outputInfo.graphicsMode[0] = 0;
+			saveAppSettings();
+		}
+		if (appControlInfo.outputInfo.graphicsMode[0] == 0)
+			stHelper_setDirectFBMode(stHelper_getFormatWidth(new_height), new_height);
 		gfx_init(0, NULL);
 		interface_resize();
 		gfx_startEventThread();
@@ -660,15 +684,27 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 	return;
 }
 
+void st_reinitFb(char *currentFormat)
+{
+	stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"deinitfb\",\"params\":[],\"id\": 1}");
+	if (appControlInfo.outputInfo.graphicsMode[0] == 0) {
+		int height = stHelper_getFormatHeight(currentFormat);
+		stHelper_setDirectFBMode(stHelper_getFormatWidth(height), height);
+	}
+	stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
+	stHelper_waitForFBdevice("/dev/fb0");
+}
+
+void st_getFormatResolution(const char *format, int *width, int *height)
+{
+	*height = stHelper_getFormatHeight(format);
+	*width  = stHelper_getFormatWidth(*height);
+}
+
 int st_needRestart(void)
 {
-/*	if(needRestart) {
-		printf("%s[%d]: ***RESTART\n", __FILE__, __LINE__);
-		needRestart = 0;
-	} else {
-		printf("%s[%d]: ***NO RESTART\n", __FILE__, __LINE__);
-	}*/
-	return needRestart;
+	// FIXME: Looks like restart is not necessary, so return false for now
+	return 0; //return needRestart;
 }
 
 #endif // STSDK
