@@ -14,20 +14,18 @@ ifneq ($(BUILD_TARGET),)
     LD=${CROSS_COMPILE}gcc
 endif
 
-all: $(OUT)$(DLLSUFFIX) $(OUT)$(LIBSUFFIX)
+all: $(OUT)$(DLLSUFFIX)
 
 $(OUT)$(DLLSUFFIX): $(SRC) $(HDR)
 	if [ "$(BUILD_TARGET)" -a ! -d "$(BUILD_TARGET)" ]; then mkdir -p $(BUILD_TARGET); fi
 	$(CC) $(CFLAGS) $(MYCFLAGS) -fPIC -c $(SRC)
 	$(LD) -shared -o $@ $(OBJ)
-	if [ "$(BUILD_TARGET)" ]; then cp $(HDR) $(BUILD_TARGET); fi
 	rm $(OBJ)
 
 $(OUT)$(LIBSUFFIX): $(SRC) $(HDR)
 	if [ "$(BUILD_TARGET)" -a ! -d "$(BUILD_TARGET)" ]; then mkdir -p $(BUILD_TARGET); fi
 	$(CC) $(CFLAGS) $(MYCFLAGS) -c $(SRC)
 	$(AR) rcs $@ $(OBJ)
-	if [ "$(BUILD_TARGET)" ]; then cp $(HDR) $(BUILD_TARGET); fi
 	rm $(OBJ)
 
 clean:
