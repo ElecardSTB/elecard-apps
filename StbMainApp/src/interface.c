@@ -379,6 +379,7 @@ const char *interface_commandName(interfaceCommand_t cmd)
 	case interfaceCommandTeletext:   return "Teletext";
 	case interfaceCommandSearch:     return "Search";
 	case interfaceCommandEpg:        return "Epg";
+	case interfaceCommandZoom:       return "Zoom";
 	case interfaceCommandCount: break;
 	}
 	static DirectFBKeySymbolNames(directfb_keynames);
@@ -3077,6 +3078,9 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 #endif
 		case interfaceCommandTV:
 			interface_enterChannelList();
+			break;
+		case interfaceCommandZoom:
+			output_toggleZoom();
 			break;
 		case interfaceCommandPageUp:
 		case interfaceCommandPageDown:

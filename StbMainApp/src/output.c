@@ -3360,6 +3360,20 @@ static int output_enterGraphicsModeMenu(interfaceMenu_t *graphicsMenu, void *pAr
 	return 0;
 }
 
+int output_setZoom(zoomPreset_t preset)
+{
+	appControlInfo.playbackInfo.zoom = preset;
+#ifdef STSDK
+	return st_applyZoom(appControlInfo.playbackInfo.zoom);
+#endif
+	return 0;
+}
+
+int output_toggleZoom()
+{
+	return output_setZoom((appControlInfo.playbackInfo.zoom+1)%zoomPresetsCount);
+}
+
 static long get_info_progress()
 {
 	return info_progress;
@@ -5712,7 +5726,7 @@ static int output_enterProfileMenu(interfaceMenu_t *pMenu, void* pArg)
 		char full_path[MAX_PROFILE_PATH];
 		int i;
 
-		interface_clearMenuEntries((interfaceMenu_t *)&ProfileMenu);
+		interface_clearMenuEntries(pMenu);
 		if( readlink(STB_PROVIDER_PROFILE, output_profile, sizeof(output_profile)) <= 0 )
 			output_profile[0] = 0;
 
@@ -5721,11 +5735,11 @@ static int output_enterProfileMenu(interfaceMenu_t *pMenu, void* pArg)
 		{
 			snprintf(full_path, sizeof(full_path), "%s%s",STB_PROVIDER_PROFILES_DIR,output_profiles[i]->d_name);
 			getParam(full_path, "NAME", "", name);
-			interface_addMenuEntry( (interfaceMenu_t *)&ProfileMenu, name, output_setProfile, SET_NUMBER(i),
+			interface_addMenuEntry( pMenu, name, output_setProfile, SET_NUMBER(i),
 			                        strcmp(full_path, output_profile) == 0 ? radiobtn_filled : radiobtn_empty );
 		}
 		if( 0 == output_profiles_count )
-			interface_addMenuEntryDisabled((interfaceMenu_t *)&ProfileMenu, _T("NO_FILES"), thumbnail_info);
+			interface_addMenuEntryDisabled(pMenu, _T("NO_FILES"), thumbnail_info);
 	}
 	return 0;
 }

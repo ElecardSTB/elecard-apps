@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #include "defines.h"
+#include "app_info.h"
 
 #include <elcd-rpc.h>
 #ifdef ENABLE_DVB
@@ -91,6 +92,8 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout, elcdRpcT
  */
 int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, void *pArg);
 
+int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg);
+
 /** Cancel queued asynchronous call.
  * 
  * @param[in] execute Call queued callback with type == invalid, empty result and saved pArg
@@ -114,6 +117,8 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat);
 void st_getFormatResolution(const char *format, int *width, int *height);
 
 void st_reinitFb(char *currentFormat);
+
+int  st_applyZoom(zoomPreset_t preset);
 
 /** Is need restart.
  * 

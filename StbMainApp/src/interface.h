@@ -403,6 +403,7 @@ typedef enum
 	interfaceCommandTeletext =                   DIKS_TEXT,
 	interfaceCommandSearch =                     DIKS_CUSTOM1,
 	interfaceCommandEpg =                        DIKS_EPG,
+	interfaceCommandZoom =                       DIKS_ZOOM,
 
 	interfaceCommandCount
 } interfaceCommand_t;

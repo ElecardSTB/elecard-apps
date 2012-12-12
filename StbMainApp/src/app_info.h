@@ -651,6 +651,13 @@ typedef struct __stb810_vidimaxInfo
 } stb810_vidimaxInfo;
 #endif
 
+typedef enum {
+	zoomStretch = 0,
+	zoomScale,
+	zoomFitWidth,
+	zoomPresetsCount,
+} zoomPreset_t;
+
 /** Currently played stream characteristics
  */
 typedef struct __stb810_playbackInfo
@@ -665,6 +672,7 @@ typedef struct __stb810_playbackInfo
 	int                  bResumeAfterStart;
 	int                  autoStop;
 	float                scale;
+	zoomPreset_t         zoom;
 	int                  channel;
 	char                 description[MENU_ENTRY_INFO_LENGTH];
 	char                 thumbnail[MAX_URL];

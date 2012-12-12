@@ -395,6 +395,19 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 	return 0;
 }
 
+int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg)
+{
+	if ( type != elcdRpcResult || !res || res->type != cJSON_String ) {
+		eprintf("%s failed: %s\n", msg, res&&res->type==cJSON_String?res->valuestring:"unknown error");
+		return 0;
+	}
+	if ( strcmp(res->valuestring, "ok") ) {
+		eprintf("%s not successfull: %s\n", msg, res->valuestring);
+		return 0;
+	}
+	return 1;
+}
+
 static void st_poolThreadCleanup(void* pArg)
 {
 	eprintf("%s: out, cancelling waiting RPCs\n", __FUNCTION__);
@@ -705,6 +718,25 @@ int st_needRestart(void)
 {
 	// FIXME: Looks like restart is not necessary, so return false for now
 	return 0; //return needRestart;
+}
+
+int st_applyZoom(zoomPreset_t preset)
+{
+	char *name = 0;
+	switch (preset) {
+		case zoomScale:    name = "scale";    break;
+		case zoomFitWidth: name = "fitwidth"; break;
+		default:           name = "stretch";
+	}
+	elcdRpcType_t type;
+	cJSON *res  = NULL;
+	cJSON *param = cJSON_CreateString(name);
+
+	st_rpcSyncTimeout(elcmd_setzoom, param, 1, &type, &res );
+	int ret = !st_isOk(type, res, __FUNCTION__);
+	cJSON_Delete(param);
+	cJSON_Delete(res);
+	return ret;
 }
 
 #endif // STSDK

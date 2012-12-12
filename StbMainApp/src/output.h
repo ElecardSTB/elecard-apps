@@ -131,6 +131,10 @@ int output_setWifiEncryption(interfaceMenu_t *pMenu, void* pArg);
 int output_setWifiMode(interfaceMenu_t *pMenu, void* pArg);
 #endif
 
+int output_toggleZoom(void);
+
+int output_setZoom(zoomPreset_t preset);
+
 #ifdef STSDK
 int output_readInterfacesFile(void);
 int output_toggleOutputModes(void);

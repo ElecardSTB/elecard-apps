@@ -1203,23 +1203,12 @@ int gfx_setSpeed(int videoLayer, double multiplier)
 #endif
 #ifdef STSDK
 	elcdRpcType_t type;
-	int           ret;
 	cJSON        *res = NULL;
 	cJSON        *param = cJSON_CreateNumber(multiplier);
 	if (!param) return result;
 
-	ret = st_rpcSync (elcmd_setspeed, param, &type, &res);
-	
-	if (!ret && type == elcdRpcResult && 
-	    res && res->type == cJSON_String &&
-		!strcmp (res->valuestring, "ok"))
-	{
-		result = 0;
-	} 
-	else 
-	{
-		eprintf("%s: failed to set speed to %f\n", __FUNCTION__, multiplier);
-	}
+	st_rpcSync (elcmd_setspeed, param, &type, &res);
+	result = !st_isOk(type, res, __FUNCTION__);
 	cJSON_Delete(res);
 	cJSON_Delete(param);
 #endif
@@ -1721,25 +1710,6 @@ static void gfx_videoProviderGetTimes(elcdRpcType_t type, cJSON *res, void* pArg
 	cJSON_Delete(res);
 }
 
-static int st_checkSuccess(elcdRpcType_t type, cJSON *res, const char *msg)
-{
-	if ( type != elcdRpcResult || !res || res->type != cJSON_String )
-	{
-		eprintf("%s: playback failed: %s\n", msg, res&&res->type==cJSON_String?res->valuestring:"unknown error");
-		gfx_videoProvider.active = 0;
-		return 0;
-	}
-
-	if ( strcmp(res->valuestring, "ok") )
-	{
-		eprintf("%s: playback not successfull: %s\n", msg, gfx_videoProvider.name, res->valuestring);
-		gfx_videoProvider.active = 0;
-		return 0;
-	}
-
-	return 1;
-}
-
 void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
 {
 #ifdef TRACE_PROVIDERS
@@ -1750,13 +1720,14 @@ void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
 	gfx_videoProvider.waiting = -1;
 	gfx_videoProvider.active  = 0;
 
-	if (st_checkSuccess(type, res, __FUNCTION__))
+	if (st_isOk(type, res, __FUNCTION__))
 	{
 		gfx_videoProvider.active = 1;
 		gfx_videoProvider.paused = 0;
 
 		gfx_videoProvider.waiting = st_rpcAsync(elcmd_times, NULL, gfx_videoProviderGetTimes, NULL);
-	}
+	} else
+		gfx_videoProvider.active = 0;
 
 	cJSON_Delete(res);
 }
@@ -2852,28 +2823,16 @@ void gfx_stopVideoProvider(int videoLayer, int force, int hideLayer)
 
 	elcdRpcType_t type;
 	cJSON        *res = NULL;
-	int           ret;
-
-	ret = st_rpcSync (force ? elcmd_stop : elcmd_pause, NULL, &type, &res);
-	if (ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String)
-	{
-		if (strcmp(res->valuestring, "ok") == 0)
-		{
-			gfx_videoProvider.paused = !force;
-			gfx_videoProvider.active = 0;
-			if (force) gfx_videoProvider.httpDuration = 0.0;
-		}
-		else 
-		{
-			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
-		}
+	int ret = st_rpcSync (force ? elcmd_stop : elcmd_pause, NULL, &type, &res);
+	if (ret == 0 && st_isOk(type, res, __FUNCTION__)) {
+		gfx_videoProvider.paused = !force;
+		gfx_videoProvider.active = 0;
+		if (force) gfx_videoProvider.httpDuration = 0.0;
 	}
 	cJSON_Delete(res);
 	
 	if (force == GFX_STOP)
-	{
 		gfx_videoProvider.name[0] = 0;
-	}
 #endif // STSDK
 #ifdef ENABLE_GSTREAMER
 	if (force)
@@ -3106,16 +3065,9 @@ void gfx_setVideoProviderPosition (int videoLayer, long position)
 	elcdRpcType_t type;
 	cJSON        *param = cJSON_CreateNumber(position);
 	cJSON        *res   = NULL;
-	int           ret;
 
-	ret = st_rpcSync (elcmd_setpos, param, &type, &res);
-	if (ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String)
-	{
-		if (strcmp(res->valuestring, "ok"))
-		{
-			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
-		}
-	}
+	st_rpcSync (elcmd_setpos, param, &type, &res);
+	st_isOk(type, res, __FUNCTION__);
 	cJSON_Delete(res);
 	cJSON_Delete(param);
 #endif
