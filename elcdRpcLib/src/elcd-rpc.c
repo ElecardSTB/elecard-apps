@@ -69,6 +69,7 @@ const char* rpc_cmd_names[] = {
 [elcmd_listvmode]   = "listvmode",
 [elcmd_getaudio]    = "getaudio",
 [elcmd_setaudio]    = "setaudio",
+[elcmd_setzoom]     = "setzoom",
 [elcmd_dvbtuners]   = "dvbtuners",
 [elcmd_dvbclearservices] = "dvbclearservices",
 [elcmd_dvbscan]     = "dvbscan",

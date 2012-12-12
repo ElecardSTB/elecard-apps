@@ -64,6 +64,7 @@ typedef enum
 	elcmd_listvmode,
 	elcmd_getaudio,
 	elcmd_setaudio,
+	elcmd_setzoom,
 	elcmd_dvbtuners,
 	elcmd_dvbclearservices,
 	elcmd_dvbscan,
@@ -101,6 +102,7 @@ typedef enum
 	case elcmd_listvmode: \
 	case elcmd_getaudio: \
 	case elcmd_setaudio: \
+	case elcmd_setzoom: \
 	case elcmd_getstream: \
 	case elcmd_dvbtuners: \
 	case elcmd_dvbclearservices: \
