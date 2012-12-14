@@ -2809,12 +2809,12 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 	switch(service->media.type)
 	{
 		case serviceMediaDVBT:
-			sprintf(buf,"DVB-T\n %s: %lu\n",
+			sprintf(buf,"DVB-T\n %s: %u\n",
 			_T("DVB_FREQUENCY"), service->media.dvb_t.centre_frequency);
 			buf += strlen(buf);
 			break;
 		case serviceMediaDVBC:
-			sprintf(buf,"DVB-C\n %s: %lu\n",
+			sprintf(buf,"DVB-C\n %s: %u\n",
 			_T("DVB_FREQUENCY"), service->media.dvb_c.frequency);
 			buf += strlen(buf);
 			break;

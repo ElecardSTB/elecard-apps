@@ -3384,7 +3384,7 @@ static void offair_exportServices(const char* filename)
 	{
 		if( (offair_services[i].common.media_id | offair_services[i].common.service_id | offair_services[i].common.transport_stream_id) != 0 )
 		{
-			fprintf(f, "service %d media_id %lu service_id %hu transport_stream_id %hu\n", i,
+			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu\n", i,
 				offair_services[i].common.media_id,
 				offair_services[i].common.service_id,
 				offair_services[i].common.transport_stream_id );
