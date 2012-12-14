@@ -5187,6 +5187,8 @@ interfaceListMenu_t * createListMenu( interfaceListMenu_t *pMenu,
 int  interface_setMenuCapacity(interfaceMenu_t *pMenu, int newCapacity)
 {
 #ifndef INTERFACE_STATIC_MENUS
+	if (newCapacity == pMenu->menuEntryCapacity)
+		return newCapacity;
 	if (newCapacity < pMenu->menuEntryCount) {
 		eprintf("%s: can't set %s capacity to %d while there are %d entries used\n", __FUNCTION__, pMenu->name, newCapacity, pMenu->menuEntryCount);
 		return -2;
