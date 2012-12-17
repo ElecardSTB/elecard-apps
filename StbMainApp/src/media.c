@@ -2272,8 +2272,6 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 		}
 	}
 
-	appControlInfo.mediaInfo.maxFile = media_currentFileCount;
-
 	if (selectedItem <= MENU_ITEM_LAST)
 		selectedItem = interface_getSelectedItem(browseMenu);/*interface_getMenuEntryCount(browseMenu) > 0 ? 0 : MENU_ITEM_MAIN;*/
 	if (selectedItem >= interface_getMenuEntryCount(browseMenu))
