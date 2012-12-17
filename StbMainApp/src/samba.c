@@ -62,6 +62,9 @@ enum {
 * LOCAL MACROS                                 *
 ************************************************/
 
+#define LOGIN_BROWSE (1)
+#define LOGIN_MOUNT  (2)
+
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
@@ -126,6 +129,7 @@ static char samba_passwd[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_workgroup[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_machine[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_share[MENU_ENTRY_INFO_LENGTH] = {0};
+static char samba_mount[MENU_ENTRY_INFO_LENGTH] = {0};
 
 static list_element_t *samba_shares = 0;
 static list_element_t *samba_currentShare = 0;
@@ -352,7 +356,7 @@ static int samba_showMenu(interfaceMenu_t *pMenu)
 	return interface_menuActionShowMenu(pMenu, &SambaMenu);
 }
 
-static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
+static int samba_fillBrowseMenu(interfaceMenu_t *sambaMenu, void *pArg)
 {
 	int res = 0;
 	int icon;
@@ -362,41 +366,39 @@ static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
 	char *str;
 	int found;
 
-	if (samba_init() != 0)
-	{
+	if (samba_init() != 0) {
 		interface_showMessageBox(_T("FAIL"), thumbnail_error, 5000);
 		return 1;
 	}
-
-	interface_clearMenuEntries((interfaceMenu_t*)&SambaMenu);
+	interface_clearMenuEntries(sambaMenu);
 
 	switch (samba_browseType)
 	{
 		case SMBC_WORKGROUP:
 			snprintf(buf, sizeof(buf), "%s: %s", _T("SAMBA_WORKGROUP"), samba_workgroup);
 			smartLineTrim(buf, MENU_ENTRY_INFO_LENGTH );
-			interface_setMenuName((interfaceMenu_t*)&SambaMenu, buf, MENU_ENTRY_INFO_LENGTH);
+			interface_setMenuName(sambaMenu, buf, MENU_ENTRY_INFO_LENGTH);
 			str = _T("SAMBA_WORKGROUP_LIST");
-			interface_addMenuEntry((interfaceMenu_t*)&SambaMenu, str, samba_browseNetwork, pArg, thumbnail_multicast);
+			interface_addMenuEntry(sambaMenu, str, samba_browseNetwork, pArg, thumbnail_multicast);
 			break;
 		case SMBC_SERVER:
 			snprintf(buf, sizeof(buf), "%s: %s", _T("SAMBA_WORKSTATION"), samba_machine);
 			smartLineTrim(buf, MENU_ENTRY_INFO_LENGTH );
-			interface_setMenuName((interfaceMenu_t*)&SambaMenu, buf, MENU_ENTRY_INFO_LENGTH);
+			interface_setMenuName(sambaMenu, buf, MENU_ENTRY_INFO_LENGTH);
 			if (samba_workgroup[0]) 
 			{
 				snprintf(buf, sizeof(buf), "%s: %s", _T("SAMBA_WORKGROUP"), samba_workgroup);
 				smartLineTrim(buf, MENU_ENTRY_INFO_LENGTH );
 				str = buf;
-				interface_addMenuEntry((interfaceMenu_t*)&SambaMenu, str, samba_browseWorkgroup, pArg, thumbnail_workstation);
+				interface_addMenuEntry(sambaMenu, str, samba_browseWorkgroup, pArg, thumbnail_workstation);
 			} else
-				interface_addMenuEntry((interfaceMenu_t*)&SambaMenu, _T("SAMBA_WORKGROUP_LIST"), samba_browseNetwork, pArg, thumbnail_multicast);
+				interface_addMenuEntry(sambaMenu, _T("SAMBA_WORKGROUP_LIST"), samba_browseNetwork, pArg, thumbnail_multicast);
 			break;
 		default:
-			interface_setMenuName((interfaceMenu_t*)&SambaMenu, _T("SAMBA_WORKGROUP_LIST"), MENU_ENTRY_INFO_LENGTH);
-			interface_addMenuEntry((interfaceMenu_t*)&SambaMenu, _T("NETWORK_PLACES"), media_initSambaBrowserMenu, pArg, thumbnail_network);
+			interface_setMenuName(sambaMenu, _T("SAMBA_WORKGROUP_LIST"), MENU_ENTRY_INFO_LENGTH);
+			interface_addMenuEntry(sambaMenu, _T("NETWORK_PLACES"), media_initSambaBrowserMenu, pArg, thumbnail_network);
 	}
-	interface_setSelectedItem((interfaceMenu_t *)&SambaMenu, 0 );
+	interface_setSelectedItem(sambaMenu, 0 );
 
 	interface_showLoading();
 	interface_displayMenu(1);
@@ -406,16 +408,13 @@ static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
 	FILE *list = popen(cmd, "r");
 	interface_hideLoading();
 	found = 0;
-	if (!list)
-	{
+	if (!list) {
 		eprintf("Samba: browse %s failed. errno = %d (%s)\n", samba_url, errno, strerror(errno));
 		res = 0; // dh;
 		interface_showMessageBox(_T("ERR_CONNECT"), thumbnail_error, 5000);
-	} else
-	{
+	} else {
 		int skip = 1;
-		while (fgets(buf, sizeof(buf), list))
-		{
+		while (fgets(buf, sizeof(buf), list)) {
 			if (skip)
 			{
 				if (buf[0] == '$' && buf[1] == '$')
@@ -437,7 +436,7 @@ static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
 			if ( icon > 0 && buf[strlen(buf)-1] != '$' /* hide system shares */ )
 			{
 				found++;
-				interface_addMenuEntry((interfaceMenu_t*)&SambaMenu, buf, pAction, (void*)interface_getMenuEntryCount((interfaceMenu_t*)&SambaMenu), icon);
+				interface_addMenuEntry(sambaMenu, buf, pAction, SET_NUMBER(interface_getMenuEntryCount(sambaMenu)), icon);
 			}
 		}
 		int exit_code = WEXITSTATUS(pclose(list));
@@ -445,13 +444,13 @@ static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
 		{
 			if ( interfaceInfo.messageBox.type != interfaceMessageBoxNone )
 				res = 1; // if called from text input function, leave message box opened
-			interface_addMenuEntry((interfaceMenu_t *)&SambaMenu, _T("ERR_NOT_LOGGED_IN"), samba_enterLogin, (void*)1, thumbnail_info);
-			samba_enterLogin((interfaceMenu_t *)&SambaMenu, (void*)1);
+			interface_addMenuEntry(sambaMenu, _T("ERR_NOT_LOGGED_IN"), samba_enterLogin, SET_NUMBER(LOGIN_BROWSE), thumbnail_info);
+			samba_enterLogin(sambaMenu, SET_NUMBER(LOGIN_BROWSE));
 			return res;
 		}
 	}
 	if (found == 0)
-		interface_addMenuEntryDisabled((interfaceMenu_t *)&SambaMenu, _T("SAMBA_NO_SHARES"), thumbnail_info);
+		interface_addMenuEntryDisabled(sambaMenu, _T("SAMBA_NO_SHARES"), thumbnail_info);
 	return res;
 }
 
@@ -485,8 +484,14 @@ static int samba_setPasswd(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return 1;
 	strcpy(samba_passwd, value);
 	dprintf("%s: New login/password: <%s><%s>\n", __FUNCTION__, samba_username, samba_passwd);
-	if (pArg || samba_browseType == SMBC_SERVER)
-		samba_showMenu(pMenu);
+	switch (GET_NUMBER(pArg))
+	{
+		case LOGIN_BROWSE:
+			samba_showMenu(pMenu);
+			return 0;
+		case LOGIN_MOUNT:
+			return samba_mountShare(samba_machine, samba_share, samba_mount);
+	}
 	return 0;
 }
 
@@ -541,6 +546,7 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg)
 	str = &mount_path[strlen(sambaRoot)];
 	interface_getMenuEntryInfo((interfaceMenu_t *)&SambaMenu, (int)pArg, samba_share, MENU_ENTRY_INFO_LENGTH);
 	strcpy( str, samba_share );
+	strcpy( samba_mount, str );
 
 	if( (ret = helperCheckDirectoryExsists(mount_path)) != 0 )
 	{
@@ -570,7 +576,7 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg)
 				}
 			}
 			fclose(f); // not found
-			interface_getText(interfaceInfo.currentMenu, _T("ENTER_SHARE_NAME"), "\\w+", samba_setShareName, samba_getShareName, inputModeABC, pArg);
+			interface_getText(interfaceInfo.currentMenu, _T("ENTER_SHARE_NAME"), "\\w+", samba_setShareName, samba_getShareName, inputModeABC, NULL);
 			return 1;
 		} else
 		{
@@ -580,7 +586,7 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg)
 		}
 	}
 
-	return samba_mountShare(samba_machine, samba_share, samba_share);
+	return samba_mountShare(samba_machine, samba_share, samba_mount);
 }
 
 static int samba_setShareName(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -606,8 +612,10 @@ static int samba_setShareName(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return 1;
 	}
 	str = strrchr(mount_path, '/');
-	if (str != NULL)
-		samba_mountShare(samba_machine, samba_share, str+1);
+	if (str != NULL) {
+		strcpy (samba_mount, str+1);
+		samba_mountShare(samba_machine, samba_share, samba_mount);
+	}
 	return 1;
 }
 
@@ -669,7 +677,7 @@ static int samba_mountShare(const char *machine, const char *share, const char *
 		{
 			//interface_showMessageBox( _T("SAMBA_MOUNT_ERROR"), thumbnail_error, 5000 );
 			sprintf(buf, "%s\n\n%s:", _T("SAMBA_MOUNT_ERROR"), _T("LOGIN"));
-			interface_getText(interfaceInfo.currentMenu, buf, "\\w+", samba_setUsername, samba_getUsername, inputModeABC, NULL);
+			interface_getText(interfaceInfo.currentMenu, buf, "\\w+", samba_setUsername, samba_getUsername, inputModeABC, SET_NUMBER(LOGIN_MOUNT));
 			return 1;
 		}
 		umount("/tmp/mount_test");
