@@ -66,6 +66,8 @@ int  samba_unmountShare(const char *mountPoint);
 void samba_cleanup();
 void *samba_readMounts(void);
 void *samba_nextMount(void *mount);
+int samba_manualBrowse(interfaceMenu_t *pMenu, void *pIgnored);
+int samba_enterLogin(interfaceMenu_t *pMenu, void *pIgnored);
 
 int samba_browseShare(interfaceMenu_t *pMenu, void *pArg);
 void* samba_readShares(void);

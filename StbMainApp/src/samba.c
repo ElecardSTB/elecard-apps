@@ -92,11 +92,11 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg);
 static int samba_mountShare(const char *machine, const char *share, const char *mountPoint);
 static int samba_setShareName(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int samba_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-static int samba_enterLogin(interfaceMenu_t *pMenu, void *pArg);
 static char *samba_getUsername(int index, void* pArg);
 static char *samba_getPasswd(int index, void* pArg);
+static int samba_showMenu(interfaceMenu_t *pMenu);
 
-static int samba_manualBrowse(interfaceMenu_t *pMenu, char *value, void* pArg);
+static int samba_setMachine(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int samba_setUsername(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int samba_setPasswd(interfaceMenu_t *pMenu, char *value, void* pArg);
 
@@ -126,8 +126,6 @@ static char samba_passwd[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_workgroup[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_machine[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_share[MENU_ENTRY_INFO_LENGTH] = {0};
-
-static volatile int waiting_password = 0;
 
 static list_element_t *samba_shares = 0;
 static list_element_t *samba_currentShare = 0;
@@ -342,9 +340,16 @@ static int samba_resolve_name(const char *name, struct in_addr *ip, int type)
 /** Ask user for Samba login and password
  * @param[in] pArg If not 0, refresh list afterwards
  */
-static int samba_enterLogin(interfaceMenu_t *pMenu, void *pArg)
+int samba_enterLogin(interfaceMenu_t *pMenu, void *pArg)
 {
 	return interface_getText(pMenu, _T("LOGIN"), "\\w+", samba_setUsername, samba_getUsername, inputModeABC, pArg);
+}
+
+static int samba_showMenu(interfaceMenu_t *pMenu)
+{
+	if (pMenu == _M &SambaMenu)
+		return samba_fillBrowseMenu(pMenu, NULL);
+	return interface_menuActionShowMenu(pMenu, &SambaMenu);
 }
 
 static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
@@ -440,7 +445,6 @@ static int samba_fillBrowseMenu(interfaceMenu_t *pMenu, void *pArg)
 		{
 			if ( interfaceInfo.messageBox.type != interfaceMessageBoxNone )
 				res = 1; // if called from text input function, leave message box opened
-			interface_hideMessageBox();
 			interface_addMenuEntry((interfaceMenu_t *)&SambaMenu, _T("ERR_NOT_LOGGED_IN"), samba_enterLogin, (void*)1, thumbnail_info);
 			samba_enterLogin((interfaceMenu_t *)&SambaMenu, (void*)1);
 			return res;
@@ -468,10 +472,8 @@ static char *samba_getMachine(int index, void* pArg)
 
 static int samba_setUsername(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if( value == NULL )
-	{
+	if (value == NULL)
 		return 1;
-	}
 	strcpy(samba_username, value);
 	interface_getText(pMenu, _T("PASSWORD"), "\\w+", samba_setPasswd, samba_getPasswd, inputModeABC, pArg);
 	return 1;
@@ -479,20 +481,16 @@ static int samba_setUsername(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 static int samba_setPasswd(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	if( value == NULL )
-	{
+	if (value == NULL)
 		return 1;
-	}
 	strcpy(samba_passwd, value);
 	dprintf("%s: New login/password: <%s><%s>\n", __FUNCTION__, samba_username, samba_passwd);
-	if( pArg != 0 )
-	{
-		samba_fillBrowseMenu( pMenu, NULL );
-	}
+	if (pArg || samba_browseType == SMBC_SERVER)
+		samba_showMenu(pMenu);
 	return 0;
 }
 
-static int samba_manualBrowse(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int samba_setMachine(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	struct in_addr ip;
 	int res;
@@ -508,8 +506,7 @@ static int samba_manualBrowse(interfaceMenu_t *pMenu, char *value, void* pArg)
 		samba_browseType = SMBC_SERVER;
 		strcpy(&samba_url[6], samba_machine);
 		dprintf("%s: manual browse %s (%s)\n", __FUNCTION__, inet_ntoa(ip), samba_url);
-		res = samba_fillBrowseMenu(pMenu, pArg);
-		interface_displayMenu(1);
+		res = samba_showMenu(pMenu);
 	} else
 	{
 		eprintf("Samba: Can't resolve '%s', res = %d\n", value, res);
@@ -517,6 +514,12 @@ static int samba_manualBrowse(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return 1;
 	}
 	return res;
+}
+
+int samba_manualBrowse(interfaceMenu_t *pMenu, void *pIgnored)
+{
+	interface_getText(pMenu, _T("ENTER_WORKSTATION_ADDR"), "\\w+", samba_setMachine, samba_getMachine, inputModeABC, NULL);
+	return 1;
 }
 
 static char *samba_getShareName(int index, void* pArg)
@@ -706,7 +709,7 @@ static int samba_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cm
 			return 0;
 		case interfaceCommandSearch:
 		case interfaceCommandBlue:
-			interface_getText(pMenu, _T("ENTER_WORKSTATION_ADDR"), "\\w+", samba_manualBrowse, samba_getMachine, inputModeABC, NULL);
+			samba_manualBrowse(pMenu, NULL);
 			return 0;
 		case interfaceCommandBack:
 			switch( samba_browseType )

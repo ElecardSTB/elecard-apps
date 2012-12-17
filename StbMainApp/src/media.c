@@ -2224,6 +2224,8 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 			str = _T("NETWORK_PLACES");
 			interface_setMenuName(browseMenu,str, strlen(str)+1);
 			browseMenu->statusBarIcons[0] = statusbar_f1_delete;
+			browseMenu->statusBarIcons[2] = statusbar_f3_edit;
+			browseMenu->statusBarIcons[3] = statusbar_f4_enterurl;
 
 			for (void *share = samba_readShares();
 			     share;
@@ -2236,6 +2238,8 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 			}
 		} else {
 			browseMenu->statusBarIcons[0] = 0;
+			browseMenu->statusBarIcons[2] = statusbar_f3_add;
+			browseMenu->statusBarIcons[3] = statusbar_f4_filetype;
 			hasDrives = 1; // not in root
 		}
 	}
@@ -2529,7 +2533,21 @@ static int media_keyCallback(interfaceMenu_t *browseMenu, pinterfaceCommandEvent
 		case interfaceCommandGreen:
 			interface_menuActionShowMenu(browseMenu, _M &media_settingsMenu);
 			return 0;
+#ifdef ENABLE_SAMBA
+		case interfaceCommandYellow:
+			if (strcmp(currentPath, sambaRoot) == 0) {
+				samba_enterLogin(browseMenu, NULL);
+				return 0;
+			}
+			break;
+#endif
 		case interfaceCommandBlue:
+#ifdef ENABLE_SAMBA
+			if (strcmp(currentPath, sambaRoot) == 0) {
+				samba_manualBrowse(browseMenu, NULL);
+				return 0;
+			}
+#endif
 			media_setBrowseMediaType(-1);
 			media_enterFileBrowserMenu(browseMenu, SET_NUMBER(MENU_ITEM_LAST));
 			interface_displayMenu(1);
