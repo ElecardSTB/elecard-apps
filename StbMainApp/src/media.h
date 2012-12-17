@@ -43,6 +43,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS  *
 ********************/
 
+#define MENU_ITEM_LAST (-3)
+#define MENU_ITEM_PREV (-4)
+
 /*********************
 * EXPORTED TYPEDEFS  *
 **********************/
@@ -148,6 +151,8 @@ void media_storagesChanged(void);
 mediaType media_getMediaType(const char *filename);
 
 int media_setBrowseMediaType(int type);
+
+int media_isBrowsingFiles(void);
 
 /** Callback for scandir function, used to select mounted USB storages
  */

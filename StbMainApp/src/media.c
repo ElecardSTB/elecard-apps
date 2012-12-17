@@ -93,9 +93,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define MAX_DEV_PATH   (16)
 
-#define MENU_ITEM_LAST (-3)
-#define MENU_ITEM_PREV (-4)
-
 #ifdef ENABLE_SAMBA
 #define ROOT         (media_browseType == mediaBrowseTypeUSB ? usbRoot : sambaRoot)
 #define IS_SMB(path) (strncmp((path), sambaRoot, strlen(sambaRoot))==0)
@@ -141,7 +138,7 @@ typedef struct __mediaFormats_t
  *  @param[in] pMenu Should be &BrowseFilesMenu
  *  @param[in] pArg  Index of selected item in updated menu. Can also have special values MENU_ITEM_LAST and MENU_ITEM_BACK
  */
-static int  media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pArg);
+static int  media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSelected);
 
 /** ActivatedAction of BrowseFilesMenu
  *  Calls media_refreshFileBrowserMenu using blocks.
@@ -656,25 +653,20 @@ int media_play_callback(interfacePlayControlButton_t button, void *pArg)
 #ifdef ENABLE_AUTOPLAY
 static int media_auto_play(void* pArg)
 {
-	return media_stream_change((interfaceMenu_t*)&BrowseFilesMenu, pArg);
+	return media_stream_change(_M &BrowseFilesMenu, pArg);
 }
 
 static int media_stream_selected(interfaceMenu_t *pMenu, void* pArg)
 {
 	//int streamNumber = GET_NUMBER(pArg);
-
 	//dprintf("%s: in\n", __FUNCTION__);
-
 	if ( /*strcmp(appControlInfo.mediaInfo.filename, &streams->items[streamNumber], sizeof(struct media_desc)) != 0 ||*/
 		appControlInfo.mediaInfo.active == 0 )
 	{
 		playingStream = 0;
-
 		//dprintf("%s: event %08X\n", __FUNCTION__, pArg);
-
 		interface_addEvent(media_auto_play, pArg, 3000, 1);
 	}
-
 	//dprintf("%s: done\n", __FUNCTION__);
 	return 0;
 }
@@ -682,18 +674,14 @@ static int media_stream_selected(interfaceMenu_t *pMenu, void* pArg)
 static int media_stream_deselected(interfaceMenu_t *pMenu, void* pArg)
 {
 	//dprintf("%s: in\n", __FUNCTION__);
-
 	//dprintf("%s: event %08X\n", __FUNCTION__, pArg);
-
 	interface_removeEvent(media_auto_play, pArg);
-
 	if ( playingStream == 0 )
 	{
 		interface_playControlDisable(1);
 		appControlInfo.mediaInfo.filename[0] = 0;
 		media_stopPlayback();
 	}
-
 	//dprintf("%s: done\n", __FUNCTION__);
 	return 0;
 }
@@ -1020,7 +1008,7 @@ static void media_setupPlayControl(void* pArg)
 
 int media_streamStart()
 {
-	return media_stream_change((interfaceMenu_t*)&BrowseFilesMenu, SET_NUMBER(CHANNEL_CUSTOM));
+	return media_stream_change(_M &BrowseFilesMenu, SET_NUMBER(CHANNEL_CUSTOM));
 }
 
 static int media_onStop()
@@ -1151,12 +1139,14 @@ void media_pauseOrStop(int stop)
 #endif
 
 	appControlInfo.mediaInfo.endOfStream = 0;
-
 	interface_removeEvent(media_check_status, NULL);
 
 	//dprintf("%s:\n -->>>>>>> Stop, stop: %d, stop restart: %d, length: %f, position: %f\n\n", __FUNCTION__, stop, media_forceRestart, gfx_getVideoProviderLength(screenMain), gfx_getVideoProviderPosition(screenMain));
 	gfx_stopVideoProvider(screenMain, stop, stop);
-
+#ifdef ENABLE_AUTOPLAY
+	if (stop)
+		playingStream = 0;
+#endif
 	interface_setBackground(0,0,0,0,NULL);
 
 	dprintf("%s: Set playback inactive\n", __FUNCTION__);
@@ -1555,7 +1545,7 @@ int media_playURL(int which, const char* URL, const char *description, const cha
 			appControlInfo.playbackInfo.thumbnail[0] = 0;
 			//strcpy(appControlInfo.playbackInfo.thumbnail, resource_thumbnails[thumbnail_internet]);
 			
-		return media_stream_change((interfaceMenu_t *)&BrowseFilesMenu, SET_NUMBER(CHANNEL_CUSTOM));
+		return media_stream_change(_M &BrowseFilesMenu, SET_NUMBER(CHANNEL_CUSTOM));
 	}
 
 	dprintf("%s: '%s'\n", __FUNCTION__,fileName);
@@ -1591,7 +1581,7 @@ int media_playURL(int which, const char* URL, const char *description, const cha
 				strcpy(appControlInfo.playbackInfo.thumbnail, thumbnail);
 			else
 				appControlInfo.playbackInfo.thumbnail[0] = 0;
-			return media_stream_change((interfaceMenu_t *)&BrowseFilesMenu, SET_NUMBER(-1));
+			return media_stream_change(_M &BrowseFilesMenu, SET_NUMBER(-1));
 	}
 }
 
@@ -2130,7 +2120,7 @@ static void media_freeBrowseInfo()
 static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSelected)
 {
 	int             selectedItem = GET_NUMBER(pSelected);
-	int             hasDrives = 0, storageCount = 0;
+	int             hasDrives = 0;
 	char            showPath[PATH_MAX];
 	char           *str;
 	int             file_icon;
@@ -2201,7 +2191,7 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 				}
 			}
 		}
-#else
+#else // STBPNX
 		//autofs is removed by hotplug with mdev
 		DIR *usbDir = opendir(usbRoot);
 		if (usbDir != NULL) {
@@ -2223,62 +2213,31 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 			closedir(usbDir);
 		} else
 			eprintf("%s: Failed to open %s directory\n", __FUNCTION__, usbRoot);
-#endif
+#endif // !STBPNX
 	}
 #ifdef ENABLE_SAMBA
 	else
 	{
 		if (isRoot)
 		{
-#ifndef STBPNX
-			char mount_cmd[PATH_MAX];
-#endif
-
-			str = _T("NETWORK_BROWSING");
-			interface_addMenuEntry(browseMenu, str, interface_menuActionShowMenu, &SambaMenu, thumbnail_workstation);
+			interface_addMenuEntry(browseMenu, _T("NETWORK_BROWSING"), interface_menuActionShowMenu, &SambaMenu, thumbnail_workstation);
 			str = _T("NETWORK_PLACES");
 			interface_setMenuName(browseMenu,str, strlen(str)+1);
-			interface_showLoading();
-			interface_displayMenu(1);
-			FILE *f = fopen(SAMBA_CONFIG, "r");
-			if (f != NULL)
-			{
-				storageCount = 0;
-				while( fgets(showPath, PATH_MAX, f) != NULL )
-				{
-					str = strchr( showPath, ';' );
-					if (str != NULL) {
-						*str++ = 0;
-#ifndef STBPNX
-						for ( char *str_end = &str[strlen(str)-1];
-						      str_end > str && (unsigned)*str_end <= ' ';
-						     *str_end-- = 0 );
-						snprintf(mount_cmd, sizeof(mount_cmd), "mount %s '%s%s'", str, sambaRoot, showPath);
-#endif
-						sprintf(str, "%s%s", sambaRoot, showPath);
-						time_t start = time(NULL);
-#ifndef STBPNX
-						if( !helperCheckDirectoryExsists( str ) )
-						{
-							mkdir(str, 0777);
-							system(mount_cmd);
-							rmdir(str); // will fail if mount succeeded
-						}
-#endif
-						if( helperCheckDirectoryExsists( str ) )
-						{
-							hasDrives++;
-						} else
-						{
-							storageCount++;
-							eprintf("%s: Samba share '%s' check failed [timeout %d]\n", __FUNCTION__, showPath, time(NULL) - start);
-						}
-					}
-				}
-				fclose(f);
+			browseMenu->statusBarIcons[0] = statusbar_f1_delete;
+
+			for (void *share = samba_readShares();
+			     share;
+			     share = samba_nextShare()) {
+				const char *name = samba_shareGetName(share);
+				if(selectedItem == MENU_ITEM_PREV && strcmp(name, media_previousDir)==0)
+					selectedItem = interface_getMenuEntryCount(browseMenu);
+				interface_addMenuEntry(browseMenu, name, samba_browseShare, share, samba_shareGetIcon(share));
+				hasDrives--;
 			}
-		} else
+		} else {
+			browseMenu->statusBarIcons[0] = 0;
 			hasDrives = 1; // not in root
+		}
 	}
 #endif // ENABLE_SAMBA
 
@@ -2349,34 +2308,9 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 	} else if (!isRoot && media_currentFileCount == 0 && media_currentDirCount == 0)
 		interface_addMenuEntryDisabled(browseMenu, _T("NO_FILES"), thumbnail_info);
 #ifdef ENABLE_SAMBA
-	if (media_browseType == mediaBrowseTypeSamba && isRoot && storageCount > 0 )
-	{
-		FILE *f = fopen(SAMBA_CONFIG, "r");
-		/* Display unavailable shares */
-		if (f != NULL) {
-			while( fgets(showPath, PATH_MAX, f) != NULL ) {
-				str = strchr( showPath, ';' );
-				if (str != NULL) {
-					*str++ = 0;
-					/*sprintf(str, "%s%s", sambaRoot, showPath);
-					dprintf("%s: Found samba share: '%s'\n", __FUNCTION__, str);
-					if( !helperCheckDirectoryExsists( str ) ) // <- long wait here!
-					{
-						str = showPath;
-						interface_addMenuEntry(browseMenu, str, NULL, NULL, thumbnail_error);
-					}*/
-					int i;
-					for (i = 0; i < media_currentDirCount; i++)
-						if (strcmp(showPath, media_currentDirEntries[i]->d_name) == 0)
-							break;
-					if  (i >= media_currentDirCount)
-						interface_addMenuEntry(browseMenu, showPath, NULL, NULL, thumbnail_error);
-				}
-			}
-			fclose(f);
-		}
-	}
-#endif // ENABLE_SAMBA
+	if (media_browseType == mediaBrowseTypeSamba && isRoot)
+		file_icon = thumbnail_network;
+#endif
 	interface_setMenuLogo(browseMenu, file_icon, -1, 0, 0, 0);
 	interface_setSelectedItem(browseMenu, selectedItem);
 	interface_hideLoading();
@@ -2392,33 +2326,44 @@ static int media_enterFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSelect
 	return 0;
 }
 
-int media_initUSBBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
+int media_initUSBBrowserMenu(interfaceMenu_t *pMenu, void* pSelected)
 {
-	//appControlInfo.mediaInfo.typeIndex = GET_NUMBER(pArg);
 	media_browseType = mediaBrowseTypeUSB;
-	BrowseFilesMenu.baseMenu.statusBarIcons[0] = 0;
+	interfaceMenu_t *browseMenu = _M &BrowseFilesMenu;
+	browseMenu->pArg = pSelected;
+	browseMenu->statusBarIcons[0] = 0;
 
 	if (strncmp(currentPath, usbRoot, strlen(usbRoot)) !=0 || !helperCheckDirectoryExsists(currentPath) )
 		strncpy(currentPath, usbRoot, strlen(usbRoot)+1);
 
 	dprintf("%s: %s\n", __FUNCTION__, currentPath);
-	return interface_menuActionShowMenu( pMenu, &BrowseFilesMenu );
+	return interface_menuActionShowMenu( pMenu, browseMenu );
 }
 
 #ifdef ENABLE_SAMBA
-int media_initSambaBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
+int media_initSambaBrowserMenu(interfaceMenu_t *pMenu, void* pSelected)
 {
-	//appControlInfo.mediaInfo.typeIndex = GET_NUMBER(pArg);
 	media_browseType = mediaBrowseTypeSamba;
-	BrowseFilesMenu.baseMenu.statusBarIcons[0] = statusbar_f1_delete;
+	interfaceMenu_t *browseMenu = _M &BrowseFilesMenu;
+	browseMenu->pArg = pSelected;
 
 	if (strncmp( currentPath, sambaRoot, strlen(sambaRoot) ) != 0 || !helperCheckDirectoryExsists(currentPath) )
 		strcpy( currentPath, sambaRoot );
 
 	dprintf("%s: %s\n", __FUNCTION__,currentPath);
-	return interface_menuActionShowMenu( pMenu, &BrowseFilesMenu );
+	if (pMenu == browseMenu) {
+		media_enterFileBrowserMenu(browseMenu, pSelected);
+		interface_displayMenu(1);
+		return 0;
+	} else
+	return interface_menuActionShowMenu( pMenu, browseMenu );
 }
 #endif
+
+int media_isBrowsingFiles(void)
+{
+	return interfaceInfo.currentMenu == _M &BrowseFilesMenu;
+}
 
 static int media_browseFolder(interfaceMenu_t *pMenu, void* pArg)
 {

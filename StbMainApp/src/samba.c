@@ -42,6 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "StbMainApp.h"
 #include "media.h"
 
+#include <service.h>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -64,6 +66,19 @@ enum {
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
 
+typedef enum {
+	mountStateInitial = 0,
+	mountStateMounting,
+	mountStateMounted,
+	mountStateFailed,
+} sambaMountState_t;
+
+typedef struct {
+	char *share;
+	sambaMountState_t state;
+	pthread_t thread;
+} sambaMount_t;
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -85,6 +100,21 @@ static int samba_manualBrowse(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int samba_setUsername(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int samba_setPasswd(interfaceMenu_t *pMenu, char *value, void* pArg);
 
+static void samba_cleanupShares(void);
+static size_t samba_trimstr(char *str, size_t len)
+{
+	for (char *str_end = &str[len-1];
+	      str_end > str && (unsigned)*str_end <= ' ';
+	     *str_end-- = 0)
+		 len--;
+	return len;
+}
+static int samba_checkShareString(const char *str, size_t str_len, const char *share, size_t share_len)
+{
+	str_len--; // closing quote
+	return str_len > share_len && str[str_len] == '\'' && strncmp(&str[str_len-share_len], share, share_len) == 0;
+}
+
 /******************************************************************
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
 *******************************************************************/
@@ -98,6 +128,9 @@ static char samba_machine[MENU_ENTRY_INFO_LENGTH] = {0};
 static char samba_share[MENU_ENTRY_INFO_LENGTH] = {0};
 
 static volatile int waiting_password = 0;
+
+static list_element_t *samba_shares = 0;
+static list_element_t *samba_currentShare = 0;
 
 /*********************************************************(((((((**********
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
@@ -206,6 +239,29 @@ static int samba_init()
 
 void samba_cleanup()
 {
+	samba_cleanupShares();
+}
+
+void samba_cleanupShares()
+{
+	list_element_t *del;
+	list_element_t *cur = samba_shares;
+	while (cur) {
+		del = cur;
+		cur = cur->next;
+		sambaMount_t *m = del->data;
+		if (m->thread) {
+			if (m->state == mountStateMounting) {
+				eprintf("%s: warning: %s is still mounting!\n", __func__, m->share);
+				pthread_cancel(m->thread);
+			}
+			pthread_join(m->thread, NULL);
+		}
+		free(m->share);
+		free_element(del);
+	}
+	samba_shares = 0;
+	samba_currentShare = 0;
 }
 
 void samba_buildMenu(interfaceMenu_t *pParent)
@@ -498,13 +554,9 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg)
 			share_len = snprintf(share_addr, sizeof(share_addr), "//%s/%s", inet_ntoa(ip), samba_share);
 			while( fgets( buf, sizeof(buf), f ) != NULL )
 			{
-				buf_len = strlen(buf);
-				if( buf_len > 0 && buf[buf_len-1] == '\n' )
-				{
-					buf[buf_len-1] = 0;
-					buf_len--;
-				}
-				if( buf_len > share_len && strcmp( &buf[buf_len-share_len], share_addr ) == 0 && (str = index(buf, ';')) != NULL)
+				buf_len = samba_trimstr(buf, strlen(buf));
+				if (samba_checkShareString(buf, buf_len, share_addr, share_len) &&
+				    (str = strchr(buf, ';')) != NULL)
 				{
 					dprintf("%s: '%s' already exists in samba.auto file\n", __FUNCTION__,share_addr);
 					fclose(f);
@@ -534,31 +586,25 @@ static int samba_setShareName(interfaceMenu_t *pMenu, char *value, void* pArg)
 	char mount_path[strlen(sambaRoot) + MENU_ENTRY_INFO_LENGTH];
 	int ret;
 
-	if( value == NULL )
-	{
+	if (value == NULL)
 		return 1;
-	}
 
 	strcpy( mount_path, sambaRoot );
 	str = &mount_path[strlen(sambaRoot)];
 	strcpy( str, value );
-	for( ptr = str; *str; str++, ptr++ )
-	{
+	for ( ptr = str; *str; str++, ptr++ ) {
 		while( *str == '/' )
 			str++;
 		if( str != ptr )
 			*ptr = *str;
 	}
-	if( (ret = helperCheckDirectoryExsists(mount_path)) != 0 )
-	{
+	if ((ret = helperCheckDirectoryExsists(mount_path)) != 0 ) {
 		interface_getText(pMenu, _T("ENTER_SHARE_NAME"), "\\w+", samba_setShareName, samba_getShareName, inputModeABC, pArg);
 		return 1;
 	}
-	str = rindex(mount_path, '/');
-	if( str != NULL )
-	{
+	str = strrchr(mount_path, '/');
+	if (str != NULL)
 		samba_mountShare(samba_machine, samba_share, str+1);
-	}
 	return 1;
 }
 
@@ -603,14 +649,8 @@ static int samba_mountShare(const char *machine, const char *share, const char *
 		share_len = sprintf(share_addr, "//%s/%s", inet_ntoa(ip), share);
 		while( fgets( buf, sizeof(buf), f ) != NULL )
 		{
-			buf_len = strlen(buf);
-			if( buf_len > 0 && buf[buf_len-1] == '\n' )
-			{
-				buf[buf_len-1] = 0;
-				buf_len--;
-			}
-			if( buf_len > share_len && strcmp( &buf[buf_len-share_len], share_addr ) == 0 )
-			{
+			buf_len = samba_trimstr(buf, strlen(buf));
+			if (samba_checkShareString(buf, buf_len, share_addr, share_len)) {
 				dprintf("Samba: '%s' already exists in samba.auto file\n",share_addr);
 				fclose(f);
 				sprintf( currentPath, "%s%s/", sambaRoot, mountPoint );
@@ -639,9 +679,11 @@ static int samba_mountShare(const char *machine, const char *share, const char *
 		fprintf( f, "%s;-fstype=cifs,ro,username=%s,password=%s :%s\n", mountPoint, username, passwd, share_addr );
 #else
 		// manual mount command
-		fprintf( f, "%s;-t cifs -o rw,username=%s,password=%s '%s'\n", mountPoint, username, passwd, share_addr );
+		fprintf( f, "%s;-t cifs -o username=%s,password=%s '%s'\n", mountPoint, username, passwd, share_addr );
 #endif
 		fclose(f);
+		samba_cleanupShares();
+
 		dprintf("%s: Added new record to samba.auto:\n%s;-fstype=cifs,ro,username='%s',password='%s' :%s\n", __FUNCTION__, mountPoint, username, passwd, share_addr );
 		sprintf( currentPath, "%s%s/", sambaRoot, mountPoint );
 		interface_showMessageBox( _T("ADDED_TO_NETWORK_PLACES"), thumbnail_info, 5000 );
@@ -682,6 +724,12 @@ static int samba_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cm
 	}
 }
 
+static int samba_showSaveError(void)
+{
+	interface_showMessageBox( _T("SETTINGS_SAVE_ERROR"), thumbnail_error, 5000);
+	return 1;
+}
+
 int samba_unmountShare(const char *mountPoint)
 {
 	FILE *src, *dst;
@@ -690,43 +738,41 @@ int samba_unmountShare(const char *mountPoint)
 	int mountPointNameLength = strlen(mountPoint);
 
 	dprintf("%s: Unmounting %s\n, __FUNCTION__", mountPoint);
-
-	if( mountPointNameLength == 0 )
+	if (mountPointNameLength == 0)
 		return 1;
 
+	for (list_element_t *el = samba_shares; el; el = el->next) {
+		sambaMount_t *m = el->data;
+		if (m->thread) {
+			//return 1;
+			eprintf("%s: warning: %s is still mounting!\n", __func__, m->share);
+			interface_showLoading();
+		}
+	}
 #ifndef STBPNX
 	snprintf(buf, sizeof(buf), "%s%s", sambaRoot, mountPoint);
 	umount(buf);
 	rmdir(buf);
 #endif
-
-	if(rename(SAMBA_CONFIG, SAMBA_CONFIG ".old") != 0 )
-	{
-		interface_showMessageBox( _T("SETTINGS_SAVE_ERROR"), thumbnail_error, 5000 );
-		return 1;
-	}
+	if (rename(SAMBA_CONFIG, SAMBA_CONFIG ".old") != 0)
+		return samba_showSaveError();
 
 	dst = fopen(SAMBA_CONFIG, "w");
-	if( dst == NULL )
-	{
+	if (dst == NULL) {
 		rename(SAMBA_CONFIG ".old", SAMBA_CONFIG);
 		unlink(SAMBA_CONFIG ".old");
-		interface_showMessageBox( _T("SETTINGS_SAVE_ERROR"), thumbnail_error, 5000 );
-		return 1;
+		return samba_showSaveError();
 	}
 	src = fopen(SAMBA_CONFIG ".old", "r");
-	if( src == NULL )
-	{
+	if (src == NULL) {
 		fclose(dst);
 		rename(SAMBA_CONFIG ".old", SAMBA_CONFIG);
 		unlink(SAMBA_CONFIG ".old");
-		interface_showMessageBox( _T("SETTINGS_SAVE_ERROR"), thumbnail_error, 5000 );
-		return 1;
+		return samba_showSaveError();
 	}
 
-	while( fgets( buf, sizeof(buf), src ) != NULL )
-	{
-		if( strncmp( buf, mountPoint, mountPointNameLength ) != 0 || buf[mountPointNameLength] != ';' )
+	while (fgets( buf, sizeof(buf), src )) {
+		if (strncmp( buf, mountPoint, mountPointNameLength ) != 0 || buf[mountPointNameLength] != ';')
 			fputs(buf, dst);
 		else
 			found = 1;
@@ -734,12 +780,208 @@ int samba_unmountShare(const char *mountPoint)
 	fclose(src);
 	fclose(dst);
 	unlink(SAMBA_CONFIG ".old");
+
+	samba_cleanupShares();
+	if (media_isBrowsingFiles())
+		interface_refreshMenu(interfaceInfo.currentMenu);
+
 #ifdef STBPNX
 	system("killall -SIGUSR1 automount");
 #endif
-	if(!found)
+	if (!found)
+		return samba_showSaveError();
+
+	return 0;
+}
+
+static int helper_isMountpoint(const char *path)
+{
+	struct stat st;
+	if (stat(path, &st) != 0 || !S_ISDIR(st.st_mode))
+		return 0;
+	dev_t st_dev = st.st_dev;
+	char parent_dir[strlen(path)+4];
+	snprintf(parent_dir, sizeof(parent_dir), "%s/..", path);
+	if (stat(parent_dir, &st) == 0)
+		return st_dev != st.st_dev;
+	return 0;
+}
+
+void* samba_readShares(void)
+{
+	FILE *f = 0;
+	if (!samba_shares && (f = fopen(SAMBA_CONFIG, "r"))) {
+		char buf[BUFFER_SIZE];
+		while (fgets(buf, sizeof(buf), f) != NULL ) {
+			char *str = strchr(buf, ';');
+			if (!str)
+				continue;
+			*str++ = 0;
+			char *share = strdup(buf);
+			if (!share)
+				continue;
+			list_element_t *el = allocate_element(sizeof(sambaMount_t));
+			if (!el)
+				continue;
+			sambaMount_t *m = el->data;
+			m->share  = share;
+			m->thread = 0;
+			m->state  = mountStateInitial;
+#ifndef STBPNX
+			snprintf(buf, sizeof(buf), "%s%s/", sambaRoot, share);
+			if (helper_isMountpoint(buf))
+				m->state = mountStateMounted;
+#endif
+			if (samba_shares) {
+				list_element_t *prev = 0;
+				for (list_element_t *cur = samba_shares; cur; cur = cur->next) {
+					sambaMount_t *cur_m = cur->data;
+					if (strnaturalcmp(cur_m->share, m->share) > 0)
+						break;
+					prev = cur;
+				}
+				if (prev) {
+					el->next = prev->next;
+					prev->next = el;
+				} else {
+					el->next = samba_shares;
+					samba_shares = el;
+				}
+			} else
+				samba_shares = el;
+		}
+		fclose(f);
+	}
+	samba_currentShare = samba_shares;
+	return samba_currentShare ? samba_currentShare->data : NULL;
+}
+
+void* samba_nextShare(void)
+{
+	if (!samba_currentShare)
+		return 0;
+	samba_currentShare = samba_currentShare->next;
+	return samba_currentShare ? samba_currentShare->data : NULL;
+}
+
+const char *samba_shareGetName(void *share)
+{
+	if (!share) return NULL;
+	return ((sambaMount_t*)share)->share;
+}
+
+int samba_shareGetIcon(void *share)
+{
+	if (!share) return thumbnail_error;
+	switch (((sambaMount_t*)share)->state)
 	{
-		interface_showMessageBox( _T("SETTINGS_SAVE_ERROR"), thumbnail_error, 5000 );
+		case mountStateInitial:
+			return thumbnail_workstation;
+		case mountStateMounted:
+			return thumbnail_folder;
+		case mountStateMounting:
+			return thumbnail_loading;
+		case mountStateFailed:
+			break;
+	}
+	return thumbnail_error;
+}
+
+static void *samba_mountThread(void* pArg)
+{
+	sambaMount_t *m = pArg;
+	m->state = mountStateMounting;
+	char mount_point[BUFFER_SIZE];
+	snprintf(mount_point, sizeof(mount_point), "%s%s/", sambaRoot, m->share);
+
+	int selected = 0; // previous dir (..)
+	interface_showLoading();
+#ifdef STBPNX
+	if (helperCheckDirectoryExists(mount_point)) {
+		strcpy(currentPath, mount_point);
+		m->state = mountStateMounted;
+	}
+#else
+	if (rmdir(mount_point) < 0 && errno == EBUSY) {
+		m->state = mountStateMounted;
+		interface_hideLoading();
+		strcpy(currentPath, mount_point);
+		media_initSambaBrowserMenu(interfaceInfo.currentMenu, SET_NUMBER(selected));
+		return 0;
+	}
+	FILE *f = fopen(SAMBA_CONFIG, "r");
+	if (f) {
+		char buf[BUFFER_SIZE];
+		while (fgets(buf, sizeof(buf), f)) {
+			char *str = strchr(buf, ';');
+			if (!str)
+				continue;
+			*str++ = 0;
+			if (strcmp(buf, m->share))
+				continue;
+
+			samba_trimstr(str, strlen(str));
+			char *source = strstr(str, "'//");
+			if (!source)
+				continue;
+			*source++ = 0;
+
+			char *opts = strstr(str, " -o ");
+			if (opts) {
+				opts += 4;
+				samba_trimstr(opts, strlen(opts));
+			}
+			source[strlen(source)-1] = 0; // trim closing quote
+
+			mkdir(mount_point, 0777);
+			eprintf("%s: mounting %s -> %s\n", __FUNCTION__, source, m->share);
+			mount(source, mount_point, "cifs", S_WRITE, opts);
+			rmdir(mount_point);
+			if (errno == EBUSY) {
+				strcpy(currentPath, mount_point);
+				m->state = mountStateMounted;
+			}
+			break;
+		}
+		fclose(f);
+	}
+#endif // !STBPNX
+	interface_hideLoading();
+	if (m->state != mountStateMounted) {
+		eprintf("%s: %s mount failed\n", __FUNCTION__, m->share);
+		m->state = mountStateFailed;
+		selected = MENU_ITEM_LAST;
+	}
+	if (media_isBrowsingFiles())
+		media_initSambaBrowserMenu(interfaceInfo.currentMenu, SET_NUMBER(selected));
+	return 0;
+}
+
+int samba_browseShare(interfaceMenu_t *pMenu, void *pArg)
+{
+	sambaMount_t *m = pArg;
+
+	dprintf("%s: %s state %d thread %d\n", __func__, m->share, m->state, m->thread);
+	if (m->state == mountStateMounting)
+		return 0;
+
+#ifndef STBPNX
+	char mount_point[BUFFER_SIZE];
+	snprintf(mount_point, sizeof(mount_point), "%s%s/", sambaRoot, m->share);
+
+	if (helper_isMountpoint(mount_point)) {
+		strcpy(currentPath, mount_point);
+		return media_initSambaBrowserMenu(pMenu, SET_NUMBER(0));
+	}
+#endif
+	if (m->thread)
+		pthread_join(m->thread, NULL);
+	int err = pthread_create(&m->thread, NULL, samba_mountThread, m);
+	if (err) {
+		eprintf("%s: failed to start mount thread: %s\n", __FUNCTION__, strerror(err));
+		m->state  = mountStateFailed;
+		m->thread = 0;
+		return 1;
 	}
 	return 0;
 }

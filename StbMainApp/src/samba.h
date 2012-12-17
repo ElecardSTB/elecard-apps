@@ -64,6 +64,14 @@ extern const  char sambaRoot[];
 void samba_buildMenu(interfaceMenu_t *pParent);
 int  samba_unmountShare(const char *mountPoint);
 void samba_cleanup();
+void *samba_readMounts(void);
+void *samba_nextMount(void *mount);
+
+int samba_browseShare(interfaceMenu_t *pMenu, void *pArg);
+void* samba_readShares(void);
+void* samba_nextShare(void);
+const char *samba_shareGetName(void *share);
+int samba_shareGetIcon(void *share);
 
 #endif // ENABLE_SAMBA
 
