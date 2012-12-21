@@ -2170,7 +2170,7 @@ static int media_refreshFileBrowserMenu(interfaceMenu_t *browseMenu, void* pSele
 				hasDrives++;
 			}
 		}
-		storageCount = media_scanStorages();
+		int storageCount = media_scanStorages();
 		hasDrives += storageCount;
 
 		if (isRoot && hasDrives == 1 && storageCount == 1)

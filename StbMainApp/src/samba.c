@@ -908,7 +908,7 @@ static void *samba_mountThread(void* pArg)
 	int selected = 0; // previous dir (..)
 	interface_showLoading();
 #ifdef STBPNX
-	if (helperCheckDirectoryExists(mount_point)) {
+	if (helperCheckDirectoryExsists(mount_point)) {
 		strcpy(currentPath, mount_point);
 		m->state = mountStateMounted;
 	}
