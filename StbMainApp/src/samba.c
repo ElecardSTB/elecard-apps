@@ -946,7 +946,7 @@ static void *samba_mountThread(void* pArg)
 
 			mkdir(mount_point, 0777);
 			eprintf("%s: mounting %s -> %s\n", __FUNCTION__, source, m->share);
-			mount(source, mount_point, "cifs", S_WRITE, opts);
+			mount(source, mount_point, "cifs", 0, opts);
 			rmdir(mount_point);
 			if (errno == EBUSY) {
 				strcpy(currentPath, mount_point);
