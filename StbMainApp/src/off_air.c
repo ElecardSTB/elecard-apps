@@ -640,7 +640,7 @@ static char* offair_getLastFrequency(int field, void* pArg)
 	if (field != 0)
 		return NULL;
 	static char frequency[10];
-	snprintf(frequency, sizeof(frequency), "%u", dvb.scan.frequency/KHZ);
+	snprintf(frequency, sizeof(frequency), "%u", dvb.scan.frequency);
 	return frequency;
 }
 
@@ -652,8 +652,8 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 	__u32 freq_step = FREQUENCY_STEP_KHZ*KHZ;
 	tunerFormat tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
-	if (dvb.scan.frequency < low_freq || dvb.scan.frequency > high_freq)
-		dvb.scan.frequency = low_freq;
+	if (dvb.scan.frequency*KHZ < low_freq || dvb.scan.frequency*KHZ > high_freq)
+		dvb.scan.frequency = low_freq/KHZ;
 
 	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"), low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == FE_QPSK ? _T("MHZ") : _T("KHZ"));
 	interface_getText(pMenu, buf, "\\d{6}", offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
@@ -671,7 +671,7 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	if( value == NULL)
 		return 1;
 
-	frequency  = strtol(value,NULL,10) * KHZ;
+	frequency  = strtoul(value,NULL,10)*KHZ;
 	tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 
