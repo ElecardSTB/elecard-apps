@@ -321,6 +321,7 @@ static int output_toggleVoipBuzzer(interfaceMenu_t* pMenu, void* pArg);
 static int output_enterDVBMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleDvbType(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
@@ -2333,6 +2334,11 @@ static int output_toggleDvbDiagnosticsOnStart(interfaceMenu_t *pMenu, void* pArg
 }
 #endif
 
+static int output_toggleDvbType(interfaceMenu_t *pMenu, void* pArg)
+{
+	return output_saveAndRedraw(dvb_toggleType(offair_getTuner()), pMenu);
+}
+
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.dvbShowScrambled = (appControlInfo.offairInfo.dvbShowScrambled + 1) % 3;
@@ -2353,7 +2359,7 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 {
 	stb810_dvbfeInfo *fe;
 
-	switch( dvb_getType(0) )
+	switch( dvb_getType(dvb_getTuner()) )
 	{
 		case DVBT:
 			fe = &appControlInfo.dvbtInfo.fe;
@@ -2420,7 +2426,7 @@ static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 
 static __u32* getDvbSymbolRange(void)
 {
-	switch (dvb_getType(0)) {
+	switch (dvb_getType(dvb_getTuner())) {
 		case DVBC: return &appControlInfo.dvbcInfo.symbolRate;
 		case DVBS: return &appControlInfo.dvbsInfo.symbolRate;
 		default:   break;
@@ -2553,6 +2559,9 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 #ifdef STSDK
 	}
 #endif
+
+	if (appControlInfo.dvbInfo.supportedCount > 1)
+		interface_addMenuEntry(dvbMenu, dvb_getTypeName(tuner), output_toggleDvbType, NULL, thumbnail_scan);
 
 	str = _T("DVB_INSTALL");
 	interface_addMenuEntry(dvbMenu, str, offair_serviceScan, NULL, thumbnail_scan);

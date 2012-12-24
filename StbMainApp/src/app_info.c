@@ -961,6 +961,8 @@ void appInfo_init(void)
 	appControlInfo.dvbInfo.channel    = 0;
 	appControlInfo.dvbInfo.channelChange = 0;
 	appControlInfo.dvbInfo.showInfo   = 0;
+	memset(&appControlInfo.dvbInfo.supported, 0, sizeof(appControlInfo.dvbInfo.supported));
+	appControlInfo.dvbInfo.supportedCount = 1;
 
 	appControlInfo.offairInfo.dvbShowScrambled    = 0;
 	appControlInfo.offairInfo.sorting             = serviceSortNone;

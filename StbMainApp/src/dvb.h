@@ -183,6 +183,10 @@ tunerFormat dvb_getTuner(void);
  */
 int dvb_getType(tunerFormat tuner);
 
+const char *dvb_getTypeName(tunerFormat tuner);
+
+int dvb_toggleType(tunerFormat tuner);
+
 /**  @ingroup dvb
  *   @brief For the given tuner returns the Frontend's freq. limits
  *

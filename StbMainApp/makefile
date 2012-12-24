@@ -408,6 +408,7 @@ LOCAL_CFLAGS += \
 endif
 
 LOCAL_CFLAGS += \
+	-I$(KDIR)/include \
 	-I$(STAGINGDIR)/usr/include \
 	-I$(STAGINGDIR)/usr/include/PCSC \
 	-I$(STAGINGDIR)/usr/include/verimatrix \

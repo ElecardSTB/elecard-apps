@@ -266,6 +266,8 @@ typedef struct
 	int                  channelChange;
 	int                  showInfo;
 	int                  scanPSI;
+	int                  supported[FE_TYPE_COUNT];
+	int                  supportedCount;
 	stb810_signalStatus  lastSignalStatus;
 	stb810_signalStatus  savedSignalStatus;
 	int                  reportedSignalStatus;
