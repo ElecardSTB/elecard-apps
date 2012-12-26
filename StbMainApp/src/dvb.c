@@ -3002,14 +3002,28 @@ int dvb_startDVB(DvbParam_t *pParam)
 	dprintf("%s[%d]: set mode %s\n", __FUNCTION__, pParam->vmsp, pParam->mode == DvbMode_Watch ? "Watch" :
 		(pParam->mode == DvbMode_Multi ? "Multi" : (pParam->mode == DvbMode_Record ? "Record" : "Play")));
 	dvb->mode = pParam->mode;
-
 	dvb->setFrequency = pParam->frequency;
-	if (dvb->setFrequency == 0 && pParam->mode == DvbMode_Watch &&
-		dvb_getServiceFrequency( dvb_getService( pParam->param.liveParam.channelIndex ), &dvb->setFrequency) != 0)
-	{
-		eprintf("%s[%d]: Watch failed to get frequency for %d service\n", __FUNCTION__, pParam->vmsp, pParam->param.liveParam.channelIndex);
-		return -1;
+	if (pParam->mode == DvbMode_Watch) {
+		EIT_service_t *service = dvb_getService( pParam->param.liveParam.channelIndex );
+		if (dvb->setFrequency == 0 && dvb_getServiceFrequency( service, &dvb->setFrequency) != 0) {
+			eprintf("%s[%d]: Watch failed to get frequency for %d service\n", __FUNCTION__, pParam->vmsp, pParam->param.liveParam.channelIndex);
+			return -1;
+		}
+		fe_type_t neededType = gFE_type;
+		if (service) {
+			switch (service->media.type) {
+				case serviceMediaDVBT: neededType = DVBT; break;
+				case serviceMediaDVBC: neededType = DVBC; break;
+				case serviceMediaDVBS: neededType = DVBS; break;
+				default:;
+			}
+		}
+		if (neededType != gFE_type && dvb_setType(dvb->vmsp, neededType) != 0) {
+			eprintf("%s[%d]: Watch failed to get frequency for %d service\n", __FUNCTION__, pParam->vmsp, pParam->param.liveParam.channelIndex);
+			return -1;
+		}
 	}
+
 	dprintf("%s[%d]: set frequency %u\n", __FUNCTION__, dvb->setFrequency);
 
 #ifdef LINUX_DVB_API_DEMUX
