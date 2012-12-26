@@ -888,24 +888,17 @@ void dvb_scanForPSI( tunerFormat tuner, unsigned long frequency, list_element_t 
 	//dvb_filterServices(out_list);
 }
 
+#define SLEEP_QUANTUM 50000
 #define BREAKABLE_SLEEP(us)										\
-	{															\
-		int _s;													\
-		for (_s=0;_s<us;_s+=500000)								\
-		{														\
+	do {														\
+		for (int _s=0;_s<us;_s+=SLEEP_QUANTUM) {				\
 			if (pFunction != NULL && pFunction() == -1)			\
-			{													\
 				return -1;										\
-			}													\
-			if (ioctl(frontend_fd, FE_READ_STATUS, &s) == -1)	\
-			{													\
-				eprintf("%s[%d]: FE_READ_STATUS failed: %s\n", __FUNCTION__, tuner, strerror(errno)); \
-				return -1;										\
-			}													\
+			ioctl_or_abort(tuner, frontend_fd, FE_READ_STATUS, &s); \
 			if (s & FE_HAS_LOCK) break;							\
-			usleep(500000);										\
+			usleep(SLEEP_QUANTUM);								\
 		}														\
-	}															\
+	} while(0)													\
 
 static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, int tuner,
                             int wait_for_lock, EIT_media_config_t *media, dvb_cancelFunctionDef* pFunction)
@@ -1035,7 +1028,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, i
 				--timeout;
 			}
 		}
-	} while (--timeout > 0 && ber >= BER_THRESHOLD);
+	} while (--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
 	dprintf("%s[%d]: %u timeout %d, ber %u\n", __FUNCTION__, tuner, frequency, timeout, ber);
 	currentFrequency[tuner] = frequency;
 	eprintf("%s[%d]: Frequency set, lock: %d\n", __FUNCTION__, tuner, hasLock);
