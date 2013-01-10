@@ -72,6 +72,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h" 
 #endif
+#include "garb.h"
 
 #ifdef STB225
 #include "Stb225.h"
@@ -1862,6 +1863,7 @@ void initialize(int argc, char *argv[])
 #ifdef ENABLE_DVB
 	dvb_init();
 #endif
+	garb_init();
 
 	downloader_init();
 #ifdef ENABLE_GSTREAMER
@@ -1989,6 +1991,7 @@ void cleanup()
 	pvr_cleanup();
 #endif
 
+	garb_terminate();
 #ifdef ENABLE_DVB
 	dprintf("%s: terminate dvb\n", __FUNCTION__);
 	dvb_terminate();
