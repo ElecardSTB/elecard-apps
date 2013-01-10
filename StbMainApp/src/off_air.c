@@ -58,6 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #include "teletext.h"
 #include "stsdk.h"
+#include "garb.h"
 
 #ifdef STBPNX
 #include <phStbRpc_Common.h>
@@ -734,6 +735,7 @@ void offair_stopVideo(int which, int reset)
 
 	if (appControlInfo.dvbInfo.active)
 	{
+		garb_stopWatching(appControlInfo.dvbInfo.channel);
 		interface_playControlSelect(interfacePlayControlStop);
 
 #ifdef ENABLE_DVB_DIAG
@@ -1165,6 +1167,8 @@ void offair_displayPlayControl(void)
 	DFBRectangle rect;
 	char buffer[MAX_MESSAGE_BOX_LENGTH] = "";
 
+	garb_drawViewership();
+
 	if( interfaceChannelControl.pSet != NULL && interfaceChannelControl.showingLength > 0 )
 	{
 		//interface_displayTextBox( interfaceInfo.screenWidth - interfaceInfo.marginSize + interfaceInfo.paddingSize + 22, interfaceInfo.marginSize, interfacePlayControl.channelNumber, NULL, 0, NULL, 0 );
@@ -1547,6 +1551,10 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		case interfaceCommandEpg:
 			offair_showSchedule(interfaceInfo.currentMenu, appControlInfo.dvbInfo.channel);
 			return 0;
+		case interfaceCommandInfo:
+		case interfaceCommandTeletext: //FIXME
+			garb_showStats();
+			return 0;
 		default:;
 	}
 	return 1;
@@ -1711,6 +1719,13 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		gfx_setVideoProviderAudioStream(which, offair_services[appControlInfo.dvbInfo.channel].audio_track);
 	}
 #endif
+	garb_startWatching(appControlInfo.dvbInfo.channel);
+
+	if (dvb_getScrambled(current_service()) != 0 && appControlInfo.offairInfo.dvbShowScrambled != SCRAMBLED_PLAY)
+	{
+		// FIXME: Need demuxer without decoder to collect statistics...
+		eprintf("offair: Scrambled channel and dvbShowScrambled != SCRAMBLED_PLAY!\n");
+	}
 
 	dprintf("%s: dvb_hasVideo == %d\n", __FUNCTION__,video_type);
 	if (video_type != 0) {
