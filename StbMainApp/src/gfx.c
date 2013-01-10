@@ -1726,8 +1726,12 @@ void gfx_videoProviderStarted(elcdRpcType_t type, cJSON *res, void* pArg)
 		gfx_videoProvider.paused = 0;
 
 		gfx_videoProvider.waiting = st_rpcAsync(elcmd_times, NULL, gfx_videoProviderGetTimes, NULL);
-	} else
+	} else {
 		gfx_videoProvider.active = 0;
+		// Playback failed - disable autostart of last played stream
+		appControlInfo.playbackInfo.streamSource = streamSourceNone;
+		saveAppSettings();
+	}
 
 	cJSON_Delete(res);
 }
