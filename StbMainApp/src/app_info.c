@@ -912,11 +912,13 @@ void appInfo_init(void)
 	appControlInfo.commandInfo.outputFile         = 0;
 
 #ifdef ENABLE_DVB
+	appControlInfo.tunerInfo[0].caps              = 0;
 	appControlInfo.tunerInfo[0].fe_status         = 0;
 	appControlInfo.tunerInfo[0].ber               = 0;
 	appControlInfo.tunerInfo[0].signal_strength   = 0;
 	appControlInfo.tunerInfo[0].snr               = 0;
 	appControlInfo.tunerInfo[0].uncorrected_blocks= 0;
+	appControlInfo.tunerInfo[1].caps              = 0;
 	appControlInfo.tunerInfo[1].fe_status         = 0;
 	appControlInfo.tunerInfo[1].ber               = 0;
 	appControlInfo.tunerInfo[1].signal_strength   = 0;
@@ -961,8 +963,6 @@ void appInfo_init(void)
 	appControlInfo.dvbInfo.channel    = 0;
 	appControlInfo.dvbInfo.channelChange = 0;
 	appControlInfo.dvbInfo.showInfo   = 0;
-	memset(&appControlInfo.dvbInfo.supported, 0, sizeof(appControlInfo.dvbInfo.supported));
-	appControlInfo.dvbInfo.supportedCount = 1;
 
 	appControlInfo.offairInfo.dvbShowScrambled    = 0;
 	appControlInfo.offairInfo.sorting             = serviceSortNone;

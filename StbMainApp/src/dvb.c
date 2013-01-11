@@ -1206,6 +1206,8 @@ int dvb_getType(tunerFormat tuner)
 
 const char *dvb_getTypeName(tunerFormat tuner)
 {
+	if (gFE_type == DVBT && (appControlInfo.tunerInfo[tuner].caps & tunerDVBT2))
+		return "DVB-T/T2";
 	return gFE_Type_Names[gFE_type];
 }
 
@@ -1251,7 +1253,7 @@ int dvb_setType(tunerFormat tuner, int type)
 int dvb_toggleType(tunerFormat tuner)
 {
 	fe_type_t type = (gFE_type+1)%FE_TYPE_COUNT;
-	while (type != gFE_type && !appControlInfo.dvbInfo.supported[type])
+	while (type != gFE_type && (appControlInfo.tunerInfo[tuner].caps & (1 << type)) == 0)
 		type = (type+1)%FE_TYPE_COUNT;
 	return dvb_setType(tuner, type);
 }
@@ -3179,14 +3181,11 @@ void dvb_init(void)
 		close(fdf);
 
 		gFE_type = fe_info.type; // Assume all FEs are the same type !
-		appControlInfo.dvbInfo.supported[fe_info.type] = 1;
+		appControlInfo.tunerInfo[i].caps = 1 << fe_info.type;
 		// FIXME: Linux DVB API v5.5 (kernel-3.3) supports DTV_ENUM_DELSYS property.
 		// What a pity we are using ancient kernels!
-		if (strstr(fe_info.name, "CXD2820R")) {
-			appControlInfo.dvbInfo.supported[DVBC] = 1;
-			appControlInfo.dvbInfo.supported[DVBT] = 1;
-			appControlInfo.dvbInfo.supportedCount  = 2;
-		}
+		if (strstr(fe_info.name, "CXD2820R"))
+			appControlInfo.tunerInfo[i].caps = tunerMultistandard | tunerDVBC | tunerDVBT | tunerDVBT2;
 		appControlInfo.tunerInfo[i].status = tunerInactive;
 		eprintf("%s[%d]: %s (%s)\n", __FUNCTION__, i, fe_info.name, gFE_Type_Names[fe_info.type]);
 	}

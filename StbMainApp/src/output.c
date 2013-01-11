@@ -2560,7 +2560,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	}
 #endif
 
-	if (appControlInfo.dvbInfo.supportedCount > 1)
+	if ((appControlInfo.tunerInfo[tuner].caps & tunerMultistandard) == tunerMultistandard)
 		interface_addMenuEntry(dvbMenu, dvb_getTypeName(tuner), output_toggleDvbType, NULL, thumbnail_scan);
 
 	str = _T("DVB_INSTALL");

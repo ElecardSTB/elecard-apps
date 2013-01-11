@@ -243,11 +243,22 @@ typedef enum
 	signalStatusNoProblems
 } stb810_signalStatus;
 
+typedef enum
+{
+	tunerDVBS = 1,
+	tunerDVBC = 2,
+	tunerDVBT = 4,
+	tunerATSC = 8,
+	tunerDVBT2 = 16,
+	tunerMultistandard = 0x80,
+} stb810_tunerCaps_t;
+
 /* DVB tuner information */
 typedef struct
 {
 	stb810_tunerStatus   status;
 	fe_status_t          fe_status;
+	uint8_t              caps;
 	__u32                ber;
 	__u16                signal_strength;
 	__u16                snr;
@@ -266,8 +277,6 @@ typedef struct
 	int                  channelChange;
 	int                  showInfo;
 	int                  scanPSI;
-	int                  supported[FE_TYPE_COUNT];
-	int                  supportedCount;
 	stb810_signalStatus  lastSignalStatus;
 	stb810_signalStatus  savedSignalStatus;
 	int                  reportedSignalStatus;
