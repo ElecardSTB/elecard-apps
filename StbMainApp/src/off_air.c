@@ -3180,7 +3180,6 @@ int offair_epgEnabled()
 
 void offair_fillDVBTMenu()
 {
-	char *str;
 	char  buf[MENU_ENTRY_INFO_LENGTH];
 
 	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
@@ -3191,7 +3190,7 @@ void offair_fillDVBTMenu()
 #ifdef ENABLE_PVR
 	if (pvr_isRecordingDVB())
 	{
-		str = dvb_getTempServiceName(appControlInfo.pvrInfo.dvb.channel);
+		char *str = dvb_getTempServiceName(appControlInfo.pvrInfo.dvb.channel);
 		if (str == NULL)
 			str = _T("NOT_AVAILABLE_SHORT");
 		snprintf(buf, sizeof(buf), "%s: %s", _T("RECORDING"), str);
@@ -3246,8 +3245,8 @@ void offair_fillDVBTMenu()
 #endif
 
 #ifndef HIDE_EXTRA_FUNCTIONS
-	str = appControlInfo.offairInfo.tunerDebug ? _T("DVB_DEBUG_ENABLE") : _T("DVB_DEBUG_DISABLE");
-	interface_addMenuEntry(dvbtMenu, str, offair_debugToggle, NULL, appControlInfo.offairInfo.tunerDebug ? thumbnail_yes : thumbnail_no);
+	interface_addMenuEntry(dvbtMenu, _T(appControlInfo.offairInfo.tunerDebug ? "DVB_DEBUG_ENABLE" : "DVB_DEBUG_DISABLE"),
+		offair_debugToggle, NULL, appControlInfo.offairInfo.tunerDebug ? thumbnail_yes : thumbnail_no);
 #endif
 }
 
@@ -4005,20 +4004,18 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 	offair_importServices(OFFAIR_SERVICES_FILENAME);
 
 	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, NULL, pParent,
-		/* interfaceInfo.clientX, interfaceInfo.clientY,
-		interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuIconThumbnail,
-		offair_enterDVBTMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, offair_enterDVBTMenu, NULL, NULL);
 
 #ifdef ENABLE_PVR
 	offair_icons[0] = statusbar_f1_record;
 #endif
 	createBasicMenu(&EPGRecordMenu.baseMenu, interfaceMenuEPG, _T("SCHEDULE"), thumbnail_epg, offair_icons,
 #ifdef ENABLE_PVR
-		(interfaceMenu_t *)&PvrMenu,
+		_M &PvrMenu,
 #else
-		(interfaceMenu_t *)&EPGMenu,
+		_M &EPGMenu,
 #endif
-		offair_EPGRecordMenuProcessCommand, offair_EPGRecordMenuDisplay, NULL, offair_initEPGRecordMenu, NULL, (void*)0);
+		offair_EPGRecordMenuProcessCommand, offair_EPGRecordMenuDisplay, NULL, offair_initEPGRecordMenu, NULL, NULL);
 
 	createListMenu(&EPGMenu, _T("EPG_MENU"), thumbnail_epg, NULL,
 #ifdef ENABLE_PVR
