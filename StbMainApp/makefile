@@ -112,7 +112,7 @@ LOCAL_CFLAGS = \
 	-Wall -Wextra -Winline -Wno-unused-parameter \
 	-Iinclude \
 	-I$(STAGINGDIR)/opt/elecard/include \
-	-D_FILE_OFFSET_BITS=64 \
+	-D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 	-finline-functions \
 	-g \
 
