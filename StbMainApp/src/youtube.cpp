@@ -472,7 +472,6 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	CURL *hnd;
 	char *str;
 	static char url[MAX_URL];
-	static char url_tmp[MAX_URL];
 	static std::string video_info;
 	static char err_buff[CURL_ERROR_SIZE];
 	int videoIndex = GET_NUMBER(pArg);
@@ -551,47 +550,48 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 
 	int selected_fmt = sizeof(supported_formats)/sizeof(supported_formats[0])-1;
 	int fmt;
-	int url_len;
-	char *fmt_url, *next_url, *fmt_str;
+	ssize_t url_len;
+	char *fmt_url, *next_url, *fmt_str, *sig;
 	int i;
-	char buffer[video_info.length()+1];
-	strcpy(buffer, video_info.c_str());
-	fmt_url_map = strstr(buffer, "url_encoded_fmt_stream_map=");
 
-	if (!fmt_url_map)
-	{
-		eprintf("%s: url_encoded_fmt_stream_map not found\n", __FUNCTION__);
+	// Trim everything except url_encoded_fmt_stream_map
+	video_info.erase(0, video_info.find("url_encoded_fmt_stream_map="));
+	video_info.erase(0, 27);
+	video_info.erase(video_info.find('&'));
+
+	size_t info_length = video_info.length()+1;
+	char buffer[info_length];
+
+	if (utf8_urltomb(video_info.c_str(), info_length, buffer, info_length)  < 0) {
+		eprintf("%s: failed to decode video_info\n", __FUNCTION__);
 		goto getinfo_failed;
 	}
 
-	fmt_url_map += sizeof("url_encoded_fmt_stream_map=")-1;
-	str = strchr(fmt_url_map, '&');
-	if (str) *str = 0;
-
+	sig = NULL;
 	fmt_url = NULL;
-	str = fmt_url_map;
-	do
-	{
-		next_url = strstr(str, "%2C");
-		if (next_url)
-		{
+	str = buffer;
+	do {
+		next_url = strchr(str, ',');
+		if (next_url) {
 			next_url[0]=0;
-			next_url+=3;
+			next_url++;
 		}
 
-		fmt_str = strstr(str, "itag%3D");
+		fmt_str = strstr(str, "itag=");
 		if (fmt_str)
 		{
-			fmt_str+=7;
+			fmt_str+=5;
 			fmt = strtol(fmt_str,NULL,10);
 			for (i=0;supported_formats[i]!=0;i++)
 				if (fmt == supported_formats[i])
 					break;
-			if (i<selected_fmt)
-			{
-				char *encoded_url = strstr(str, "url%3D");
+			if (i<selected_fmt) {
+				char *encoded_url = strstr(str, "url=");
 				if (encoded_url) {
-					fmt_url=encoded_url+6;
+					sig = strstr(str, "&sig=");
+					if (sig)
+						sig+=5;
+					fmt_url=encoded_url+4;
 					selected_fmt = i;
 				}
 			}
@@ -601,41 +601,23 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		str = next_url;
 	} while(str);
 
-	if (!fmt_url)
-	{
+	if (!fmt_url || !sig) {
 		eprintf("%s: no supported format found\n", __FUNCTION__);
 		goto getinfo_failed;
 	}
-	
-	str = strstr( fmt_url, "%26quality" ); // find end url
+
+	str = strchr( fmt_url, '&');
+	if (str) *str = 0;
+	str = strchr( sig, '&');
 	if (str) *str = 0;
 
 	//eprintf("%s: encoded url: %s\n", __FUNCTION__, fmt_url);
-	if (           utf8_urltomb(fmt_url, strlen(fmt_url)+1, url_tmp, sizeof(url_tmp)-1 )  < 0 ||
-	    (url_len = utf8_urltomb(url_tmp, strlen(url_tmp)+1, url,     sizeof(url)-1     )) < 0)
-	{
+	if (utf8_urltomb(fmt_url, strlen(fmt_url)+1, url, sizeof(url)-1) < 0) {
 		eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, fmt_url);
 		goto getinfo_failed;
 	}
-	str = strstr(url, "sig=");
-	if (str && url_len+6 < sizeof(url)) {
-		// Replace 'sig=' with 'signature='
-		str+=3;
-		memmove(str+6, str, url_len-(str-url)+1);
-		memcpy (str, "nature", 6);
-		url_len+=6;
-	}
-	str = strstr(url, "; codecs=\"");
-	if (str) {
-		// Remove '; codecs="..."' section from url
-		char *closing_marks = strchr(str+10, '"');
-		if (closing_marks) {
-			closing_marks++;
-			size_t codecs_len = closing_marks-str;
-			memmove(str, closing_marks, url_len-(closing_marks-url));
-			url_len -= codecs_len;
-		}
-	}
+	url_len = strlen(url);
+	snprintf(url+url_len, sizeof(url)-url_len, "&signature=%s", sig);
 
 	eprintf("Youtube: Playing (format %2d) '%s'\n", supported_formats[selected_fmt], url );
 	{
