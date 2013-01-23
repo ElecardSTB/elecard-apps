@@ -548,44 +548,39 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg)
 	strcpy( str, samba_share );
 	strcpy( samba_mount, str );
 
-	if( (ret = helperCheckDirectoryExsists(mount_path)) != 0 )
-	{
-		ret = samba_resolve_name(samba_machine, &ip, 0x20);
-		if (ret)
-		{
-			FILE *f;
-			f = fopen(SAMBA_CONFIG, "r");
-			if( f == NULL )
-			{
-				interface_showMessageBox( _T("SETTINGS_SAVE_ERROR"), thumbnail_error, 5000 );
-				return 1;
-			}
-			share_len = snprintf(share_addr, sizeof(share_addr), "//%s/%s", inet_ntoa(ip), samba_share);
-			while( fgets( buf, sizeof(buf), f ) != NULL )
-			{
-				buf_len = samba_trimstr(buf, strlen(buf));
-				if (samba_checkShareString(buf, buf_len, share_addr, share_len) &&
-				    (str = strchr(buf, ';')) != NULL)
-				{
-					dprintf("%s: '%s' already exists in samba.auto file\n", __FUNCTION__,share_addr);
-					fclose(f);
-					*str = 0;
-					sprintf( currentPath, "%s%s/", sambaRoot, buf );
-					media_initSambaBrowserMenu( interfaceInfo.currentMenu, (void*)MENU_ITEM_BACK );
-					return 0;
-				}
-			}
-			fclose(f); // not found
-			interface_getText(interfaceInfo.currentMenu, _T("ENTER_SHARE_NAME"), "\\w+", samba_setShareName, samba_getShareName, inputModeABC, NULL);
-			return 1;
-		} else
-		{
-			eprintf("Samba: Can't resolve '%s', res = %d\n", samba_machine, ret);
-			interface_showMessageBox( _T("CONNECTION_FAILED"), thumbnail_error, 5000 );
-			return 1;
-		}
+	ret = samba_resolve_name(samba_machine, &ip, 0x20);
+	if (!ret) {
+		eprintf("Samba: Can't resolve '%s'\n", samba_machine);
+		interface_showMessageBox( _T("CONNECTION_FAILED"), thumbnail_error, 5000 );
+		return 1;
 	}
 
+	FILE *f = fopen(SAMBA_CONFIG, "r");
+	if (f != NULL) {
+		share_len = snprintf(share_addr, sizeof(share_addr), "//%s/%s", inet_ntoa(ip), samba_share);
+		while ( fgets(buf, sizeof(buf), f) ) {
+			buf_len = samba_trimstr(buf, strlen(buf));
+			if (samba_checkShareString(buf, buf_len, share_addr, share_len)) {
+				dprintf("%s: '%s' already exists in samba.auto file\n", __FUNCTION__,share_addr);
+				fclose(f);
+				*str = 0;
+				sprintf( currentPath, "%s%s/", sambaRoot, buf );
+				media_initSambaBrowserMenu( interfaceInfo.currentMenu, (void*)MENU_ITEM_BACK );
+				return 0;
+			}
+			str = strchr(buf, ';');
+			if (str) {
+				*str = 0;
+				if (strcmp(buf, samba_mount) == 0) {
+					fclose(f);
+					dprintf("%s: '%s' already exists in samba.auto file\n", __FUNCTION__, samba_mount);
+					interface_getText(interfaceInfo.currentMenu, _T("ENTER_SHARE_NAME"), "\\w+", samba_setShareName, samba_getShareName, inputModeABC, NULL);
+					return 1;
+				}
+			}
+		}
+		fclose(f); // not found
+	}
 	return samba_mountShare(samba_machine, samba_share, samba_mount);
 }
 
