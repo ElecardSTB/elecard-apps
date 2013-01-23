@@ -588,9 +588,9 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 			if (i<selected_fmt) {
 				char *encoded_url = strstr(str, "url=");
 				if (encoded_url) {
-					sig = strstr(str, "&sig=");
+					sig = strstr(str, "sig=");
 					if (sig)
-						sig+=5;
+						sig+=4;
 					fmt_url=encoded_url+4;
 					selected_fmt = i;
 				}
