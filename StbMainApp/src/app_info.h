@@ -258,11 +258,16 @@ typedef struct
 {
 	stb810_tunerStatus   status;
 	fe_status_t          fe_status;
+	fe_type_t            type;
+	// Tuner info is always numbered from zero.
+	// adapter field is used to describe the real port/adapter number
+	// On ST if this index is greater than ADAPTER_COUNT, then it is a ST tuner
+	int                  adapter;
 	uint8_t              caps;
-	__u32                ber;
-	__u16                signal_strength;
-	__u16                snr;
-	__u32                uncorrected_blocks;
+	uint32_t             ber;
+	uint16_t             signal_strength;
+	uint16_t             snr;
+	uint32_t             uncorrected_blocks;
 } stb810_tunerInfo;
 
 /** DVB T input/display information
@@ -270,7 +275,7 @@ typedef struct
 typedef struct
 {
 	int                  active;
-	tunerFormat          tuner;
+	tunerFormat          tuner; // points to tunerInfo
 	int                  channel;
 	int                  audio_track;
 	int                  scrambled;
@@ -515,23 +520,23 @@ typedef struct __stb810_commandInfo
 
 typedef struct __stb810_dvbfeInfo
 {
-	long                 lowFrequency;
-	long                 highFrequency;
-	long                 frequencyStep;
+	uint32_t             lowFrequency;
+	uint32_t             highFrequency;
+	uint32_t             frequencyStep;
 	int                  inversion;
 } stb810_dvbfeInfo;
 
 typedef struct __stb810_dvbtInfo
 {
 	stb810_dvbfeInfo     fe;
-	long                 bandwidth;
+	fe_bandwidth_t       bandwidth;
 } stb810_dvbtInfo;
 
 typedef struct __stb810_dvbcInfo
 {
 	stb810_dvbfeInfo     fe;
 	fe_modulation_t      modulation;
-	__u32                symbolRate;
+	uint32_t             symbolRate;
 } stb810_dvbcInfo;
 
 typedef enum {
@@ -544,7 +549,7 @@ typedef struct __stb810_dvbsInfo
 	// NB: DVB-S treat this values as MHz
 	stb810_dvbfeInfo     c_band;
 	stb810_dvbfeInfo     k_band;
-	__u32                symbolRate;
+	uint32_t             symbolRate;
 	stb810_dvbsBand_t    band;
 } stb810_dvbsInfo;
 
@@ -699,7 +704,6 @@ typedef struct __stb810_networkInfo
  */
 typedef struct __stb810_controlInfo
 {
-	
 #ifdef ENABLE_DVB
 	stb810_tunerInfo     tunerInfo[inputTuners];
 	stb810_dvbInfo       dvbInfo;

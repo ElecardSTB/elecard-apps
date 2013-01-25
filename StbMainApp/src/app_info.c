@@ -248,35 +248,35 @@ int loadAppSettings()
 		{
 			//dprintf("%s: dvb net scan %d\n", __FUNCTION__, appControlInfo.dvbCommonInfo.networkScan);
 		}
-		else if (sscanf(buf, "DVBCLOWFREQUENCY=%ld", &appControlInfo.dvbcInfo.fe.lowFrequency) == 1)
+		else if (sscanf(buf, "DVBCLOWFREQUENCY=%u", &appControlInfo.dvbcInfo.fe.lowFrequency) == 1)
 		{
 			//dprintf("%s: dvb low freq %d\n", __FUNCTION__, appControlInfo.dvbLowFrequency);
 		}
-		else if (sscanf(buf, "DVBCHIGHFREQUENCY=%ld", &appControlInfo.dvbcInfo.fe.highFrequency) == 1)
+		else if (sscanf(buf, "DVBCHIGHFREQUENCY=%u", &appControlInfo.dvbcInfo.fe.highFrequency) == 1)
 		{
 			//dprintf("%s: dvb high freq %d\n", __FUNCTION__, appControlInfo.dvbHighFrequency);
 		}
-		else if (sscanf(buf, "DVBCFREQUENCYSTEP=%ld", &appControlInfo.dvbcInfo.fe.frequencyStep) == 1)
+		else if (sscanf(buf, "DVBCFREQUENCYSTEP=%u", &appControlInfo.dvbcInfo.fe.frequencyStep) == 1)
 		{
 			//dprintf("%s: dvb freq step %d\n", __FUNCTION__, appControlInfo.dvbFrequencyStep);
 		}
-		else if (sscanf(buf, "DVBTLOWFREQUENCY=%ld", &appControlInfo.dvbtInfo.fe.lowFrequency) == 1)
+		else if (sscanf(buf, "DVBTLOWFREQUENCY=%u", &appControlInfo.dvbtInfo.fe.lowFrequency) == 1)
 		{
 			//dprintf("%s: dvb low freq %d\n", __FUNCTION__, appControlInfo.dvbLowFrequency);
 		}
-		else if (sscanf(buf, "DVBTHIGHFREQUENCY=%ld", &appControlInfo.dvbtInfo.fe.highFrequency) == 1)
+		else if (sscanf(buf, "DVBTHIGHFREQUENCY=%u", &appControlInfo.dvbtInfo.fe.highFrequency) == 1)
 		{
 			//dprintf("%s: dvb high freq %d\n", __FUNCTION__, appControlInfo.dvbHighFrequency);
 		}
-		else if (sscanf(buf, "DVBTFREQUENCYSTEP=%ld", &appControlInfo.dvbtInfo.fe.frequencyStep) == 1)
+		else if (sscanf(buf, "DVBTFREQUENCYSTEP=%u", &appControlInfo.dvbtInfo.fe.frequencyStep) == 1)
 		{
 			//dprintf("%s: dvb freq step %d\n", __FUNCTION__, appControlInfo.dvbFrequencyStep);
 		}
-		else if (sscanf(buf, "DVBTBANDWIDTH=%ld", &appControlInfo.dvbtInfo.bandwidth) == 1)
+		else if (sscanf(buf, "DVBTBANDWIDTH=%u", (unsigned*)&appControlInfo.dvbtInfo.bandwidth) == 1)
 		{
 			//dprintf("%s: dvb freq step %d\n", __FUNCTION__, appControlInfo.dvbFrequencyStep);
 		}
-		else if (sscanf(buf, "QAMMODULATION=%d", (int*)&appControlInfo.dvbcInfo.modulation) == 1)
+		else if (sscanf(buf, "QAMMODULATION=%u", (unsigned*)&appControlInfo.dvbcInfo.modulation) == 1)
 		{
 			//dprintf("%s: dvb modulation %d\n", __FUNCTION__, appControlInfo.dvbModulation);
 		}
@@ -459,15 +459,15 @@ int loadAppSettings()
 		{
 			//dprintf("%s: Screen filtration %s\n", __FUNCTION__, appControlInfo.outputInfo.bScreenFiltration ? "on" : "off");
 		}
-		else if (sscanf(buf, "SATURATION=%d", (int *)&appControlInfo.pictureInfo.saturation) == 1)
+		else if (sscanf(buf, "SATURATION=%d", &appControlInfo.pictureInfo.saturation) == 1)
 		{
 			//dprintf("%s: saturation %d\n", __FUNCTION__, appControlInfo.pictureInfo.saturation);
 		}
-		else if (sscanf(buf, "CONTRAST=%d", (int *)&appControlInfo.pictureInfo.contrast) == 1)
+		else if (sscanf(buf, "CONTRAST=%d", &appControlInfo.pictureInfo.contrast) == 1)
 		{
 			//dprintf("%s: contrast %d\n", __FUNCTION__, appControlInfo.pictureInfo.contrast);
 		}
-		else if (sscanf(buf, "BRIGHTNESS=%d", (int *)&appControlInfo.pictureInfo.brightness) == 1)
+		else if (sscanf(buf, "BRIGHTNESS=%d", &appControlInfo.pictureInfo.brightness) == 1)
 		{
 			//dprintf("%s: brightness %d\n", __FUNCTION__, appControlInfo.pictureInfo.brightness);
 		}
@@ -720,21 +720,21 @@ int saveAppSettings()
 		}
 	fprintf(fd, "ASPECTRATIO=%s\n",               appControlInfo.outputInfo.aspectRatio == aspectRatio_16x9 ? "16:9" : "4:3");
 	if (appControlInfo.outputInfo.graphicsMode[0])
-	fprintf(fd, "GRAPHICS_MODE=%s\n",              appControlInfo.outputInfo.graphicsMode);
+	fprintf(fd, "GRAPHICS_MODE=%s\n",             appControlInfo.outputInfo.graphicsMode);
 	fprintf(fd, "VOLUME=%d\n",                    appControlInfo.soundInfo.volumeLevel);
-	fprintf(fd, "FADEIN_VOLUME=%d\n",               appControlInfo.soundInfo.fadeinVolume);
+	fprintf(fd, "FADEIN_VOLUME=%d\n",             appControlInfo.soundInfo.fadeinVolume);
 #ifdef ENABLE_DVB
 	fprintf(fd, "TUNERSPEED=%d\n",                appControlInfo.dvbCommonInfo.adapterSpeed);
 	fprintf(fd, "EXTENDEDSCAN=%d\n",              appControlInfo.dvbCommonInfo.extendedScan);
 	fprintf(fd, "NETWORKSCAN=%d\n",               appControlInfo.dvbCommonInfo.networkScan);
-	fprintf(fd, "DVBTLOWFREQUENCY=%ld\n",         appControlInfo.dvbtInfo.fe.lowFrequency);
-	fprintf(fd, "DVBTHIGHFREQUENCY=%ld\n",        appControlInfo.dvbtInfo.fe.highFrequency);
-	fprintf(fd, "DVBTFREQUENCYSTEP=%ld\n",        appControlInfo.dvbtInfo.fe.frequencyStep);
+	fprintf(fd, "DVBTLOWFREQUENCY=%u\n",          appControlInfo.dvbtInfo.fe.lowFrequency);
+	fprintf(fd, "DVBTHIGHFREQUENCY=%u\n",         appControlInfo.dvbtInfo.fe.highFrequency);
+	fprintf(fd, "DVBTFREQUENCYSTEP=%u\n",         appControlInfo.dvbtInfo.fe.frequencyStep);
 	fprintf(fd, "DVBTINVERSION=%d\n",             appControlInfo.dvbtInfo.fe.inversion);
-	fprintf(fd, "DVBTBANDWIDTH=%ld\n",            appControlInfo.dvbtInfo.bandwidth);
-	fprintf(fd, "DVBCLOWFREQUENCY=%ld\n",         appControlInfo.dvbcInfo.fe.lowFrequency);
-	fprintf(fd, "DVBCHIGHFREQUENCY=%ld\n",        appControlInfo.dvbcInfo.fe.highFrequency);
-	fprintf(fd, "DVBCFREQUENCYSTEP=%ld\n",        appControlInfo.dvbcInfo.fe.frequencyStep);
+	fprintf(fd, "DVBTBANDWIDTH=%u\n",             appControlInfo.dvbtInfo.bandwidth);
+	fprintf(fd, "DVBCLOWFREQUENCY=%u\n",          appControlInfo.dvbcInfo.fe.lowFrequency);
+	fprintf(fd, "DVBCHIGHFREQUENCY=%u\n",         appControlInfo.dvbcInfo.fe.highFrequency);
+	fprintf(fd, "DVBCFREQUENCYSTEP=%u\n",         appControlInfo.dvbcInfo.fe.frequencyStep);
 	fprintf(fd, "DVBCINVERSION=%d\n",             appControlInfo.dvbcInfo.fe.inversion);
 	fprintf(fd, "QAMMODULATION=%d\n",             appControlInfo.dvbcInfo.modulation);
 	fprintf(fd, "QAMSYMBOLRATE=%u\n",             appControlInfo.dvbcInfo.symbolRate);

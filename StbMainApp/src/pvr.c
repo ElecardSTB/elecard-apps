@@ -477,8 +477,6 @@ static void pvr_stopRecordingST(int which)
 void pvr_stopRecordingDVB(int which)
 {
 	dprintf("%s: Stop PVR record on tuner %d\n", __FUNCTION__, which);
-	//dvb_stopDVB(appControlInfo.pvrInfo.tuner, 1);
-	//appControlInfo.tunerInfo[appControlInfo.pvrInfo.tuner].status = tunerInactive;
 
 #ifdef STBPNX
 	client_write(&pvr_socket, "ds",3);
@@ -1139,9 +1137,6 @@ void pvr_recordNow(void)
 #ifdef STSDK
 		//offair_stopVideo( screenMain, 1 );
 
-		int tuner = appControlInfo.dvbInfo.tuner;
-		if (tuner >= VMSP_COUNT)
-			tuner -= VMSP_COUNT;
 		elcdRpcType_t type;
 		cJSON *answer   = NULL;
 		int    ret;
@@ -1149,7 +1144,7 @@ void pvr_recordNow(void)
 		if (!param)
 			return;
 		char url[24];
-		snprintf(url, sizeof(url), "dvb://%d@%d", channel, tuner);
+		snprintf(url, sizeof(url), "dvb://%d@%d", channel, st_getTunerIndex(appControlInfo.dvbInfo.tuner));
 		cJSON_AddItemToObject(param, "url", cJSON_CreateString(url));
 		
 		cJSON_AddItemToObject(param, "filename", cJSON_CreateString(appControlInfo.pvrInfo.directory));

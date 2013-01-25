@@ -63,7 +63,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define VMSP_COUNT         (2)
+#define ADAPTER_COUNT      (2)
 
 #define DVBC FE_QAM
 #define DVBT FE_OFDM
@@ -101,7 +101,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED TYPEDEFS                            *
 ************************************************/
 
-typedef int dvb_displayFunctionDef(long , int, tunerFormat, long, long);
+typedef int dvb_displayFunctionDef(uint32_t, int, tunerFormat, int, int);
 
 typedef int dvb_cancelFunctionDef(void);
 
@@ -134,7 +134,7 @@ typedef struct __dvb_multiParam {
  */
 typedef struct __dvb_param {
 	DvbMode_t mode;
-	int vmsp;
+	int adapter;
 	char *directory;
 	union 
 	{
@@ -172,8 +172,6 @@ void dvb_init(void);
  */
 void dvb_terminate(void);
 
-tunerFormat dvb_getTuner(void);
-
 /**  @ingroup dvb
  *   @brief Returns the fe_type of the FrontEnd device
  *
@@ -181,7 +179,10 @@ tunerFormat dvb_getTuner(void);
  *
  *   @return fe_type or -1 if failed
  */
-int dvb_getType(tunerFormat tuner);
+static inline fe_type_t dvb_getType(tunerFormat tuner)
+{
+	return appControlInfo.tunerInfo[tuner].type;
+}
 
 const char *dvb_getTypeName(tunerFormat tuner);
 
@@ -212,22 +213,22 @@ int dvb_startDVB(DvbParam_t *pParam);
 /**  @ingroup dvb_instance
  *   @brief Function used to stop DVB decoding from a given tuner
  *
- *   @param[in]  vmsp      DVB tuner/vmsp to be used
+ *   @param[in]  adapter   DVB adapter to be used
  *   @param[in]  reset     Flag to indicate if the tuner will be put into sleep mode
  *
  *   @sa dvb_startDVB()
  */
-void dvb_stopDVB(int vmsp, int force);
+void dvb_stopDVB(int adapter, int force);
 
 /**  @ingroup dvb_instance
  *   @brief Change audio PID of currently running channel
  *
- *   @param[in]  vmsp     DVB tuner/vmsp to be used
+ *   @param[in]  adapter  DVB adapter to be used
  *   @param[in]  aPID     New audio PID to be used
  *
  *   @return 0 on success
  */
-int dvb_changeAudioPid(int vmsp, short unsigned int aPID);
+int dvb_changeAudioPid(tunerFormat tuner, uint16_t aPID);
 
 /**  @ingroup dvb_instance
  *   @brief Get signal info from specified tuner
@@ -282,7 +283,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency,
  *   @param[in]  tuner             Tuner to use
  *   @param[in]  frequency         Frequency to scan
  */
-void dvb_scanForEPG( tunerFormat tuner, unsigned long frequency );
+void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency );
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
@@ -291,7 +292,7 @@ void dvb_scanForEPG( tunerFormat tuner, unsigned long frequency );
  *   @param[in]  frequency         Frequency to scan
  *   @param[out] out_list          Service list to store PAT+PMT data
  */
-void dvb_scanForPSI( tunerFormat tuner, unsigned long frequency, list_element_t **out_list );
+void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out_list );
 
 /**  @ingroup dvb_service
  *   @brief Function used to return the number of available DVB channels
@@ -433,75 +434,37 @@ int dvb_hasMediaType(EIT_service_t *service, media_type m_type);
 int dvb_hasMedia(EIT_service_t *service);
 
 /**  @ingroup dvb_service
- *   @brief Function checks stream has specified payload type (non-blocking)
- *
- *   @param[in]  serivce   Channel to be used
- *   @param[in]  p_type    Payload type to check
- *
- *   @return 1 if found
- *   @sa dvb_hasPayloadType()
- */
-int dvb_hasPayloadTypeNB(EIT_service_t *service, payload_type p_type);
-
-/**  @ingroup dvb_service
- *   @brief Function checks stream has specified media type (video or audio) (non-blocking)
- *
- *   @param[in]  serivce   Channel to be used
- *   @param[in]  m_type    Media type to check
- *
- *   @return 1 if found
- *   @sa dvb_hasMediaType()
- */
-int dvb_hasMediaTypeNB(EIT_service_t *service, media_type m_type);
-
-/**  @ingroup dvb_service
- *   @brief Function checks stream has any supported media (non-blocking)
- *
- *   @param[in]  serivce   Channel to be used
- *
- *   @return 1 if found
- *   @sa dvb_hasMedia()
- */
-int dvb_hasMediaNB(EIT_service_t *service);
-
-/**  @ingroup dvb_service
  *   @brief Function used to get number of audio tracks of a given channel
- *
  *   @param[in]  serivce   Channel to be used
- *
  *   @return Audio track count or -1 on error
  */
-int dvb_getAudioCountForService(EIT_service_t *service);
+int dvb_getAudioCount(EIT_service_t *service);
 
 /**  @ingroup dvb_service
  *   @brief Function used to get audio PID of specified track of a given channel
- *
  *   @param[in]  serivce   Channel to be used
  *   @param[in]  audio     Audio track number
- *
  *   @return Audio track PID or -1 on error
  */
-short unsigned int dvb_getAudioPidForService(EIT_service_t *service, int audio);
+uint16_t dvb_getAudioPid(EIT_service_t *service, int audio);
 
 /**  @ingroup dvb_service
  *   @brief Function used to get audio type of specified track of a given channel
- *
  *   @param[in]  serivce   Channel to be used
  *   @param[in]  audio     Audio track number
- *
- *   @return Audio track type or -1 on error
+ *   @return Audio track type or 0 on error
  */
-int dvb_getAudioTypeForService(EIT_service_t *service, int audio);
+PMT_stream_type_t dvb_getAudioType(EIT_service_t *service, int audio);
+
+PMT_stream_type_t dvb_getVideoType(EIT_service_t *service);
 
 /**  @ingroup dvb_service
  *   @brief Function used to get name of event with specified ID from a given channel
- *
  *   @param[in]  serivce   Channel to be used
  *   @param[in]  event_id  Event ID
- *
  *   @return NULL if event not found
  */
-char* dvb_getEventName( EIT_service_t* service, short int event_id );
+char* dvb_getEventName( EIT_service_t* service, uint16_t event_id );
 
 /**  @ingroup dvb_service
  *   @brief Cleanup NIT structure
@@ -510,23 +473,19 @@ void dvb_clearNIT(NIT_table_t *nit);
 
 /**  @ingroup dvb_service
  *   @brief Function exports current channel list to specified file
- *
  *   @param[in]  filename  Channel file name
  */
 void dvb_exportServiceList(char* filename);
 
 /**  @ingroup dvb_service
  *   @brief Function imports current channel list from specified file
- *
  *   @param[in]  filename  Channel file name
- *
  *   @return 0 on success
  */
 int dvb_readServicesFromDump(char* filename);
 
 /**  @ingroup dvb_service
  *   @brief Function cleans current channel list
- *
  *   @param[in]  permanent Save changes to disk
  */
 void dvb_clearServiceList(int permanent);
@@ -539,27 +498,33 @@ void dvb_clearServiceList(int permanent);
 
 #ifdef LINUX_DVB_API_DEMUX
 /** Function used to obtain the length of the given PVR stream
- *
  *   @param[in]  which     PVR stream being played
  *   @param[out] pPosition Pointer to variable to hold length
  */
 void dvb_getPvrLength(int which, DvbFilePosition_t *pPosition);
 
 /** Function used to obtain the current playback position of the given PVR stream
- *
  *   @param[in]  which     PVR stream being played
  *   @param[out] pPosition Pointer to variable to hold current position
  */
 void dvb_getPvrPosition(int which, DvbFilePosition_t *pPosition);
 
 /** Function used to return the bit rate for the given pvr playback
- *
  *   @param[in]  which     PVR playback session
- *
  *   @return Bit rate in bytes per second
  */
 int dvb_getPvrRate(int which);
 #endif // LINUX_DVB_API_DEMUX
+
+static inline int dvb_getAdapter(tunerFormat tuner)
+{
+	return appControlInfo.tunerInfo[tuner].adapter;
+}
+
+static inline int dvb_isLinuxTuner(tunerFormat tuner)
+{
+	return dvb_getAdapter(tuner) < ADAPTER_COUNT;
+}
 
 /** @} */
 

@@ -94,18 +94,6 @@ typedef struct
 	pthread_t thread;
 } rpcPool_t;
 
-#ifdef ENABLE_DVB
-
-typedef enum
-{
-	tunerNotFound = -1,
-	tunerTypeDVBT = 0,
-	tunerTypeDVBC,
-	tunerTypeDVBS,
-} st_tunerType_t;
-
-#endif
-
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -118,9 +106,6 @@ static void* st_poolThread(void* pArg);
 *******************************************************************/
 
 #ifdef ENABLE_DVB
-static int st_tuner = tunerNotFound;
-static st_tunerType_t st_tuners[TUNER_MAX_NUMBER];
-
 static const struct { fe_modulation_t value; const char *name; } modulation_names[] =
 {
 	{QPSK,    "qpsk"},
@@ -176,10 +161,8 @@ int st_init(void)
 	}
 
 	res = pthread_create( &pool.thread, NULL, st_poolThread, NULL );
-	if( res != 0 )
-	{
-		eprintf("%s: failed to create pool thread: %s\n", __FUNCTION__, strerror(res));
-	}
+	if (res != 0)
+		eprintf("%s: (!) failed to create pool thread: %s\n", __FUNCTION__, strerror(res));
 
 #ifdef ENABLE_DVB
 	elcdRpcType_t type = elcdRpcInvalid;
@@ -187,32 +170,40 @@ int st_init(void)
 	if ( st_rpcSync(elcmd_dvbtuners, NULL, &type, &result ) != 0 || type != elcdRpcResult || result == NULL )
 	{
 		cJSON_Delete(result);
-		return st_tuner;
+		return -1;
 	}
 
 	if (result->type == cJSON_Array)
 	{
-		cJSON *t;
-		int i;
-		for (i = 0; i<TUNER_MAX_NUMBER; i++)
+		tunerFormat tuner;
+		for (tuner = inputTuner0; tuner < inputTuners && appControlInfo.tunerInfo[tuner].status != tunerNotPresent; tuner++);
+		dprintf("%s: tuner %d\n", __func__, tuner);
+
+		for (int i = 0; i<TUNER_MAX_NUMBER && tuner < inputTuners; i++)
 		{
-			st_tuners[i] = tunerNotFound;
-			t = cJSON_GetArrayItem( result, i );
+			cJSON *t = cJSON_GetArrayItem( result, i );
 			if (!t)
 				break;
 			if (t->type == cJSON_String)
 			{
-				if (strcasecmp( t->valuestring, "DVB-T" ) == 0)
-					st_tuners[i] = tunerTypeDVBT;
-				else
-				if (strcasecmp( t->valuestring, "DVB-S" ) == 0)
-					st_tuners[i] = tunerTypeDVBS;
-				else
-				if (strcasecmp( t->valuestring, "DVB-C" ) == 0)
-					st_tuners[i] = tunerTypeDVBC;
+				if (strcasecmp( t->valuestring, "DVB-T" ) == 0) {
+					appControlInfo.tunerInfo[tuner].type = DVBT;
+					appControlInfo.tunerInfo[tuner].caps = tunerDVBT;
+				} else
+				if (strcasecmp( t->valuestring, "DVB-S" ) == 0) {
+					appControlInfo.tunerInfo[tuner].type = DVBS;
+					appControlInfo.tunerInfo[tuner].caps = tunerDVBS;
+				} else
+				if (strcasecmp( t->valuestring, "DVB-C" ) == 0) {
+					appControlInfo.tunerInfo[tuner].type = DVBC;
+					appControlInfo.tunerInfo[tuner].caps = tunerDVBC;
+				} else
+					continue;
 
-				if (st_tuner == tunerNotFound && st_tuners[i] != tunerNotFound)
-					st_tuner = i;
+				appControlInfo.tunerInfo[tuner].status = tunerInactive;
+				appControlInfo.tunerInfo[tuner].adapter = ADAPTER_COUNT+i;
+
+				tuner++;
 			}
 		}
 	}
@@ -513,44 +504,20 @@ type_known:
 }
 
 #ifdef ENABLE_DVB
-int st_getDvbTuner(void)
+void st_setTuneParams(tunerFormat tuner, cJSON *params)
 {
-	return st_tuner;
-}
-
-fe_type_t st_getDvbTunerType(int tuner)
-{
-	if (st_tuner < 0)
-		return 0;
-
-	if (tuner < 0)
-		tuner = st_tuner;
-
-	switch (st_tuners[tuner])
+	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
+	switch (appControlInfo.tunerInfo[tuner].type)
 	{
-		case tunerNotFound: break; 
-		case tunerTypeDVBT: return FE_OFDM;
-		case tunerTypeDVBC: return FE_QAM;
-		case tunerTypeDVBS: return FE_QPSK;
-	}
-	return 0;
-}
-
-void st_setTuneParams(int tuner, cJSON *params)
-{
-	switch (st_tuners[tuner])
-	{
-		case tunerTypeDVBC:;
-			int i;
-			for (i=0;modulation_names[i].name!=NULL;i++)
-				if (modulation_names[i].value == appControlInfo.dvbcInfo.modulation)
-				{
+		case DVBC:
+			for (int i=0; modulation_names[i].name != NULL; i++)
+				if (modulation_names[i].value == appControlInfo.dvbcInfo.modulation) {
 					cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modulation_names[i].name));
 					break;
 				}
 			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbcInfo.symbolRate ));
 			break;
-		case tunerTypeDVBS:
+		case DVBS:
 			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbsInfo.symbolRate ));
 			break;
 		default:;

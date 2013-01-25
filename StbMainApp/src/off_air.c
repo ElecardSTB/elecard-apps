@@ -154,7 +154,7 @@ static int  offair_startNextChannel(int direction, void* pArg);
 static int  offair_setChannel(int channel, void* pArg);
 static int  offair_infoTimerEvent(void *pArg);
 static int  offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, int ts_id, int audio_type, int video_type);
+static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type);
 static void offair_initDVBTOutputMenu(interfaceMenu_t *pParent, int which);
 static int  offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg);
 static void offair_sortEvents(list_element_t **event_list);
@@ -196,6 +196,11 @@ static int  offair_checkSignal(int which, list_element_t **pPSI);
 static int  wizard_init();
 static int  wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbackMenu, unsigned long monitor_only_frequency);
 static void wizard_cleanup(int finished);
+
+static inline EIT_service_t *current_service()
+{
+	return offair_services[appControlInfo.dvbInfo.channel].service;
+}
 
 #endif /* ENABLE_DVB */
 
@@ -271,40 +276,8 @@ interfaceListMenu_t DVBTOutputMenu;
 
 tunerFormat offair_getTuner(void)
 {
-	stb810_tunerStatus status;
-	for ( status = tunerInactive; status < tunerStatusGaurd; status++ )
-	{
-		tunerFormat tuner;
-		for ( tuner = inputTuner0; tuner < inputTuners; tuner++ )
-		{
-			if ( appControlInfo.tunerInfo[tuner].status == status )
-			{
-				if ( status!=tunerInactive )
-				{
-					switch ( status )
-					{
-						case(tunerDVBMain) :
-							offair_stopVideo(screenMain, 1);
-							break;
-#ifdef ENABLE_PVR
-						case(tunerDVBPvr) :
-							pvr_stopRecordingDVB(screenMain);
-							break;
-#endif
-						default :
-							break;
-					}
-				}
-				return tuner;
-			}
-		}
-	}
-#ifdef STSDK
-	int st_tuner = st_getDvbTuner();
-	if (st_tuner >= 0)
-		return VMSP_COUNT+st_tuner;
-#endif
-	return inputTuner0;
+	offair_stopVideo(screenMain, 1);
+	return appControlInfo.dvbInfo.tuner;
 }
 
 static long offair_getFrequency(void *pArg)
@@ -366,7 +339,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 	interface_sliderShow(1, 1);
 }
 
-static int offair_updateDisplay(long frequency, int channelCount, tunerFormat tuner, long frequencyIndex, long frequencyCount)
+static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerFormat tuner, int frequencyIndex, int frequencyCount)
 {
 	interfaceCommand_t cmd;
 
@@ -741,7 +714,6 @@ void offair_stopVideo(int which, int reset)
 #ifdef ENABLE_DVB_DIAG
 		interface_removeEvent(offair_updatePSI, NULL);
 #endif
-
 		interface_removeEvent(offair_updateEPG, NULL);
 #ifdef ENABLE_STATS
 		interface_removeEvent(offair_updateStatsEvent, NULL);
@@ -776,7 +748,7 @@ void offair_stopVideo(int which, int reset)
 #endif
 
 		dprintf("%s: Stop video \n", __FUNCTION__);
-		dvb_stopDVB(appControlInfo.dvbInfo.tuner, reset);
+		dvb_stopDVB(dvb_getAdapter(appControlInfo.dvbInfo.tuner), reset);
 		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
 		appControlInfo.dvbInfo.active = 0;
 
@@ -784,14 +756,6 @@ void offair_stopVideo(int which, int reset)
 		offair_setInfoUpdateTimer(which, 0);
 
 		interface_disableBackground();
-		/*if (which == screenMain)
-		{
-		offair_fillDVBTMenu();
-		}
-		else
-		{
-		offair_initDVBTOutputMenu(which);
-		}*/
 	}
 
 	mysem_release(offair_semaphore);
@@ -813,14 +777,14 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		{
 			if (appControlInfo.dvbInfo.audio_track != selected)
 			{
-				if (dvb_getAudioTypeForService(offair_services[appControlInfo.dvbInfo.channel].service, selected) != dvb_getAudioTypeForService(offair_services[appControlInfo.dvbInfo.channel].service, appControlInfo.dvbInfo.audio_track))
+				if (dvb_getAudioType(current_service(), selected) != dvb_getAudioType(current_service(), appControlInfo.dvbInfo.audio_track))
 				{
 					offair_stopVideo(which, 0);
 					appControlInfo.dvbInfo.audio_track = selected;
 					offair_startVideo(which);
 				} else
 				{
-					dvb_changeAudioPid(appControlInfo.dvbInfo.tuner, dvb_getAudioPidForService(offair_services[appControlInfo.dvbInfo.channel].service, selected));
+					dvb_changeAudioPid(appControlInfo.dvbInfo.tuner, dvb_getAudioPid(current_service(), selected));
 				}
 				appControlInfo.dvbInfo.audio_track = selected;
 			}
@@ -828,9 +792,9 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		} else if (cmd->command == interfaceCommandDown)
 		{
 			selected++;
-			if (selected >= dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service))
+			if (selected >= dvb_getAudioCount(current_service()))
 			{
-				selected = dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service)-1;
+				selected = dvb_getAudioCount(current_service())-1;
 			}
 		}	else if (cmd->command == interfaceCommandUp)
 		{
@@ -846,19 +810,16 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 	}
 
 	buf[0] = 0;
-	if (dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service) > 0)
+	if (dvb_getAudioCount(current_service()) > 0)
 	{
-
-		int i;
-
-		for (i=0; i<dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service); i++)
+		for (int i=0; i<dvb_getAudioCount(current_service()); i++)
 		{
 			if (selected == i)
 			{
-				sprintf(str, "> Audio Track %d [%d] <\n", i, dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service));
+				sprintf(str, "> Audio Track %d [%d] <\n", i, dvb_getAudioCount(current_service()));
 			} else
 			{
-				sprintf(str, "    Audio Track %d [%d]\n", i, dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service));
+				sprintf(str, "    Audio Track %d [%d]\n", i, dvb_getAudioCount(current_service()));
 			}
 			strcat(buf, str);
 		}
@@ -894,8 +855,8 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		if (pvr_isPlayingDVB(which)) {
 			pvr_stopRecordingDVB(which);
 			if (appControlInfo.dvbInfo.channel > 0) {
-				offair_getServiceDescription(offair_services[appControlInfo.dvbInfo.channel].service,desc,_T("DVB_CHANNELS"));
-				interface_playControlUpdateDescriptionThumbnail(desc, offair_services[appControlInfo.dvbInfo.channel].service->service_descriptor.service_type == 2 ? thumbnail_radio : thumbnail_channels);
+				offair_getServiceDescription(current_service(),desc,_T("DVB_CHANNELS"));
+				interface_playControlUpdateDescriptionThumbnail(desc, current_service()->service_descriptor.service_type == 2 ? thumbnail_radio : thumbnail_channels);
 			}
 		}
 #endif
@@ -919,7 +880,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	} else if (button == interfacePlayControlAudioTracks)
 	{
 		//dprintf("%S: request change tracks\n", __FUNCTION__);
-		if (dvb_getAudioCountForService(offair_services[appControlInfo.dvbInfo.channel].service) > 0)
+		if (dvb_getAudioCount(current_service()) > 0)
 		{
 			//dprintf("%s: display change tracks\n", __FUNCTION__);
 			offair_audioChange(interfaceInfo.currentMenu, NULL, CHANNEL_INFO_SET(which, 0));
@@ -929,9 +890,9 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	}else if (button == interfacePlayControlAddToPlaylist)
 	{
 		dprintf("%s: add to playlist %d\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
-		dvb_getServiceURL(offair_services[appControlInfo.dvbInfo.channel].service, desc);
+		dvb_getServiceURL(current_service(), desc);
 		eprintf("offair: Add to Playlist '%s'\n", desc);
-		playlist_addUrl(desc, dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
+		playlist_addUrl(desc, dvb_getServiceName(current_service()));
 	} else if (button == interfacePlayControlMode )
 	{
 		if ( offair_scheduleCheck(appControlInfo.dvbInfo.channel) == 0 )
@@ -970,11 +931,16 @@ static int offair_multiviewPlay( interfaceMenu_t *pMenu, void *pArg)
 	DvbParam_t param;
 	int channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 
-	if( dvb_getServiceFrequency(offair_services[channelNumber].service, &f1) != 0 || f1 == 0 )
-	{
-		eprintf("offair: Can't determine frequency of channel %d - can't start multiview!\n", channelNumber);
+	if( dvb_getServiceFrequency(offair_services[channelNumber].service, &f1) != 0 || f1 == 0 ) {
+		eprintf("%s: Can't determine frequency of channel %d\n", __FUNCTION__, channelNumber);
 		return -1;
 	}
+	int tuner = offair_findCapableTuner(offair_services[channelNumber].service);
+	if (tuner < 0) {
+		eprintf("%s: Failed to find tuner matching type %d\n", __FUNCTION__, offair_services[channelNumber].service->media.type);
+		return -1;
+	}
+
 	gfx_stopVideoProviders(screenMain);
 
 	param.mode = DvbMode_Multi;
@@ -985,10 +951,16 @@ static int offair_multiviewPlay( interfaceMenu_t *pMenu, void *pArg)
 	payload[0] = dvb_hasPayloadType( offair_services[channelNumber].service, payloadTypeH264 ) ? payloadTypeH264 : payloadTypeMpeg2;
 	param.media = &offair_services[channelNumber].service->media;
 	mvCount = 1;
-	for( i = channelNumber+1; mvCount < 4 && i < offair_serviceCount; i++ )
+	for (i = channelNumber+1;
+	     mvCount < 4 && i != channelNumber;
+	     i = (i+1) % offair_indexCount)
 	{
-		if( offair_services[i].service != NULL && (dvb_getScrambled(offair_services[i].service) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY) && dvb_getServiceFrequency(offair_services[i].service, &f) == 0 &&
-			f == f1 && dvb_hasMediaType( offair_services[i].service, mediaTypeVideo ) )
+		if (offair_services[i].service != NULL &&
+		   (dvb_getScrambled(offair_services[i].service) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY) &&
+		    offair_services[i].service->media.type == offair_services[channelNumber].service->media.type &&
+		    dvb_getServiceFrequency(offair_services[i].service, &f) == 0 &&
+		    f == f1 &&
+		    dvb_hasMediaType( offair_services[i].service, mediaTypeVideo ))
 		{
 			appControlInfo.multiviewInfo.pArg[mvCount] = CHANNEL_INFO_SET(screenMain, i);
 			dvb_getPIDs(offair_services[i].service,-1,&param.param.multiParam.channels[mvCount],NULL,NULL,NULL);
@@ -996,26 +968,14 @@ static int offair_multiviewPlay( interfaceMenu_t *pMenu, void *pArg)
 			mvCount++;
 		}
 	}
-	for( i = 0; mvCount < 4 && i<channelNumber; i++ )
-	{
-		if( offair_services[i].service != NULL && (dvb_getScrambled(offair_services[i].service) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY) && dvb_getServiceFrequency(offair_services[i].service, &f) == 0 &&
-			f == f1 && dvb_hasMediaType( offair_services[i].service, mediaTypeVideo ) )
-		{
-			appControlInfo.multiviewInfo.pArg[mvCount] = CHANNEL_INFO_SET(screenMain, i);
-			dvb_getPIDs(offair_services[i].service,-1,&param.param.multiParam.channels[mvCount],NULL,NULL,NULL);
-			payload[mvCount] = dvb_hasPayloadType( offair_services[i].service, payloadTypeH264 ) ? payloadTypeH264 : payloadTypeMpeg2;
-			mvCount++;
-		}
-	}
-	for( i = mvCount; i < 4; i++ )
-	{
+	for (i = mvCount; i < 4; i++) {
 		appControlInfo.multiviewInfo.pArg[i] = NULL;
 		param.param.multiParam.channels[i] = 0;
 	}
 	appControlInfo.multiviewInfo.selected = 0;
 	appControlInfo.multiviewInfo.count = mvCount;
 
-	param.vmsp = offair_getTuner();
+	param.adapter = dvb_getAdapter(tuner);
 	param.directory = NULL;
 	file = fopen(OFFAIR_MULTIVIEW_INFOFILE, "w");
 	fprintf(file, "%d %d %d %d %d %d %d %d",
@@ -1030,7 +990,7 @@ static int offair_multiviewPlay( interfaceMenu_t *pMenu, void *pArg)
 	appControlInfo.dvbInfo.showInfo = 0;
 	offair_setInfoUpdateTimer(screenMain, 0);
 
-	offair_startDvbVideo(screenMain, &param, 0,0,0,payload[0]);
+	offair_startDvbVideo(screenMain, &param, 0,payload[0]);
 	return 0;
 }
 
@@ -1198,7 +1158,7 @@ void offair_displayPlayControl()
 	        || (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
 #endif
 	      )
-		 ) && offair_services[appControlInfo.dvbInfo.channel].service != NULL )
+		 ) && current_service() != NULL )
 	{
 		DFBCHECK( pgfx_font->GetHeight(pgfx_font, &fh) );
 		DFBCHECK( pgfx_font->GetAscender(pgfx_font, &fa) );
@@ -1287,7 +1247,7 @@ void offair_displayPlayControl()
 		/*interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, rect.x+rect.w+interfaceInfo.paddingSize*3-2, rect.y-2, w-rect.w-interfaceInfo.paddingSize*3+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideBottom|interfaceBorderSideRight);
 		interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_DK_RED, INTERFACE_SCROLLBAR_COLOR_DK_GREEN, INTERFACE_SCROLLBAR_COLOR_DK_BLUE, INTERFACE_SCROLLBAR_COLOR_DK_ALPHA, rect.x+rect.w+interfaceInfo.paddingSize*3-2, rect.y-2, w-rect.w-interfaceInfo.paddingSize*3+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideLeft);*/
 
-		strcpy(buffer, dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
+		strcpy(buffer, dvb_getServiceName(current_service()));
 		buffer[getMaxStringLengthForFont(pgfx_font, buffer, w-rect.w-DVBPC_STATUS_ICON_SIZE-interfaceInfo.paddingSize*3)] = 0;
 
 #ifdef ENABLE_PVR
@@ -1308,7 +1268,7 @@ void offair_displayPlayControl()
 
 		interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideBottom);
 
-		offair_getServiceDescription(offair_services[appControlInfo.dvbInfo.channel].service, buffer, NULL);
+		offair_getServiceDescription(current_service(), buffer, NULL);
 
 		interface_drawTextWW(pgfx_smallfont, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+interfaceInfo.paddingSize, rect.y, rect.w-interfaceInfo.paddingSize, rect.h, buffer, ALIGN_LEFT);
 
@@ -1498,7 +1458,7 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 #ifdef ENABLE_PVR
 			    !pvr_isRecordingDVB() &&
 #endif
-			    dvb_hasMediaType(offair_services[appControlInfo.dvbInfo.channel].service, mediaTypeVideo) == 1 && (dvb_getScrambled(offair_services[appControlInfo.dvbInfo.channel].service) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY)
+			    dvb_hasMediaType(current_service(), mediaTypeVideo) == 1 && (dvb_getScrambled(current_service()) == 0 || appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY)
 			   )
 			{
 				offair_multiviewPlay(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, appControlInfo.dvbInfo.channel));
@@ -1522,64 +1482,43 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 
 void offair_startVideo(int which)
 {
-	int audio_type;
-	int video_type;
+	if (current_service() == NULL) {
+		eprintf("%s: Failed to start channel %d: offair service is NULL\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
+		return;
+	}
+	appControlInfo.dvbInfo.tuner = offair_findCapableTuner(current_service());
+
 	DvbParam_t param;
 	param.frequency = 0;
 	param.mode = DvbMode_Watch;
-	param.vmsp = offair_getTuner();
-	param.param.liveParam.channelIndex = dvb_getServiceIndex(offair_services[appControlInfo.dvbInfo.channel].service);
+	param.adapter = dvb_getAdapter(appControlInfo.dvbInfo.tuner);
+	param.media = &current_service()->media;
+	param.param.liveParam.channelIndex = dvb_getServiceIndex(current_service());
 	param.param.liveParam.audioIndex = appControlInfo.dvbInfo.audio_track;
 	param.directory = NULL;
 
-	if (offair_services[appControlInfo.dvbInfo.channel].service == NULL)
+	if (current_service()->program_map.map.streams == NULL ||
+	   (current_service()->flags & serviceFlagHasPMT) == 0)
 	{
-		eprintf("offair: Failed to start channel %d: offair service is NULL\n", appControlInfo.dvbInfo.channel);
-		return;
-	}
-
-	if (offair_services[appControlInfo.dvbInfo.channel].service->program_map.map.streams == NULL ||
-		(offair_services[appControlInfo.dvbInfo.channel].service->flags & serviceFlagHasPMT) == 0)
-	{
+		offair_stopVideo(which, 1);
 		interface_showMessageBox(_T("DVB_SCANNING_SERVICE"), thumbnail_loading, 0);
-		eprintf("offair: Channel '%s' has no PMT info, force rescan on %lu Hz, type %d\n", dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service), offair_services[appControlInfo.dvbInfo.channel].service->media.frequency, offair_services[appControlInfo.dvbInfo.channel].service->media.type);
-		dvb_frequencyScan(offair_getTuner(), offair_services[appControlInfo.dvbInfo.channel].service->media.frequency, &offair_services[appControlInfo.dvbInfo.channel].service->media, NULL, NULL, 1, NULL);
+		eprintf("offair: Channel '%s' has no PMT info, force rescan on %lu Hz, type %d\n", dvb_getServiceName(current_service()), current_service()->media.frequency, current_service()->media.type);
+		dvb_frequencyScan(appControlInfo.dvbInfo.tuner, current_service()->media.frequency, &current_service()->media, NULL, NULL, 1, NULL);
 		offair_fillDVBTMenu();
 		offair_fillDVBTOutputMenu(screenMain);
 		interface_hideMessageBox();
 	}
 
-	/*if (dvb_getScrambled(offair_services[appControlInfo.dvbInfo.channel].service) && appControlInfo.offairInfo.dvbShowScrambled == 0)
+	if (current_service()->program_map.map.streams == NULL ||
+	   (current_service()->flags & serviceFlagHasPMT) == 0)
 	{
-		interface_showMessageBox(_T("ERR_SCRAMBLED_CHANNEL"), thumbnail_error, 0);
-		eprintf("offair: Channel '%s' is scrambled!\n", dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
-		return;
-	}*/
-
-	if (offair_services[appControlInfo.dvbInfo.channel].service->program_map.map.streams == NULL ||
-		(offair_services[appControlInfo.dvbInfo.channel].service->flags & serviceFlagHasPMT) == 0)
-	{
-		eprintf("offair: Channel '%s' has no PIDs!\n", dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
+		eprintf("offair: Channel '%s' has no PIDs!\n", dvb_getServiceName(current_service()));
 		interface_showMessageBox(_T("ERR_NO_STREAMS_IN_CHANNEL"), thumbnail_error, 0);
 		return;
 	}
 
-	param.media = &offair_services[appControlInfo.dvbInfo.channel].service->media;
-
-	switch ( dvb_getAudioTypeForService(offair_services[appControlInfo.dvbInfo.channel].service,
-		appControlInfo.dvbInfo.audio_track) )
-	{
-	case payloadTypeAC3:
-		audio_type = streamTypeAudioAC3;
-		break;
-	case payloadTypeAAC:
-		audio_type = streamTypeAudioAAC;
-		break;
-	default:
-		audio_type = streamTypeAudioMPEG1;
-	}
-	video_type = dvb_hasMediaType(offair_services[appControlInfo.dvbInfo.channel].service, mediaTypeVideo) ?
-		( dvb_hasPayloadType( offair_services[appControlInfo.dvbInfo.channel].service, payloadTypeH264 ) ? streamTypeVideoH264 : streamTypeVideoMPEG2 ) : 0;
+	int audio_type = dvb_getAudioType(current_service(), appControlInfo.dvbInfo.audio_track);
+	int video_type = dvb_getVideoType(current_service());
 
 #ifdef ENABLE_DVB_DIAG
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
@@ -1591,24 +1530,21 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
 #endif
 
-	offair_startDvbVideo(which,&param,0,0,audio_type, video_type);
+	offair_startDvbVideo(which,&param,audio_type, video_type);
 }
 
-static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, int ts_id, int audio_type, int video_type)
+static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type)
 {
 	char filename[256];
 	char qualifier[64];
 
-	int ret;
 	gfx_stopVideoProviders(which);
 
-	dprintf("%s: Start video on tuner %d\n", __FUNCTION__, param->vmsp);
+	dprintf("%s: Start video on tuner %d (%d)\n", __FUNCTION__, appControlInfo.dvbInfo.tuner, dvb_getAdapter(appControlInfo.dvbInfo.tuner));
 
-	appControlInfo.dvbInfo.tuner = param->vmsp;
 #ifdef STSDK
-	if( appControlInfo.dvbInfo.tuner < VMSP_COUNT ) {
+	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
 #endif
-	appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerDVBMain;
 
 #ifdef STBTI
 	sprintf(filename, "ln -s /dev/dvb/adapter%d/dvr0 %s", appControlInfo.dvbInfo.tuner, OFFAIR_MULTIVIEW_FILENAME);
@@ -1620,11 +1556,10 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 	{
 		sprintf(filename, OFFAIR_MULTIVIEW_INFOFILE);
 	} else
-#endif
-	{
-		sprintf(filename, "/dev/dvb/adapter%d/demux0", appControlInfo.dvbInfo.tuner);
-	}
-#endif
+#endif // ENABLE_MULTI_VIEW
+	sprintf(filename, "/dev/dvb/adapter%d/demux0", appControlInfo.dvbInfo.tuner);
+#endif // !STBTI
+#ifdef STB6x8x
 	sprintf(qualifier, "%s%s%s%s%s",
 		"", // (which==screenPip) ? ":SD:NoSpdif:I2S1" : "",
 		audio_type == streamTypeAudioAC3 ? ":AC3" : "",
@@ -1633,29 +1568,24 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 		(appControlInfo.soundInfo.rcaOutput==1) ? "" : ":I2S0");
 
 	dprintf("%s: Qualifier: %s\n", __FUNCTION__, qualifier);
-
-	if (video_type != 0)
-	{
-		media_slideshowStop(1);
-	}
+#endif // STB6x8x
 
 	dprintf("%s: dvb_startDVB\n", __FUNCTION__);
 	dvb_startDVB(param);
 #ifdef STSDK
 	} else {
 		cJSON *params = cJSON_CreateObject();
-		if (!params)
-		{
+		if (!params) {
 			eprintf("%s: out of memory\n", __FUNCTION__);
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			return;
 		}
-		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(offair_services[appControlInfo.dvbInfo.channel].service->media.frequency/KHZ) );
-		st_setTuneParams(param->vmsp-VMSP_COUNT, params);
+		st_setTuneParams(appControlInfo.dvbInfo.tuner, params);
+		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(current_service()->media.frequency/KHZ) );
 		cJSON *result = NULL;
 		elcdRpcType_t type = elcdRpcInvalid;
-		eprintf("%s: tuning %d to %6u\n", __FUNCTION__, param->vmsp-VMSP_COUNT, offair_services[appControlInfo.dvbInfo.channel].service->media.frequency/KHZ);
-		ret = st_rpcSync( elcmd_dvbtune, params, &type, &result );
+		eprintf("%s: tuning %d to %6u\n", __FUNCTION__, st_getTunerIndex(appControlInfo.dvbInfo.tuner), current_service()->media.frequency/KHZ);
+		st_rpcSync( elcmd_dvbtune, params, &type, &result );
 		cJSON_Delete(params);
 		cJSON_Delete(result);
 		if( type != elcdRpcResult )
@@ -1666,31 +1596,32 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 		}
 	}
 	// Always use 0 index for Linux tuners
-	sprintf(filename, "dvb://%d@%d", offair_services[appControlInfo.dvbInfo.channel].service->common.service_id, 
-	        param->vmsp < VMSP_COUNT ? 0 : param->vmsp-VMSP_COUNT);
+	sprintf(filename, "dvb://%d@%d", current_service()->common.service_id, st_getTunerIndex(appControlInfo.dvbInfo.tuner));
 	qualifier[0]=0;
-#endif
+#endif // STSDK
+	appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerDVBMain;
 
-	ret = gfx_startVideoProvider(filename, which, 0, qualifier);
-
+	int ret = gfx_startVideoProvider(filename, which, 0, qualifier);
 	if (ret != 0)
 	{
 		eprintf("offair: Failed to start video provider '%s'\n", filename);
 		interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
-		dvb_stopDVB(appControlInfo.dvbInfo.tuner, 1);
+		dvb_stopDVB(dvb_getAdapter(appControlInfo.dvbInfo.tuner), 1);
+		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
 		return;
 	}
 
-	if (dvb_getScrambled(offair_services[appControlInfo.dvbInfo.channel].service) != 0 && appControlInfo.offairInfo.dvbShowScrambled != SCRAMBLED_PLAY)
+	if (dvb_getScrambled(current_service()) != 0 && appControlInfo.offairInfo.dvbShowScrambled != SCRAMBLED_PLAY)
 	{
 		// FIXME: Need demuxer without decoder to collect statistics...
 		eprintf("offair: Scrambled channel and dvbShowScrambled != SCRAMBLED_PLAY!\n");
 	}
 
 	dprintf("%s: dvb_hasVideo == %d\n", __FUNCTION__,video_type);
-	if (video_type == 0 && appControlInfo.slideshowInfo.state == slideshowDisabled)
-	{
-		interface_setBackground(0,0,0,0xFF, INTERFACE_WALLPAPER_IMAGE);//IMAGE_DIR "wallpaper_audio.png");
+	if (video_type != 0) {
+		media_slideshowStop(1);
+	} else if (appControlInfo.slideshowInfo.state == slideshowDisabled) {
+		interface_setBackground(0,0,0,0xFF, INTERFACE_WALLPAPER_IMAGE);
 	}
 
 	appControlInfo.dvbInfo.active = 1;
@@ -1700,21 +1631,12 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int service_id, i
 	appControlInfo.dvbInfo.reportedSignalStatus = 0;
 
 #ifdef STSDK
-	if (appControlInfo.dvbInfo.tuner < VMSP_COUNT)
+	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner))
 #endif
 	{
 		offair_setStateCheckTimer(which, 1);
 		offair_setInfoUpdateTimer(which, 1);
 	}
-
-	/*if (which == screenMain)
-	{
-		offair_fillDVBTMenu();
-	}
-	else
-	{
-		offair_initDVBTOutputMenu(which);
-	}*/
 
 #ifdef ENABLE_MULTI_VIEW
 	if( param->mode == DvbMode_Multi )
@@ -1880,15 +1802,21 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 	dprintf("%s: in %d\n", __FUNCTION__, channelNumber);
 
-	if ( dvb_getServiceID(offair_services[channelNumber].service) == -1 )
-	{
-		eprintf("offair: Unknown service for channel %d\n", channelNumber);
+	if ( dvb_getServiceID(offair_services[channelNumber].service) == -1 ) {
+		eprintf("%s: Unknown service for channel %d\n", __FUNCTION__, channelNumber);
 		return -1;
 	}
 
-	if (/*(appControlInfo.offairInfo.dvbShowScrambled == 0 && dvb_getScrambled( offair_services[channelNumber].service )) || */!dvb_hasMedia(offair_services[channelNumber].service))
+	if (/*(appControlInfo.offairInfo.dvbShowScrambled == 0 && dvb_getScrambled( offair_services[channelNumber].service )) || */
+		!dvb_hasMedia(offair_services[channelNumber].service))
 	{
-		eprintf("offair: Scrambled or media-less service ignored %d\n", channelNumber);
+		eprintf("%s: Scrambled or media-less service ignored %d\n", __FUNCTION__, channelNumber);
+		return -1;
+	}
+
+	if (offair_findCapableTuner(offair_services[channelNumber].service) < 0) {
+		eprintf("%s: no tuner found to handle media type %d\n", __FUNCTION__, offair_services[channelNumber].service->media.type);
+		interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 3000);
 		return -1;
 	}
 
@@ -3199,9 +3127,9 @@ void offair_fillDVBTMenu()
 #endif
 	{
 		int no_channel =  appControlInfo.dvbInfo.channel <= 0 || appControlInfo.dvbInfo.channel == CHANNEL_CUSTOM ||
-			appControlInfo.dvbInfo.channel > offair_serviceCount || offair_services[appControlInfo.dvbInfo.channel].service == NULL;
+			appControlInfo.dvbInfo.channel > offair_serviceCount || current_service() == NULL;
 		snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"),
-			no_channel ? _T("NONE") : dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
+			no_channel ? _T("NONE") : dvb_getServiceName(current_service()));
 		if (no_channel)
 			interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_not_selected);
 		else
@@ -3524,6 +3452,7 @@ void offair_clearServiceList(int permanent)
 	pvr_stopRecordingDVB(screenMain);
 #endif
 	offair_stopVideo(screenMain, 1);
+	appControlInfo.dvbInfo.channel = 0;
 	dvb_clearServiceList(permanent);
 	offair_initServices();
 #if (defined ENABLE_PVR) && (defined STBPNX)
@@ -3817,7 +3746,7 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 		char *str = "";
 		int confirm = 1;
 		int delay = 10000;
-		void *param = (void*)offair_services[appControlInfo.dvbInfo.channel].service->media.frequency;
+		void *param = (void*)current_service()->media.frequency;
 
 		dprintf("%s: Signal status changed!\n", __FUNCTION__);
 
@@ -3894,7 +3823,7 @@ static int  offair_updatePSI(void* pArg)
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if( offair_services[appControlInfo.dvbInfo.channel].service == NULL )
+	if( current_service() == NULL )
 	{
 		eprintf("offair: Can't update PSI: service %d is null\n",appControlInfo.dvbInfo.channel);
 		return -1;
@@ -3902,8 +3831,8 @@ static int  offair_updatePSI(void* pArg)
 
 	//if (appControlInfo.dvbInfo.scanPSI)
 	{
-		dprintf("%s: *** updating PSI [%s]***\n", __FUNCTION__, dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
-		dvb_scanForPSI( appControlInfo.dvbInfo.tuner, offair_services[appControlInfo.dvbInfo.channel].service->media.frequency, &running_program_map );
+		dprintf("%s: *** updating PSI [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
+		dvb_scanForPSI( appControlInfo.dvbInfo.tuner, current_service()->media.frequency, &running_program_map );
 		dprintf("%s: *** PSI updated ***\n", __FUNCTION__ );
 
 		dprintf("%s: active %d, channel %d/%d\n", __FUNCTION__, appControlInfo.dvbInfo.active, my_channel, appControlInfo.dvbInfo.channel);
@@ -3938,7 +3867,7 @@ static int  offair_updateEPG(void* pArg)
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if( offair_services[appControlInfo.dvbInfo.channel].service == NULL )
+	if( current_service() == NULL )
 	{
 		dprintf("offair: Can't update EPG: service %d is null\n",appControlInfo.dvbInfo.channel);
 		return -1;
@@ -3957,8 +3886,8 @@ static int  offair_updateEPG(void* pArg)
 	{
 		dprintf("%s: scan for epg\n", __FUNCTION__);
 
-		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(offair_services[appControlInfo.dvbInfo.channel].service));
-		dvb_scanForEPG( appControlInfo.dvbInfo.tuner, offair_services[appControlInfo.dvbInfo.channel].service->media.frequency );
+		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
+		dvb_scanForEPG( appControlInfo.dvbInfo.tuner, current_service()->media.frequency );
 		dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
 
 		dprintf("%s: if active\n", __FUNCTION__);
@@ -3969,7 +3898,7 @@ static int  offair_updateEPG(void* pArg)
 
 			if (appControlInfo.dvbInfo.active)
 			{
-				offair_getServiceDescription(offair_services[appControlInfo.dvbInfo.channel].service,desc,_T("DVB_CHANNELS"));
+				offair_getServiceDescription(current_service(),desc,_T("DVB_CHANNELS"));
 				interface_playControlUpdateDescription(desc);
 				interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
 			}
@@ -3986,11 +3915,7 @@ static int  offair_updateEPG(void* pArg)
 int  offair_tunerPresent(void)
 {
 	return (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
-	        appControlInfo.tunerInfo[1].status != tunerNotPresent)
-#ifdef STSDK
-	    || (st_getDvbTuner() >= 0)
-#endif
-	       ;
+	        appControlInfo.tunerInfo[1].status != tunerNotPresent);
 }
 
 void offair_buildDVBTMenu(interfaceMenu_t *pParent)
@@ -4075,6 +4000,9 @@ void offair_playURL(char* URL, int which)
 	frequency = atol(ud.address);
 	ts_id = atoi(ud.source);
 	srv_id = ud.port;
+	// FIXME: Not used in current implementation
+	(void)ts_id;
+	(void)srv_id;
 
 	if(ud.stream[0] == '?')
 	{
@@ -4231,7 +4159,7 @@ parsing_done:
 
 	param.frequency = frequency;
 	param.mode = DvbMode_Watch;
-	param.vmsp = offair_getTuner();
+	param.adapter = offair_getTuner();
 	param.param.playParam.audioPid = apid;
 	param.param.playParam.videoPid = vpid;
 	param.param.playParam.textPid  = tpid;
@@ -4246,7 +4174,7 @@ parsing_done:
 	interface_playControlSetProcessCommand(offair_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, appControlInfo.playbackInfo.playlistMode == playlistModeFavorites ? playlist_setChannel : offair_setChannel);
 
-	offair_startDvbVideo(which, &param, srv_id, ts_id,  at, vt);
+	offair_startDvbVideo(which, &param, at, vt);
 
 	playlist_setLastUrl(URL);
 
@@ -4401,7 +4329,7 @@ int offair_getCurrentServiceIndex(int which)
 	{
 		return -1;
 	}
-	return dvb_getServiceIndex(offair_services[appControlInfo.dvbInfo.channel].service);
+	return dvb_getServiceIndex(current_service());
 }
 
 #ifdef ENABLE_STATS
@@ -4444,6 +4372,21 @@ static int offair_updateStatsEvent(void *pArg)
 }
 #endif
 
+int offair_findCapableTuner(EIT_service_t *service)
+{
+	uint8_t type = 0;
+	switch (service->media.type) {
+		case serviceMediaDVBT: type = tunerDVBT; break;
+		case serviceMediaDVBC: type = tunerDVBC; break;
+		case serviceMediaDVBS: type = tunerDVBS; break;
+		default: return -1;
+	}
+	for (tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++)
+		if (appControlInfo.tunerInfo[tuner].caps & type)
+			return tuner;
+	return -1;
+}
+
 int offair_checkForUpdates()
 {
 	return 0;
@@ -4463,7 +4406,7 @@ static int wizard_infoTimerEvent(void *pArg)
 	return 0;
 }
 
-static int wizard_checkAbort(long frequency, int channelCount, tunerFormat tuner, long frequencyNumber, long frequencyMax)
+static int wizard_checkAbort(uint32_t frequency, int channelCount, tunerFormat tuner, int frequencyNumber, int frequencyMax)
 {
 	interfaceCommand_t cmd;
 

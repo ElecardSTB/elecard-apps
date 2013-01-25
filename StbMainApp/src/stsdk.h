@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "defines.h"
 #include "app_info.h"
+#include "dvb.h"
 
 #include <elcd-rpc.h>
 #ifdef ENABLE_DVB
@@ -101,10 +102,13 @@ int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg);
 void st_cancelAsync(int index, int execute);
 
 #ifdef ENABLE_DVB
-int st_getDvbTuner(void);
-void st_setTuneParams(int tuner, cJSON *params);
-
-fe_type_t st_getDvbTunerType(int tuner);
+void st_setTuneParams(tunerFormat tuner, cJSON *params);
+static inline int st_getTunerIndex(tunerFormat tuner)
+{
+	return appControlInfo.tunerInfo[tuner].adapter >= ADAPTER_COUNT ?
+	       appControlInfo.tunerInfo[tuner].adapter  - ADAPTER_COUNT :
+	       appControlInfo.tunerInfo[tuner].adapter;
+}
 #endif
 
 /** Changes hdmi output mode. Reinitialize framebuffer if resolution is changed.

@@ -168,42 +168,34 @@ int  offair_tunerPresent(void);
 
 /**
 *   @brief Function used to build the DVB T menu data structures
-*
-*   @retval void
+*   This function MUST be called once on application start
 */
 void offair_buildDVBTMenu(interfaceMenu_t *pParent);
 
 /**
-*   @brief Function used to obtain a tuner
-*
-*   @retval The most suitable tuner to be used
+*   @brief Function used to obtain current tuner
+*   Any tuner activity is stopped on this function call
+*   @retval int Current selected tuner
 */
 tunerFormat offair_getTuner(void);
 
 /**
 *   @brief Function used to perform a channel change
-* 
 *   @param pArg     I       Channel to change to (void* is cast to int)
-*
-*   @retval The most suitable tuner to be used
+*   @retval int Zero on success
 */
 int offair_channelChange(interfaceMenu_t* pMenu, void* pArg);
 
 /**
 *   @brief Function used to start DVB T output
-*
-*   @param which    I       Screen to start video on
-*
-*   @retval void
+*   @param[in] which deprecated
 */
 void offair_startVideo(int which);
 
 /**
 *   @brief Function used to stop DVB T output
-*
-*   @param which    I       Screen to stop video on
-
- *   @retval void
+*   @param[in] which deprecated
+*   @param[in] reset If set resets current frequency to force tuner retune
 */
 void offair_stopVideo(int which, int reset);
 
@@ -249,6 +241,9 @@ int  offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg);
 int  offair_getIndex(int index);
 
 int  offair_getServiceIndex(EIT_service_t *service);
+
+// Returns -1 if no tuner supporting service media type is found, tunerFormat otherwise
+int offair_findCapableTuner(EIT_service_t *service);
 
 int  offair_getServiceCount();
 
