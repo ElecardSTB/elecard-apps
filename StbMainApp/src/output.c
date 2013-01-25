@@ -3193,13 +3193,10 @@ static void output_fillFormatMenu(void)
 	int    ret;
 
 	ret = st_rpcSync( elcmd_listvmode, NULL, &type, &list );
-	if( ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array )
-	{
+	if(ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array) {
 		cJSON *mode;
 		char *name;
-		int supported;
-		int current;
-		int native;
+
 		struct commonOutputModes_s {
 			char	*displayName;
 			char	*groupName;
@@ -3212,7 +3209,7 @@ static void output_fillFormatMenu(void)
 			{"PAL",		"720x576p",	sizeof("720x576p") - 1,	NULL},
 			{"NTSC",	"720x480p",	sizeof("720x576p") - 1,	NULL},
 		};
-		int i, j, n = 0;
+		int i, j;
 		int icon;
 		int commonOutputModesCount = sizeof(commonOutputModes) / sizeof(commonOutputModes[0]);
 		int hasSupportedModes = 0;
@@ -3222,66 +3219,60 @@ static void output_fillFormatMenu(void)
 		//check if supported any mode
 		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
 			name = objGetString(mode, "name", NULL);
-			if (!name)
+			if(!name)
 				continue;
-			supported = objCheckIfTrue(mode, "supported");
-			if (supported) {
-				hasSupportedModes = 1;
-				break;
-			}
-		}
 
-		//if showes advanced settings fill menu here, else fill mediate commonOutputModes massive
-		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
-			name = objGetString( mode, "name", NULL );
-			if (!name)
-				continue;
-			supported = objCheckIfTrue( mode, "supported" );
-			int len = sizeof(output_currentFormat);
-			current = objCheckIfTrue(mode, "current");
-			if (current) {
+			if(objCheckIfTrue(mode, "current")) {
+				int len = sizeof(output_currentFormat);
 				strncpy(output_currentFormat, name, len);
-				output_currentFormat[len - 1]=0;
-				selected = n;
+				output_currentFormat[len - 1] = 0;
 			}
-
-			if(!hasSupportedModes || showAdvanced) {
-				native  = objCheckIfTrue( mode, "native" );
-				if (native)
-					icon = thumbnail_tvstandard;
-				else
-					icon = supported ? thumbnail_channels : thumbnail_not_selected;
-
-				interface_addMenuEntry(formatMenu, name, output_setFormat, NULL, icon);
-				n++;
-			} else {
-				if (!supported)
-					continue;
-				for(j = 0; j < commonOutputModesCount; j++)
-					if (strncmp(commonOutputModes[j].groupName, name, commonOutputModes[j].groupNameLen) == 0 &&
+			if(objCheckIfTrue(mode, "supported")) {
+				//fill mediate commonOutputModes massive
+				for(j = 0; j < commonOutputModesCount; j++) {
+					if( strncmp(commonOutputModes[j].groupName, name, commonOutputModes[j].groupNameLen) == 0 &&
 					   (commonOutputModes[j].mode == NULL || strcmp(commonModeNames[j], name) < 0)) // choose the best mode (with highest fps)
 					{
 						commonOutputModes[j].mode = mode;
-						strncpy(commonModeNames[j], name, sizeof(commonModeNames[j])-1);
-						commonModeNames[j][sizeof(commonModeNames[j])-1] = 0;
+						strncpy(commonModeNames[j], name, sizeof(commonModeNames[j]) - 1);
+						commonModeNames[j][sizeof(commonModeNames[j]) - 1] = 0;
+						hasSupportedModes = 1;
 					}
+				}
+			}
+		}
+
+		if(!hasSupportedModes || showAdvanced) {
+			uint32_t n = 0;
+			//fill advanced settings fill menu here
+			for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
+				name = objGetString( mode, "name", NULL );
+				if(!name)
+					continue;
+
+				if(objCheckIfTrue(mode, "current")) {
+					selected = n;
+				}
+
+				if(objCheckIfTrue(mode, "native")) {
+					icon = thumbnail_tvstandard;
+				} else {
+					icon = objCheckIfTrue(mode, "supported") ? thumbnail_channels : thumbnail_not_selected;
+				}
+
+				interface_addMenuEntry(formatMenu, name, output_setFormat, NULL, icon);
+				n++;
 			}
 		}
 
 		if(hasSupportedModes) {
 			if(!showAdvanced) {
-				selected = MENU_ITEM_BACK;
 				for(j = 0; j < commonOutputModesCount; j++) {
 					if(commonOutputModes[j].mode) {
 						mode = commonOutputModes[j].mode;
-						native  = objCheckIfTrue(mode, "native");
-						current = objCheckIfTrue(mode, "current");
 
-						if (native)
-							icon = thumbnail_tvstandard;
-						else
-							icon = thumbnail_channels;
-						if (current)
+						icon = objCheckIfTrue(mode, "native") ? thumbnail_tvstandard : thumbnail_channels;
+						if(objCheckIfTrue(mode, "current"))
 							selected = j;
 						interface_addMenuEntry(formatMenu, commonOutputModes[j].displayName, output_setFormat, commonModeNames[j], icon);
 					}

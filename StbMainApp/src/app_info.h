@@ -768,16 +768,15 @@ extern int   globalSmallFontHeight;
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /** Function used to initialise the application information data structure and load last saved settings
  * @sa loadAppSettings()
  * @sa loadVoipSettings()
  */
 void appInfo_init();
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 /** Function used to load application settings from file
  * @return 0 on success
  * @sa saveAppSettings()
