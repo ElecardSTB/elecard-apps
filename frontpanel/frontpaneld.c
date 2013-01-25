@@ -172,11 +172,9 @@ void CheckBoardType()
 			g_frontpanelPath = PATH_CH7162;
 			g_frontpanelBrightness = BRIGHTNESS_CH7162;
 		}
-	} else {
-		fputs("Variable board_name not setted!!!\n", stderr);
 	}
 	if(g_board == UNKNOWN) {
-		fputs("Unknown g_board\n", stderr);
+		fprintf(stderr, "frontpaneld: board_name=%s not supported\n", boardName ? boardName : "(null)");
 		exit(1);
 	}
 }
