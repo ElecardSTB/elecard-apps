@@ -437,6 +437,7 @@ LOCAL_CFLAGS += \
 	-I$(_phStbSystemManager_DIR)/inc \
 	-I$(_phStbDFB_DIR)/inc \
 	-I$(BUILDROOT) \
+	-I$(PRJROOT)/src/project/elecard/apps/cJSON/include \
 	-I$(PRJROOT)/src/project/elecard/apps/StbPvr/include \
 	-I/opt/philips/Tools/SDK/overlay/dfb/include/glib-2.0 \
 	-I/opt/philips/Tools/SDK/overlay/dfb/include/glib-2.0/glib \
