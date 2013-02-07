@@ -69,6 +69,7 @@ typedef enum
 	elcmd_dvbclearservices,
 	elcmd_dvbscan,
 	elcmd_dvbtune,
+	elcmd_dvbdiseqc,
 	elcmd_reclist,
 	elcmd_getstream,
 	elcmd_sync = elcmd_getstream,
@@ -108,6 +109,7 @@ typedef enum
 	case elcmd_dvbclearservices: \
 	case elcmd_dvbscan: \
 	case elcmd_dvbtune: \
+	case elcmd_dvbdiseqc: \
 	case elcmd_reclist
 
 #define case_all_async \
