@@ -516,6 +516,8 @@ void dvb_getPvrPosition(int which, DvbFilePosition_t *pPosition);
 int dvb_getPvrRate(int which);
 #endif // LINUX_DVB_API_DEMUX
 
+int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_media_config_t *media);
+
 static inline int dvb_getAdapter(tunerFormat tuner)
 {
 	return appControlInfo.tunerInfo[tuner].adapter;

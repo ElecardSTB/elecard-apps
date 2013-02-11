@@ -79,6 +79,7 @@ static const char *slideshowModeNames[]= SLIDESHOW_MODE_NAMES;
 static const char *videoModeNames[]    = VIDEO_MODE_NAMES;
 #ifdef ENABLE_DVB
 static const char *serviceSortNames[]  = SERVICE_SORT_NAMES;
+static const char *diseqcSwictNames[]  = DISEQC_SWITCH_NAMES;
 #endif
 
 /******************************************************************
@@ -288,6 +289,15 @@ int loadAppSettings()
 		{
 			//dprintf("%s: show scrambled %d\n", __FUNCTION__, appControlInfo.offairInfo.dvbShowScrambled);
 		}
+		else if (sscanf(buf, "DISEQC_SWITCH=%[^\r\n ]", val ) == 1) {
+			for (int i = 0; i < diseqcSwitchTypeCount; i++)
+				if (!strcasecmp(diseqcSwictNames[i], val)) {
+					appControlInfo.dvbsInfo.diseqc.type = i;
+					break;
+				}
+		}
+		else if (sscanf(buf, "DISEQC_PORT=%hhu", &appControlInfo.dvbsInfo.diseqc.port ) == 1) {}
+		else if (sscanf(buf, "DISEQC_UNCOMMITED=%hhu", &appControlInfo.dvbsInfo.diseqc.uncommited) == 1) {}
 		else if (sscanf(buf, "DVBSORTING=%[^\r\n ]", val ) == 1)
 		{
 			for( i = 0; i < serviceSortCount; i++ )
@@ -738,6 +748,9 @@ int saveAppSettings()
 	fprintf(fd, "DVBCINVERSION=%d\n",             appControlInfo.dvbcInfo.fe.inversion);
 	fprintf(fd, "QAMMODULATION=%d\n",             appControlInfo.dvbcInfo.modulation);
 	fprintf(fd, "QAMSYMBOLRATE=%u\n",             appControlInfo.dvbcInfo.symbolRate);
+	fprintf(fd, "DISEQC_SWITCH=%s\n",             diseqcSwictNames[ appControlInfo.dvbsInfo.diseqc.type ]);
+	fprintf(fd, "DISEQC_PORT=%u\n",               appControlInfo.dvbsInfo.diseqc.port);
+	fprintf(fd, "DISEQC_UNCOMMITED=%u\n",         appControlInfo.dvbsInfo.diseqc.uncommited);
 	fprintf(fd, "SHOWSCRAMBLED=%d\n",             appControlInfo.offairInfo.dvbShowScrambled);
 	fprintf(fd, "DVBSORTING=%s\n",                serviceSortNames[appControlInfo.offairInfo.sorting]);
 	fprintf(fd, "DVBSERVICELIST=%s\n",            appControlInfo.offairInfo.serviceList);
@@ -956,6 +969,7 @@ void appInfo_init(void)
 	appControlInfo.dvbsInfo.k_band.highFrequency  = 12750;
 	appControlInfo.dvbsInfo.symbolRate            = 22000;
 	appControlInfo.dvbsInfo.band                  = dvbsBandK;
+	appControlInfo.dvbsInfo.polarization          = 1;
 
 	appControlInfo.dvbInfo.active     = 0;
 	appControlInfo.dvbInfo.tuner      = 0;

@@ -113,6 +113,7 @@ static inline int st_getTunerIndex(tunerFormat tuner)
 	       appControlInfo.tunerInfo[tuner].adapter  - ADAPTER_COUNT :
 	       appControlInfo.tunerInfo[tuner].adapter;
 }
+void st_sendDiseqc(tunerFormat tuner, const uint8_t *cmd, size_t len);
 #endif
 
 /** Changes hdmi output mode. Reinitialize framebuffer if resolution is changed.

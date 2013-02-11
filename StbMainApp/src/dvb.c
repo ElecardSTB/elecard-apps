@@ -248,6 +248,13 @@ static inline int dvb_isLinuxAdapter(int adapter)
 {
 	return adapter >= 0 && adapter < ADAPTER_COUNT;
 }
+// Low nibble of 4th (data) DiSEqC command byte
+static inline uint8_t diseqc_data_lo(int satellite_position, int is_vertical, uint32_t f_khz)
+{
+	return (satellite_position & 0x03) << 2 | is_vertical << 1 | (f_khz > 11700000);
+}
+
+static int dvb_diseqcSend (tunerFormat tuner, int frontend_fd, const uint8_t *tx, size_t tx_len);
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -907,6 +914,43 @@ void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out
 	//dvb_filterServices(out_list);
 }
 
+int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_media_config_t *media)
+{
+	if (appControlInfo.tunerInfo[tuner].type != DVBS ||
+	    appControlInfo.dvbsInfo.diseqc.type == 0)
+		return 0;
+	if (appControlInfo.dvbsInfo.diseqc.uncommited) {
+		uint8_t ucmd[4] = { 0xe0, 0x10, 0x39, appControlInfo.dvbsInfo.diseqc.uncommited-1 };
+		dvb_diseqcSend(tuner, frontend_fd, ucmd, 4);
+	}
+	int is_vertical = media ? media->dvb_s.polarization == 0x01 : appControlInfo.dvbsInfo.polarization;
+	int port = appControlInfo.dvbsInfo.diseqc.type == diseqcSwitchMulti ?
+	           appControlInfo.dvbsInfo.diseqc.port & 1 :
+	           appControlInfo.dvbsInfo.diseqc.port;
+	uint8_t data_hi = appControlInfo.dvbsInfo.diseqc.type == diseqcSwitchMulti ? 0x70 : 0xF0;
+	uint8_t cmd[4] = { 0xe0, 0x10, 0x38, data_hi | diseqc_data_lo(port, is_vertical, frequency) };
+
+	dvb_diseqcSend(tuner, frontend_fd, cmd, 4);
+	return 0;
+}
+
+int dvb_diseqcSend(tunerFormat tuner, int frontend_fd, const uint8_t* tx, size_t tx_len)
+{
+	dprintf("%s: sending %d: %02x %02x %02x %02x %02x %02x\n", __FUNCTION__, tx_len, tx[0], tx[1], tx[2],
+		tx_len > 3 ? tx[3] : 0, tx_len > 4 ? tx[4] : 0, tx_len > 5 ? tx[5] : 0);
+#ifdef STSDK
+	if (!dvb_isLinuxTuner(tuner)) {
+		st_sendDiseqc(tuner, tx, tx_len);
+		return 0;
+	}
+#endif
+	struct dvb_diseqc_master_cmd cmd;
+	cmd.msg_len = tx_len;
+	memcpy(cmd.msg, tx, cmd.msg_len);
+	ioctl_or_abort(tuner, frontend_fd, FE_DISEQC_SEND_MASTER_CMD, &cmd);
+	return 0;
+}
+
 #define SLEEP_QUANTUM 50000
 #define BREAKABLE_SLEEP(us)										\
 	do {														\
@@ -966,6 +1010,8 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		                       appControlInfo.dvbsInfo.symbolRate*1000;
 		p.u.qpsk.fec_inner   = FEC_NONE;
 		eprintf("   S: Symbol rate %u\n", p.u.qpsk.symbol_rate);
+
+		dvb_diseqcSetup(tuner, frontend_fd, frequency, media);
 	} else
 	{
 		eprintf("%s[%d]: ERROR: Unsupported frontend type=%s (media %d).\n", __FUNCTION__, tuner,
@@ -1382,6 +1428,8 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 		for (frequency = low_freq; frequency <= high_freq; frequency += freq_step)
 		{
+			dvb_diseqcSetup(tuner, -1, frequency, NULL);
+
 			p_freq->valueint = st_frequency(tuner, frequency);
 			p_freq->valuedouble = p_freq->valueint;
 			dprintf("%s[%d]: Check main freq: %u\n", __FUNCTION__, tuner, frequency);
@@ -1562,6 +1610,8 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 
 	if (!dvb_isLinuxTuner(tuner))
 	{
+		dvb_diseqcSetup(tuner, -1, frequency, media);
+
 		if (dvb_getType(tuner) == DVBS)
 		{
 			cJSON_AddItemToObject(params, "start", cJSON_CreateNumber( frequency ) );

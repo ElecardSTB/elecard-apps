@@ -525,6 +525,21 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params)
 		default:;
 	}
 }
+
+void st_sendDiseqc(tunerFormat tuner, const uint8_t *cmd, size_t len)
+{
+	cJSON *a = cJSON_CreateArray();
+	for (size_t i = 0; i < len; i++)
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(cmd[i]));
+	cJSON *params = cJSON_CreateObject();
+	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
+	cJSON_AddItemToObject(params, "cmd", a);
+	cJSON *result = NULL;
+	elcdRpcType_t type = elcdRpcInvalid;
+	st_rpcSyncTimeout(elcmd_dvbdiseqc, params, 1, &type, &result);
+	cJSON_Delete(params);
+	cJSON_Delete(result);
+}
 #endif // ENABLE_DVB
 
 static int stHelper_getFormatHeight(const char *format)

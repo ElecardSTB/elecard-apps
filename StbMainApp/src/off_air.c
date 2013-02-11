@@ -1586,6 +1586,8 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			return;
 		}
+		dvb_diseqcSetup(appControlInfo.dvbInfo.tuner, -1, current_service()->media.frequency, &current_service()->media);
+
 		st_setTuneParams(appControlInfo.dvbInfo.tuner, params);
 		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(st_frequency(appControlInfo.dvbInfo.tuner, current_service()->media.frequency)) );
 		cJSON *result = NULL;

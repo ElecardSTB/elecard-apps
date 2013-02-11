@@ -544,6 +544,21 @@ typedef enum {
 	dvbsBandC,
 } stb810_dvbsBand_t;
 
+typedef enum {
+	diseqcSwitchNone = 0,
+	diseqcSwitchSimple,
+	diseqcSwitchMulti,
+	diseqcSwitchTypeCount,
+} diseqcSwitchType_t;
+
+#define DISEQC_SWITCH_NAMES { "NONE", "Simple", "Multi" }
+
+typedef struct {
+	diseqcSwitchType_t type;
+	uint8_t port;       // 0..3
+	uint8_t uncommited; // 0 - off, 1..16
+} stb810_diseqcInfo_t;
+
 typedef struct __stb810_dvbsInfo
 {
 	// NB: DVB-S treat this values as MHz
@@ -552,6 +567,7 @@ typedef struct __stb810_dvbsInfo
 	uint32_t             symbolRate;
 	fe_sec_voltage_t     polarization;
 	stb810_dvbsBand_t    band;
+	stb810_diseqcInfo_t  diseqc;
 } stb810_dvbsInfo;
 
 typedef enum __teletextStatus_t

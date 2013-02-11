@@ -319,11 +319,15 @@ static int output_toggleVoipBuzzer(interfaceMenu_t* pMenu, void* pArg);
 #endif
 #ifdef ENABLE_DVB
 static int output_enterDVBMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterDiseqcMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbPolarization(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbType(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbTuner(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleDiseqcSwitch(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleDiseqcPort(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleDiseqcUncommited(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
@@ -396,6 +400,9 @@ static inline void output_redrawMenu(interfaceMenu_t *pMenu)
 
 #ifdef ENABLE_DVB
 static interfaceListMenu_t DVBSubMenu;
+static interfaceListMenu_t DiSEqCMenu;
+
+static const char *diseqc_switch_names[] = DISEQC_SWITCH_NAMES;
 #endif
 static interfaceListMenu_t StandardMenu;
 static interfaceListMenu_t FormatMenu;
@@ -2418,6 +2425,24 @@ static int output_toggleDvbExtScan(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
+static int output_toggleDiseqcSwitch(interfaceMenu_t *pMenu, void* pArg)
+{
+	appControlInfo.dvbsInfo.diseqc.type = (appControlInfo.dvbsInfo.diseqc.type+1) % diseqcSwitchTypeCount;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static int output_toggleDiseqcPort(interfaceMenu_t *pMenu, void* pArg)
+{
+	appControlInfo.dvbsInfo.diseqc.port = (appControlInfo.dvbsInfo.diseqc.port+1) % 4;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static int output_toggleDiseqcUncommited(interfaceMenu_t *pMenu, void* pArg)
+{
+	appControlInfo.dvbsInfo.diseqc.uncommited = (appControlInfo.dvbsInfo.diseqc.uncommited+1) % 17;
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
 static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 {
 	stb810_dvbfeInfo *fe = NULL;
@@ -2689,7 +2714,30 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 #ifdef STSDK
 	}
 #endif
+	if (tunerType == DVBS)
+		interface_addMenuEntry(dvbMenu, "DiSEqC", interface_menuActionShowMenu, &DiSEqCMenu, thumbnail_scan);
 
+	return 0;
+}
+
+int output_enterDiseqcMenu(interfaceMenu_t *diseqcMenu, void* notused)
+{
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	interface_clearMenuEntries(diseqcMenu);
+	if (appControlInfo.dvbsInfo.diseqc.uncommited)
+		snprintf(buf, sizeof(buf), "DiSEqC 1.1 Switch: %u", appControlInfo.dvbsInfo.diseqc.uncommited);
+	else
+		snprintf(buf, sizeof(buf), "DiSEqC 1.1 Switch: %s", _T("NONE"));
+	interface_addMenuEntry(diseqcMenu, buf, output_toggleDiseqcUncommited, NULL, thumbnail_configure);
+	snprintf(buf, sizeof(buf), "DiSEqC 1.0 Switch: %s", _T( diseqc_switch_names[appControlInfo.dvbsInfo.diseqc.type] ));
+	interface_addMenuEntry(diseqcMenu, buf, output_toggleDiseqcSwitch, NULL, thumbnail_configure);
+	if (appControlInfo.dvbsInfo.diseqc.type) {
+		if (appControlInfo.dvbsInfo.diseqc.type == diseqcSwitchMulti)
+			snprintf(buf, sizeof(buf), "Multiswitch Port: %c", 'A' + (appControlInfo.dvbsInfo.diseqc.port & 1));
+		else
+			snprintf(buf, sizeof(buf), "Switch LNB: %u", appControlInfo.dvbsInfo.diseqc.port + 1);
+		interface_addMenuEntry(diseqcMenu, buf, output_toggleDiseqcPort, NULL, thumbnail_configure);
+	}
 	return 0;
 }
 #endif /* ENABLE_DVB */
@@ -5621,6 +5669,8 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #ifdef ENABLE_DVB
 	createListMenu(&DVBSubMenu, _T("DVB_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
+	createListMenu(&DiSEqCMenu, "DiSEqC", settings_dvb, NULL, _M &DVBSubMenu,
+		interfaceListMenuIconThumbnail, output_enterDiseqcMenu, NULL, NULL);
 #endif
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterNetworkMenu, output_leaveNetworkMenu, NULL);
