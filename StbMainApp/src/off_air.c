@@ -1524,6 +1524,9 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
 #endif
 
+#ifdef STSDK
+	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner))
+#endif
 	interface_addEvent(offair_updateEPG, SET_NUMBER(which), 1000, 1);
 #ifdef ENABLE_STATS
 	time(&statsInfo.endTime);
@@ -1581,10 +1584,10 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 			return;
 		}
 		st_setTuneParams(appControlInfo.dvbInfo.tuner, params);
-		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(current_service()->media.frequency/KHZ) );
+		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(st_frequency(appControlInfo.dvbInfo.tuner, current_service()->media.frequency)) );
 		cJSON *result = NULL;
 		elcdRpcType_t type = elcdRpcInvalid;
-		eprintf("%s: tuning %d to %6u\n", __FUNCTION__, st_getTunerIndex(appControlInfo.dvbInfo.tuner), current_service()->media.frequency/KHZ);
+		eprintf("%s: tuning %d to %6u\n", __FUNCTION__, st_getTunerIndex(appControlInfo.dvbInfo.tuner), st_frequency(appControlInfo.dvbInfo.tuner, current_service()->media.frequency));
 		st_rpcSync( elcmd_dvbtune, params, &type, &result );
 		cJSON_Delete(params);
 		cJSON_Delete(result);

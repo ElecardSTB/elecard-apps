@@ -1382,7 +1382,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 		for (frequency = low_freq; frequency <= high_freq; frequency += freq_step)
 		{
-			p_freq->valueint = frequency/KHZ;
+			p_freq->valueint = st_frequency(tuner, frequency);
 			p_freq->valuedouble = p_freq->valueint;
 			dprintf("%s[%d]: Check main freq: %u\n", __FUNCTION__, tuner, frequency);
 			if (pFunction != NULL && pFunction(frequency, dvb_getNumberOfServices(), tuner, 0, 0) == -1)
@@ -1487,7 +1487,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 				SCAN_MESSAGE("DVB[%d]: Found something on %u, search channels!\n", tuner, f);
 				/* Scan for channels within this frequency / transport stream */
 #ifdef STSDK
-				p_freq->valueint = f/KHZ;
+				p_freq->valueint = st_frequency(tuner, f);
 				p_freq->valuedouble = (double)p_freq->valueint;
 				res = st_rpcSync(elcmd_dvbtune, params, &type, &result );
 				cJSON_Delete(result); // ignore
@@ -1582,11 +1582,11 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 
 		if (dvb_setFrequency(dvb_getType(tuner), frequency, frontend_fd, dvb_getAdapter(tuner), 1, NULL, pCancelFunction) != 1)
 		{
-			eprintf("%s[%d]: failed to set frequency to %.3f MHz\n", __FUNCTION__, tuner, (float)frequency/MHZ);
+			eprintf("%s[%d]: failed to set frequency to %.3f MHz\n", __FUNCTION__, tuner, (float)st_frequency(tuner, frequency)/KHZ);
 			close(frontend_fd);
 			return -1;
 		}
-		cJSON_AddItemToObject(params, "frequency", cJSON_CreateNumber( frequency/KHZ ) );
+		cJSON_AddItemToObject(params, "frequency", cJSON_CreateNumber(st_frequency(tuner, frequency)) );
 		st_rpcSync(elcmd_dvbtune, params, &type, &result ); // ignore
 		cJSON_Delete(params);
 		cJSON_Delete(result);

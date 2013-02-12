@@ -102,6 +102,10 @@ int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg);
 void st_cancelAsync(int index, int execute);
 
 #ifdef ENABLE_DVB
+uint32_t st_frequency(tunerFormat tuner, uint32_t frequency)
+{
+	return dvb_getType(tuner) == DVBS ? frequency : frequency/1000;
+}
 void st_setTuneParams(tunerFormat tuner, cJSON *params);
 static inline int st_getTunerIndex(tunerFormat tuner)
 {
