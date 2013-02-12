@@ -628,8 +628,11 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 	if (dvb.scan.frequency*KHZ < low_freq || dvb.scan.frequency*KHZ > high_freq)
 		dvb.scan.frequency = low_freq/KHZ;
 
-	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"), low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == FE_QPSK ? _T("MHZ") : _T("KHZ"));
-	interface_getText(pMenu, buf, "\\d{6}", offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
+	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"), low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == DVBS ? _T("MHZ") : _T("KHZ"));
+	const char *mask = "\\d{6}";
+	if (dvb_getType(tuner) == DVBS)
+		mask = appControlInfo.dvbsInfo.band == dvbsBandK ? "\\d{5}" : "\\d{4}";
+	interface_getText(pMenu, buf, mask, offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
 	return 0;
 }
 
