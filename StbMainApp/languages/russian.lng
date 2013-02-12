@@ -1,3 +1,4 @@
+DVB_POLARIZATION=Поляризация
 LANG_NAME=Русский
 ACCOUNT=Личные данные
 ADDED_TO_ADDRESS_BOOK=Добавлено в адресную книгу
@@ -100,6 +101,7 @@ DVB_LOW_FREQ=Нижняя частота DVB
 DVB_MODE=Режим
 DVB_NETWORK_SEARCH=Использовать сетевой поиск
 DVB_NO_CHANNELS=Прием эфирного вещания еще не настроен.\nЖелаете приступить\nк автоматической настройке?
+DVB_POLARIZATION=Поляризация
 DVB_PROVIDER=Провайдер DVB
 DVB_QAM_MODULATION=Число позиций модуляции QAM
 DVB_SCAN_FREQUENCY=Сканировать частоту

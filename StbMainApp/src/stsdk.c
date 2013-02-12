@@ -519,6 +519,8 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params)
 			break;
 		case DVBS:
 			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbsInfo.symbolRate ));
+			if (appControlInfo.dvbsInfo.polarization)
+				cJSON_AddItemToObject(params, "vertical", cJSON_CreateTrue());
 			break;
 		default:;
 	}

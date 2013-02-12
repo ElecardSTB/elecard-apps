@@ -100,6 +100,7 @@ DVB_LOW_FREQ=Lower DVB Frequency Limit
 DVB_MODE=Mode
 DVB_NETWORK_SEARCH=Use network search
 DVB_NO_CHANNELS=DVB Channels are not Configured Yet.\nDo You Wish to Start Automatic Scan Now?
+DVB_POLARIZATION=Polarization
 DVB_PROVIDER=DVB Provider
 DVB_QAM_MODULATION=QAM Modulation
 DVB_SCAN_FREQUENCY=Scan Custom Frequency

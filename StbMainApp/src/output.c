@@ -321,6 +321,7 @@ static int output_toggleVoipBuzzer(interfaceMenu_t* pMenu, void* pArg);
 static int output_enterDVBMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleDvbPolarization(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbType(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbTuner(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
@@ -2399,6 +2400,12 @@ static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
+static int output_toggleDvbPolarization(interfaceMenu_t *pMenu, void* pArg)
+{
+	appControlInfo.dvbsInfo.polarization = !appControlInfo.dvbsInfo.polarization;
+	return output_saveAndRedraw(0, pMenu);
+}
+
 static int output_toggleDvbSpeed(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.dvbCommonInfo.adapterSpeed = (appControlInfo.dvbCommonInfo.adapterSpeed+1) % 11;
@@ -2624,8 +2631,9 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		sprintf(buf, "%s: %u %s", _T("DVB_SYMBOL_RATE"), getDvbSymbolRate()?*(getDvbSymbolRate()):0, _T("KHZ"));
 		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionSymbolRate), thumbnail_configure);
 	}
-	if (tunerType == DVBT)
+	switch (tunerType)
 	{
+	case DVBT:
 		switch (appControlInfo.dvbtInfo.bandwidth)
 		{
 			case BANDWIDTH_8_MHZ: sprintf(buf, "%s: 8 %s", _T("DVB_BANDWIDTH"), _T( "MHZ" ) ); break;
@@ -2635,22 +2643,24 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 				sprintf(buf, "%s: Auto", _T("DVB_BANDWIDTH") );
 		}
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
-	} else if (tunerType == DVBC)
-	{
-		char *mod;
-
+		break;
+	case DVBC:
 		switch (appControlInfo.dvbcInfo.modulation)
 		{
-			case QAM_16: mod = "QAM16"; break;
-			case QAM_32: mod = "QAM32"; break;
-			case QAM_64: mod = "QAM64"; break;
-			case QAM_128: mod = "QAM128"; break;
-			case QAM_256: mod = "QAM256"; break;
-			default: mod = _T("NOT_AVAILABLE_SHORT");
+			case QAM_16:  str = "QAM16"; break;
+			case QAM_32:  str = "QAM32"; break;
+			case QAM_64:  str = "QAM64"; break;
+			case QAM_128: str = "QAM128"; break;
+			case QAM_256: str = "QAM256"; break;
+			default:      str = _T("NOT_AVAILABLE_SHORT");
 		}
-
-		sprintf(buf, "%s: %s", _T("DVB_QAM_MODULATION"), mod);
+		sprintf(buf, "%s: %s", _T("DVB_QAM_MODULATION"), str);
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
+		break;
+	case DVBS:
+		sprintf(buf, "%s: %c", _T("DVB_POLARIZATION"), appControlInfo.dvbsInfo.polarization ? 'V' : 'H');
+		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbPolarization, NULL, thumbnail_configure);
+		break;
 	}
 
 	sprintf(buf, "%s: %u %s", _T("DVB_LOW_FREQ"), fe->lowFrequency, get_HZprefix(tunerType));

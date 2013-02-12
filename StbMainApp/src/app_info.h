@@ -550,6 +550,7 @@ typedef struct __stb810_dvbsInfo
 	stb810_dvbfeInfo     c_band;
 	stb810_dvbfeInfo     k_band;
 	uint32_t             symbolRate;
+	fe_sec_voltage_t     polarization;
 	stb810_dvbsBand_t    band;
 } stb810_dvbsInfo;
 

@@ -952,8 +952,8 @@ void appInfo_init(void)
 
 	appControlInfo.dvbsInfo.c_band.lowFrequency   =  3700;
 	appControlInfo.dvbsInfo.c_band.highFrequency  =  4200;
-	appControlInfo.dvbsInfo.k_band.lowFrequency   = 10000;
-	appControlInfo.dvbsInfo.k_band.highFrequency  = 14000;
+	appControlInfo.dvbsInfo.k_band.lowFrequency   = 10700;
+	appControlInfo.dvbsInfo.k_band.highFrequency  = 12750;
 	appControlInfo.dvbsInfo.symbolRate            = 22000;
 	appControlInfo.dvbsInfo.band                  = dvbsBandK;
 
