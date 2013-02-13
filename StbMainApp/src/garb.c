@@ -34,7 +34,8 @@
 #include "debug.h"
 #include "StbMainApp.h"
 #include "off_air.h"
-#include "cJSON.h"
+#include "l10n.h"
+#include <cJSON.h>
 #include <service.h>
 #include <elcd-rpc.h>
 
@@ -51,6 +52,9 @@
 #define WATCH_PERIOD    (30)
 #define WATCH_THRESHOLD (15)
 
+#define GARB_ID_LENGTH  (6)
+//#define ALLOW_NO_VIEWERSHIP
+
 #define HH_NONE  (-1)
 #define HH_GUEST (99)
 
@@ -61,7 +65,11 @@
 * LOCAL TYPEDEFS                               *
 ************************************************/
 
-typedef char houseHoldMember_t[6];
+typedef struct
+{
+	char id[GARB_ID_LENGTH];
+	char *name;
+} houseHoldMember_t;
 
 typedef struct
 {
@@ -74,7 +82,7 @@ typedef struct
 	int       channel;
 	struct tm start_time;
 	time_t    duration;
-	houseHoldMember_t viewership;
+	char      id[GARB_ID_LENGTH];
 } garbWatchHistory_t;
 
 typedef struct
@@ -85,8 +93,7 @@ typedef struct
 		int count;
 		houseHoldMember_t *members;
 	} hh;
-	int viewership;
-	houseHoldMember_t guest;
+	houseHoldMember_t viewership;
 
 	struct {
 		garbWatchState_t state[MAX_MEMORIZED_SERVICES];
@@ -107,6 +114,7 @@ typedef struct
 static void garb_load();
 static void *garb_thread(void *notused);
 
+static void garb_printMembers(char text[]);
 static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int garb_quizSexCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
@@ -116,14 +124,14 @@ static int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t
 *******************************************************************/
 
 static garbState_t garb_info;
+static int viewership_offset = 0;
 
 void garb_init()
 {
 	pthread_mutex_init(&garb_info.channels.lock, NULL);
 	garb_info.channels.current = CHANNEL_NONE;
 	memset(&garb_info, 0, sizeof(garb_info));
-	strncpy(garb_info.guest, "00000", sizeof(garb_info.guest)-1);
-	garb_info.viewership = HH_NONE;
+	garb_resetViewership();
 	garb_load();
 	pthread_create(&garb_info.thread, 0, garb_thread, 0);
 }
@@ -132,6 +140,8 @@ void garb_terminate()
 {
 	pthread_cancel(garb_info.thread);
 	pthread_join(garb_info.thread, NULL);
+	for (int i = 0; i<garb_info.hh.count; i++)
+		FREE(garb_info.hh.members[i].name);
 	FREE(garb_info.hh.members);
 	garb_info.history.tail = NULL;
 	free_elements(&garb_info.history.head);
@@ -140,9 +150,11 @@ void garb_terminate()
 
 static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
 {
+	dprintf("%s: %d %s\n", __func__, interface_commandName(cmd->command));
 	switch (cmd->command)
 	{
 		case interfaceCommand0: // guest
+			garb_info.viewership.name = _T("GUEST");
 			interface_showConfirmationBox(
 				"Please specify your gender:\n\n"
 				"1. Male\n"
@@ -150,14 +162,25 @@ static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEven
 				"\nUse numeric remote buttons",
 				thumbnail_question, garb_quizSexCallback, NULL);
 			return 1;
+		case interfaceCommand9:
+			if (garb_info.hh.count > 9) {
+				if (viewership_offset + 8 > garb_info.hh.count)
+					viewership_offset = 0;
+				else
+					viewership_offset += 8;
+				char text[MAX_MESSAGE_BOX_LENGTH];
+				garb_printMembers(text);
+				interface_showConfirmationBox(text, thumbnail_account_active, garb_viewershipCallback, NULL);
+				return 1;
+			}
+			// fall through
 		case interfaceCommand1: case interfaceCommand2: case interfaceCommand3:
 		case interfaceCommand4: case interfaceCommand5: case interfaceCommand6:
-		case interfaceCommand7: case interfaceCommand8: case interfaceCommand9:
+		case interfaceCommand7: case interfaceCommand8:
 		{
 			int index = cmd->command - interfaceCommand1;
 			if (index < garb_info.hh.count) {
-				garb_info.viewership = index;
-				memcpy(garb_info.guest, garb_info.hh.members[index], sizeof(garb_info.guest));
+				memcpy(&garb_info.viewership, &garb_info.hh.members[index], sizeof(garb_info.viewership));
 				interface_hideMessageBox();
 				return 0;
 			}
@@ -170,11 +193,12 @@ static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEven
 
 int garb_quizSexCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
 {
+	dprintf("%s: %s\n", __func__, interface_commandName(cmd->command));
 	switch (cmd->command)
 	{
 		case interfaceCommand1:
 		case interfaceCommand2:
-			garb_info.guest[0] = '1' + (cmd->command - interfaceCommand1);
+			garb_info.viewership.id[0] = '1' + (cmd->command - interfaceCommand1);
 			interface_showConfirmationBox(
 				"How old are you?\n\n"
 				"1. Up to  8 y.o.\n"
@@ -186,9 +210,11 @@ int garb_quizSexCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 				"\nUse numeric remote buttons",
 				thumbnail_question, garb_quizAgeCallback, NULL);
 			return 1;
+#ifdef ALLOW_NO_VIEWERSHIP
 		case interfaceCommandExit:
-			garb_info.viewership = HH_NONE;
+			garb_resetViewership();
 			return 0;
+#endif
 		default:;
 	}
 	return 1;
@@ -196,39 +222,56 @@ int garb_quizSexCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 
 int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
 {
+	dprintf("%s: %s\n", __func__, interface_commandName(cmd->command));
 	switch (cmd->command)
 	{
 		case interfaceCommand1: case interfaceCommand2: case interfaceCommand3:
 		case interfaceCommand4: case interfaceCommand5: case interfaceCommand6:
-			garb_info.guest[1] = '1' + (cmd->command - interfaceCommand1);
-			garb_info.viewership = HH_GUEST;
+			garb_info.viewership.id[1] = '1' + (cmd->command - interfaceCommand1);
 			return 0;
+#ifdef ALLOW_NO_VIEWERSHIP
 		case interfaceCommandExit:
-			garb_info.viewership = HH_NONE;
+			garb_resetViewership();
 			return 0;
+#endif
 		default:;
 	}
 	return 1;
 }
 
-void garb_checkViewership()
+static void garb_printMembers(char text[])
 {
-	if (garb_info.viewership == HH_NONE) {
-		char text[MAX_MESSAGE_BOX_LENGTH];
-		char line[MENU_ENTRY_INFO_LENGTH];
-		strcpy(text, "Please, choose viewership:\n\n");
+	char line[MENU_ENTRY_INFO_LENGTH];
+	strcpy(text, "Please, choose viewership:\n\n");
+	if (garb_info.hh.count < 10)
 		for (int i = 0; i < garb_info.hh.count; i++) {
-			snprintf(line, sizeof(line), "%d. %s\n", i+1, garb_info.hh.members[i]);
+			snprintf(line, sizeof(line), "%d. %s\n", i+1, garb_info.hh.members[i].name);
 			strcat(text, line);
 		}
-		strcat(text, "\n0. Guest\n\nTo answer, use numeric remote buttons\n");
+	else {
+		for (int i = 0; i < 8 && i+viewership_offset < garb_info.hh.count; i++) {
+			snprintf(line, sizeof(line), "%d. %s\n", i+1, garb_info.hh.members[i+viewership_offset].name);
+			strcat(text, line);
+		}
+		strcat(text, "\n9. Next page...");
+	}
+	strcat(text, "\n0. Guest\n\nTo answer, use numeric remote buttons\n");
+}
+
+void garb_checkViewership()
+{
+	if (!garb_info.viewership.id[0]) {
+		char text[MAX_MESSAGE_BOX_LENGTH];
+		viewership_offset = 0;
+		garb_printMembers(text);
 		interface_showConfirmationBox(text, thumbnail_account_active, garb_viewershipCallback, NULL);
 	}
 }
 
 void garb_resetViewership()
 {
-	garb_info.viewership = HH_NONE;
+	garb_info.viewership.id[0] = 0;
+	garb_info.viewership.name = _T("LOGIN");
 }
 
 void garb_load()
@@ -271,13 +314,16 @@ void garb_load()
 		}
 		memset(garb_info.hh.members, 0, members_size);
 		cJSON *members = cJSON_GetObjectItem(config, "members");
-		char  *id;
+		char  *id, *name;
 		for (int i = 0; i < garb_info.hh.count; i++) {
-			id = jsonGetString(cJSON_GetArrayItem(members, i), NULL);
+			cJSON *member = cJSON_GetArrayItem(members, i);
+			id = objGetString(member, "id", NULL);
 			if (id)
-				strncpy(garb_info.hh.members[i], id, sizeof(garb_info.hh.members[i])-1);
+				strncpy(garb_info.hh.members[i].id, id, sizeof(garb_info.hh.members[i])-1);
 			else
-				garb_info.hh.members[i][0] = 'A'+i;
+				garb_info.hh.members[i].id[0] = 'A'+i;
+			name = objGetString(member, "name", NULL);
+			garb_info.hh.members[i].name = strdup(name ? name : garb_info.hh.members[i].id);
 		}
 	} else
 		eprintf("%s: (!) no HH members specified!\n", __FUNCTION__);
@@ -286,12 +332,19 @@ void garb_load()
 #else
 	garb_info.hh.number = 123456;
 	garb_info.hh.device = 2;
-	garb_info.hh.count  = 3;
+	garb_info.hh.count  = 10;
 	size_t members_size = garb_info.hh.count * sizeof(houseHoldMember_t);
 	garb_info.hh.members = dmalloc(members_size);
-	strcpy(garb_info.hh.members[0], "A");
-	strcpy(garb_info.hh.members[1], "B");
-	strcpy(garb_info.hh.members[2], "ABC");
+	strcpy(garb_info.hh.members[0].id, "A");
+	strcpy(garb_info.hh.members[1].id, "B");
+	strcpy(garb_info.hh.members[2].id, "ABC");
+	garb_info.hh.members[0].name = strdup("Афанасий");
+	garb_info.hh.members[1].name = strdup("Борис");
+	garb_info.hh.members[2].name = strdup("Тимофей");
+	for (int i=3; i<garb_info.hh.count; i++) {
+		snprintf(garb_info.hh.members[i].id, sizeof(garb_info.hh.members[i].id), "C%d", i);
+		garb_info.hh.members[i].name = strdup(garb_info.hh.members[i].id);
+	}
 #endif
 }
 
@@ -354,7 +407,7 @@ void garb_gatherStats(time_t now)
 	}
 
 	garbWatchHistory_t *tail = garb_info.history.tail ? garb_info.history.tail->data : NULL;
-	if (tail && tail->channel == max_channel && strcmp(tail->viewership, garb_info.guest) == 0)
+	if (tail && tail->channel == max_channel && strcmp(tail->id, garb_info.viewership.id) == 0)
 		tail->duration += WATCH_PERIOD;
 	else {
 		list_element_t *new_tail = allocate_element(sizeof(garbWatchHistory_t));
@@ -365,7 +418,7 @@ void garb_gatherStats(time_t now)
 			localtime_r(&now, &hist->start_time);
 			hist->duration   = WATCH_PERIOD;
 			hist->channel    = max_channel;
-			memcpy(hist->viewership, garb_info.guest, sizeof(hist->viewership));
+			memcpy(hist->id, garb_info.viewership.id, sizeof(hist->id));
 
 			if (garb_info.history.tail)
 				garb_info.history.tail->next = new_tail;
@@ -428,9 +481,8 @@ void garb_showStats()
 
 void garb_drawViewership()
 {
-	if ( garb_info.viewership != HH_NONE &&
-	    !interfaceInfo.showMenu &&
+	if ( !interfaceInfo.showMenu &&
 	     interfacePlayControl.enabled &&
 	     interfacePlayControl.visibleFlag)
-		interface_displayTextBox(interfaceInfo.clientX, interfaceInfo.clientY, garb_info.guest, NULL, 0, NULL, 0);
+		interface_displayTextBox(interfaceInfo.clientX, interfaceInfo.clientY, garb_info.viewership.name, NULL, 0, NULL, 0);
 }
