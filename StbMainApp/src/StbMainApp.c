@@ -600,6 +600,7 @@ static int toggleStandby(void)
 		if (appControlInfo.dvbInfo.active) {
 			inStandbyActiveVideo = -appControlInfo.dvbInfo.channel;
 			offair_stopVideo(screenMain, 1);
+			garb_resetViewership();
 		}
 #endif
 		interface_displayMenu(1);

@@ -51,6 +51,7 @@
 #define CHANNEL_NONE    (-1)
 #define WATCH_PERIOD    (30)
 #define WATCH_THRESHOLD (15)
+#define VIEWERSHIP_TIMEOUT (30*60)
 
 #define GARB_ID_LENGTH  (6)
 //#define ALLOW_NO_VIEWERSHIP
@@ -94,6 +95,7 @@ typedef struct
 		houseHoldMember_t *members;
 	} hh;
 	houseHoldMember_t viewership;
+	time_t lastStop;
 
 	struct {
 		garbWatchState_t state[MAX_MEMORIZED_SERVICES];
@@ -260,6 +262,8 @@ static void garb_printMembers(char text[])
 
 void garb_checkViewership()
 {
+	if (time(0) - garb_info.lastStop > VIEWERSHIP_TIMEOUT)
+		garb_resetViewership();
 	if (!garb_info.viewership.id[0]) {
 		char text[MAX_MESSAGE_BOX_LENGTH];
 		viewership_offset = 0;
@@ -381,6 +385,7 @@ void garb_stopWatching(int channel)
 			eprintf("%s: ignore watch value %d for %d channel\n", __FUNCTION__, watched, channel);
 	}
 	pthread_mutex_unlock(&garb_info.channels.lock);
+	time(&garb_info.lastStop);
 }
 
 void garb_gatherStats(time_t now)
