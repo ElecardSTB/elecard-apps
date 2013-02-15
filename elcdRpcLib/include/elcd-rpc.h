@@ -62,6 +62,7 @@ typedef enum
 	elcmd_getspeed,
 	elcmd_setvmode,
 	elcmd_listvmode,
+	elcmd_listvoutput,
 	elcmd_getaudio,
 	elcmd_setaudio,
 	elcmd_setzoom,
@@ -100,6 +101,7 @@ typedef enum
 	case elcmd_getspeed: \
 	case elcmd_setvmode: \
 	case elcmd_listvmode: \
+	case elcmd_listvoutput: \
 	case elcmd_getaudio: \
 	case elcmd_setaudio: \
 	case elcmd_setzoom: \
