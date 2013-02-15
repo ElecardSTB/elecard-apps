@@ -595,6 +595,10 @@ static int toggleStandby(void)
 			cmd.command = interfaceCommandStop;
 			interface_processCommand(&cmd);
 		}
+		if (appControlInfo.dvbInfo.active) {
+			inStandbyActiveVideo = -appControlInfo.dvbInfo.channel;
+			offair_stopVideo(screenMain, 1);
+		}
 
 		interface_displayMenu(1);
 
@@ -609,6 +613,8 @@ static int toggleStandby(void)
 			cmd.command = interfaceCommandPlay;
 			interface_processCommand(&cmd);
 		}
+		if(inStandbyActiveVideo<0)
+			offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
 
 		//dprintf("%s: return from standby\n", __FUNCTION__);
 		appControlInfo.inStandby = 0;
