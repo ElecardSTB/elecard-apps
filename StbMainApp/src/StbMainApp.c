@@ -571,6 +571,56 @@ static int PowerOff(void *pArg)
 	return system("poweroff");
 }
 
+static int toggleStandby(void)
+{
+	interfaceCommandEvent_t cmd;
+
+	//dprintf("%s: switch standby\n", __FUNCTION__);
+	/* Standby button was pressed once. Switch standby mode.  */
+	if (appControlInfo.inStandby == 0) {
+		//dprintf("%s: go to standby\n", __FUNCTION__);
+		appControlInfo.inStandby = 1;
+
+#if (defined ENABLE_PVR && defined ENABLE_DVB && defined STBPNX)
+		if(pvr_isPlayingDVB(screenMain)) {
+			offair_stopVideo(screenMain, 1);
+		}
+#endif
+
+		inStandbyActiveVideo = gfx_videoProviderIsActive(screenMain);
+
+		if(inStandbyActiveVideo) {
+			memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
+			cmd.source = DID_STANDBY;
+			cmd.command = interfaceCommandStop;
+			interface_processCommand(&cmd);
+		}
+
+		interface_displayMenu(1);
+
+		system("standbyon");
+		return 1;
+	} else {
+		interface_displayMenu(1);
+		system("standbyoff");
+
+		if(inStandbyActiveVideo) {
+			memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
+			cmd.command = interfaceCommandPlay;
+			interface_processCommand(&cmd);
+		}
+
+		//dprintf("%s: return from standby\n", __FUNCTION__);
+		appControlInfo.inStandby = 0;
+#ifndef STSDK
+		if(helperCheckUpdates()) {
+			interface_showConfirmationBox(_T("CONFIRM_FIRMWARE_UPDATE"), thumbnail_question, helper_confirmFirmwareUpdate, NULL);
+		}
+#endif
+		return 2;
+	}
+}
+
 static int checkPowerOff(DFBEvent *pEvent)
 {
 	int isFrontpanelPower = 0;
@@ -631,54 +681,10 @@ static int checkPowerOff(DFBEvent *pEvent)
 			//dprintf("%s: repeat 3 sec - halt\n", __FUNCTION__);
 			/* Standby button has been held for 3 seconds. Power off. */
 //			PowerOff(NULL);
-		} else if(!repeat && Helper_IsTimeGreater(currentPress, validStandbySwitchTime)) {
-			int ret = 0;
-			interfaceCommandEvent_t cmd;
+		} else if(!repeat && Helper_IsTimeGreater(currentPress, validStandbySwitchTime))
+		{
+			int ret = toggleStandby();
 
-			//dprintf("%s: switch standby\n", __FUNCTION__);
-			/* Standby button was pressed once. Switch standby mode.  */
-			if (appControlInfo.inStandby == 0) {
-				//dprintf("%s: go to standby\n", __FUNCTION__);
-				appControlInfo.inStandby = 1;
-
-#if (defined ENABLE_PVR && defined ENABLE_DVB && defined STBPNX)
-				if(pvr_isPlayingDVB(screenMain)) {
-					offair_stopVideo(screenMain, 1);
-				}
-#endif
-
-				inStandbyActiveVideo = gfx_videoProviderIsActive(screenMain);
-
-				if(inStandbyActiveVideo) {
-					memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
-					cmd.source = DID_STANDBY;
-					cmd.command = interfaceCommandStop;
-					interface_processCommand(&cmd);
-				}
-
-				interface_displayMenu(1);
-
-				system("standbyon");
-				ret = 1;
-			} else {
-				interface_displayMenu(1);
-				system("standbyoff");
-
-				if(inStandbyActiveVideo) {
-					memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
-					cmd.command = interfaceCommandPlay;
-					interface_processCommand(&cmd);
-				}
-
-				//dprintf("%s: return from standby\n", __FUNCTION__);
-				appControlInfo.inStandby = 0;
-#ifndef STSDK
-				if(helperCheckUpdates()) {
-					interface_showConfirmationBox(_T("CONFIRM_FIRMWARE_UPDATE"), thumbnail_question, helper_confirmFirmwareUpdate, NULL);
-				}
-#endif
-				ret = 2;
-			}
 			memcpy(&validStandbySwitchTime, &currentPress, sizeof(struct timeval));
 			validStandbySwitchTime.tv_sec += STANDBY_TIMEOUT;
 			return ret;
