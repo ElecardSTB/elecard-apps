@@ -116,7 +116,7 @@ static inline int st_getTunerIndex(tunerFormat tuner)
  * @param[in] selectedFormat Setted output mode.
  * @param[in] previousFormat Previous output mode. For detecting resolution change
  */
-void st_changeOutputMode(char *selectedFormat, char *previousFormat);
+void st_changeOutputMode(const char *output, const char *previousFormat, const char *selectedFormat);
 
 void st_getFormatResolution(const char *format, int *width, int *height);
 

@@ -1470,6 +1470,11 @@ void *keyThread(void *pArg)
 		eventBuffer->WaitForEventWithTimeout(eventBuffer, 3, 0);
 		flushEventsFlag = 0;
 
+		if(!keyThreadActive) {
+			eventBuffer->Reset(eventBuffer);
+			break;
+		}
+
 		result = eventBuffer->HasEvent(eventBuffer);
 		if (result == DFB_BUFFEREMPTY)
 		{

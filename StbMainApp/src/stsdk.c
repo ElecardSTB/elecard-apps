@@ -607,14 +607,16 @@ static int stHelper_indicatorShowVideoFormat(const char *name)
 	return 0;
 }
 
-int st_setVideoFormat(const char *name)
+static int st_setVideoFormat(const char *output, const char *mode)
 {
 	elcdRpcType_t type;
 	cJSON *res  = NULL;
-	cJSON *mode = cJSON_CreateString(name);
+	cJSON *params = cJSON_CreateObject();
 	int    ret = 1;
 
-	ret = st_rpcSync( elcmd_setvmode, mode, &type, &res );
+	cJSON_AddItemToObject(params, "output", cJSON_CreateString(output));
+	cJSON_AddItemToObject(params, "mode", cJSON_CreateString(mode));
+	ret = st_rpcSync(elcmd_setvmode, params, &type, &res);
 //	ret = st_rpcSyncTimeout( elcmd_setvmode, mode, 1, &type, &res );
 
 	if( ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String ) {
@@ -622,18 +624,19 @@ int st_setVideoFormat(const char *name)
 			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
 			ret = 1;
 		} else {
-			stHelper_indicatorShowVideoFormat(name);
+			stHelper_indicatorShowVideoFormat(mode);
 		}
 	} else if ( type == elcdRpcError && res && res->type == cJSON_String ) {
 		eprintf("%s: error: %s\n", __FUNCTION__, res->valuestring);
 		ret = 1;
 	}
 	cJSON_Delete(res);
-	cJSON_Delete(mode);
+	cJSON_Delete(params);
+
 	return ret;
 }
 
-void st_changeOutputMode(char *selectedFormat, char *previousFormat)
+void st_changeOutputMode(const char *output, const char *previousFormat, const char *selectedFormat)
 {
 	int old_height, new_height;
 	old_height = stHelper_getFormatHeight(previousFormat);
@@ -643,7 +646,7 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 		gfx_stopEventThread();
 		gfx_terminate();
 		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"deinitfb\",\"params\":[],\"id\": 1}");
-		st_setVideoFormat(selectedFormat);
+		st_setVideoFormat(output, selectedFormat);
 		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
 		stHelper_waitForFBdevice("/dev/fb0");
 		if (new_height < 720 && interfaceInfo.screenHeight >= 720) {
@@ -658,7 +661,7 @@ void st_changeOutputMode(char *selectedFormat, char *previousFormat)
 		gfx_startEventThread();
 		needRestart = 1;
 	} else {
-		st_setVideoFormat(selectedFormat);
+		st_setVideoFormat(output, selectedFormat);
 	}
 
 	return;

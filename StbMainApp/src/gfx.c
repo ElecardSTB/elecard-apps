@@ -4507,12 +4507,11 @@ void gfx_startEventThread(void)
 
 void gfx_stopEventThread(void)
 {
-	pthread_cancel(event_thread);
+	keyThreadActive = 0;
+//	pthread_cancel(event_thread);
+//	appEventBuffer->WakeUp(appEventBuffer);
 	pthread_join(event_thread, NULL);
-/*printf("%s[%d]: ***\n", __FILE__, __LINE__);
-	if(appEventBuffer) {
-		appEventBuffer->Release(appEventBuffer);
-		appEventBuffer = NULL;
-	}
-printf("%s[%d]: ***\n", __FILE__, __LINE__);*/
+
+	appEventBuffer->Release(appEventBuffer);
+	appEventBuffer = NULL;
 }
