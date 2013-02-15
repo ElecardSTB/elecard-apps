@@ -504,24 +504,30 @@ type_known:
 }
 
 #ifdef ENABLE_DVB
-void st_setTuneParams(tunerFormat tuner, cJSON *params)
+void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media)
 {
 	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
 	switch (appControlInfo.tunerInfo[tuner].type)
 	{
-		case DVBC:
+		case DVBC: {
+			fe_modulation_t modulation = media ? media->dvb_c.modulation : appControlInfo.dvbcInfo.modulation;
 			for (int i=0; modulation_names[i].name != NULL; i++)
-				if (modulation_names[i].value == appControlInfo.dvbcInfo.modulation) {
+				if (modulation_names[i].value == modulation) {
 					cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modulation_names[i].name));
 					break;
 				}
-			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbcInfo.symbolRate ));
+			cJSON_AddItemToObject(params, "symbolrate",
+				cJSON_CreateNumber( media ? media->dvb_c.symbol_rate/1000 : appControlInfo.dvbcInfo.symbolRate ));
 			break;
-		case DVBS:
-			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber( appControlInfo.dvbsInfo.symbolRate ));
-			if (appControlInfo.dvbsInfo.polarization)
+		}
+		case DVBS: {
+			int vertical = media ? media->dvb_s.polarization == 1 : appControlInfo.dvbsInfo.polarization;
+			cJSON_AddItemToObject(params, "symbolrate",
+				cJSON_CreateNumber( media ? media->dvb_s.symbol_rate/1000 : appControlInfo.dvbsInfo.symbolRate ));
+			if (vertical)
 				cJSON_AddItemToObject(params, "vertical", cJSON_CreateTrue());
 			break;
+		}
 		default:;
 	}
 }

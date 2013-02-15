@@ -1415,7 +1415,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 		eprintf("%s[%d]: out of memory\n", __FUNCTION__, tuner);
 		return -1;
 	}
-	st_setTuneParams(tuner, params);
+	st_setTuneParams(tuner, params, NULL);
 
 	cJSON *result = NULL;
 	elcdRpcType_t type = elcdRpcInvalid;
@@ -1446,7 +1446,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 				cJSON_Delete(params);
 				params = cJSON_CreateObject();
-				st_setTuneParams(tuner, params);
+				st_setTuneParams(tuner, params, NULL);
 
 				dprintf("%s[%d]: Found something on %u, search channels!\n", __FUNCTION__, tuner, frequency);
 				res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
@@ -1606,7 +1606,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 	}
 	cJSON *result = NULL;
 	elcdRpcType_t type = elcdRpcInvalid;
-	st_setTuneParams(tuner, params);
+	st_setTuneParams(tuner, params, media);
 
 	if (!dvb_isLinuxTuner(tuner))
 	{
@@ -1643,7 +1643,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 
 		// reset rpc variables
 		params = cJSON_CreateObject();
-		st_setTuneParams(tuner, params);
+		st_setTuneParams(tuner, params, media);
 
 		result = NULL;
 		type = elcdRpcInvalid;

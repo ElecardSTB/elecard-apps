@@ -1588,7 +1588,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		}
 		dvb_diseqcSetup(appControlInfo.dvbInfo.tuner, -1, current_service()->media.frequency, &current_service()->media);
 
-		st_setTuneParams(appControlInfo.dvbInfo.tuner, params);
+		st_setTuneParams(appControlInfo.dvbInfo.tuner, params, &current_service()->media);
 		cJSON_AddItemToObject( params, "frequency", cJSON_CreateNumber(st_frequency(appControlInfo.dvbInfo.tuner, current_service()->media.frequency)) );
 		cJSON *result = NULL;
 		elcdRpcType_t type = elcdRpcInvalid;

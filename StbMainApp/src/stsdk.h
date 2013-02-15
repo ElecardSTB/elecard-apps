@@ -106,7 +106,7 @@ uint32_t st_frequency(tunerFormat tuner, uint32_t frequency)
 {
 	return dvb_getType(tuner) == DVBS ? frequency : frequency/1000;
 }
-void st_setTuneParams(tunerFormat tuner, cJSON *params);
+void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media);
 static inline int st_getTunerIndex(tunerFormat tuner)
 {
 	return appControlInfo.tunerInfo[tuner].adapter >= ADAPTER_COUNT ?
