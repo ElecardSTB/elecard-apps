@@ -116,6 +116,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FORMAT_CHANGE_TIMEOUT       (15)
 
+#define ARRAY_SIZE(arr)				(sizeof(arr)/sizeof(*arr))
+
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
@@ -734,12 +736,13 @@ static int output_tryNewVideoMode_Event(void* pArg)
 	if(strcmp(newVideoMode, p_videoOutput->currentFormat) == 0) {
 		return 1;
 	}
-	interface_showConfirmationBox(_T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, pArg);
+	interface_showMessageBox(_T("PLEASE_WAIT"), thumbnail_info, 0);
 
 	st_changeOutputMode(p_videoOutput->name, p_videoOutput->currentFormat, newVideoMode);
 	strcpy(p_videoOutput->currentFormat, newVideoMode);
 	interface_addEvent(output_cancelFormat, pArg, FORMAT_CHANGE_TIMEOUT * 1000, 1);
 
+	interface_showConfirmationBox(_T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, pArg);
 	return 1;
 }
 
@@ -776,7 +779,6 @@ static int output_setVideoOutput(interfaceMenu_t *pMenu, void* pArg)
     return 0;
 }
 
-#define ARRAY_SIZE(arr)		(sizeof(arr)/sizeof(*arr))
 static void output_fillVideoOutputMenu(videoOutput_t *p_videoOutput)
 {
 	int32_t			selected = MENU_ITEM_BACK;
