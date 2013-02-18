@@ -298,7 +298,7 @@ static int ggfx_NumLayers = 0;
 /**
  * @brief Pointer to the thread that handles directfb events.
  */
-static pthread_t event_thread;
+static pthread_t gfx_inputEventThread = NULL;
 /*********************************************************(((((((**********
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
 ***************************************************************************/
@@ -4499,19 +4499,20 @@ void gfx_waitForProviders()
 
 void gfx_startEventThread(void)
 {
-	pgfx_dfb->CreateInputEventBuffer( pgfx_dfb, DICAPS_KEYS|DICAPS_BUTTONS|DICAPS_AXES, DFB_TRUE, &appEventBuffer);
-
-	pthread_create(&event_thread, NULL, keyThread, (void*)appEventBuffer);
-//	pthread_detach(event_thread);
+	if(gfx_inputEventThread == NULL) {
+		pgfx_dfb->CreateInputEventBuffer(pgfx_dfb, DICAPS_KEYS|DICAPS_BUTTONS|DICAPS_AXES, DFB_TRUE, &appEventBuffer);
+		pthread_create(&gfx_inputEventThread, NULL, keyThread, (void *)appEventBuffer);
+// 		pthread_detach(gfx_inputEventThread);
+	}
 }
 
 void gfx_stopEventThread(void)
 {
-	keyThreadActive = 0;
-//	pthread_cancel(event_thread);
-//	appEventBuffer->WakeUp(appEventBuffer);
-	pthread_join(event_thread, NULL);
-
-	appEventBuffer->Release(appEventBuffer);
-	appEventBuffer = NULL;
+	if(gfx_inputEventThread) {
+		keyThreadActive = 0;
+		pthread_join(gfx_inputEventThread, NULL);
+		gfx_inputEventThread = NULL;
+		appEventBuffer->Release(appEventBuffer);
+		appEventBuffer = NULL;
+	}
 }

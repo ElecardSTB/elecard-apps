@@ -1379,7 +1379,7 @@ static int getActiveMedia(){
 
 void *keyThread(void *pArg)
 {
-	IDirectFBEventBuffer *eventBuffer = (IDirectFBEventBuffer*)pArg;
+	IDirectFBEventBuffer *eventBuffer = (IDirectFBEventBuffer *)pArg;
 	DFBInputDeviceKeySymbol lastsym;
 	int allow_repeat = 0;
 	unsigned long timediff;
@@ -1456,7 +1456,7 @@ void *keyThread(void *pArg)
 	}
 //#endif
 
-	while ( keepCommandLoopAlive )
+	while(keepCommandLoopAlive && keyThreadActive)
 	{
 		DFBEvent event;
 		DFBResult result;
@@ -1469,11 +1469,6 @@ void *keyThread(void *pArg)
 
 		eventBuffer->WaitForEventWithTimeout(eventBuffer, 3, 0);
 		flushEventsFlag = 0;
-
-		if(!keyThreadActive) {
-			eventBuffer->Reset(eventBuffer);
-			break;
-		}
 
 		result = eventBuffer->HasEvent(eventBuffer);
 		if (result == DFB_BUFFEREMPTY)
