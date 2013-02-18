@@ -604,6 +604,16 @@ static int stHelper_sendToSocket(const char *socketPath, const char *cmd)
 	return 0;
 }
 
+static int stHelper_sendToElcd(const char *cmd)
+{
+//TODO: use socket client
+	char buf[256];
+	snprintf(buf, sizeof(buf), "StbCommandClient -f /tmp/elcd.sock '{\"method\":\"%s\",\"params\":[],\"id\": 1}'", cmd);
+//stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"deinitfb\",\"params\":[],\"id\": 1}");
+	system(buf);
+	return 0;
+}
+
 static int stHelper_indicatorShowVideoFormat(const char *name)
 {
 	char buf[16] = "\0";
@@ -630,14 +640,16 @@ static int stHelper_indicatorShowVideoFormat(const char *name)
 	return 0;
 }
 
-int st_setVideoFormat(const char *name)
+static int st_setVideoFormat(const char *output, const char *mode)
 {
 	elcdRpcType_t type;
 	cJSON *res  = NULL;
-	cJSON *mode = cJSON_CreateString(name);
+	cJSON *params = cJSON_CreateObject();
 	int    ret = 1;
 
-	ret = st_rpcSync( elcmd_setvmode, mode, &type, &res );
+	cJSON_AddItemToObject(params, "output", cJSON_CreateString(output));
+	cJSON_AddItemToObject(params, "mode", cJSON_CreateString(mode));
+	ret = st_rpcSync(elcmd_setvmode, params, &type, &res);
 //	ret = st_rpcSyncTimeout( elcmd_setvmode, mode, 1, &type, &res );
 
 	if( ret == 0 && type == elcdRpcResult && res && res->type == cJSON_String ) {
@@ -645,56 +657,69 @@ int st_setVideoFormat(const char *name)
 			eprintf("%s: failed: %s\n", __FUNCTION__, res->valuestring);
 			ret = 1;
 		} else {
-			stHelper_indicatorShowVideoFormat(name);
+			stHelper_indicatorShowVideoFormat(mode);
 		}
 	} else if ( type == elcdRpcError && res && res->type == cJSON_String ) {
 		eprintf("%s: error: %s\n", __FUNCTION__, res->valuestring);
 		ret = 1;
 	}
 	cJSON_Delete(res);
-	cJSON_Delete(mode);
+	cJSON_Delete(params);
+
 	return ret;
 }
 
-void st_changeOutputMode(char *selectedFormat, char *previousFormat)
+int32_t st_changeOutputMode(videoOutput_t *p_videoOutput, const char *newOutputFormat)
 {
-	int old_height, new_height;
-	old_height = stHelper_getFormatHeight(previousFormat);
-	new_height = stHelper_getFormatHeight(selectedFormat);
+	uint32_t	old_height;
+	uint32_t	new_height;
+	uint32_t	len;
+
+	if(!p_videoOutput || !newOutputFormat)
+		return -1;
+	old_height = stHelper_getFormatHeight(p_videoOutput->currentFormat);
+	new_height = stHelper_getFormatHeight(newOutputFormat);
 
 	if (old_height != new_height) {
 		gfx_stopEventThread();
 		gfx_terminate();
-		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"deinitfb\",\"params\":[],\"id\": 1}");
-		st_setVideoFormat(selectedFormat);
-		stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
+		stHelper_sendToElcd("deinitfb");
+		st_setVideoFormat(p_videoOutput->name, newOutputFormat);
+		stHelper_sendToElcd("initfb");
 		stHelper_waitForFBdevice("/dev/fb0");
-		if (new_height < 720 && interfaceInfo.screenHeight >= 720) {
-			// Reset graphics mode for small resolutions
-			appControlInfo.outputInfo.graphicsMode[0] = 0;
-			saveAppSettings();
+		if(p_videoOutput->isMajor) {
+			if (new_height < 720 && interfaceInfo.screenHeight >= 720) {
+				// Reset graphics mode for small resolutions
+				appControlInfo.outputInfo.graphicsMode[0] = 0;
+				saveAppSettings();
+			}
+			if (appControlInfo.outputInfo.graphicsMode[0] == 0) {
+				stHelper_setDirectFBMode(stHelper_getFormatWidth(new_height), new_height);
+			}
 		}
-		if (appControlInfo.outputInfo.graphicsMode[0] == 0)
-			stHelper_setDirectFBMode(stHelper_getFormatWidth(new_height), new_height);
 		gfx_init(0, NULL);
 		interface_resize();
 		gfx_startEventThread();
 		needRestart = 1;
 	} else {
-		st_setVideoFormat(selectedFormat);
+		st_setVideoFormat(p_videoOutput->name, newOutputFormat);
 	}
 
-	return;
+	len = sizeof(p_videoOutput->currentFormat);
+	strncpy(p_videoOutput->currentFormat, newOutputFormat, len);
+	p_videoOutput->currentFormat[len - 1] = 0;
+
+	return 0;
 }
 
 void st_reinitFb(char *currentFormat)
 {
-	stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"deinitfb\",\"params\":[],\"id\": 1}");
+	stHelper_sendToElcd("deinitfb");
 	if (appControlInfo.outputInfo.graphicsMode[0] == 0) {
 		int height = stHelper_getFormatHeight(currentFormat);
 		stHelper_setDirectFBMode(stHelper_getFormatWidth(height), height);
 	}
-	stHelper_sendToSocket("/tmp/elcd.sock", "{\"method\":\"initfb\",\"params\":[],\"id\": 1}");
+	stHelper_sendToElcd("initfb");
 	stHelper_waitForFBdevice("/dev/fb0");
 }
 

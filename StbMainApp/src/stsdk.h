@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "defines.h"
 #include "app_info.h"
 #include "dvb.h"
+#include "output.h"
 
 #include <elcd-rpc.h>
 #ifdef ENABLE_DVB
@@ -118,10 +119,10 @@ void st_sendDiseqc(tunerFormat tuner, const uint8_t *cmd, size_t len);
 
 /** Changes hdmi output mode. Reinitialize framebuffer if resolution is changed.
  * 
- * @param[in] selectedFormat Setted output mode.
- * @param[in] previousFormat Previous output mode. For detecting resolution change
+ * @param[in] p_videoOutput   Structure that contain information about setted video output.
+ * @param[in] newOutputFormat Setted output mode.
  */
-void st_changeOutputMode(char *selectedFormat, char *previousFormat);
+int32_t st_changeOutputMode(videoOutput_t *p_videoOutput, const char *newOutputFormat);
 
 void st_getFormatResolution(const char *format, int *width, int *height);
 

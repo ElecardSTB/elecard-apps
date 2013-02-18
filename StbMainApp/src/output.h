@@ -61,6 +61,20 @@ typedef enum _colorSetting_t
 	colorSettingCount = 3, // don't include Hue for now...
 } colorSetting_t;
 
+#ifdef STSDK
+typedef struct {
+	interfaceListMenu_t	menu;
+	char				name[64];
+	char				currentFormat[64];
+	uint32_t			formatCount;
+	uint8_t				showAdvanced;
+	uint8_t				isMajor;
+	uint8_t				hasFeedback;	//Defines supporting feedback from video receivers.
+										//It mean that receiver can inform about supported (and native) modes.
+
+} videoOutput_t;
+#endif
+
 /*******************
 * EXPORTED DATA    *
 ********************/

@@ -67,6 +67,7 @@ const char* rpc_cmd_names[] = {
 [elcmd_getvol]      = "getvol",
 [elcmd_setvmode]    = "setvmode",
 [elcmd_listvmode]   = "listvmode",
+[elcmd_listvoutput] = "listvoutput",
 [elcmd_getaudio]    = "getaudio",
 [elcmd_setaudio]    = "setaudio",
 [elcmd_setzoom]     = "setzoom",

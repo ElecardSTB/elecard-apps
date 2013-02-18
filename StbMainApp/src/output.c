@@ -116,6 +116,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FORMAT_CHANGE_TIMEOUT       (15)
 
+#define ARRAY_SIZE(arr)				(sizeof(arr)/sizeof(*arr))
+
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
@@ -351,12 +353,12 @@ static int output_askPassword(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterPassword(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg);
 #endif
-static void output_fillFormatMenu(void);
 static void output_fillTimeZoneMenu(void);
 #if (defined STB6x8x) || (defined STB225)
 static void output_fillStandardMenu(void);
 #endif
 #ifdef STB82
+static void output_fillFormatMenu(void);
 static void output_fillBlankingMenu(void);
 #endif
 
@@ -366,7 +368,7 @@ static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
 
-static int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg);
+static int output_toggleAdvancedVideoOutput(interfaceMenu_t *pMenu, void* pArg);
 #endif
 static const char* output_getLanModeName(lanMode_t mode);
 static void output_setIfaceMenuName(interfaceMenu_t *pMenu, const char *ifaceName, int wan, lanMode_t lanMode);
@@ -404,10 +406,12 @@ static interfaceListMenu_t DiSEqCMenu;
 
 static const char *diseqc_switch_names[] = DISEQC_SWITCH_NAMES;
 #endif
+#ifndef STSDK
 static interfaceListMenu_t StandardMenu;
 static interfaceListMenu_t FormatMenu;
-static interfaceListMenu_t GraphicsModeMenu;
 static interfaceListMenu_t BlankingMenu;
+#endif
+static interfaceListMenu_t GraphicsModeMenu;
 static interfaceListMenu_t TimeZoneMenu;
 static interfaceListMenu_t InterfaceMenu;
 static interfaceListMenu_t PlaybackMenu;
@@ -466,8 +470,10 @@ static pppInfo_t pppInfo;
 
 #ifdef STSDK
 static interfaceListMenu_t UpdateMenu;
-static char output_currentFormat[64] = "";
-static char output_originalFormat[64] = "";
+
+videoOutput_t	*p_mainVideoOutput = NULL;
+static char		previousFormat[64]; //this needs for cancel switching video output format
+static uint32_t	isToggleContinues = 0; //this indicates that "togle vfmt" button pressed several times without apply/cancaling format
 #endif
 
 #define GRAPHICS_MODE_COUNT 4
@@ -669,7 +675,7 @@ int output_saveAndRedraw(int saveFailed, interfaceMenu_t *pMenu)
 }
 
 #ifdef STSDK
-static void output_applyFormat(void)
+static void output_applyFormatMessage(void)
 {
 	if (st_needRestart()) {
 		interface_showMessageBox(_T("RESTARTING"), thumbnail_warning, 0);
@@ -677,13 +683,16 @@ static void output_applyFormat(void)
 	}
 }
 
-static int output_cancelFormat(void *notused)
+//this function MUST NOT be called from keyThread, because it cantain call of st_changeOutputMode() that can reinit DirectFB
+static int output_cancelFormat(void *pArg)
 {
+	videoOutput_t	*p_videoOutput = (videoOutput_t *)pArg;
+
 	interface_hideMessageBox();
-	st_changeOutputMode(output_originalFormat, output_currentFormat);
-	strcpy(output_currentFormat, output_originalFormat);
-	output_refillMenu(_M &FormatMenu);
-	output_applyFormat();
+	st_changeOutputMode(p_videoOutput, previousFormat);
+
+	output_refillMenu(&(p_videoOutput->menu.baseMenu));
+	output_applyFormatMessage();
 	interface_displayMenu(1);
 	return 0;
 }
@@ -691,38 +700,52 @@ static int output_cancelFormat(void *notused)
 static int output_confirmFormat(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	if ((cmd->command == interfaceCommandGreen) ||
-	    (cmd->command == interfaceCommandEnter) ||
-	    (cmd->command == interfaceCommandOk))
+		(cmd->command == interfaceCommandEnter) ||
+		(cmd->command == interfaceCommandOk))
 	{
+//		videoOutput_t	*p_videoOutput = (videoOutput_t *)pArg;
+
 		interface_hideMessageBox();
-		interface_removeEvent(output_cancelFormat, NULL);
-		output_applyFormat();
-		strcpy(output_originalFormat, output_currentFormat);
+		interface_removeEvent(output_cancelFormat, pArg);
+		output_applyFormatMessage();
 	} else {
 		// output_cancelFormat MUST NOT be called from keyThread, because it tries to cancel it
-		interface_addEvent(output_cancelFormat, NULL, 0, 1);
+		interface_addEvent(output_cancelFormat, pArg, 0, 1);
 	}
+	isToggleContinues = 0;
 	return 0;
 }
 
-static int output_toggleOutputModesEvent(void *pFormatStr)
+static const char *output_getSelectedFormatName(interfaceMenu_t *pMenu)
 {
-	st_changeOutputMode(pFormatStr, output_currentFormat);
-	strcpy(output_currentFormat, pFormatStr);
+	int32_t		itemMenu = pMenu->selectedItem;
 
-	interface_addEvent(output_cancelFormat, NULL, FORMAT_CHANGE_TIMEOUT*1000, 1);
-	interface_showConfirmationBox( _T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, NULL );
-	return 1;
+	if(itemMenu < 0)
+		return NULL;
+
+	if(pMenu->menuEntry[itemMenu].pArg)
+		return (char *)pMenu->menuEntry[itemMenu].pArg;
+
+	return pMenu->menuEntry[itemMenu].info;
 }
 
-static char *output_getFormatName(interfaceMenu_t *pMenu, int itemMenu)
+//this function MUST NOT be called from keyThread, because it cantain call of st_changeOutputMode() that can reinit DirectFB
+static int output_tryNewVideoMode_Event(void* pArg)
 {
-	char *formatName = NULL;
-	formatName = pMenu->menuEntry[itemMenu].info;
-	if(pMenu->menuEntry[itemMenu].pArg)
-		formatName = (char *)pMenu->menuEntry[itemMenu].pArg;
+	videoOutput_t	*p_videoOutput = (videoOutput_t *)pArg;
+	const char		*newVideoMode = output_getSelectedFormatName(&(p_videoOutput->menu.baseMenu));
 
-	return formatName;
+	if(strcmp(p_videoOutput->currentFormat, newVideoMode) == 0) {
+		return 1;
+	}
+	interface_showMessageBox(_T("PLEASE_WAIT"), thumbnail_info, 0);
+
+	st_changeOutputMode(p_videoOutput, newVideoMode);
+
+	interface_addEvent(output_cancelFormat, pArg, FORMAT_CHANGE_TIMEOUT * 1000, 1);
+
+	interface_showConfirmationBox(_T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, pArg);
+	return 1;
 }
 
 /**
@@ -730,51 +753,201 @@ static char *output_getFormatName(interfaceMenu_t *pMenu, int itemMenu)
  */
 int output_toggleOutputModes(void)
 {
-	int next = 0;
-	interfaceMenu_t *pMenu = _M &FormatMenu;
-	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
-	next = pMenu->selectedItem + 1;
-	if(next > (pMenu->menuEntryCount - 2)) //last item is show/hide advanced menu, so ignore it
-		next = 0;
-	pMenu->selectedItem = next;
+	interfaceMenu_t	*pMenu;
 
-	interface_addEvent(output_toggleOutputModesEvent, output_getFormatName(pMenu, next), 0, 1);
+	//we shold enable VideoSubMenu, because p_mainVideoOutput initialize there
+	interface_switchMenu(interfaceInfo.currentMenu, &(VideoSubMenu.baseMenu));
+	if(p_mainVideoOutput == NULL) {
+		return -1;
+	}
+	pMenu = &(p_mainVideoOutput->menu.baseMenu);
+	interface_menuActionShowMenu(interfaceInfo.currentMenu, pMenu);
+	if(p_mainVideoOutput->formatCount) {
+		uint32_t	next = 0;
+		next = pMenu->selectedItem + 1;
+		if(next > (p_mainVideoOutput->formatCount - 1))
+			next = 0;
+		pMenu->selectedItem = next;
+	} else {
+		return -1;
+	}
+
+	if(isToggleContinues == 0) {
+		strcpy(previousFormat, p_mainVideoOutput->currentFormat);
+		isToggleContinues = 1;
+	}
+	interface_addEvent(output_tryNewVideoMode_Event, (void *)p_mainVideoOutput, 0, 1);
 	return 0;
 }
 
-
-static int output_outputModesToggleAdvanced(interfaceMenu_t *pMenu, void* pArg)
+static int output_setVideoOutput(interfaceMenu_t *pMenu, void* pArg)
 {
-	int *showAdvanced = (int *)pArg;
-	*showAdvanced = !*showAdvanced;
-	output_fillFormatMenu();
-//	if(*showAdvanced == 0)
+	videoOutput_t	*p_videoOutput = (videoOutput_t *)pMenu;
+
+	isToggleContinues = 1;
+	strcpy(previousFormat, p_videoOutput->currentFormat);
+	interface_addEvent(output_tryNewVideoMode_Event, (void *)p_videoOutput, 0, 1);
+
+	return 0;
+}
+
+static void output_fillVideoOutputMenu(videoOutput_t *p_videoOutput)
+{
+	int32_t			selected = MENU_ITEM_BACK;
+	interfaceMenu_t	*formatMenu = &(p_videoOutput->menu.baseMenu);
+	elcdRpcType_t	type;
+	cJSON			*list;
+	cJSON			*param;
+	int32_t			ret;
+
+	param = cJSON_CreateString(p_videoOutput->name);
+	interface_clearMenuEntries(formatMenu);
+	ret = st_rpcSync(elcmd_listvmode, param, &type, &list);
+	if(ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array) {
+		cJSON *mode;
+		char *name;
+
+		struct {
+			char	*displayName;
+			char	*groupName;
+			int		groupNameLen;
+			cJSON	*mode;
+			char	*modeName;
+		} humanReadableOutputModes[] = {
+//			{"1080p",	"1080p",	sizeof("1080p") - 1,	NULL, NULL},
+			{"1080i",	"1080i",	sizeof("1080i") - 1,	NULL, NULL},
+			{"720p",	"720p",		sizeof("720p") - 1,		NULL, NULL},
+			{"PAL",		"720x576",	sizeof("720x576") - 1,	NULL, NULL},
+			{"NTSC",	"720x480",	sizeof("720x480") - 1,	NULL, NULL},
+		};
+		uint32_t	i;
+		int32_t		icon;
+		int32_t		hasSupportedModes = 0;
+
+		//check if supported any mode
+		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
+			name = objGetString(mode, "name", NULL);
+			if(!name)
+				continue;
+
+			if(objCheckIfTrue(mode, "current")) {
+				int len = sizeof(p_videoOutput->currentFormat);
+				strncpy(p_videoOutput->currentFormat, name, len);
+				p_videoOutput->currentFormat[len - 1] = 0;
+			}
+			if(!p_videoOutput->hasFeedback || objCheckIfTrue(mode, "supported")) {
+				uint32_t	j;
+				//fill mediate humanReadableOutputModes massive
+				for(j = 0; j < ARRAY_SIZE(humanReadableOutputModes); j++) {
+					//chek group name
+					if(strncmp(humanReadableOutputModes[j].groupName, name, humanReadableOutputModes[j].groupNameLen) != 0)
+						continue;
+					//choose the best mode (with highest fps)
+					//for example, next inequalitys are true:
+					//	"1080p60" > "1080p30" > "1080i50"
+					//	"720x576p50 (4:3)" > "720x576p50" > "720x576i50 (4:3)" > "720x576i50"
+					if(humanReadableOutputModes[j].modeName && (strcmp(humanReadableOutputModes[j].modeName, name) > 0))
+						continue;
+					// skip resolutions with 4:3 aspect
+					if(strstr(name, "(4:3)"))
+						continue;
+
+					humanReadableOutputModes[j].modeName = name;
+					humanReadableOutputModes[j].mode = mode;
+
+					hasSupportedModes = 1;
+					break;
+				}
+			}
+			if(p_videoOutput->showAdvanced && hasSupportedModes)
+				break;
+		}
+
+		if(!hasSupportedModes || p_videoOutput->showAdvanced) {
+			uint32_t formatId = 0;
+			//fill advanced settings fill menu here
+			for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
+				name = objGetString(mode, "name", NULL);
+				if(!name)
+					continue;
+
+				if(objCheckIfTrue(mode, "current")) {
+					selected = formatId;
+				}
+
+				icon = thumbnail_channels;
+				if(p_videoOutput->hasFeedback) {
+					if(objCheckIfTrue(mode, "native")) {
+						icon = thumbnail_tvstandard;
+					} else if(!objCheckIfTrue(mode, "supported")) {
+						icon = thumbnail_not_selected;
+					}
+				}
+
+				interface_addMenuEntry(formatMenu, name, output_setVideoOutput, NULL, icon);
+				formatId++;
+			}
+			p_videoOutput->formatCount = formatId;
+		}
+
+		if(hasSupportedModes) {
+			if(!p_videoOutput->showAdvanced) {
+				uint32_t formatId = 0;
+				//This static array should be changed on something clearer
+				static char	correctModeNames[ARRAY_SIZE(humanReadableOutputModes)][64];
+
+				for(i = 0; i < ARRAY_SIZE(humanReadableOutputModes); i++) {
+					if(humanReadableOutputModes[i].mode) {
+						mode = humanReadableOutputModes[i].mode;
+
+						icon = objCheckIfTrue(mode, "native") ? thumbnail_tvstandard : thumbnail_channels;
+						if(objCheckIfTrue(mode, "current"))
+							selected = formatId;
+
+						strncpy(correctModeNames[i], humanReadableOutputModes[i].modeName, sizeof(correctModeNames[i]) - 1);
+						correctModeNames[i][sizeof(correctModeNames[i]) - 1] = 0;
+// printf("%s[%d]: humanReadableOutputModes[%d].displayName=%s, correctModeNames[%d]=%s\n",
+// 		__FILE__, __LINE__, i, humanReadableOutputModes[i].displayName, i, correctModeNames[i]);
+
+						interface_addMenuEntry(formatMenu, humanReadableOutputModes[i].displayName, output_setVideoOutput, correctModeNames[i], icon);
+						formatId++;
+					}
+				}
+				p_videoOutput->formatCount = formatId;
+				interface_addMenuEntry(formatMenu, _T("SHOW_ADVANCED"), output_toggleAdvancedVideoOutput, (void *)p_videoOutput, thumbnail_configure);
+			} else {
+				interface_addMenuEntry(formatMenu, _T("HIDE_ADVANCED"), output_toggleAdvancedVideoOutput, (void *)p_videoOutput, thumbnail_configure);
+			}
+		}
+	} else if( type == elcdRpcError && list && list->type == cJSON_String )
+		eprintf("%s: failed to get video mode list: %s\n", list->valuestring);
+	cJSON_Delete(param);
+	cJSON_Delete(list);
+
+	interface_setSelectedItem(formatMenu, selected);
+}
+
+static int output_toggleAdvancedVideoOutput(interfaceMenu_t *pMenu, void* pArg)
+{
+	videoOutput_t	*p_videoOutput = (videoOutput_t *)pArg;
+
+	p_videoOutput->showAdvanced = !p_videoOutput->showAdvanced;
+	output_fillVideoOutputMenu(p_videoOutput);
+//	if(p_videoOutput->showAdvanced == 0)
 //		interface_setSelectedItem(pMenu, interface_getMenuEntryCount(pMenu) - 1);
 	interface_displayMenu(1);
 
 	return 0;
 }
-#endif // STSDK
 
-/**
- * This function now uses the Encoder API to set the output format instead of the Output API.
- */
-static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
+static int output_enterVideoOutputMenu(interfaceMenu_t *pMenu, void *pArg)
 {
-#ifdef STB82
-	int format = GET_NUMBER(pArg);
+	videoOutput_t	*p_videoOutput = (videoOutput_t *)pArg;
 
-	gfx_changeOutputFormat(format);
-	appControlInfo.outputInfo.format = format;
-	output_warnIfFailed(saveAppSettings());
-    output_fillFormatMenu();
-	interface_displayMenu(1);
-#endif // STB82
-#ifdef STSDK
-	interface_addEvent(output_toggleOutputModesEvent, output_getFormatName(pMenu, pMenu->selectedItem), 0, 1);
-#endif
-    return 0;
+	output_fillVideoOutputMenu(p_videoOutput);
+	return 0;
 }
+#endif // STSDK
 
 #ifdef STB82
 /**
@@ -3202,6 +3375,23 @@ static void output_fillTimeZoneMenu(void)
 	interface_setSelectedItem(tzMenu, selected);
 }
 
+#ifdef STB82
+/**
+ * This function now uses the Encoder API to set the output format instead of the Output API.
+ */
+static int output_setFormat(interfaceMenu_t *pMenu, void* pArg)
+{
+	int format = GET_NUMBER(pArg);
+
+	gfx_changeOutputFormat(format);
+	appControlInfo.outputInfo.format = format;
+	output_warnIfFailed(saveAppSettings());
+    output_fillFormatMenu();
+	interface_displayMenu(1);
+
+    return 0;
+}
+
 /**
  * This function now uses the Encoder description to get the supported outout formats instead of the Output API.
  */
@@ -3210,7 +3400,6 @@ static void output_fillFormatMenu(void)
 	int selected = MENU_ITEM_BACK;
 	interfaceMenu_t *formatMenu = _M &FormatMenu;
 	interface_clearMenuEntries(formatMenu);
-#ifdef STB82
 	int n = 0;
 	int position = 0;
 	char *signalName;
@@ -3262,124 +3451,17 @@ static void output_fillFormatMenu(void)
 			}
 		}
 	}
-#endif // STB82
-#ifdef STSDK
-	elcdRpcType_t type;
-	cJSON *list = NULL;
-	int    ret;
 
-	ret = st_rpcSync( elcmd_listvmode, NULL, &type, &list );
-	if(ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array) {
-		cJSON *mode;
-		char *name;
-
-		struct commonOutputModes_s {
-			char	*displayName;
-			char	*groupName;
-			int		groupNameLen;
-			cJSON	*mode;
-		} commonOutputModes[] = {
-//			{"1080p",	"1080p",	sizeof("1080p") - 1,	NULL},
-			{"1080i",	"1080i",	sizeof("1080i") - 1,	NULL},
-			{"720p",	"720p",		sizeof("720p") - 1,		NULL},
-			{"PAL",		"720x576p",	sizeof("720x576p") - 1,	NULL},
-			{"NTSC",	"720x480p",	sizeof("720x576p") - 1,	NULL},
-		};
-		int i, j;
-		int icon;
-		int commonOutputModesCount = sizeof(commonOutputModes) / sizeof(commonOutputModes[0]);
-		int hasSupportedModes = 0;
-		static char	commonModeNames[sizeof(commonOutputModes) / sizeof(commonOutputModes[0])][32];
-		static int showAdvanced = 0;
-
-		//check if supported any mode
-		for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
-			name = objGetString(mode, "name", NULL);
-			if(!name)
-				continue;
-
-			if(objCheckIfTrue(mode, "current")) {
-				int len = sizeof(output_currentFormat);
-				strncpy(output_currentFormat, name, len);
-				output_currentFormat[len - 1] = 0;
-			}
-			if(objCheckIfTrue(mode, "supported")) {
-				//fill mediate commonOutputModes massive
-				for(j = 0; j < commonOutputModesCount; j++) {
-					if( strncmp(commonOutputModes[j].groupName, name, commonOutputModes[j].groupNameLen) == 0 &&
-					   (commonOutputModes[j].mode == NULL || strcmp(commonModeNames[j], name) < 0)) // choose the best mode (with highest fps)
-					{
-						commonOutputModes[j].mode = mode;
-						strncpy(commonModeNames[j], name, sizeof(commonModeNames[j]) - 1);
-						commonModeNames[j][sizeof(commonModeNames[j]) - 1] = 0;
-						hasSupportedModes = 1;
-					}
-				}
-			}
-		}
-
-		if(!hasSupportedModes || showAdvanced) {
-			uint32_t n = 0;
-			//fill advanced settings fill menu here
-			for(i = 0; (mode = cJSON_GetArrayItem(list, i)) != NULL; i++) {
-				name = objGetString( mode, "name", NULL );
-				if(!name)
-					continue;
-
-				if(objCheckIfTrue(mode, "current")) {
-					selected = n;
-				}
-
-				if(objCheckIfTrue(mode, "native")) {
-					icon = thumbnail_tvstandard;
-				} else {
-					icon = objCheckIfTrue(mode, "supported") ? thumbnail_channels : thumbnail_not_selected;
-				}
-
-				interface_addMenuEntry(formatMenu, name, output_setFormat, NULL, icon);
-				n++;
-			}
-		}
-
-		if(hasSupportedModes) {
-			if(!showAdvanced) {
-				for(j = 0; j < commonOutputModesCount; j++) {
-					if(commonOutputModes[j].mode) {
-						mode = commonOutputModes[j].mode;
-
-						icon = objCheckIfTrue(mode, "native") ? thumbnail_tvstandard : thumbnail_channels;
-						if(objCheckIfTrue(mode, "current"))
-							selected = j;
-						interface_addMenuEntry(formatMenu, commonOutputModes[j].displayName, output_setFormat, commonModeNames[j], icon);
-					}
-				}
-				interface_addMenuEntry(formatMenu, _T("SHOW_ADVANCED"), output_outputModesToggleAdvanced, &showAdvanced, thumbnail_configure);
-			} else {
-				interface_addMenuEntry(formatMenu, _T("HIDE_ADVANCED"), output_outputModesToggleAdvanced, &showAdvanced, thumbnail_configure);
-			}
-		}
-	} else if( type == elcdRpcError && list && list->type == cJSON_String )
-		eprintf("%s: failed to get video mode list: %s\n", list->valuestring);
-	cJSON_Delete(list);
-#endif // STSDK
 	interface_setSelectedItem(formatMenu, selected);
 }
-
-#ifdef STSDK
-int output_enterFormatMenu(interfaceMenu_t *pMenu, void *pArg)
-{
-	output_fillFormatMenu();
-	strcpy(output_originalFormat, output_currentFormat);
-	return 0;
-}
-#endif
+#endif // STB82
 
 static int output_applyGraphicsMode(void *notused)
 {
 	gfx_stopEventThread();
 	gfx_terminate();
 #ifdef STSDK
-	st_reinitFb(output_currentFormat);
+	st_reinitFb(p_mainVideoOutput ? p_mainVideoOutput->currentFormat : "");
 #endif
 	interface_hideLoading();
 	gfx_init(0, NULL);
@@ -3399,11 +3481,11 @@ static int output_setGraphicsMode(interfaceMenu_t *pMenu, void *pModeStr)
 	int width = 720, height = 576;
 	if (sscanf(pModeStr, "%dx%d", &width, &height) != 2) {
 #ifdef STSDK
-		st_getFormatResolution(output_currentFormat, &width, &height);
+		st_getFormatResolution(p_mainVideoOutput ? p_mainVideoOutput->currentFormat : "", &width, &height);
 #endif
 	}
 	if (width  == interfaceInfo.screenWidth &&
-	    height == interfaceInfo.screenHeight) {
+		height == interfaceInfo.screenHeight) {
 		interface_displayMenu(1);
 		return 0;
 	}
@@ -3417,7 +3499,7 @@ static int output_enterGraphicsModeMenu(interfaceMenu_t *graphicsMenu, void *pAr
 {
 #ifdef STSDK
 	int new_height, height;
-	st_getFormatResolution(output_currentFormat, &new_height, &height);
+	st_getFormatResolution(p_mainVideoOutput ? p_mainVideoOutput->currentFormat : "", &new_height, &height);
 #endif
 	interface_clearMenuEntries(graphicsMenu);
 	for (int i = 0; i < GRAPHICS_MODE_COUNT; i++) {
@@ -4012,25 +4094,23 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 
 int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 {
+	char *str;
+	char buf[MENU_ENTRY_INFO_LENGTH];
+
+#ifdef STB82
 	// assert (videoMenu == (interfaceMenu_t*)&VideoSubMenu);
 	interface_clearMenuEntries(videoMenu);
-#ifdef STB82
+
 	interface_addMenuEntry(videoMenu, _T("TV_STANDARD"), interface_menuActionShowMenu, &StandardMenu, thumbnail_tvstandard);
 	/* We only enable this menu when we are outputting SD and we do not only have the HD denc. (HDMI is not denc[0])*/
-	if (!(gfx_isHDoutput()) && !(appControlInfo.outputInfo.encDesc[0].all_connectors & DSOC_HDMI))
-#endif
-	{
+	if(!(gfx_isHDoutput()) && !(appControlInfo.outputInfo.encDesc[0].all_connectors & DSOC_HDMI)) {
 		interface_addMenuEntry(videoMenu, _T("TV_FORMAT"), interface_menuActionShowMenu, &FormatMenu, thumbnail_channels);
-#ifdef STB82
+
 		/*Only add slow blanking if we have the capability*/
 		if (appControlInfo.outputInfo.encDesc[0].caps & DSOCAPS_SLOW_BLANKING)
 			interface_addMenuEntry(videoMenu, _T("TV_BLANKING"), interface_menuActionShowMenu, &BlankingMenu, thumbnail_configure);
-#endif
 	}
 	interface_addMenuEntry(videoMenu, _T("INTERFACE_SIZE"), interface_menuActionShowMenu, &GraphicsModeMenu, settings_interface);
-#ifdef STB82
-	char *str;
-	char buf[MENU_ENTRY_INFO_LENGTH];
 
 	str = appControlInfo.outputInfo.aspectRatio == aspectRatio_16x9 ? "16:9" : "4:3";
 	sprintf(buf, "%s: %s", _T("ASPECT_RATIO"), str);
@@ -4049,7 +4129,64 @@ int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 	str = _T("COLOR_SETTINGS");
 	interface_addMenuEntry(videoMenu, str, output_showColorSlider, NULL, thumbnail_tvstandard);
 #endif // STB82
+#ifdef STSDK
+	static uint8_t	initialized = 0;
 
+	if(!initialized) {
+		elcdRpcType_t	type;
+		cJSON			*list = NULL;
+		int32_t			ret;
+
+		interface_clearMenuEntries(videoMenu);
+
+		ret = st_rpcSync(elcmd_listvoutput, NULL, &type, &list);
+		if(ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array) {
+			uint32_t	i;
+//			uint32_t	j = 0;
+			cJSON		*output;
+
+			for(i = 0; (output = cJSON_GetArrayItem(list, i)) != NULL; i++) {
+				videoOutput_t	*p_videoOutput;
+				char			*name;
+				name = objGetString(output, "name", NULL);
+				if(!name)
+					continue;
+
+				//TODO: dont forget to free it somewhere
+				p_videoOutput = malloc(sizeof(videoOutput_t));
+				if(p_videoOutput == NULL) {
+					eprintf("%s: ERROR: Cant allocate memory\n", __FUNCTION__);
+					continue;
+				}
+				memset(p_videoOutput, 0 , sizeof(videoOutput_t));
+
+				strncpy(p_videoOutput->name, name, sizeof(p_videoOutput->name));
+				p_videoOutput->name[sizeof(p_videoOutput->name) - 1] = 0;
+
+				if(objCheckIfTrue(output, "major")) {
+					p_mainVideoOutput = p_videoOutput;
+					p_videoOutput->isMajor = 1;
+				}
+				if(objCheckIfTrue(output, "feedback")) {
+					p_videoOutput->hasFeedback = 1;
+				}
+
+				snprintf(buf, sizeof(buf), "TV_FORMAT_%s", name);
+				str = _T(buf);
+				createListMenu(&(p_videoOutput->menu), str, settings_video, NULL, videoMenu,
+								interfaceListMenuIconThumbnail, output_enterVideoOutputMenu, NULL, p_videoOutput);
+				interface_addMenuEntry(videoMenu, str, interface_menuActionShowMenu, &(p_videoOutput->menu), thumbnail_channels);
+			}
+		} else {
+			eprintf("%s: failed to get video outputs\n", __FUNCTION__);
+		}
+		cJSON_Delete(list);
+
+		interface_addMenuEntry(videoMenu, _T("INTERFACE_SIZE"), interface_menuActionShowMenu, &GraphicsModeMenu, settings_interface);
+
+		initialized = 1;
+	}
+#endif
 	return 0;
 }
 
@@ -5675,21 +5812,19 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterNetworkMenu, output_leaveNetworkMenu, NULL);
 
+#ifndef STSDK
 	createListMenu(&StandardMenu, _T("TV_STANDARD"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&FormatMenu, _T("TV_FORMAT"), settings_video, NULL, _M &VideoSubMenu,
-		interfaceListMenuIconThumbnail,
-#ifdef STSDK
-		output_enterFormatMenu, NULL, NULL);
-#else
-		NULL, NULL, NULL);
-#endif
-	createListMenu(&GraphicsModeMenu, _T("INTERFACE_SIZE"), settings_video, NULL, _M &VideoSubMenu,
-		interfaceListMenuIconThumbnail, output_enterGraphicsModeMenu, NULL, NULL);
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 
 	createListMenu(&BlankingMenu, _T("TV_BLANKING"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+
+#endif
+	createListMenu(&GraphicsModeMenu, _T("INTERFACE_SIZE"), settings_video, NULL, _M &VideoSubMenu,
+		interfaceListMenuIconThumbnail, output_enterGraphicsModeMenu, NULL, NULL);
 
 	createListMenu(&TimeZoneMenu, _T("TIME_ZONE"), settings_datetime, NULL, _M &TimeSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
@@ -5756,9 +5891,9 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #endif
 #if (defined STB82)
 	output_fillBlankingMenu();
+	output_fillFormatMenu();
 #endif
 	output_fillOutputMenu();
-	output_fillFormatMenu();
 	output_fillTimeZoneMenu();
 }
 
