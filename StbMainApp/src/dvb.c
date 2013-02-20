@@ -979,6 +979,17 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		media = NULL;
 	if (type == DVBT && (media == NULL || media->type == serviceMediaDVBT))
 	{
+#ifdef DTV_STREAM_ID
+		uint8_t plp_id = media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id;
+		struct dtv_property dtv = { .cmd = DTV_STREAM_ID, .u.data = plp_id, };
+		struct dtv_properties cmdseq = { .num = 1, .props = &dtv, };
+		if (ioctl(frontend_fd, FE_SET_PROPERTY, &cmdseq) == -1) {
+			eprintf("%s[%d]: set %u plp failed: %s\n", __FUNCTION__, tuner, plp_id, strerror(errno));
+			appControlInfo.dvbtInfo.plp_id = 0;
+			return -1;
+		}
+		eprintf("   T: plp %u\n", plp_id);
+#endif
 		p.u.ofdm.bandwidth = media != NULL ? media->dvb_t.bandwidth :
 		                     appControlInfo.dvbtInfo.bandwidth;
 		p.u.ofdm.code_rate_HP = FEC_AUTO;
@@ -1653,10 +1664,12 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 		eprintf("%s[%d]: scanning %6u\n", __FUNCTION__, tuner, frequency / KHZ);
 		int res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
 		cJSON_Delete(params);
+		if (!st_isOk(type, result, "  service scan"))
+			res = 1;
 		cJSON_Delete(result);
-		if (frontend_fd != 0) close(frontend_fd);
-		if (res != 0 || type != elcdRpcResult)
-		{
+		if (frontend_fd != 0)
+			close(frontend_fd);
+		if (res != 0) {
 			eprintf("%s[%d]: failed to scan %6u\n", __FUNCTION__, tuner, frequency / KHZ );
 			return -1;
 		}

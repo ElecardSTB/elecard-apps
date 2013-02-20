@@ -509,6 +509,10 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
 	switch (appControlInfo.tunerInfo[tuner].type)
 	{
+		case DVBT:
+			cJSON_AddItemToObject(params, "stream",
+				cJSON_CreateNumber( media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id ));
+			break;
 		case DVBC: {
 			fe_modulation_t modulation = media ? media->dvb_c.modulation : appControlInfo.dvbcInfo.modulation;
 			for (int i=0; modulation_names[i].name != NULL; i++)

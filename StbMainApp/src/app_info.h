@@ -530,6 +530,7 @@ typedef struct __stb810_dvbtInfo
 {
 	stb810_dvbfeInfo     fe;
 	fe_bandwidth_t       bandwidth;
+	uint8_t              plp_id;
 } stb810_dvbtInfo;
 
 typedef struct __stb810_dvbcInfo

@@ -660,9 +660,13 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	}
 	interface_hideMessageBox();
 	offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
+
+	int ok = 0;
+	do {
+
 	memset(&nit, 0, sizeof(NIT_table_t));
-	if (dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay, appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL) == 0)
-	{
+	ok = 0 == dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay, appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL);
+	if (ok) {
 		interface_refreshMenu(pMenu);
 		output_showDVBMenu(pMenu, NULL);
 		offair_fillDVBTMenu();
@@ -672,6 +676,18 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 #endif
 	}
 	dvb_clearNIT(&nit);
+
+	if (ok &&
+	    dvb_getType(tuner) == DVBT &&
+	   (appControlInfo.tunerInfo[tuner].caps & tunerDVBT2) &&
+	    appControlInfo.dvbtInfo.plp_id < 3) {
+		appControlInfo.dvbtInfo.plp_id++;
+		dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
+		ok = 1;
+	} else
+		ok = 0;
+	} while (ok);
+	appControlInfo.dvbtInfo.plp_id = 0;
 	interface_sliderShow(0, 0);
 	sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
 	interface_showMessageBox(buf, thumbnail_info, 5000);
