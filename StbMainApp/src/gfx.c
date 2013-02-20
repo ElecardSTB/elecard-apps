@@ -4510,6 +4510,7 @@ void gfx_stopEventThread(void)
 {
 	if(gfx_inputEventThread) {
 		keyThreadActive = 0;
+		appEventBuffer->WakeUp(appEventBuffer);
 		pthread_join(gfx_inputEventThread, NULL);
 		gfx_inputEventThread = NULL;
 		appEventBuffer->Release(appEventBuffer);
