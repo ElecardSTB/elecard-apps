@@ -780,6 +780,7 @@ void offair_stopVideo(int which, int reset)
 	mysem_release(offair_semaphore);
 }
 
+#ifndef STSDK
 static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
@@ -848,6 +849,7 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 	}
 	return 1;
 }
+#endif // !STSDK
 
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 {
@@ -896,8 +898,9 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		interface_displayMenu(1);
 #endif
 		return 0;
-	} else if (button == interfacePlayControlAudioTracks)
-	{
+	} else
+#ifndef STSDK
+	if (button == interfacePlayControlAudioTracks) {
 		//dprintf("%S: request change tracks\n", __FUNCTION__);
 		if (dvb_getAudioCount(current_service()) > 0)
 		{
@@ -906,7 +909,9 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 		interface_displayMenu(1);
 		return 0;
-	}else if (button == interfacePlayControlAddToPlaylist)
+	} else
+#endif // !STSDK
+	if (button == interfacePlayControlAddToPlaylist)
 	{
 		dprintf("%s: add to playlist %d\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
 		dvb_getServiceURL(current_service(), desc);
