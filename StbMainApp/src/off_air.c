@@ -149,6 +149,7 @@ typedef struct _offair_multiviewInstance_t {
 
 #ifdef ENABLE_DVB
 
+static void offair_exportServices(const char* filename);
 static void offair_setStateCheckTimer(int which, int bEnable);
 static int  offair_startNextChannel(int direction, void* pArg);
 static int  offair_setChannel(int channel, void* pArg);
@@ -166,6 +167,7 @@ static int  offair_scheduleCheck( int channelNumber );
 static int  offair_showSchedule(interfaceMenu_t *pMenu, void* pArg);
 static int  offair_updateEPG(void* pArg);
 static int  offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void* pArg);
+static int  offair_audioChanged(void* pArg);
 #ifdef ENABLE_DVB_DIAG
 static int  offair_updatePSI(void* pArg);
 #endif
@@ -793,18 +795,19 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			return 0;
 		} else if (cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk || cmd->command == interfaceCommandGreen)
 		{
-			if (appControlInfo.dvbInfo.audio_track != selected)
+			if (offair_services[appControlInfo.dvbInfo.channel].audio_track != selected)
 			{
-				if (dvb_getAudioType(current_service(), selected) != dvb_getAudioType(current_service(), appControlInfo.dvbInfo.audio_track))
+				if (dvb_getAudioType(current_service(), selected) != dvb_getAudioType(current_service(), offair_services[appControlInfo.dvbInfo.channel].audio_track))
 				{
 					offair_stopVideo(which, 0);
-					appControlInfo.dvbInfo.audio_track = selected;
+					offair_services[appControlInfo.dvbInfo.channel].audio_track = selected;
 					offair_startVideo(which);
 				} else
 				{
 					dvb_changeAudioPid(appControlInfo.dvbInfo.tuner, dvb_getAudioPid(current_service(), selected));
+					offair_services[appControlInfo.dvbInfo.channel].audio_track = selected;
 				}
-				appControlInfo.dvbInfo.audio_track = selected;
+				offair_exportServices(OFFAIR_SERVICES_FILENAME);
 			}
 			return 0;
 		} else if (cmd->command == interfaceCommandDown)
@@ -824,7 +827,7 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		}
 	} else
 	{
-		selected = appControlInfo.dvbInfo.audio_track;
+		selected = offair_services[appControlInfo.dvbInfo.channel].audio_track;
 	}
 
 	buf[0] = 0;
@@ -1502,6 +1505,16 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 	return 0;
 }
 
+static int offair_audioChanged(void* pArg)
+{
+	int selected = GET_NUMBER(pArg);
+	if (appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
+		offair_services[appControlInfo.dvbInfo.channel].audio_track = selected;
+		offair_exportServices(OFFAIR_SERVICES_FILENAME);
+	}
+	return 0;
+}
+
 void offair_startVideo(int which)
 {
 	if (current_service() == NULL) {
@@ -1516,7 +1529,7 @@ void offair_startVideo(int which)
 	param.adapter = dvb_getAdapter(appControlInfo.dvbInfo.tuner);
 	param.media = &current_service()->media;
 	param.param.liveParam.channelIndex = dvb_getServiceIndex(current_service());
-	param.param.liveParam.audioIndex = appControlInfo.dvbInfo.audio_track;
+	param.param.liveParam.audioIndex = offair_services[appControlInfo.dvbInfo.channel].audio_track;
 	param.directory = NULL;
 
 	if (current_service()->program_map.map.streams == NULL ||
@@ -1539,7 +1552,7 @@ void offair_startVideo(int which)
 		return;
 	}
 
-	int audio_type = dvb_getAudioType(current_service(), appControlInfo.dvbInfo.audio_track);
+	int audio_type = dvb_getAudioType(current_service(), offair_services[appControlInfo.dvbInfo.channel].audio_track);
 	int video_type = dvb_getVideoType(current_service());
 
 #ifdef ENABLE_DVB_DIAG
@@ -1637,7 +1650,12 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
 		return;
 	}
-
+#ifdef STSDK
+	if (offair_services[appControlInfo.dvbInfo.channel].audio_track) {
+		eprintf("%s: set audio %u\n", __func__, offair_services[appControlInfo.dvbInfo.channel].audio_track);
+		gfx_setVideoProviderAudioStream(which, offair_services[appControlInfo.dvbInfo.channel].audio_track);
+	}
+#endif
 	if (dvb_getScrambled(current_service()) != 0 && appControlInfo.offairInfo.dvbShowScrambled != SCRAMBLED_PLAY)
 	{
 		// FIXME: Need demuxer without decoder to collect statistics...
@@ -1869,7 +1887,6 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
 	appControlInfo.mediaInfo.bHttp = 0;
 	appControlInfo.dvbInfo.channel = channelNumber;
-	appControlInfo.dvbInfo.audio_track = 0;
 	appControlInfo.dvbInfo.scrambled = dvb_getScrambled(offair_services[channelNumber].service);
 
 	buttons = interfacePlayControlStop|interfacePlayControlPlay|interfacePlayControlPrevious|interfacePlayControlNext;
@@ -1883,6 +1900,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	interface_playControlSetDisplayFunction(offair_displayPlayControl);
 	interface_playControlSetProcessCommand(offair_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, offair_setChannel);
+	interface_playControlSetAudioCallback(offair_audioChanged);
 	interface_channelNumberShow(appControlInfo.playbackInfo.channel);
 
 	int i;
@@ -3338,10 +3356,11 @@ static void offair_exportServices(const char* filename)
 	{
 		if( (offair_services[i].common.media_id | offair_services[i].common.service_id | offair_services[i].common.transport_stream_id) != 0 )
 		{
-			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu\n", i,
+			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu\n", i,
 				offair_services[i].common.media_id,
 				offair_services[i].common.service_id,
-				offair_services[i].common.transport_stream_id );
+				offair_services[i].common.transport_stream_id,
+				offair_services[i].audio_track);
 		}
 	}
 	fclose(f);
@@ -3352,7 +3371,7 @@ static void offair_importServices(const char* filename)
 	char buf[BUFFER_SIZE];
 	int i;
 	unsigned long media_id;
-	unsigned short service_id, transport_stream_id;
+	unsigned short service_id, transport_stream_id, audio_track;
 
 	FILE* fd = fopen( filename, "r" );
 	if( fd == NULL )
@@ -3362,21 +3381,18 @@ static void offair_importServices(const char* filename)
 	}
 	while (fgets(buf, BUFFER_SIZE, fd) != NULL)
 	{
-		media_id = i = service_id = transport_stream_id = 0;
-		if ( sscanf(buf, "service %d media_id %lu service_id %hu transport_stream_id %hu\n",
-			&i, &media_id, &service_id, &transport_stream_id) == 4)
+		media_id = i = service_id = transport_stream_id = audio_track = 0;
+		if ( sscanf(buf, "service %d media_id %lu service_id %hu transport_stream_id %hu audio_track %hu\n",
+			&i, &media_id, &service_id, &transport_stream_id, &audio_track) >= 4)
 		{
-			if(i >= MAX_MEMORIZED_SERVICES || i < 0)
-			{
+			if (i >= MAX_MEMORIZED_SERVICES || i < 0)
 				continue;
-			}
-			if ( i >= offair_serviceCount )
-			{
+			if (i >= offair_serviceCount)
 				offair_serviceCount = i+1;
-			}
 			offair_services[i].common.media_id = media_id;
 			offair_services[i].common.service_id = service_id;
 			offair_services[i].common.transport_stream_id = transport_stream_id;
+			offair_services[i].audio_track = audio_track;
 		}
 	}
 	fclose(fd);

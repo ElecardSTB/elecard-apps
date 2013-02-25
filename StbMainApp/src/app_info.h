@@ -277,7 +277,6 @@ typedef struct
 	int                  active;
 	tunerFormat          tuner; // points to tunerInfo
 	int                  channel;
-	int                  audio_track;
 	int                  scrambled;
 	int                  channelChange;
 	int                  showInfo;
