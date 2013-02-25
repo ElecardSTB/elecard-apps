@@ -246,7 +246,11 @@ static inline int dvb_isSupported(fe_type_t  type)
 }
 static inline int dvb_isLinuxAdapter(int adapter)
 {
+#ifdef STSDK
 	return adapter >= 0 && adapter < ADAPTER_COUNT;
+#else
+	return 1;
+#endif
 }
 // Low nibble of 4th (data) DiSEqC command byte
 static inline uint8_t diseqc_data_lo(int satellite_position, int is_vertical, uint32_t f_khz)
@@ -255,6 +259,9 @@ static inline uint8_t diseqc_data_lo(int satellite_position, int is_vertical, ui
 }
 
 static int dvb_diseqcSend (tunerFormat tuner, int frontend_fd, const uint8_t *tx, size_t tx_len);
+#ifdef DTV_DELIVERY_SYSTEM
+static int dvb_isFrontendT2(int frontend_fd);
+#endif
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -851,10 +858,12 @@ static void dvb_scanForServices (long frequency, char * demux_devname, NIT_table
 void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 {
 	int adapter = appControlInfo.tunerInfo[tuner].adapter;
+#ifdef STSDK
 	if (!dvb_isLinuxAdapter(adapter)) {
 		eprintf("%s[%d]: unsupported\n", __FUNCTION__, tuner);
 		return;
 	}
+#endif
 #ifdef LINUX_DVB_API_DEMUX
 	struct section_buf eit_filter;
 	char demux_devname[32];
@@ -885,10 +894,12 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out_list )
 {
 	int adapter = appControlInfo.tunerInfo[tuner].adapter;
+#ifdef STSDK
 	if (!dvb_isLinuxAdapter(adapter)) {
 		eprintf("%s[%d]: unsupported\n", __FUNCTION__, tuner);
 		return;
 	}
+#endif
 #ifdef LINUX_DVB_API_DEMUX
 	struct section_buf pat_filter;
 	char demux_devname[32];
@@ -1245,10 +1256,42 @@ const char *dvb_getTypeName(tunerFormat tuner)
 	return fe_typeNames[appControlInfo.tunerInfo[tuner].type];
 }
 
+int dvb_isTunerT2(tunerFormat tuner)
+{
+	if (dvb_getType(tuner) != DVBT ||
+	   (appControlInfo.tunerInfo[tuner].caps & tunerDVBT2) == 0)
+		return 0;
+	int t2 = 0;
+#ifdef DTV_DELIVERY_SYSTEM
+#ifdef STSDK
+	if (dvb_isLinuxTuner(tuner))
+#endif
+	{
+		int fdf = dvb_openFrontend(dvb_getAdapter(tuner), O_RDONLY);
+		if (fdf) {
+			t2 = dvb_isFrontendT2(fdf);
+			close(fdf);
+		}
+	}
+#endif // DTV_DELIVERY_SYSTEM
+	return t2;
+}
+
+#ifdef DTV_DELIVERY_SYSTEM
+int dvb_isFrontendT2(int frontent_fd)
+{
+	struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
+	struct dtv_properties cmdseq = { .num = 1, .props = &p, };
+	return ioctl(frontent_fd, FE_GET_PROPERTY, &cmdseq) >= 0 && p.u.data == SYS_DVBT2;
+}
+#endif
+
 int dvb_setType(tunerFormat tuner, int type)
 {
 	int ret = -1;
+#ifdef STSDK
 	if (dvb_isLinuxAdapter(appControlInfo.tunerInfo[tuner].adapter))
+#endif
 		ret = dvb_setFrontendType(appControlInfo.tunerInfo[tuner].adapter, type);
 
 	if (ret != 0)
@@ -1382,11 +1425,13 @@ int dvb_getSignalInfo(tunerFormat tuner,
                       uint16_t *snr, uint16_t *signal, uint32_t *ber, uint32_t *uncorrected_blocks)
 {
 	int adapter = appControlInfo.tunerInfo[tuner].adapter;
+#ifdef STSDK
 	if (!dvb_isLinuxAdapter(adapter)) {
 		eprintf("%s[%d]: unsupported\n", __FUNCTION__, tuner);
 		return 0;
 	}
-	int frontend_fd;
+#endif
+	int frontend_fd = 0;
 	fe_status_t status = 0;
 
 	mysem_get(dvb_fe_semaphore);

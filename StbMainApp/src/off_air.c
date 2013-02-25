@@ -677,13 +677,11 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	}
 	dvb_clearNIT(&nit);
 
-	if (ok &&
-	    dvb_getType(tuner) == DVBT &&
-	   (appControlInfo.tunerInfo[tuner].caps & tunerDVBT2) &&
-	    appControlInfo.dvbtInfo.plp_id < 3) {
+	if (ok && dvb_isTunerT2(tuner) &&
+	    appControlInfo.dvbtInfo.plp_id < 3)
+	{
 		appControlInfo.dvbtInfo.plp_id++;
 		dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
-		ok = 1;
 	} else
 		ok = 0;
 	} while (ok);

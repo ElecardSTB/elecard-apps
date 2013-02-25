@@ -528,6 +528,8 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 	return dvb_getAdapter(tuner) < ADAPTER_COUNT;
 }
 
+int dvb_isTunerT2(tunerFormat tuner);
+
 /** @} */
 
 #endif /* ENABLE_DVB */
