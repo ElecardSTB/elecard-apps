@@ -61,6 +61,7 @@
 
 #define GARB_TEST
 #define GARB_CONFIG CONFIG_DIR "/garb.json"
+#define GARB_FDD    CONFIG_DIR "/garb.fdd"
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -113,6 +114,7 @@ typedef struct
 * STATIC FUNCTION PROTOTYPES                                      *
 *******************************************************************/
 
+static void garb_save();
 static void garb_load();
 static void *garb_thread(void *notused);
 
@@ -120,6 +122,11 @@ static void garb_printMembers(char text[]);
 static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int garb_quizSexCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
+
+static inline int get_start_time(const struct tm *t)
+{
+	return t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec;
+}
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -142,6 +149,7 @@ void garb_terminate()
 {
 	pthread_cancel(garb_info.thread);
 	pthread_join(garb_info.thread, NULL);
+	garb_save();
 	for (int i = 0; i<garb_info.hh.count; i++)
 		FREE(garb_info.hh.members[i].name);
 	FREE(garb_info.hh.members);
@@ -352,6 +360,32 @@ void garb_load()
 #endif
 }
 
+void garb_save()
+{
+	rename(GARB_FDD, GARB_FDD ".prev");
+	FILE *f = fopen(GARB_FDD, "w");
+	if (!f) {
+		eprintf("%s: failed to create file: %s\n", __FUNCTION__, strerror(errno));
+		return;
+	}
+	garbWatchHistory_t *hist;
+	for (list_element_t *el = garb_info.history.head; el; el = el->next) {
+		hist = el->data;
+		if (hist->channel != CHANNEL_NONE) {
+			fprintf(f, "%06d %d %d %c %ld %d 0 %02d %s\n",
+				garb_info.hh.number,
+				garb_info.hh.device,
+				get_start_time(&hist->start_time),
+				hist->id[0] == '1' || hist->id[0] == '2' ? 'G' : 'T',
+				hist->duration,
+				hist->channel,
+				0x02,
+				hist->id);
+		}
+	}
+	fclose(f);
+}
+
 void garb_startWatching(int channel)
 {
 	dprintf("%s: %d\n", __func__, channel);
@@ -450,6 +484,7 @@ void *garb_thread(void *notused)
 	for (;;) {
 		time(&now);
 		garb_gatherStats(now);
+		garb_save();
 		localtime_r(&now, &t);
 		timeout = 30 - (t.tm_sec % 30);
 		sleep(timeout);
