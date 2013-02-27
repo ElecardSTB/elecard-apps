@@ -1616,6 +1616,10 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		case interfaceCommandTeletext: //FIXME
 			garb_showStats();
 			return 0;
+		case DIKS_HOME:
+			garb_resetViewership();
+			garb_checkViewership();
+			return 0;
 		default:;
 	}
 	return 1;
