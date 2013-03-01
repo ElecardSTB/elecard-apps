@@ -114,6 +114,9 @@ typedef struct
 * STATIC FUNCTION PROTOTYPES                                      *
 *******************************************************************/
 
+#ifdef GARB_TEST
+static void garb_test();
+#endif
 static void garb_save();
 static void garb_load();
 static void *garb_thread(void *notused);
@@ -142,6 +145,9 @@ void garb_init()
 	memset(&garb_info, 0, sizeof(garb_info));
 	garb_resetViewership();
 	garb_load();
+#ifdef GARB_TEST
+	garb_test();
+#endif
 	pthread_create(&garb_info.thread, 0, garb_thread, 0);
 }
 
@@ -288,7 +294,6 @@ void garb_resetViewership()
 
 void garb_load()
 {
-#ifndef GARB_TEST
 	int fd = open(GARB_CONFIG, O_RDONLY);
 	if (fd < 0) {
 		eprintf("%s: failed to open garb config: %s\n", __FUNCTION__, strerror(errno));
@@ -310,40 +315,43 @@ void garb_load()
 	}
 
 	garb_info.hh.number = objGetInt(config, "number", 0);
-	garb_info.hh.count  = objGetInt(config, "count",  0);
 	garb_info.hh.device = objGetInt(config, "device", 0);
+	garb_info.hh.count  = 0;
+	garb_info.hh.members = NULL;
 
-	if (garb_info.hh.number <= 0)
-		eprintf("%s: (!) no HH number specified!\n", __FUNCTION__);
-	if (garb_info.hh.count > 0) {
-		size_t members_size = garb_info.hh.count * sizeof(houseHoldMember_t);
-		garb_info.hh.members = dmalloc(members_size);
-		if (garb_info.hh.members == NULL) {
-			eprintf("%s: (!) failed to allocate %d members\n", __FUNCTION__, garb_info.hh.count);
-			garb_info.hh.count = 0;
-			free(config);
-			return;
-		}
-		memset(garb_info.hh.members, 0, members_size);
-		cJSON *members = cJSON_GetObjectItem(config, "members");
-		char  *id, *name;
-		for (int i = 0; i < garb_info.hh.count; i++) {
-			cJSON *member = cJSON_GetArrayItem(members, i);
-			id = objGetString(member, "id", NULL);
-			if (id)
-				strncpy(garb_info.hh.members[i].id, id, sizeof(garb_info.hh.members[i])-1);
-			else
-				garb_info.hh.members[i].id[0] = 'A'+i;
-			name = objGetString(member, "name", NULL);
-			garb_info.hh.members[i].name = strdup(name ? name : garb_info.hh.members[i].id);
-		}
-	} else
+	cJSON *members = cJSON_GetObjectItem(config, "members");
+	cJSON *m;
+	for (int i = 0; (m = cJSON_GetArrayItem(members, i)); i++) {
+		char  *id = objGetString(m, "id", NULL);
+		if (!id)
+			continue;
+
+		houseHoldMember_t *p = realloc(garb_info.hh.members,
+		                              (garb_info.hh.count+1) * sizeof(houseHoldMember_t));
+		if (!p) break;
+		garb_info.hh.members = p;
+		strncpy(p[garb_info.hh.count].id, id, sizeof(p[garb_info.hh.count].id)-1);
+
+		char *name = objGetString(m, "name", NULL);
+		p[garb_info.hh.count].name = strdup(name ? name : p[garb_info.hh.count].id);
+		garb_info.hh.count++;
+	}
+	if (garb_info.hh.count == 0)
 		eprintf("%s: (!) no HH members specified!\n", __FUNCTION__);
 
 	free(config);
-#else
-	garb_info.hh.number = 123456;
-	garb_info.hh.device = 2;
+}
+
+#ifdef GARB_TEST
+void garb_test()
+{
+	if (garb_info.hh.count > 0)
+		return;
+	eprintf("%s: in\n", __FUNCTION__);
+	if (garb_info.hh.number == 0)
+		garb_info.hh.number = 123456;
+	if (garb_info.hh.device == 0)
+		garb_info.hh.device = 2;
 	garb_info.hh.count  = 10;
 	size_t members_size = garb_info.hh.count * sizeof(houseHoldMember_t);
 	garb_info.hh.members = dmalloc(members_size);
