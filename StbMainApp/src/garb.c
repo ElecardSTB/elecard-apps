@@ -75,17 +75,9 @@ typedef struct
 	char *name;
 } houseHoldMember_t;
 
-typedef enum
-{
-	stateEmpty = 0,
-	stateMember,
-	stateMemberWatching,
-	stateGuestWatching,
-} watchSlotState_t;
-
 typedef struct
 {
-	watchSlotState_t  state;
+	int watching;
 	houseHoldMember_t viewer;
 } watchSlot_t;
 
@@ -214,35 +206,32 @@ static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEven
 		case interfaceCommand7: case interfaceCommand8:
 		{
 			int index = viewership_offset + cmd->command - interfaceCommand1;
+			if (index < garb_info.hh.count) {
+				if (garb_info.viewership[index].watching) {
+					garb_info.viewership[index].watching = 0;
+					garb_info.viewers--;
+				} else {
+					garb_info.viewership[index].watching = 1;
+					garb_info.viewers++;
+				}
+			} else
 			if (index < viewer_count()) {
-				switch (garb_info.viewership[index].state)
-				{
-					case stateEmpty:
-						break;
-					case stateMember:
-						garb_info.viewership[index].state = stateMemberWatching;
-						garb_info.viewers++;
-						break;
-					case stateMemberWatching:
-						garb_info.viewership[index].state = stateMember;
-						garb_info.viewers--;
-						break;
-					case stateGuestWatching:
-						garb_info.viewership[index].state = stateEmpty;
-						garb_info.viewers--;
-						garb_info.guests--;
-						if (viewership_offset >= viewer_count())
-							viewership_offset = 0;
-				}
-				if (garb_info.viewers == 0) {
-					garb_askViewership();
-					return 1;
-				}
-				interface_playControlRefresh(0);
-				interface_hideMessageBox();
-				return 0;
+				if (index+1 < viewer_count())
+					memmove(&garb_info.viewership[index], &garb_info.viewership[index+1],
+						sizeof(garb_info.viewership[index])*(viewer_count()-index-1));
+				garb_info.viewers--;
+				garb_info.guests--;
+				if (viewership_offset >= viewer_count())
+					viewership_offset = 0;
+			} else
+				return 1;
+			if (garb_info.viewers == 0) {
+				garb_askViewership();
+				return 1;
 			}
-			return 1;
+			interface_playControlRefresh(0);
+			interface_hideMessageBox();
+			return 0;
 		}
 		case DIKS_HOME:
 		case interfaceCommandExit:
@@ -295,7 +284,7 @@ int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 			garb_info.viewership[garb_quiz_index].viewer.id[1] = '1' + (cmd->command - interfaceCommand1);
 			memcpy(&garb_info.viewership[garb_quiz_index].viewer.id[2], "000", 4);
 			garb_info.viewership[garb_quiz_index].viewer.name = garb_info.viewership[garb_quiz_index].viewer.id;
-			garb_info.viewership[garb_quiz_index].state = stateGuestWatching;
+			garb_info.viewership[garb_quiz_index].watching = 1;
 			garb_info.viewers++;
 			garb_info.guests++;
 			interface_playControlRefresh(0);
@@ -318,7 +307,7 @@ static void garb_printMembers(char text[])
 	int count = viewer_count();
 	for (int i = 0; i < 8 && i+viewership_offset < count; i++) {
 		snprintf(line, sizeof(line), "%d. [%s] %s\n", i+1,
-			garb_info.viewership[i+viewership_offset].state == stateMember ? "  " : "x", garb_info.viewership[i+viewership_offset].viewer.name);
+			garb_info.viewership[i+viewership_offset].watching ? "x" : "  ", garb_info.viewership[i+viewership_offset].viewer.name);
 		strcat(text, line);
 	}
 	if (count > 8)
@@ -347,12 +336,10 @@ void garb_askViewership()
 
 void garb_resetViewership()
 {
-	for (int i = garb_info.hh.count + garb_info.guests; i>=garb_info.hh.count; i--)
-		garb_info.viewership[i].state = stateEmpty;
 	garb_info.guests = 0;
-	for (int i = 0; i<garb_info.hh.count; i++)
-		garb_info.viewership[i].state = stateMember;
 	garb_info.viewers = 0;
+	for (int i = 0; i<garb_info.hh.count; i++)
+		garb_info.viewership[i].watching = 0;
 	garb_quiz_index = MAX_VIEWERS-1;
 }
 
@@ -396,7 +383,7 @@ void garb_load()
 
 		char *name = objGetString(m, "name", NULL);
 		viewer->name = strdup(name ? name : viewer->id);
-		garb_info.viewership[garb_info.hh.count].state = stateMember;
+		garb_info.viewership[garb_info.hh.count].watching = 0;
 		garb_info.hh.count++;
 	}
 	if (garb_info.hh.count == 0)
@@ -606,15 +593,12 @@ void garb_drawViewership()
 		if (garb_info.viewers == 0)
 			strcpy(text, _T("LOGIN"));
 		else
-		for (int i = 0; i<count; i++) {
-			if (garb_info.viewership[i].state == stateGuestWatching ||
-			    garb_info.viewership[i].state == stateMemberWatching)
-			{
+		for (int i = 0; i<count; i++)
+			if (garb_info.viewership[i].watching) {
 				if (text[0])
 					strcat(text, "\n");
 				strcat(text, garb_info.viewership[i].viewer.name);
 			}
-		}
 		interface_displayTextBox(interfaceInfo.clientX, interfaceInfo.clientY, text, NULL, 0, NULL, 0);
 	}
 }
