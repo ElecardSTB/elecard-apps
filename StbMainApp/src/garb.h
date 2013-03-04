@@ -42,6 +42,7 @@
 void garb_init();
 void garb_terminate();
 
+void garb_askViewership();
 void garb_resetViewership();
 void garb_checkViewership();
 void garb_showStats();
