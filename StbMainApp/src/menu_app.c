@@ -459,7 +459,11 @@ void menu_init()
 
 	menu_buildMainMenu();
 
+#ifdef ENABLE_DVB
+	interfaceInfo.currentMenu = _M &DVBTOutputMenu;
+#else
 	interfaceInfo.currentMenu = _M &interfaceMainMenu;
+#endif
 #ifdef ENABLE_PROVIDER_PROFILES
 	output_checkProfile();
 #endif
