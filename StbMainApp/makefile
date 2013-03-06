@@ -713,9 +713,9 @@ copy_images :
 copy_config :
 	@echo 'INSTALL $(PROGRAM)/streams.txt & channels.conf & settings.conf -> $(DEFAULTS_DIR)'
 	$(Q)mkdir -p $(DEFAULTS_DIR)
-	$(Q)install -m0644 streams.txt $(DEFAULTS_DIR)
-	$(Q)install -m0644 channels.conf $(DEFAULTS_DIR)
-	$(Q)install -m0644 settings.conf $(DEFAULTS_DIR)
+#	$(Q)install -m0644 streams.txt $(DEFAULTS_DIR)
+#	$(Q)install -m0644 channels.conf $(DEFAULTS_DIR)
+#	$(Q)install -m0644 settings.conf $(DEFAULTS_DIR)
 
 copy_fonts :
 	@echo 'INSTALL $(PROGRAM)/fonts -> $(DATA_DIR)/fonts'
