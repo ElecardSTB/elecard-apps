@@ -66,7 +66,13 @@ endif
 # Default settings
 # -----------------------------------------------------------------------------
 TEST_MODE ?= 0
+ENABLE_DVB ?= 1
+ENABLE_IPTV ?= 1
 ENABLE_VOD ?= 1
+ENABLE_USB ?= 1
+ENABLE_FAVORITES ?= 1
+ENABLE_WEB_SERVICES ?= 1
+ENABLE_RUTUBE ?= 1
 ENABLE_VERIMATRIX ?= 0
 ENABLE_SECUREMEDIA ?= 0
 ENABLE_PVR ?= 0
@@ -226,8 +232,32 @@ ifeq ($(ENABLE_EXPAT),2)
     LOCAL_LDFLAGS += -ldl
 endif
 
+ifeq ($(ENABLE_DVB),1)
+    LOCAL_CFLAGS += -DENABLE_DVB=$(ENABLE_DVB)
+endif
+
+ifeq ($(ENABLE_IPTV),1)
+    LOCAL_CFLAGS += -DENABLE_IPTV=$(ENABLE_IPTV)
+endif
+
 ifeq ($(ENABLE_VOD),1)
 	LOCAL_CFLAGS += -DENABLE_VOD=$(ENABLE_VOD)
+endif
+
+ifeq ($(ENABLE_USB),1)
+    LOCAL_CFLAGS += -DENABLE_USB=$(ENABLE_USB)
+endif
+
+ifeq ($(ENABLE_FAVORITES),1)
+    LOCAL_CFLAGS += -DENABLE_FAVORITES=$(ENABLE_FAVORITES)
+endif
+
+ifeq ($(ENABLE_WEB_SERVICES),1)
+    LOCAL_CFLAGS += -DENABLE_WEB_SERVICES=$(ENABLE_WEB_SERVICES)
+endif
+
+ifeq ($(ENABLE_RUTUBE),1)
+    LOCAL_CFLAGS += -DENABLE_RUTUBE=$(ENABLE_RUTUBE)
 endif
 
 ifeq ($(ENABLE_LAN),1)

@@ -74,7 +74,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /** @def ENABLE_DVB Enable DVB functions
  */
 
-#define ENABLE_DVB
+//#define ENABLE_DVB
 
 #ifndef STSDK
 #define LINUX_DVB_API_DEMUX
@@ -82,7 +82,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /** @def ENABLE_IPTV Enable IPTV menu and features
  */
-#define ENABLE_IPTV
+//#define ENABLE_IPTV
 
 /** @def ENABLE_VOD Enable VoD menu and features (defined in Makefile)
  */
@@ -90,11 +90,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /** @def ENABLE_FAVORITES Enable Favorites menu
  */
-#define ENABLE_FAVORITES
+//#define ENABLE_FAVORITES
 
 /** @def ENABLE_USB Enable USB menu
  */
-#define ENABLE_USB
+//#define ENABLE_USB
 
 /** @def ENABLE_PVR Enable PVR functions (defined in Makefile)
  */
@@ -102,7 +102,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /** @def ENABLE_WEB_SERVICES Enable Web services
  */
-#define ENABLE_WEB_SERVICES
+//#define ENABLE_WEB_SERVICES
 
 /** @def HIDE_EXTRA_FUNCTIONS Remove development/extra functions from menu
  */
@@ -116,14 +116,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 //#define ENABLE_LAN
 
-/** @def ENABLE_REGPLAT Enable RegPlat support (defined in Makefile)
+/** @def ENABLE_PPP Enable PPP connections (defined in Makefile)
  */
-//#define ENABLE_REGPLAT
+//#define ENABLE_PPP
 
 /** @def ENABLE_WIFI Enable wifi support (defined in Makefile)
  */
 //#define ENABLE_WIFI
 
+/** @def ENABLE_PASSWORD Enable password protection of settings (defined in Makefile)
+ */
+//#define ENABLE_PASSWORD
+
+/** @def ENABLE_MESSAGES Enable provider messages
+ */
+//#define ENABLE_MESSAGES
+
+/** @def ENABLE_XWORKS Enable xWorks support for stream switching IPTV (defined in Makefile)
+ */
+//#define ENABLE_XWORKS
+
+/** @def ENABLE_REGPLAT Enable RegPlat support (defined in Makefile)
+ */
+//#define ENABLE_REGPLAT
 
 #ifdef ENABLE_TELETES
 
@@ -148,7 +163,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	/** @def ENABLE_STATS Enable DVB watch statistics
 	 */
 	//#define ENABLE_STATS
-#endif
+#endif // ENABLE_DVB
 
 #ifdef  ENABLE_WEB_SERVICES
 
@@ -156,10 +171,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	 */
 	#define ENABLE_SAMBA
 
-	/*
-	 * STB820/810 only Web services
-	 */
-#if (defined STB82)
 	/** @def ENABLE_BROWSER Enable Browser menu (defined in Makefile)
 	 */
 	//#define ENABLE_BROWSER
@@ -172,7 +183,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		 */
 		//#define ENABLE_DLNA_DMR
 	#endif
-#endif // STB82
 
 	/** @def ENABLE_YOUTUBE Enable YouTube menu
 	  */
@@ -180,8 +190,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 	/** @def ENABLE_RUTUBE Enable RuTube menu
 	 */
-	#define ENABLE_RUTUBE
-#endif
+	//#define ENABLE_RUTUBE
+#endif // ENABLE_WEB_SERVICES
 
 /*************************************
  * STB820/810 only features
@@ -199,18 +209,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#define ENABLE_VOIP_CONFERENCE
 #endif
 
-
-/** @def ENABLE_PASSWORD Enable password protection of settings (defined in Makefile)
- */
-//#define ENABLE_PASSWORD
-
 /** @def ENABLE_MULTI_VIEW Enable multiview feature
  */
 #define ENABLE_MULTI_VIEW
-
-/** @def ENABLE_PPP Enable PPP connections (defined in Makefile)
- */
-//#define ENABLE_PPP
 
 #ifdef ENABLE_LAN
 	/** @def ENABLE_BRIDGE Enable BRIDGE option in networking menu
@@ -218,24 +219,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#define ENABLE_BRIDGE
 #endif
 
-/** @def ENABLE_MESSAGES Enable provider messages
- */
-#define ENABLE_MESSAGES
-
 /** @def SHOW_CARD_MENU Enable smart card menu
  */
 //#define SHOW_CARD_MENU
-
-/** @def ENABLE_XWORKS Enable xWorks support for stream switching IPTV (defined in Makefile)
- */
-//#define ENABLE_XWORKS
 
 /** @def ENABLE_PROVIDER_PROFILES Enable support for predefined by provider settings for IPTV/VOD (defined in Makefile)
  */
 //#define ENABLE_PROVIDER_PROFILES
 
 #endif // STB82
-
 
 #ifdef ENABLE_TVMYWAY
 
@@ -368,15 +360,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #ifndef STB_DHCPD_CONF
-	#define STB_DHCPD_CONF     "/var/etc/dhcpd.conf"
+	#define STB_DHCPD_CONF     SYSTEM_CONFIG_DIR "/dhcpd.conf"
 #endif
 
 #ifndef STB_RESOLV_CONF
-	#define STB_RESOLV_CONF     "/var/etc/resolv.conf"
+	#define STB_RESOLV_CONF     SYSTEM_CONFIG_DIR "/resolv.conf"
 #endif
 
 #ifndef STB_HOSTAPD_CONF
-	#define STB_HOSTAPD_CONF    "/var/etc/hostapd.conf"
+	#define STB_HOSTAPD_CONF    SYSTEM_CONFIG_DIR "/hostapd.conf"
 #endif
 
 #ifndef STB_WPA_SUPPLICANT_CONF
