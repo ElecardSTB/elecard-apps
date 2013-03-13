@@ -296,7 +296,7 @@ static int samba_browseWorkgroup(interfaceMenu_t *pMenu, void *pArg)
 
 static int samba_selectWorkgroup(interfaceMenu_t *pMenu, void *pArg)
 {
-	interface_getMenuEntryInfo((interfaceMenu_t*)&SambaMenu, (int)pArg, samba_workgroup, MENU_ENTRY_INFO_LENGTH);
+	interface_getMenuEntryInfo((interfaceMenu_t*)&SambaMenu, GET_NUMBER(pArg), samba_workgroup, MENU_ENTRY_INFO_LENGTH);
 	samba_browseWorkgroup(pMenu, pArg);
 	return 0;
 }
@@ -304,7 +304,7 @@ static int samba_selectWorkgroup(interfaceMenu_t *pMenu, void *pArg)
 static int samba_selectMachine(interfaceMenu_t *pMenu, void *pArg)
 {
 	samba_browseType = SMBC_SERVER;
-	interface_getMenuEntryInfo((interfaceMenu_t*)&SambaMenu, (int)pArg, samba_machine, MENU_ENTRY_INFO_LENGTH);
+	interface_getMenuEntryInfo((interfaceMenu_t*)&SambaMenu, GET_NUMBER(pArg), samba_machine, MENU_ENTRY_INFO_LENGTH);
 	strcpy(&samba_url[6], samba_machine);
 	samba_fillBrowseMenu(pMenu,pArg);
 	interface_displayMenu(1);
@@ -544,7 +544,7 @@ static int samba_selectShare(interfaceMenu_t *pMenu, void *pArg)
 
 	strcpy( mount_path, sambaRoot );
 	str = &mount_path[strlen(sambaRoot)];
-	interface_getMenuEntryInfo((interfaceMenu_t *)&SambaMenu, (int)pArg, samba_share, MENU_ENTRY_INFO_LENGTH);
+	interface_getMenuEntryInfo((interfaceMenu_t *)&SambaMenu, GET_NUMBER(pArg), samba_share, MENU_ENTRY_INFO_LENGTH);
 	strcpy( str, samba_share );
 	strcpy( samba_mount, str );
 
@@ -827,8 +827,10 @@ void* samba_readShares(void)
 			if (!share)
 				continue;
 			list_element_t *el = allocate_element(sizeof(sambaMount_t));
-			if (!el)
+			if (!el) {
+				free(share);
 				continue;
+			}
 			sambaMount_t *m = el->data;
 			m->share  = share;
 			m->thread = 0;

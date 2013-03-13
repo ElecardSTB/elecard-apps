@@ -77,9 +77,9 @@ extern time_t stats_lastTime;
 *******************************************************************/
 
 int stats_buildMenu(interfaceMenu_t* pParent);
-int stats_init();
-int stats_save();
-int stats_load();
+int stats_init(void);
+int stats_save(void);
+int stats_load(void);
 
 #endif //ENABLE_STATS
 #endif //__STATS_H

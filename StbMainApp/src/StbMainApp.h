@@ -85,7 +85,7 @@ int  helperParseMmio(int addr);
  */
 char *helperStrCpyTrimSystem(char *dst, char *src);
 
-void helperFlushEvents();
+void helperFlushEvents(void);
 
 interfaceCommand_t helperGetEvent(int flush);
 
@@ -97,7 +97,7 @@ void signal_handler(int signal);
 
 void tprintf(const char *str, ...);
 
-int  helperCheckUpdates();
+int  helperCheckUpdates(void);
 
 /** Copy src string to new dest buffer.
  * @param[out] dest If already allocated and have enough space, will be used without changing pointer. If buffer will not be big enough, realloc would be used on *dest.

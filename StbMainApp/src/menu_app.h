@@ -47,8 +47,8 @@ extern interfaceListMenu_t interfaceMainMenu;
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
 
-void menu_init();
-void menu_cleanup();
+void menu_init(void);
+void menu_cleanup(void);
 int  open_browser(interfaceMenu_t* pMenu, void* pArg);
 
 #endif /* __MENU_APP_H      Do not add any thing below this line */

@@ -73,14 +73,14 @@ extern interfaceListMenu_t DialedNumbersMenu;
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
 
-void voip_init();
-void voip_cleanup();
+void voip_init(void);
+void voip_cleanup(void);
 void voip_buildMenu(interfaceMenu_t *pParent);
 int  voip_dialNumber(interfaceMenu_t *pMenu, void *pArg);
 int  voip_fillMenu(interfaceMenu_t *pMenu, void *pArg);
 int  voip_answerCall(interfaceMenu_t *pMenu, void *pArg);
 int  voip_hangup(interfaceMenu_t *pMenu, void *pArg);
-void voip_setBuzzer();
+void voip_setBuzzer(void);
 
 #endif // ENABLE_VOIP
 

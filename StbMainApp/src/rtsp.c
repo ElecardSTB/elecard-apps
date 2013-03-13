@@ -974,7 +974,6 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 {
 	int which = CHANNEL_INFO_GET_SCREEN(pArg);
 	unsigned int streamNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
-	streams_struct* stream_ptr=NULL;
 
 	dprintf("%s(%d): in %d\n", __FUNCTION__, which, streamNumber);
 
@@ -990,36 +989,23 @@ static int rtsp_stream_change(interfaceMenu_t *pMenu, void* pArg)
 
 	if (streamNumber != CHANNEL_CUSTOM)
 	{
-		dprintf("%s: collect if needed\n", __FUNCTION__);
-
 		interface_setSelectedItem(_M &rtspStreamMenu, streamNumber);
 
-		if ( pstream_head != NULL )
-		{
-			stream_ptr = pstream_head;
-		} else
-		{
+		if ( pstream_head == NULL ) {
 			int ret = get_rtsp_streams(ppstream_head);
 			dprintf("%s: Found streams %i\n", __FUNCTION__,ret);
-			if ( (ret == 0)&&(pstream_head != NULL) )
-			{
-				stream_ptr = pstream_head;
-			} else
-			{
+			if (ret != 0 || pstream_head == NULL) {
 				interface_showMessageBox(_T("ERR_DEFAULT_STREAM"), thumbnail_warning, 0);
 				eprintf("RTSP: Failed to find default stream\n");
 				return -1;
 			}
 		}
-
-		stream_ptr = get_stream(streamNumber);
-		if( !stream_ptr )
-		{
+		streams_struct* stream_ptr = get_stream(streamNumber);
+		if ( !stream_ptr ) {
 			interface_showMessageBox(_T("ERR_STREAM_IN_LIST"), thumbnail_error, 0);
 			eprintf("RTSP: Stream number %d not found in linked list\n", streamNumber);
 			return -1;
 		}
-
 		//dprintf("%s: stream_ptr->stream %s\n", __FUNCTION__, stream_ptr->stream);
 
 		stream_info.port = appControlInfo.rtspInfo.RTSPPort;
@@ -1213,8 +1199,6 @@ void rtsp_buildMenu(interfaceMenu_t *pParent)
 static int rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	unsigned int streamNumber;
-	int ret;
-	streams_struct* stream_ptr=NULL;
 	char URL[MAX_URL];
 
 	if( cmd->command == interfaceCommandBlue )
@@ -1234,30 +1218,16 @@ static int rtsp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 	{
 		if (cmd->command == interfaceCommandYellow || cmd->command == interfaceCommandGreen)
 		{
-			dprintf("%s: collect if needed\n", __FUNCTION__);
-
-			if ( pstream_head != NULL )
-			{
-				stream_ptr = pstream_head;
-			} else
-			{
-				ret=get_rtsp_streams(ppstream_head);
-				dprintf("%s: Found streams %i\n", __FUNCTION__,ret);
-				if ( (ret == 0)&&(pstream_head != NULL) )
-				{
-					stream_ptr = pstream_head;
-				} else
-				{
+			if ( pstream_head == NULL ) {
+				int ret=get_rtsp_streams(ppstream_head);
+				if (ret != 0 || pstream_head == NULL) {
+					eprintf("%s: Failed to find default stream\n", __FUNCTION__);
 					interface_showMessageBox(_T("ERR_DEFAULT_STREAM"), thumbnail_warning, 0);
-					eprintf("RTSP: Failed to find default stream\n");
 					return 0;
 				}
 			}
-
-			stream_ptr = get_stream(streamNumber);
-
-			if ( !stream_ptr )
-			{
+			streams_struct* stream_ptr = get_stream(streamNumber);
+			if ( !stream_ptr ) {
 				interface_showMessageBox(_T("ERR_STREAM_IN_LIST"), thumbnail_error, 0);
 				eprintf("RTSP: Stream number not found in linked list\n");
 				return 0;

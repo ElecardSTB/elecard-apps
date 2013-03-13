@@ -71,12 +71,12 @@ extern "C" {
 	/** Get permanent link to currently playing YouTube stream
 	 * @return Statically allocated string, empty if YouTube is not active
 	 */
-	char *youtube_getCurrentURL();
+	char *youtube_getCurrentURL(void);
 
 	/** Play YouTube stream, predefined in appControlInfo.mediaInfo.lastFile
 	 * @return 0 on success
 	 */
-	int youtube_streamStart();
+	int youtube_streamStart(void);
 #ifdef __cplusplus
 }
 #endif

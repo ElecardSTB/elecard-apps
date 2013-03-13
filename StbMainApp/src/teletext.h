@@ -53,7 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
 
-void teletext_init();
+void teletext_init(void);
 
 /**
 *   @brief Function takes PES packets from buffer of TS packets
@@ -64,7 +64,7 @@ void teletext_init();
 void teletext_readPESPacket(unsigned char *buf, size_t size);
 
 /* Displays teletext */
-void teletext_displayTeletext();
+void teletext_displayTeletext(void);
 
 #endif /* ENABLE_TELETEXT */
 

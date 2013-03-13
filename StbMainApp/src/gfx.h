@@ -224,35 +224,35 @@ IDirectFBDisplayLayer *gfx_getLayer(int which);
 *
 *   @retval id of requested video layer
 */
-int gfx_getPrimaryLayer();
+int gfx_getPrimaryLayer(void);
 
 /**
 *   @brief Return id of the image layer
 *
 *   @retval id of requested video layer
 */
-int gfx_getImageLayer();
+int gfx_getImageLayer(void);
 
 /**
 *   @brief Return id of the pip video layer
 *
 *   @retval id of requested video layer
 */
-int gfx_getPipVideoLayer();
+int gfx_getPipVideoLayer(void);
 
 /**
 *   @brief Return id of the main video layer
 *
 *   @retval id of requested video layer
 */
-int gfx_getMainVideoLayer();
+int gfx_getMainVideoLayer(void);
 
 /**
 *   @brief Return a number of layers supported
 *
 *   @retval number of supported layers.
 */
-int gfx_getNumberLayers();
+int gfx_getNumberLayers(void);
 
 /**
 *   @brief Function used to decode an Image
@@ -495,7 +495,7 @@ void gfx_changeOutputFormat(int format);
  * @retval 1 if HD output
  *         0 if not.
  */
-int gfx_isHDoutput();
+int gfx_isHDoutput(void);
 
 /**
  * @brief Function used to determine if we support TV standard selection or not.
@@ -503,7 +503,7 @@ int gfx_isHDoutput();
  * @retval 1 if TV Standard selection possible
  *         0 if not.
  */
-int gfx_tvStandardSelectable();
+int gfx_tvStandardSelectable(void);
 
 /**
 *   @brief Function used to initialise the graphics
@@ -628,7 +628,7 @@ int gfx_setVideoProviderLive(int videoLayer);
 int gfx_resumeVideoProvider(int videoLayer);
 
 /* Wait for last operation with providers to finish */
-void gfx_waitForProviders();
+void gfx_waitForProviders(void);
 
 void gfx_startEventThread(void);
 void gfx_stopEventThread(void);

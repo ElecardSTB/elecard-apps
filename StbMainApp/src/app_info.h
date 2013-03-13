@@ -805,26 +805,26 @@ extern "C" {
  * @sa loadAppSettings()
  * @sa loadVoipSettings()
  */
-void appInfo_init();
+void appInfo_init(void);
 
 /** Function used to load application settings from file
  * @return 0 on success
  * @sa saveAppSettings()
  */
-int loadAppSettings();
+int loadAppSettings(void);
 
 /** Function used to load VoIP settings from file
  * @return 0 on success
  * @sa loadAppSettings()
  */
-int loadVoipSettings();
+int loadVoipSettings(void);
 
 /** Function used to save application and VoIP settings to file
  * @return 0 on success
  * @sa loadAppSettings()
  * @sa loadVoipSettings()
  */
-int saveAppSettings();
+int saveAppSettings(void);
 
 #ifdef STSDK
 int saveProxySettings(void);

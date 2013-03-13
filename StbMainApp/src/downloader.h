@@ -54,7 +54,7 @@ typedef void (*downloadCallback)(int,void*);
 extern "C" {
 #endif
 
-void downloader_init();
+void downloader_init(void);
 
 /**
  * @brief Download a file in blocking mode. Downloaded files saved by default to /tmp/XXXXXXXX/<filename>.
@@ -102,7 +102,7 @@ int  downloader_push(const char *url, char *filename,  size_t fn_size, size_t qu
 /**
  * @brief Terminate all downloads and free data.
  */
-void downloader_cleanup();
+void downloader_cleanup(void);
 
 /**
  * @brief Get download info from pool.

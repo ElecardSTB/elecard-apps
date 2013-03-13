@@ -65,7 +65,7 @@ extern char       currentPath[];
 extern "C" {
 #endif
 
-int media_startPlayback();
+int media_startPlayback(void);
 
 /**
 *   @brief Function used to initialize Media play control and start playback of appControlInfo.mediaInfo.filename

@@ -75,7 +75,7 @@ void rtsp_buildMenu(interfaceMenu_t *pParent);
 
 int rtsp_fillStreamMenu(interfaceMenu_t *pMenu, void* pArg);
 
-void rtsp_cleanupMenu();
+void rtsp_cleanupMenu(void);
 
 /**
 *   @brief Function used to stop RTSP input display

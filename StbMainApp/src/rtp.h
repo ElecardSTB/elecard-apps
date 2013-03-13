@@ -83,7 +83,7 @@ int rtp_initStreamMenu(interfaceMenu_t *pMenu, void* pArg);
 */
 int rtp_initEpgMenu(interfaceMenu_t *pMenu, void* pArg);
 
-void rtp_cleanupMenu();
+void rtp_cleanupMenu(void);
 
 /** Function used to stop RTP input display
 *
@@ -110,7 +110,7 @@ int rtp_getChannelNumber(const char *url);
 /** Cleans up previously acquired IPTV EPG
  *  Should be called after changing EPG url
  */
-void rtp_cleanupEPG();
+void rtp_cleanupEPG(void);
 
 /** Cleans IPTV channel list
  *  Should be called after changing IPTV playlist url
@@ -124,7 +124,7 @@ int rtp_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 /** Record current or last played RTP stream
  *  @return pvr_record return value
  */
-int rtp_recordNow();
+int rtp_recordNow(void);
 #endif
 
 #endif /* __RTP_H      Do not add any thing below this line */

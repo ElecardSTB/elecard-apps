@@ -1344,7 +1344,7 @@ void interface_playControlSetDisplayFunction(playControlDisplayFunction pDisplay
 
 void interface_playControlSetButtons(interfacePlayControlButton_t buttons);
 
-interfacePlayControlButton_t interface_playControlGetButtons();
+interfacePlayControlButton_t interface_playControlGetButtons(void);
 
 /** Set play control visible and reset play control hide event
  *  @param[in] redraw If set to 1, redraw interface immediately
@@ -1355,7 +1355,7 @@ void interface_playControlHide(int redraw);
 
 void interface_playControlDisable(int redraw);
 
-void interface_playControlReset();
+void interface_playControlReset(void);
 
 void interface_channelNumberShow(int channelNumber);
 
@@ -1379,7 +1379,7 @@ void interface_playControlHighlight(interfacePlayControlButton_t button);
 int  interface_multiviewProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 
 /* Displays media description box on top of the screen */
-void interface_showPlayState();
+void interface_showPlayState(void);
 
 /**
  *  @brief Adds new event to interface event pool
@@ -1459,13 +1459,13 @@ void interface_displayCustomScrollingTextBox( int x, int y, int w, int h,
                                               int lineOffset, int visibleLines,
                                               int lineCount, int icon);
 
-void interface_showLoading();
+void interface_showLoading(void);
 
-void interface_hideLoading();
+void interface_hideLoading(void);
 
-void interface_showLoadingAnimation();
+void interface_showLoadingAnimation(void);
 
-void interface_hideLoadingAnimation();
+void interface_hideLoadingAnimation(void);
 
 /**
  *  @brief Displays message box in the center of screen, which hides when any key is pressed
@@ -1550,7 +1550,7 @@ void interface_showConfirmationBox(const char *text, int icon,
  *  @sa interface_showScrollingBox()
  *  @sa interface_showConfirmationBox()
  */
-void interface_hideMessageBox();
+void interface_hideMessageBox(void);
 
 void interface_soundControlSetup(soundControlCallback pAction, void *pArg,
                                  long min, long max, long cur);
@@ -1678,15 +1678,15 @@ int  interface_getSelectedItem(interfaceMenu_t *pMenu);
 
 int  interface_isMenuEntrySelectable(interfaceMenu_t *pMenu, int index);
 
-void interface_showSlideshowControl();
+void interface_showSlideshowControl(void);
 
-void interface_slideshowControlDisplay();
+void interface_slideshowControlDisplay(void);
 
 int  interface_slideshowControlProcessCommand(pinterfaceCommandEvent_t cmd);
 
-int  interface_getTextBoxMaxLineCount();
+int  interface_getTextBoxMaxLineCount(void);
 
-void interface_flipSurface();
+void interface_flipSurface(void);
 
 void interface_customSlider(customSliderFunction pFunction, void *pArg,
                             int showOverMenu, int bRedrawFlag);

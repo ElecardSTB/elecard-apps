@@ -160,18 +160,18 @@ static button_t controlButtons[] = {
 *******************************************************************/
 
 #ifdef STB82
-static void interface_animateSurface();
+static void interface_animateSurface(void);
 #endif
 
 static void interface_animateMenu(int flipFB, int animate);
 
 static int  interface_animationFrameEvent(void *pArg);
 
-static void interface_displayPlayControl();
+static void interface_displayPlayControl(void);
 
-static inline void interface_displayPlayState();
+static inline void interface_displayPlayState(void);
 
-static void interface_displaySoundControl();
+static void interface_displaySoundControl(void);
 
 static int interface_refreshClock(void *pArg);
 
@@ -181,22 +181,22 @@ static int interface_channelNumberHide (void *pArg);
 
 static void messageBox_setDefaultColors(void);
 
-static int interface_displayPosterBox();
+static int interface_displayPosterBox(void);
 
 static int interface_hideMessageBoxEvent(void *pArg);
 
-static void interface_enterChannelList();
+static void interface_enterChannelList(void);
 
 static void interface_reinitializeListMenu(interfaceMenu_t *pMenu);
 
-static void interface_displaySliderControl();
+static void interface_displaySliderControl(void);
 
-static void interface_displayStatusbar();
+static void interface_displayStatusbar(void);
 
-static void interface_displayCall();
+static void interface_displayCall(void);
 
 #ifdef ENABLE_MESSAGES
-static void interface_displayMessageNotify();
+static void interface_displayMessageNotify(void);
 #endif
 
 #if 0
@@ -205,7 +205,7 @@ static int getLeftStringOverflow(char *string, int maxWidth);
 
 static int interface_playControlSetVisible(void *pArg);
 
-static inline int PlayControlSliderIsVisible()
+static inline int PlayControlSliderIsVisible(void)
 {
 	return !interfaceInfo.showMenu && (interfacePlayControl.visibleFlag || interfacePlayControl.alwaysShowSlider);
 }
@@ -389,7 +389,7 @@ const char *interface_commandName(interfaceCommand_t cmd)
 			return directfb_keynames[i].name;
 
 	static char key[10];
-	snprintf(key, sizeof(key), "%d", (int)key);
+	snprintf(key, sizeof(key), "%d", cmd);
 	return key;
 }
 

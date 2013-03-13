@@ -80,9 +80,9 @@ int playlist_startNextChannel(int direction, void* pArg);
 
 int playlist_setChannel(int channel, void* pArg);
 
-int playlist_streamStart();
+int playlist_streamStart(void);
 
-char *playlist_getLastURL();
+char *playlist_getLastURL(void);
 
 /** @ingroup playlist
  *  Download and parse playlist from specified URL

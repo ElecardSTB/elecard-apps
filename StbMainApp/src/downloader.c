@@ -247,7 +247,7 @@ static int downloader_exec(curlDownloadInfo_t* info)
 	if(!curl)
 		return  -1;
 
-	if(*info->filename == 0)
+	if (info->filename[0] == 0)
 	{
 		strncpy( info->filename, DNLD_PATH, DNLD_PATH_LENGTH-1 );
 		info->filename[DNLD_PATH_LENGTH-1] = 0;
@@ -363,7 +363,7 @@ static int downloader_exec(curlDownloadInfo_t* info)
 	curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, info);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, downloader_writeCallback);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);	// nessesary, we are in m/t environment
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);	// nessesary, we are in m/t environment
 	if( noproxy )
 		curl_easy_setopt(curl, CURLOPT_PROXY, "");
 	else
@@ -410,7 +410,6 @@ failure:
 int downloader_get(const char* url, int timeout, char *filename, size_t fn_size, size_t quota)
 {
 	curlDownloadInfo_t info;
-	int res;
 
 	if( !url || !filename || fn_size <= DNLD_PATH_LENGTH )
 		return -2;
@@ -423,9 +422,9 @@ int downloader_get(const char* url, int timeout, char *filename, size_t fn_size,
 	info.pCallback = NULL;
 	info.stop_thread = 0;
 	info.index = -1;
+	info.out_file = 0;
 
-	res = downloader_exec(&info);
-	return res;
+	return downloader_exec(&info);
 }
 
 #if 0

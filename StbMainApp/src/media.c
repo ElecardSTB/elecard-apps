@@ -690,7 +690,7 @@ static int media_stream_deselected(interfaceMenu_t *pMenu, void* pArg)
 int media_startNextChannel(int direction, void* pArg)
 {
 	int             indexChange = (direction?-1:1);
-	char            playingDir[MAX_URL];
+	static char     playingDir[MAX_URL];
 	char           *playingFile = NULL;
 	char           *str;
 	struct dirent **playDirEntries;

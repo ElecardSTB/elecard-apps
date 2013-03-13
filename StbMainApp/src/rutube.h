@@ -95,9 +95,9 @@ extern "C" {
 	/** Get permanent link to currently playing Rutube stream
 	 * @return Statically allocated string, empty if Rutube is not active
 	 */
-	char *rutube_getCurrentURL();
+	char *rutube_getCurrentURL(void);
 
-	void rutube_cleanupMenu();
+	void rutube_cleanupMenu(void);
 #ifdef __cplusplus
 }
 #endif

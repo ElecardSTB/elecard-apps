@@ -96,7 +96,7 @@ extern "C" {
 *   @retval void
 */
 void output_buildMenu(interfaceMenu_t *pParent);
-void output_cleanupMenu();
+void output_cleanupMenu(void);
 
 #ifdef ENABLE_DVB
 int output_showDVBMenu(interfaceMenu_t *pMenu, void* notused);

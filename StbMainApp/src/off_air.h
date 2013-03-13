@@ -230,11 +230,11 @@ TELETXT_PID::= ushort
 
 void offair_playURL(char* URL, int which);
 
-void offair_initServices();
+void offair_initServices(void);
 
-void offair_clearServices();
+void offair_clearServices(void);
 
-void offair_cleanupMenu();
+void offair_cleanupMenu(void);
 
 int  offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg);
 
@@ -246,17 +246,17 @@ int  offair_getServiceIndex(EIT_service_t *service);
 // Returns -1 if no tuner supporting service media type is found, tunerFormat otherwise
 int offair_findCapableTuner(EIT_service_t *service);
 
-int  offair_getServiceCount();
+int  offair_getServiceCount(void);
 
 int  offair_getCurrentServiceIndex(int which);
 
 EIT_service_t* offair_getService(int index);
 
-void offair_fillDVBTMenu();
+void offair_fillDVBTMenu(void);
 
 void offair_fillDVBTOutputMenu(int which);
 
-int  offair_epgEnabled();
+int  offair_epgEnabled(void);
 
 int  offair_frequencyMonitor(interfaceMenu_t *pMenu, void* pArg);
 

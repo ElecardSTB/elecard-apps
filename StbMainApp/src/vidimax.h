@@ -45,9 +45,9 @@ extern "C" {
 	void vidimax_buildCascadedMenu(interfaceMenu_t* pParent);	
 	int vidimax_fillMenu(interfaceMenu_t *pMenu, void* pArg);
 	void vidimax_drawMainMenuIcons (imageIndex_t imIndex, DFBRectangle * rect, int selected);
-	int vidimax_refreshMenu();
-	void vidimax_stopVideoCallback();
-	void vidimax_cleanup();
+	int vidimax_refreshMenu(void);
+	void vidimax_stopVideoCallback(void);
+	void vidimax_cleanup(void);
 	void vidimax_notifyVideoSize(int x, int y, int w, int h);
 #ifdef __cplusplus
 }

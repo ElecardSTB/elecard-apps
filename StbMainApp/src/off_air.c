@@ -195,11 +195,11 @@ static int  offair_updateStatsEvent(void* pArg);
 static int  offair_checkSignal(int which, list_element_t **pPSI);
 #endif
 
-static int  wizard_init();
+static int  wizard_init(void);
 static int  wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbackMenu, unsigned long monitor_only_frequency);
 static void wizard_cleanup(int finished);
 
-static inline EIT_service_t *current_service()
+static inline EIT_service_t *current_service(void)
 {
 	return offair_services[appControlInfo.dvbInfo.channel].service;
 }
@@ -1064,7 +1064,7 @@ static int offair_multi_callback(pinterfaceCommandEvent_t cmd, void* pArg)
 	return 0;
 }
 
-static void offair_displayMultiviewControl()
+static void offair_displayMultiviewControl(void)
 {
 	int i, x, y, w;
 	char number[4];
@@ -1135,7 +1135,7 @@ static void offair_displayMultiviewControl()
 }
 #endif
 
-void offair_displayPlayControl()
+void offair_displayPlayControl(void)
 {
 	int x, y, w, h, fh, fa, sfh;
 	DFBRectangle rect;
@@ -3331,29 +3331,22 @@ void offair_sortEvents(list_element_t **event_list)
 	}
 }
 
-static void offair_sortSchedule()
+static void offair_sortSchedule(void)
 {
-	list_element_t *service_element;
-
-	EIT_service_t *service;
-
-	for( service_element = dvb_services; service_element != NULL; service_element = service_element->next )
-	{
-		service = (EIT_service_t *)service_element->data;
+	for (list_element_t *s = dvb_services; s != NULL; s = s->next ) {
+		EIT_service_t * service = s->data;
 		offair_sortEvents(&service->schedule);
 	}
 }
 
 static void offair_exportServices(const char* filename)
 {
-	int i = 0;
 	FILE* f = fopen( filename, "w" );
-	if( f == NULL )
-	{
+	if (f == NULL) {
+		eprintf("%s: Failed to open '%s': %s\n", __FUNCTION__, filename, strerror(errno));
 		return;
 	}
-	for( i = 0; i < offair_serviceCount; ++i )
-	{
+	for( int i = 0; i < offair_serviceCount; ++i ) {
 		if( (offair_services[i].common.media_id | offair_services[i].common.service_id | offair_services[i].common.transport_stream_id) != 0 )
 		{
 			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu\n", i,

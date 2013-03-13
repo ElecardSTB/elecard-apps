@@ -66,7 +66,7 @@ extern "C" {
 
 char *l10n_getText(const char* key);
 int   l10n_init(const char* languageName);
-void  l10n_cleanup();
+void  l10n_cleanup(void);
 int   l10n_switchLanguage(const char* newLanguage);
 int   l10n_initLanguageMenu(interfaceMenu_t *pMenu, void* pArg);
 

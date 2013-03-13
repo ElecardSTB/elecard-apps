@@ -63,7 +63,7 @@ extern const  char sambaRoot[];
 
 void samba_buildMenu(interfaceMenu_t *pParent);
 int  samba_unmountShare(const char *mountPoint);
-void samba_cleanup();
+void samba_cleanup(void);
 void *samba_readMounts(void);
 void *samba_nextMount(void *mount);
 int samba_manualBrowse(interfaceMenu_t *pMenu, void *pIgnored);

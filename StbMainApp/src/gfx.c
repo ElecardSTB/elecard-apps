@@ -298,7 +298,7 @@ static int ggfx_NumLayers = 0;
 /**
  * @brief Pointer to the thread that handles directfb events.
  */
-static pthread_t gfx_inputEventThread = NULL;
+static pthread_t gfx_inputEventThread = 0;
 /*********************************************************(((((((**********
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
 ***************************************************************************/
@@ -456,18 +456,12 @@ read_2_bytes (FILE *myfile)
 
 int is_rotation_JPEG(const char *filename)
 {
-	int set_flag;
 	unsigned int length, i;
 	int is_motorola; /* Flag for byte order */
 	unsigned int offset, number_of_tags, tagnum;
-	FILE * myfile;		/* My JPEG file */
 	unsigned char exif_data[65536L];
 
-
-	set_flag = 0;
-
-
-	myfile = fopen(filename,"rb");
+	FILE * myfile = fopen(filename,"rb");
 
 	if(!myfile) return 0;
 
@@ -580,6 +574,7 @@ int is_rotation_JPEG(const char *filename)
 	//8	Left side	Bottom
 
 	/* Get the Orientation value */
+	int set_flag = 0;
 	if (is_motorola) {
 		if (exif_data[offset+8] != 0) goto failure;
 		set_flag = exif_data[offset+9];
@@ -624,15 +619,15 @@ static void gfx_getDestinationRectangle(int * pWidth, int * pHeight)
 			y = 576;
 		}
 		break;
+		/// FIXME: 1280x720 is used as 1080p 3D mode in STB225 // Kpy
 		case(DSOR_1280_720) :
+#if 0
 		{
 			x = 1280;
 			y = 720;
-//Kpy
-			x = 1920;
-			y = 1080;
 		}
 		break;
+#endif
 		case(DSOR_1920_1080) :
 		{
 			x = 1920;
@@ -4499,7 +4494,7 @@ void gfx_waitForProviders()
 
 void gfx_startEventThread(void)
 {
-	if(gfx_inputEventThread == NULL) {
+	if(!gfx_inputEventThread) {
 		pgfx_dfb->CreateInputEventBuffer(pgfx_dfb, DICAPS_KEYS|DICAPS_BUTTONS|DICAPS_AXES, DFB_TRUE, &appEventBuffer);
 		pthread_create(&gfx_inputEventThread, NULL, keyThread, (void *)appEventBuffer);
 // 		pthread_detach(gfx_inputEventThread);
@@ -4512,7 +4507,7 @@ void gfx_stopEventThread(void)
 		keyThreadActive = 0;
 		appEventBuffer->WakeUp(appEventBuffer);
 		pthread_join(gfx_inputEventThread, NULL);
-		gfx_inputEventThread = NULL;
+		gfx_inputEventThread = 0;
 		appEventBuffer->Release(appEventBuffer);
 		appEventBuffer = NULL;
 	}
