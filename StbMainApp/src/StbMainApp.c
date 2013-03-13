@@ -595,11 +595,12 @@ static int toggleStandby(void)
 			cmd.command = interfaceCommandStop;
 			interface_processCommand(&cmd);
 		}
+#ifdef ENABLE_DVB
 		if (appControlInfo.dvbInfo.active) {
 			inStandbyActiveVideo = -appControlInfo.dvbInfo.channel;
 			offair_stopVideo(screenMain, 1);
 		}
-
+#endif
 		interface_displayMenu(1);
 
 		system("standbyon");
@@ -613,9 +614,10 @@ static int toggleStandby(void)
 			cmd.command = interfaceCommandPlay;
 			interface_processCommand(&cmd);
 		}
+#ifdef ENABLE_DVB
 		if(inStandbyActiveVideo<0)
 			offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
-
+#endif
 		//dprintf("%s: return from standby\n", __FUNCTION__);
 		appControlInfo.inStandby = 0;
 #ifndef STSDK
