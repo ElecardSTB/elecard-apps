@@ -2755,8 +2755,7 @@ int dvb_hasMediaNB(EIT_service_t *service)
 {
 	if ((service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT) &&
 		(dvb_hasMediaTypeNB(service, mediaTypeVideo) ||
-		 dvb_hasMediaTypeNB(service, mediaTypeAudio) ||
-		 dvb_hasMediaTypeNB(service, (media_type)payloadTypeText)) )
+		 dvb_hasMediaTypeNB(service, mediaTypeAudio)) )
 	{
 		return 1;
 	}
