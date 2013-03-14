@@ -247,6 +247,7 @@ static int playlist_stream_change(interfaceMenu_t *pMenu, void* pArg)
 		} else
 #endif
 #ifdef ENABLE_DVB
+#ifdef DVB_FAVORITES
 		if (strncasecmp(URL, URL_DVB_MEDIA, sizeof(URL_DVB_MEDIA)-1) == 0)
 		{
 			appControlInfo.playbackInfo.playlistMode = playlistModeFavorites;
@@ -257,6 +258,7 @@ static int playlist_stream_change(interfaceMenu_t *pMenu, void* pArg)
 			dprintf("%s: offair_playURL(%s)\n", __FUNCTION__,URL);
 			offair_playURL(URL,screenMain);
 		} else
+#endif
 #endif
 		{
 			eprintf("playlist: Incorrect URL '%s'\n", URL);

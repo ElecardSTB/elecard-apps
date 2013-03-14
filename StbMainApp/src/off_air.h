@@ -47,6 +47,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS  *
 ********************/
 
+//#define DVB_FAVORITES
+
 #define interfaceMenuEPG (3)
 
 #define CHANNEL_INFO_SET(screen, channel) ((void*)(intptr_t)((screen << 16) | (channel)))
@@ -228,7 +230,9 @@ AUDIO_PID  ::= ushort
 TELETXT_PID::= ushort
 */
 
+#ifdef DVB_FAVORITES
 void offair_playURL(char* URL, int which);
+#endif
 
 void offair_initServices(void);
 
