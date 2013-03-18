@@ -108,6 +108,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define XWORKS_INIT_SCRIPT          "/etc/init.d/S94xworks"
 #endif
 
+#define MOBILE_APN_FILE             SYSTEM_CONFIG_DIR "/ppp/chatscripts/apn"
+#define MOBILE_PHONE_FILE           SYSTEM_CONFIG_DIR "/ppp/chatscripts/phone"
+
 #define TEMP_CONFIG_FILE            "/var/tmp/cfg.tmp"
 
 #define OUTPUT_INFO_SET(type,index) (void*)(intptr_t)(((int)type << 16) | (index))
@@ -167,7 +170,6 @@ typedef struct
 {
 	char login[MENU_ENTRY_INFO_LENGTH];
 	char password[MENU_ENTRY_INFO_LENGTH];
-	pthread_t check_thread;
 } pppInfo_t;
 #endif
 
@@ -258,7 +260,6 @@ static int output_enterWANMenu (interfaceMenu_t *wanMenu, void* pArg);
 static int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface);
 #ifdef ENABLE_PPP
 static int output_enterPPPMenu (interfaceMenu_t *pMenu, void* pArg);
-static int output_leavePPPMenu (interfaceMenu_t *pMenu, void* pArg);
 #endif
 #ifdef ENABLE_LAN
 static int output_enterLANMenu (interfaceMenu_t *lanMenu, void* pArg);
@@ -285,6 +286,13 @@ static int output_readWpaSupplicantConf(const char *filename);
 static int output_writeWpaSupplicantConf(const char *filename);
 #endif
 #endif // ENABLE_WIFI
+#ifdef ENABLE_MOBILE
+static void output_readMobileSettings(void);
+static int output_writeMobileSettings(void);
+static int output_enterMobileMenu (interfaceMenu_t *pMenu, void* ignored);
+static int output_changeMobileAPN(interfaceMenu_t *pMenu, void* ignored);
+static int output_changeMobilePhone(interfaceMenu_t *pMenu, void* ignored);
+#endif // ENABLE_MOBILE
 
 #ifdef ENABLE_IPTV
 static int output_enterIPTVMenu(interfaceMenu_t *pMenu, void* pArg);
@@ -374,6 +382,10 @@ static const char* output_getLanModeName(lanMode_t mode);
 static void output_setIfaceMenuName(interfaceMenu_t *pMenu, const char *ifaceName, int wan, lanMode_t lanMode);
 static int  output_isIfaceDhcp(stb810_networkInterface_t iface);
 
+static void* output_refreshLoop(void *pMenu);
+static int   output_refreshStop(interfaceMenu_t *pMenu, void *pArg);
+static int   output_refreshStart(interfaceMenu_t *pMenu, void *pArg);
+
 /** Display message box if failed is non-zero and no previous failures occured.
  *  Return non-zero if message was displayed (and display updated). */
 static int output_warnIfFailed(int failed);
@@ -435,6 +447,9 @@ static interfaceListMenu_t GatewaySubMenu;
 #ifdef ENABLE_WIFI
 interfaceListMenu_t WifiSubMenu;
 #endif
+#ifdef ENABLE_MOBILE
+interfaceListMenu_t MobileMenu;
+#endif
 #ifdef ENABLE_IPTV
 static interfaceListMenu_t IPTVSubMenu;
 
@@ -486,6 +501,18 @@ static struct {
 	{ "MEDIUM", "1280x720" },
 	{ "SMALL",  "1920x1080" },
 };
+
+#ifdef ENABLE_MOBILE
+static struct {
+	char apn  [MENU_ENTRY_INFO_LENGTH];
+	char phone[MENU_ENTRY_INFO_LENGTH];
+} mobileInfo = {
+	.apn     = {0},
+	.phone   = {0},
+};
+#endif // ENABLE_MOBILE
+
+static pthread_t output_refreshThread = 0;
 
 /**
  * @brief Useful DFB macros to have Strings and Values in an array.
@@ -4524,6 +4551,11 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 #ifdef ENABLE_PPP
 	interface_addMenuEntry(networkMenu, _T("PPP"), interface_menuActionShowMenu, &PPPSubMenu, settings_network);
 #endif
+	// ---------------------------- Mobile -------------------------------------
+#ifdef ENABLE_MOBILE
+	if (helperFileExists("/dev/ttyUSB0"))
+	interface_addMenuEntry(networkMenu, _T("MOBILE"), interface_menuActionShowMenu, &MobileMenu, settings_network);
+#endif
 	// -------------------------------------------------------------------------
 
 #ifdef ENABLE_IPTV
@@ -4744,6 +4776,39 @@ int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface)
 	return 0;
 }
 
+void* output_refreshLoop(void *pMenu)
+{
+	for (;;)
+	{
+		sleep(2);
+		output_redrawMenu(pMenu);
+	}
+	pthread_exit(NULL);
+}
+
+int output_refreshStart(interfaceMenu_t* pMenu, void* pArg)
+{
+	int err = 0;
+	if (output_refreshThread == 0) {
+		err = pthread_create( &output_refreshThread, NULL, output_refreshLoop, pMenu );
+		if (err != 0) {
+			eprintf("%s: failed to start refresh thread: %s\n", __FUNCTION__, strerror(-err));
+			output_refreshThread = 0;
+		}
+	}
+	return err;
+}
+
+int output_refreshStop(interfaceMenu_t* pMenu, void* pArg)
+{
+	if (output_refreshThread != 0) {
+		pthread_cancel(output_refreshThread);
+		pthread_join  (output_refreshThread, NULL);
+		output_refreshThread = 0;
+	}
+	return 0;
+}
+
 #ifdef ENABLE_PPP
 static char* output_getPPPPassword(int field, void* pArg)
 {
@@ -4803,16 +4868,6 @@ static int output_changePPPLogin(interfaceMenu_t *pMenu, void* pArg)
 	return interface_getText( pMenu, _T("LOGIN"), "\\w+", output_setPPPLogin, output_getPPPLogin, inputModeABC, NULL );
 }
 
-static void* output_checkPPPThread(void *pMenu)
-{
-	for (;;)
-	{
-		sleep(2);
-		output_redrawMenu(pMenu);
-	}
-	pthread_exit(NULL);
-}
-
 static int output_restartPPP(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showMessageBox(_T("RENEW_IN_PROGRESS"), settings_renew, 0);
@@ -4823,20 +4878,8 @@ static int output_restartPPP(interfaceMenu_t *pMenu, void* pArg)
 	output_refillMenu(pMenu);
 	interface_hideMessageBox();
 
-	if (pppInfo.check_thread == 0)
-		pthread_create( &pppInfo.check_thread, NULL, output_checkPPPThread, pMenu );
+	output_refreshStart(pMenu, pArg);
 
-	return 0;
-}
-
-static int output_leavePPPMenu(interfaceMenu_t *pMenu, void* pArg)
-{
-	if (pppInfo.check_thread != 0)
-	{
-		pthread_cancel( pppInfo.check_thread );
-		pthread_join( pppInfo.check_thread, NULL );
-		pppInfo.check_thread = 0;
-	}
 	return 0;
 }
 
@@ -4888,8 +4931,7 @@ static int output_enterPPPMenu(interfaceMenu_t *pMenu, void* pArg)
 		if( WIFEXITED(res) == 1 && WEXITSTATUS(res) == 0 )
 		{
 			str = _T("CONNECTING");
-			if( pppInfo.check_thread == 0 )
-				pthread_create( &pppInfo.check_thread, NULL, output_checkPPPThread, pMenu );
+			output_refreshStart(pMenu, pArg);
 		}
 		else
 			str = _T("OFF");
@@ -5840,7 +5882,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 #ifdef ENABLE_PPP
 	createListMenu(&PPPSubMenu, _T("PPP"), settings_network, NULL, _M &NetworkSubMenu,
-		interfaceListMenuIconThumbnail, output_enterPPPMenu, output_leavePPPMenu, SET_NUMBER(ifaceWAN));
+		interfaceListMenuIconThumbnail, output_enterPPPMenu, output_refreshStop, SET_NUMBER(ifaceWAN));
 #endif
 #ifdef ENABLE_LAN
 	createListMenu(&LANSubMenu, "LAN", settings_network, NULL, _M &NetworkSubMenu,
@@ -5859,6 +5901,10 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	interface_setCustomKeysCallback(_M &WifiSubMenu, output_wifiKeyCallback);
 
 	wireless_buildMenu(_M &WifiSubMenu);
+#endif
+#ifdef ENABLE_MOBILE
+	createListMenu(&MobileMenu, _T("MOBILE"), settings_network, NULL, _M &NetworkSubMenu,
+		interfaceListMenuIconThumbnail, output_enterMobileMenu, output_refreshStop, NULL);
 #endif
 #ifdef ENABLE_IPTV
 	createListMenu(&IPTVSubMenu, _T("TV_CHANNELS"), thumbnail_multicast, NULL, _M &NetworkSubMenu,
@@ -6455,3 +6501,137 @@ int  output_isIfaceDhcp(stb810_networkInterface_t iface)
 	}
 	return 0;
 }
+
+#ifdef ENABLE_MOBILE
+static void output_readMobileSettings(void)
+{
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	FILE *f = fopen(MOBILE_APN_FILE, "ro");
+	if (f) {
+		fgets(buf, sizeof(buf), f);
+		fclose(f);
+		if (sscanf(buf, "AT+CGDCONT=1,\"IP\",\"%[^\"\n\r]\"", mobileInfo.apn) != 1)
+			eprintf("%s: failed to get apn from string: '%s'\n", __FUNCTION__, buf);
+	}
+	f = fopen(MOBILE_PHONE_FILE, "ro");
+	if (f) {
+		fgets(buf, sizeof(buf), f);
+		fclose(f);
+		if (sscanf(buf, "ATDT%[^\n\r]", mobileInfo.phone) != 1)
+			eprintf("%s: failed to get phone from string: '%s'\n", __FUNCTION__, buf);
+	}
+}
+
+static int output_writeMobileSettings(void)
+{
+	int err = 0;
+	FILE *f = fopen(MOBILE_APN_FILE, "w");
+	if (f) {
+		fprintf(f, "AT+CGDCONT=1,\"IP\",\"%s\"", mobileInfo.apn);
+		fclose(f);
+	} else {
+		eprintf("%s: failed to open %s for writing: %s\n", __FUNCTION__, MOBILE_APN_FILE, strerror(errno));
+		err = 1;
+	}
+	f = fopen(MOBILE_PHONE_FILE, "w");
+	if (f) {
+		fprintf(f, "ATDT%s", mobileInfo.phone);
+		fclose(f);
+	} else {
+		eprintf("%s: failed to open %s for writing: %s\n", __FUNCTION__, MOBILE_APN_FILE, strerror(errno));
+		err = 1;
+	}
+	return err;
+}
+
+static char* output_getMobileAPN(int index, void* pArg)
+{
+	if (index == 0)
+		return mobileInfo.apn;
+	return NULL;
+}
+
+static char* output_getMobilePhone(int index, void* pArg)
+{
+	if (index == 0)
+		return mobileInfo.phone;
+	return NULL;
+}
+
+static int output_setMobileAPN(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if (value == NULL)
+		return 1;
+	if (value[0] == 0)
+		return 0;
+	strncpy(mobileInfo.apn, value, sizeof(mobileInfo.apn)-1);
+	return output_saveAndRedraw(output_writeMobileSettings(), pMenu);
+}
+
+static int output_setMobilePhone(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if (value == NULL)
+		return 1;
+	if (value[0] == 0)
+		return 0;
+	strncpy(mobileInfo.phone, value, sizeof(mobileInfo.phone)-1);
+	return output_saveAndRedraw(output_writeMobileSettings(), pMenu);
+}
+
+static int output_changeMobileAPN(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, "", "\\w+", output_setMobileAPN,   output_getMobileAPN,   inputModeABC, pArg);
+}
+
+static int output_changeMobilePhone(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, "", "\\w+", output_setMobilePhone, output_getMobilePhone, inputModeABC, pArg);
+}
+
+static int output_restartMobile(interfaceMenu_t *pMenu, void* pArg)
+{
+	interface_showMessageBox(_T("RENEW_IN_PROGRESS"), settings_renew, 0);
+
+	int timeout = 3;
+	int res = system("killall pppd 2> /dev/null");
+	while (timeout && WIFEXITED(res) == 1 && WEXITSTATUS(res) == 0) {
+		sleep(1);
+		res = system("killall pppd 2> /dev/null");
+		timeout--;
+	}
+	system("killall -9 pppd 2> /dev/null");
+	system("pppd call mobile-noauth");
+
+	output_refillMenu(pMenu);
+	interface_hideMessageBox();
+	output_refreshStart(pMenu, pArg);
+	return 0;
+}
+
+int output_enterMobileMenu(interfaceMenu_t *mobileMenu, void *ignored)
+{
+	interface_clearMenuEntries(mobileMenu);
+	output_readMobileSettings();
+
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	snprintf(buf, sizeof(buf), "%s: %s", "APN",   mobileInfo.apn);
+	interface_addMenuEntry(mobileMenu, buf, output_changeMobileAPN,   NULL, thumbnail_enterurl);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("PHONE_NUMBER"), mobileInfo.phone);
+	interface_addMenuEntry(mobileMenu, buf, output_changeMobilePhone, NULL, thumbnail_enterurl);
+	interface_addMenuEntry(mobileMenu, _T("APPLY_NETWORK_SETTINGS"), output_restartMobile, NULL, settings_renew);
+	char *str = NULL;
+	if (helperCheckDirectoryExsists("/sys/class/net/ppp0"))
+		str = _T("ON");
+	else {
+		int res = system("killall -0 pppd 2> /dev/null");
+		if (WIFEXITED(res) == 1 && WEXITSTATUS(res) == 0) {
+			str = _T("CONNECTING");
+			output_refreshStart(mobileMenu, NULL);
+		} else
+			str = _T("OFF");
+	}
+	snprintf(buf, sizeof(buf), "%s: %s", _T("MOBILE"), str);
+	interface_addMenuEntryDisabled(mobileMenu, buf, thumbnail_info);
+	return 0;
+}
+#endif // ENABLE_MOBILE
