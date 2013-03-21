@@ -401,6 +401,7 @@ typedef enum
 	interfaceCommandPageDown =                   DIKS_PAGE_DOWN,
 	interfaceCommandRefresh =                    DIKS_RESTART,
 	interfaceCommandTeletext =                   DIKS_TEXT,
+	interfaceCommandSubtitle =                   DIKS_SUBTITLE,
 	interfaceCommandSearch =                     DIKS_CUSTOM1,
 	interfaceCommandEpg =                        DIKS_EPG,
 	interfaceCommandZoom =                       DIKS_ZOOM,

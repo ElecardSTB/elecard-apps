@@ -263,6 +263,13 @@ static int dvb_diseqcSend (tunerFormat tuner, int frontend_fd, const uint8_t *tx
 static int dvb_isFrontendT2(int frontend_fd);
 #endif
 
+static inline int isSubtitle( PID_info_t* stream)
+{
+	return stream->component_descriptor.stream_content == 0x03 &&
+	       stream->component_descriptor.component_type >= 0x10 &&
+	       stream->component_descriptor.component_type <= 0x15;
+}
+
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
@@ -2694,6 +2701,51 @@ int dvb_getAudioCount(EIT_service_t *service)
 	return audioCount;
 }
 
+int dvb_getSubtitleCount(EIT_service_t *service)
+{
+	int count = 0;
+	mysem_get(dvb_semaphore);
+	for (list_element_t *s = service->program_map.map.streams; s; s = s->next) {
+		PID_info_t* stream = s->data;
+		if (isSubtitle(stream))
+			count++;
+	}
+	mysem_release(dvb_semaphore);
+	return count;
+}
+
+list_element_t* dvb_getNextSubtitleStream(EIT_service_t *service, list_element_t *subtitle)
+{
+	list_element_t *stream = subtitle ? subtitle->next : service->program_map.map.streams;
+	while (stream) {
+		PID_info_t* info = stream->data;
+		if (isSubtitle(info))
+			break;
+		stream = stream->next;
+	}
+	return stream;
+}
+
+uint16_t dvb_getNextSubtitle(EIT_service_t *service, uint16_t subtitle_pid)
+{
+	assert (service);
+	int found = 0;
+	mysem_get(dvb_semaphore);
+	for (list_element_t *s = service->program_map.map.streams; s; s = s->next) {
+		PID_info_t* stream = s->data;
+		if (isSubtitle(stream)) {
+			if (subtitle_pid == 0 || found) {
+				mysem_release(dvb_semaphore);
+				return stream->elementary_PID;
+			}
+			if (stream->elementary_PID == subtitle_pid)
+				found = 1;
+		}
+	}
+	mysem_release(dvb_semaphore);
+	return 0;
+}
+
 int dvb_getServiceID(EIT_service_t *service)
 {
 	if(service != NULL)
@@ -3032,6 +3084,9 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 				buf+=strlen(buf);
 				break;
 			case payloadTypeText:
+				if (isSubtitle(stream))
+					sprintf( buf, "  PID: %hu %s\n", stream->elementary_PID , _T("SUBTITLES") );
+				else
 				sprintf( buf, "  PID: %hu %s\n", stream->elementary_PID , _T("TELETEXT") );
 				buf+=strlen(buf);
 				break;

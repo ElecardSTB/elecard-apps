@@ -518,6 +518,13 @@ int dvb_getPvrRate(int which);
 
 int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_media_config_t *media);
 
+uint16_t dvb_getNextSubtitle(EIT_service_t *service, uint16_t subtitle_pid);
+list_element_t* dvb_getNextSubtitleStream(EIT_service_t *service, list_element_t *subtitle);
+uint16_t dvb_getStreamPid(PID_info_t *stream)
+{
+	return stream->elementary_PID;
+}
+
 static inline int dvb_getAdapter(tunerFormat tuner)
 {
 	return appControlInfo.tunerInfo[tuner].adapter;

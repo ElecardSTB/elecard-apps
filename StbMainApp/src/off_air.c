@@ -201,6 +201,8 @@ static int  wizard_init(void);
 static int  wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbackMenu, unsigned long monitor_only_frequency);
 static void wizard_cleanup(int finished);
 
+static int offair_subtitleShow(uint16_t subtitle_pid);
+
 static inline EIT_service_t *current_service(void)
 {
 	return offair_services[appControlInfo.dvbInfo.channel].service;
@@ -242,6 +244,16 @@ static int  offair_indeces[MAX_MEMORIZED_SERVICES];
 static int  offair_indexCount = 0;
 static int  offair_scheduleIndex;   // service number
 static char offair_lcn_buf[4];
+
+static struct {
+	int index;
+	list_element_t *stream;
+	int visible;
+} subtitle = {
+	.index   = 0,
+	.stream  = NULL,
+	.visible = 0,
+};
 
 static pmysem_t epg_semaphore = 0;
 static pmysem_t offair_semaphore = 0;
@@ -1194,6 +1206,21 @@ void offair_displayPlayControl(void)
 		}
 	}
 
+	if ( subtitle.visible ) {
+		if (subtitle.stream) {
+			PID_info_t *info = subtitle.stream->data;
+			if (info->ISO_639_language_code[0])
+				sprintf(buffer, "%s: %d (%s)", _T("SUBTITLES"), subtitle.index, info->ISO_639_language_code);
+			else
+				sprintf(buffer, "%s: %d", _T("SUBTITLES"), subtitle.index);
+		} else
+			sprintf(buffer, "%s: %s", _T("SUBTITLES"), _T("OFF"));
+		interface_displayTextBox(
+			interfaceInfo.clientX + interfaceInfo.marginSize,
+			interfaceInfo.clientY,
+			buffer, NULL, 0, NULL, 0);
+	}
+
 	if ( (!interfaceInfo.showMenu &&
 	      ( (interfacePlayControl.enabled && interfacePlayControl.visibleFlag) ||
 	         interfacePlayControl.showState || appControlInfo.dvbInfo.reportedSignalStatus
@@ -1319,6 +1346,52 @@ void offair_displayPlayControl(void)
 	}
 
 	interface_slideshowControlDisplay();
+}
+
+static int offair_toggleSubtitles(void)
+{
+	subtitle.stream = dvb_getNextSubtitleStream(current_service(), subtitle.stream);
+	if (subtitle.stream == NULL && subtitle.index == 0) {
+		interface_showMessageBox(_T("NO_SUBTITLES"), thumbnail_warning, 3000);
+		return 1;
+	}
+	if (subtitle.stream)
+		subtitle.index++;
+	else
+		subtitle.index = 0;
+	offair_subtitleShow(subtitle.stream ? dvb_getStreamPid(subtitle.stream->data) : 0);
+	return 0;
+}
+
+static int offair_subtitleControlHide(void *ignored)
+{
+	subtitle.visible = 0;
+	interface_displayMenu(1);
+}
+
+int offair_subtitleShow(uint16_t subtitle_pid)
+{
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON *res = NULL;
+	cJSON *params = cJSON_CreateObject();
+	if (!params)
+		return -1;
+	cJSON_AddItemToObject(params, "pid", cJSON_CreateNumber(subtitle_pid));
+	dprintf("%s: %04x (%u)\n", __func__, subtitle_pid, subtitle_pid);
+	int ret = st_rpcSync (elcmd_subtitle, params, &type, &res);
+	cJSON_Delete(params);
+	if (ret != 0 || type != elcdRpcResult) {
+		eprintf("%s: failed: %s\n", __FUNCTION__, jsonGetString(res, ""));
+		cJSON_Delete(res);
+		return -1;
+	}
+	cJSON_Delete(res);
+#endif
+	subtitle.visible = 1;
+	interface_displayMenu(1);
+	interface_addEvent(offair_subtitleControlHide, NULL, 2000, 1);
+	return 0;
 }
 
 static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
@@ -1478,7 +1551,12 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 
 		return 1;
 	}
-
+	if (cmd->command == interfaceCommandSubtitle &&
+	    appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM)
+	{
+		offair_toggleSubtitles();
+		return 0;
+	}
 	dprintf("%s: break\n", __FUNCTION__);
 
 	if( appControlInfo.teletextInfo.subtitleFlag == 0 )
