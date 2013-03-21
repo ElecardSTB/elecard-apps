@@ -112,13 +112,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			PERROR("%s[%d]: ioctl " #request " failed", __FUNCTION__, tuner);  \
 	} while(0)
 
-#define ioctl_loop(tuner, err, fd, request, ...)                                    \
+#define ioctl_loop(tuner, err, fd, request, ...)                               \
 	do {                                                                       \
 		err = ioctl(fd, request, ##__VA_ARGS__);                               \
 		if (err < 0) {                                                         \
 			info("%s[%d]: ioctl " #request " failed", __FUNCTION__, tuner);    \
 		}                                                                      \
 	} while (err<0)                                                            \
+
+#if 0
+#define mysem_get(sem) do {                                                    \
+	eprintf("%s: mysem_get\n", __FUNCTION__);                                  \
+	mysem_get(sem);                                                            \
+} while (0)
+
+#define mysem_release(sem) do {                                                \
+	eprintf("%s: mysem_release\n", __FUNCTION__);                              \
+	mysem_release(sem);                                                        \
+} while (0)
+#endif
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -2603,6 +2615,7 @@ static PID_info_t* dvb_getVideoStream(EIT_service_t *service)
 				return stream;
 		}
 	}
+	mysem_release(dvb_semaphore);
 	return NULL;
 }
 
@@ -2949,9 +2962,7 @@ int dvb_getServiceURL(EIT_service_t *service, char* URL)
 	while( stream_element != NULL)
 	{
 		stream = (PID_info_t*)stream_element->data;
-		mysem_release(dvb_semaphore);
 		type = dvb_getStreamType( stream );
-		mysem_get(dvb_semaphore);
 		switch( type )
 		{
 			case payloadTypeMpegAudio:
@@ -3042,9 +3053,7 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 	while( stream_element != NULL)
 	{
 		stream = (PID_info_t*)stream_element->data;
-		mysem_release(dvb_semaphore);
 		type = dvb_getStreamType( stream );
-		mysem_get(dvb_semaphore);
 		switch( type )
 		{
 			case payloadTypeMpegAudio:
