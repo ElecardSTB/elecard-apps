@@ -930,10 +930,10 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	} else
 #endif // DVB_FAVORITES
 #ifdef ENABLE_PVR
-	if (button == interfacePlayControlRecord)
+	if (button == interfacePlayControlRecord) {
 		pvr_toogleRecordingDVB();
+	} else
 #endif
-	else
 	{
 		// default action
 		return 1;
