@@ -165,7 +165,8 @@ static int  offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* p
 static int  offair_getUserLCN(interfaceMenu_t *pMenu, char *value, void* pArg);
 static int  offair_changeLCN(interfaceMenu_t *pMenu, void* pArg);
 static int  offair_scheduleCheck( int channelNumber );
-static int  offair_showSchedule(interfaceMenu_t *pMenu, void* pArg);
+static int  offair_showSchedule(interfaceMenu_t *pMenu, int channel);
+static int  offair_showScheduleMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  offair_updateEPG(void* pArg);
 static int  offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void* pArg);
 static int  offair_audioChanged(void* pArg);
@@ -928,18 +929,9 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		playlist_addUrl(desc, dvb_getServiceName(current_service()));
 	} else
 #endif // DVB_FAVORITES
-	if (button == interfacePlayControlMode )
-	{
-		if ( offair_scheduleCheck(appControlInfo.dvbInfo.channel) == 0 )
-			offair_showSchedule( interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.channel));
-		else
-			interface_showMessageBox( _T("EPG_UNAVAILABLE"), thumbnail_epg ,3000);
-	}
 #ifdef ENABLE_PVR
-	else if (button == interfacePlayControlRecord)
-	{
+	if (button == interfacePlayControlRecord)
 		pvr_toogleRecordingDVB();
-	}
 #endif
 	else
 	{
@@ -1367,6 +1359,7 @@ static int offair_subtitleControlHide(void *ignored)
 {
 	subtitle.visible = 0;
 	interface_displayMenu(1);
+	return 0;
 }
 
 int offair_subtitleShow(uint16_t subtitle_pid)
@@ -1394,11 +1387,20 @@ int offair_subtitleShow(uint16_t subtitle_pid)
 	return 0;
 }
 
+#ifdef ENABLE_TELETEXT
+static int returnAndRedraw(void)
+{
+	if( appControlInfo.teletextInfo.subtitleFlag == 0 )
+		interface_playControlRefresh(1);
+	else
+		interface_playControlHide(1);
+	return 0;
+}
+#endif // ENABLE_TELETEXT
+
 static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
-	int sFlag=0;
 	dprintf("%s: in 0x%08X\n", __FUNCTION__, cmd);
-
 #ifdef ENABLE_TELETEXT
 	if(appControlInfo.teletextInfo.exists)
 	{
@@ -1415,6 +1417,7 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 			}
 			appControlInfo.teletextInfo.freshCounter = 0;
 			interfaceInfo.teletext.pageNumber = 100;
+			return returnAndRedraw();
 		}
 
 		if(interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
@@ -1446,11 +1449,11 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 					if(interfaceInfo.teletext.pageNumber == appControlInfo.teletextInfo.subtitlePage)
 					{
 						appControlInfo.teletextInfo.subtitleFlag=1;
-						sFlag=1;
 					}
 					else if (appControlInfo.teletextInfo.status != teletextStatus_ready)
 						appControlInfo.teletextInfo.status = teletextStatus_demand;
 				}
+				return returnAndRedraw();
 			}
 			else if(appControlInfo.teletextInfo.status >= teletextStatus_demand)
 			{
@@ -1476,19 +1479,12 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 				if(interfaceInfo.teletext.pageNumber == appControlInfo.teletextInfo.subtitlePage)
 				{
 					appControlInfo.teletextInfo.subtitleFlag=1;
-					sFlag=1;
 				}
+				return returnAndRedraw();
 			}
 		}
 	}
 #endif // #ifdef ENABLE_TELETEXT
-#ifdef ENABLE_PVR
-	if (cmd->command == interfaceCommandRecord)
-	{
-		pvr_toogleRecordingDVB();
-		return 0;
-	}
-#endif
 	if (cmd->source == DID_FRONTPANEL)
 	{
 		switch (cmd->command)
@@ -1501,41 +1497,22 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 				cmd->command = interfaceCommandVolumeDown;
 				interface_soundControlProcessCommand(cmd);
 				return 0;
-			case interfaceCommandDown: cmd->command = interfaceCommandChannelDown; break;
-			case interfaceCommandUp: cmd->command = interfaceCommandChannelUp; break;
+			case interfaceCommandDown:  cmd->command = interfaceCommandChannelDown; break;
+			case interfaceCommandUp:    cmd->command = interfaceCommandChannelUp; break;
 			case interfaceCommandEnter: cmd->command = interfaceCommandBack; break;
 			default:;
 		}
 	}
 
-	if ((
-		  cmd->command == interfaceCommandExit ||
-		  cmd->command == interfaceCommandBack ||
-		  cmd->command == interfaceCommandChannelUp ||
-		  cmd->command == interfaceCommandChannelDown ||
-		  cmd->command == interfaceCommandRecord ||
-		  cmd->command == interfaceCommandPlay ||
-		 (cmd->command == interfaceCommandStop && cmd->source == DID_STANDBY) ||
-		  cmd->command == interfaceCommandRed ||
-		  cmd->command == interfaceCommandGreen ||
-		  cmd->command == interfaceCommandYellow ||
-		  cmd->command == interfaceCommandBlue ||
-		  cmd->command == interfaceCommandRefresh ||
-		 (cmd->command >= interfaceCommand0 && cmd->command <= interfaceCommand9) ||
-		  cmd->command == interfaceCommandTV
-		) && (!sFlag))
+	switch (cmd->command)
 	{
-		if (appControlInfo.dvbInfo.showInfo && cmd->command == interfaceCommandExit)
-		{
-			appControlInfo.dvbInfo.showInfo = 0;
-			offair_setInfoUpdateTimer(screenMain, 0);
+#ifdef ENABLE_PVR
+		case interfaceCommandRecord:
+			pvr_toogleRecordingDVB();
 			return 0;
-		}
-
+#endif
 #ifdef ENABLE_MULTI_VIEW
-		if( cmd->command == interfaceCommandTV)
-		{
-			int which = CHANNEL_INFO_GET_SCREEN(pArg);
+		case interfaceCommandTV:
 			if ( appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM &&
 #ifdef ENABLE_PVR
 			    !pvr_isRecordingDVB() &&
@@ -1543,28 +1520,36 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 				 can_play(appControlInfo.dvbInfo.channel) && has_video(appControlInfo.dvbInfo.channel)
 			   )
 			{
-				offair_multiviewPlay(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, appControlInfo.dvbInfo.channel));
+				offair_multiviewPlay(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
 				return 0;
 			}
-		}
-#endif
-
-		return 1;
+			break;
+#endif // ENABLE_MULTI_VIEW
+		case interfaceCommandExit:
+			if (appControlInfo.dvbInfo.showInfo) {
+				appControlInfo.dvbInfo.showInfo = 0;
+				offair_setInfoUpdateTimer(screenMain, 0);
+				return 0;
+			}
+			break;
+		case interfaceCommandPlay:
+		case interfaceCommandStop:
+		case interfaceCommandOk:
+			// Disable play/stop and playcontrol buttons activation
+			return 0;
+		case interfaceCommandSubtitle:
+			if (appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
+				offair_toggleSubtitles();
+				return 0;
+			}
+			break;
+		case interfaceCommandBlue:
+		case interfaceCommandEpg:
+			offair_showSchedule(interfaceInfo.currentMenu, appControlInfo.dvbInfo.channel);
+			return 0;
+		default:;
 	}
-	if (cmd->command == interfaceCommandSubtitle &&
-	    appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM)
-	{
-		offair_toggleSubtitles();
-		return 0;
-	}
-	dprintf("%s: break\n", __FUNCTION__);
-
-	if( appControlInfo.teletextInfo.subtitleFlag == 0 )
-		interface_playControlRefresh(1);
-	else
-		interface_playControlHide(1);
-
-	return 0;
+	return 1;
 }
 
 static int offair_audioChanged(void* pArg)
@@ -3579,7 +3564,16 @@ static int offair_scheduleCheck( int serviceNumber )
 	return (offair_services[serviceNumber].service->schedule == NULL || dvb_hasMedia(offair_services[serviceNumber].service) == 0) ? 1 : 0;
 }
 
-static int offair_showSchedule(interfaceMenu_t *pMenu, void* pArg)
+static int offair_showSchedule(interfaceMenu_t *pMenu, int channel)
+{
+	if ( offair_scheduleCheck(channel) == 0 )
+		return offair_showScheduleMenu(pMenu, SET_NUMBER(channel));
+
+	interface_showMessageBox( _T("EPG_UNAVAILABLE"), thumbnail_epg ,3000);
+	return 1;
+}
+
+static int offair_showScheduleMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buffer[MAX_MESSAGE_BOX_LENGTH], *str;
 	int buf_length = 0, event_length;
@@ -3668,7 +3662,7 @@ static int offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg)
 				sprintf(buf, "%02d. %s", i, offair_services[i].service->service_descriptor.service_name);
 			}
 			buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
-			interface_addMenuEntry((interfaceMenu_t*)&EPGMenu, buf, offair_showSchedule, SET_NUMBER(i), thumbnail_channels);
+			interface_addMenuEntry((interfaceMenu_t*)&EPGMenu, buf, offair_showScheduleMenu, SET_NUMBER(i), thumbnail_channels);
 		} else
 		{
 			if( offair_services[i].service != NULL )
@@ -4351,6 +4345,9 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			dvb_getServiceDescription(offair_services[channelNumber].service, URL);
 			eprintf("offaie: Channel %d info:\n%s\n", channelNumber, URL);
 			interface_showMessageBox(URL, thumbnail_info, 0);
+			return 0;
+		case interfaceCommandEpg:
+			offair_showSchedule(pMenu, channelNumber);
 			return 0;
 #ifdef ENABLE_MULTI_VIEW
 		case interfaceCommandTV:
