@@ -121,6 +121,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define ARRAY_SIZE(arr)				(sizeof(arr)/sizeof(*arr))
 
+#define DVB_MIN_SYMBOLRATE               100
+#define DVB_MAX_SYMBOLRATE             60000
+#define DVB_MIN_FREQUENCY_C            47000
+#define DVB_MAX_FREQUENCY_C         10020000
+#define DVB_MIN_FREQUENCY_T           174000
+#define DVB_MAX_FREQUENCY_T           862000
+#define DVB_MIN_FREQUENCY_C_BAND        3400
+#define DVB_MAX_FREQUENCY_C_BAND        4800
+#define DVB_MIN_FREQUENCY_K_BAND       11000
+#define DVB_MAX_FREQUENCY_K_BAND       18000
+#define DVB_MIN_FREQUENCY_STEP          1000
+#define DVB_MAX_FREQUENCY_STEP          8000
+
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
@@ -2643,6 +2656,28 @@ static int output_toggleDiseqcUncommited(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
+static void getDvbLimits(tunerFormat tuner, uint32_t *min, uint32_t *max)
+{
+	switch (dvb_getType(tuner)) {
+		case DVBS:
+			if (appControlInfo.dvbsInfo.band == dvbsBandC) {
+				*min = DVB_MIN_FREQUENCY_C_BAND;
+				*max = DVB_MAX_FREQUENCY_C_BAND;
+			} else {
+				*min = DVB_MIN_FREQUENCY_K_BAND;
+				*max = DVB_MAX_FREQUENCY_K_BAND;
+			}
+			break;
+		case DVBC:
+			*min = DVB_MIN_FREQUENCY_C;
+			*max = DVB_MAX_FREQUENCY_C;
+			break;
+		default: // DVBT
+			*min = DVB_MIN_FREQUENCY_T;
+			*max = DVB_MAX_FREQUENCY_T;
+	}
+}
+
 static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 {
 	stb810_dvbfeInfo *fe = NULL;
@@ -2682,17 +2717,21 @@ static char *output_getDvbRange(int field, void* pArg)
 		int id = GET_NUMBER(pArg);
 		buffer[0] = 0;
 		stb810_dvbfeInfo *fe = getDvbRange(appControlInfo.dvbInfo.tuner);
-		uint32_t *symbolRate = getDvbSymbolRate();
-		if (!fe || !symbolRate)
+		if (!fe)
 			return buffer;
 		switch (id)
 		{
 			case 0: sprintf(buffer, "%u", fe->lowFrequency); break;
 			case 1: sprintf(buffer, "%u", fe->highFrequency); break;
 			case 2: sprintf(buffer, "%u", fe->frequencyStep); break;
-			case 3: sprintf(buffer, "%u", *symbolRate); break;
+			case 3: {
+				uint32_t *symbolRate = getDvbSymbolRate();
+				if (!symbolRate)
+					return buffer;
+				sprintf(buffer, "%u", *symbolRate);
+				break;
+			}
 		}
-
 		return buffer;
 	} else
 		return NULL;
@@ -2708,27 +2747,61 @@ static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 		return 1;
 
 	val = strtoul(value, NULL, 10);
-	fe = getDvbRange(appControlInfo.dvbInfo.tuner);
-	uint32_t *symbolRate = getDvbSymbolRate();
-	if (!fe || !symbolRate)
-		return 0;
 
-	if ( (option <= optionFreqStep && (val < 1000 || val > 860000)) ||
-	     (option == optionFreqStep && (val < 1    || val > 50000)) )
+	if (option == optionSymbolRate)
 	{
-		interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_error, 0);
-		return -1;
+		if (val < DVB_MIN_FREQUENCY_STEP || val > DVB_MAX_FREQUENCY_STEP) {
+			eprintf("%s: invalid frequency step %u\n", __FUNCTION__, val);
+			interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_error, 0);
+			return -1;
+		}
+		uint32_t *symbolRate = getDvbSymbolRate();
+		if (!symbolRate) {
+			eprintf("%s: failed to get symbolRate for tuner %d %s\n", __FUNCTION__,
+				appControlInfo.dvbInfo.tuner, dvb_getTypeName(appControlInfo.dvbInfo.tuner));
+			goto set_range_failed;
+		}
+		*symbolRate = val;
+		return output_saveAndRedraw(saveAppSettings(), pMenu);
 	}
 
+	fe = getDvbRange(appControlInfo.dvbInfo.tuner);
+	if (!fe) {
+		eprintf("%s: failed to get freuquency range for tuner %d %s\n", __FUNCTION__,
+			appControlInfo.dvbInfo.tuner, dvb_getTypeName(appControlInfo.dvbInfo.tuner));
+		goto set_range_failed;
+	}
+
+	if (option == optionFreqStep) {
+		if (val < DVB_MIN_FREQUENCY_STEP || val > DVB_MAX_FREQUENCY_STEP) {
+			eprintf("%s: invalid frequency step %u\n", __FUNCTION__, val);
+			interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_warning, 0);
+			return -1;
+		}
+	} else {
+		uint32_t min,max;
+		getDvbLimits(appControlInfo.dvbInfo.tuner, &min, &max);
+		if (val < min || val > max) {
+			eprintf("%s: invalid frequency %u: must be %u-%u for tuner %d type %s\n", __FUNCTION__,
+				val, min, max, appControlInfo.dvbInfo.tuner, dvb_getTypeName(appControlInfo.dvbInfo.tuner));
+			interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_warning, 0);
+			return -1;
+		}
+	}
 	switch (option)
 	{
 		case optionLowFreq:     fe->lowFrequency  = val; break;
 		case optionHighFreq:    fe->highFrequency = val; break;
 		case optionFreqStep:    fe->frequencyStep = val; break;
-		case optionSymbolRate:  *symbolRate = val; break;
-		default: return 0;
+		default:
+			eprintf("%s: wrong option %d\n", __FUNCTION__, option);
+			goto set_range_failed;
 	}
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
+
+set_range_failed:
+	interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
+	return -1;
 }
 
 static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
@@ -2756,9 +2829,9 @@ static int output_changeDvbRange(interfaceMenu_t *pMenu, void* pArg)
 	int tunerType = dvb_getType(appControlInfo.dvbInfo.tuner);
 	switch (id)
 	{
-		case optionLowFreq:    sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"), get_HZprefix(tunerType)); break;
+		case optionLowFreq:    sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"),  get_HZprefix(tunerType)); break;
 		case optionHighFreq:   sprintf(buf, "%s, %s: ", _T("DVB_HIGH_FREQ"), get_HZprefix(tunerType)); break;
-		case optionFreqStep:   sprintf(buf, "%s, %s: ", _T("DVB_STEP_FREQ"), _T("KHZ")); break;
+		case optionFreqStep:   sprintf(buf, "%s, %s: ", _T("DVB_STEP_FREQ"),   _T("KHZ")); break;
 		case optionSymbolRate: sprintf(buf, "%s, %s: ", _T("DVB_SYMBOL_RATE"), _T("KHZ")); break;
 		default: return -1;
 	}
