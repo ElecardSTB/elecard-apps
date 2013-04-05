@@ -41,6 +41,7 @@ ENABLE_PVR ?= 1
 endif
 
 ENABLE_BROWSER ?= 1
+ENABLE_USE_CJSON := 1
 endif
 
 ifneq ($(STAPISDK_VERSION),) # --- STB83x/STB84x ---
@@ -52,12 +53,14 @@ ENABLE_PPP ?= 1
 ENABLE_XWORKS ?= 0
 ENABLE_DLNA ?= 1
 ENABLE_HDDESIGN ?= 0
+ENABLE_USE_CJSON := 1
 else
 ENABLE_HDDESIGN := 0
 endif
 
 ifneq ($(UEMD),)             # --- Module ---
 ENABLE_GSTREAMER ?= 1
+ENABLE_DLNA ?= 1
 endif
 ifeq ($(ARCH),)              # --- PC x86/x64 ---
 ENABLE_GSTREAMER ?= 1
@@ -93,6 +96,7 @@ ENABLE_MESSAGES ?= 0
 ENABLE_TELETES ?= 0
 ENABLE_3DRENDERING ?= 0
 ENABLE_GSTREAMER ?= 0
+ENABLE_USE_CJSON ?= 0
 
 TEST_SERVER ?= 1
 
@@ -130,7 +134,6 @@ LOCAL_CXXFLAGS = \
 LOCAL_LDFLAGS = \
 	-lnet \
 	-lcommon \
-	-lcjson \
 	-Xlinker -rpath -Xlinker /opt/elecard/lib \
 	-L$(ROOTFS)/opt/elecard/lib \
 	-lrt -lpthread -Xlinker -z -Xlinker muldefs
@@ -297,8 +300,10 @@ ifeq ($(ENABLE_TELETES),1)
 endif
 
 ifeq ($(ENABLE_GSTREAMER),1)
-	LOCAL_CFLAGS  += $(shell pkg-config --cflags gstreamer-0.10) -DENABLE_GSTREAMER=$(ENABLE_GSTREAMER)
-	LOCAL_LDFLAGS += $(shell pkg-config --libs   gstreamer-0.10)
+	GST_LOCAL_CFLAGS  := $(shell pkg-config --cflags gstreamer-0.10) -DENABLE_GSTREAMER=$(ENABLE_GSTREAMER)
+	GST_LOCAL_LDFLAGS := $(shell pkg-config --libs   gstreamer-0.10)
+	LOCAL_CFLAGS  += $(GST_LOCAL_CFLAGS)
+	LOCAL_LDFLAGS += $(GST_LOCAL_LDFLAGS)
 endif
 
 ifeq ($(ENABLE_VIDIMAX),1)
@@ -359,6 +364,12 @@ ifeq ($(ENABLE_TVMYWAY),1)
 	LOCAL_CFLAGS += -DENABLE_TVMYWAY=$(ENABLE_TVMYWAY)
 endif
 
+ifeq ($(ENABLE_USE_CJSON),1)
+	LOCAL_CFLAGS += -I$(PRJROOT)/src/project/elecard/apps/cJSON/include
+	LOCAL_CFLAGS += -I$(PRJROOT)/src/apps/cJSON/include \
+	LOCAL_LDFLAGS += -lcjson
+endif
+
 # -----------------------------------------------------------------------------
 # File layout
 # -----------------------------------------------------------------------------
@@ -366,7 +377,7 @@ endif
 TARGET_DATA_DIR=/opt/elecard/share/StbMainApp
 INSTALL_DIR = $(ROOTFS)/opt/elecard/bin
 LIB_DIR =     $(ROOTFS)/opt/elecard/lib
-DATA_DIR =    $(ROOTFS)/$(TARGET_DATA_DIR)
+DATA_DIR =    $(ROOTFS)$(TARGET_DATA_DIR)
 
 ifneq ($(STAPISDK_VERSION),)
 DEFAULTS_DIR =  $(ROOTFS)/etc/defaults/elecard/StbMainApp
@@ -473,7 +484,6 @@ LOCAL_CFLAGS += \
 	-I$(_phStbSystemManager_DIR)/inc \
 	-I$(_phStbDFB_DIR)/inc \
 	-I$(BUILDROOT) \
-	-I$(PRJROOT)/src/project/elecard/apps/cJSON/include \
 	-I$(PRJROOT)/src/project/elecard/apps/StbPvr/include \
 	-I/opt/philips/Tools/SDK/overlay/dfb/include/glib-2.0 \
 	-I/opt/philips/Tools/SDK/overlay/dfb/include/glib-2.0/glib \
@@ -537,6 +547,8 @@ ifneq ($(UEMD),)
 LOCAL_CFLAGS += \
 	-DSTBuemd \
 	--sysroot=$(STAGINGDIR) \
+	-DGST_VIDEO_SINK=\"mvdusink\" \
+	-DGST_AUDIO_SINK=\"alsasink\" \
 
 CC  = $(CROSS_COMPILE)gcc
 CXX = $(CROSS_COMPILE)g++
@@ -567,7 +579,6 @@ LOCAL_CFLAGS  += \
 	-DSTSDK=1 \
 	-Isrc \
 	-I$(DVD_ROOT)/st2fx/src/DirectFB-1.4.12/source/src \
-	-I$(PRJROOT)/src/apps/cJSON/include \
 	-I$(PRJROOT)/src/apps/elcdRpcLib/include \
 	-I$(STAGINGDIR)/usr/include/glib-2.0 -I$(STAGINGDIR)/usr/lib/glib-2.0/include
 
@@ -600,12 +611,13 @@ H_FILES += $(wildcard src/*.h)
 
 LOCAL_CXXFLAGS += $(LOCAL_CFLAGS)
 
-all: $(OBJECTS) $(PROGRAM) install
+all: build install
+build: $(PROGRAM)
 
 $(PROGRAM): $(OBJECTS) $(DEPENDS_EXTRA)
 	$(CXX) -o $(PROGRAM) $(OBJECTS) $(LOCAL_LDFLAGS)
 
-install: $(PROGRAM) $(INSTALL_EXTRA)
+install: build $(INSTALL_EXTRA)
 	$(Q)mkdir -p $(INSTALL_DIR) $(DATA_DIR) $(DEFAULTS_DIR)
 	$(Q)install -m0755 $(PROGRAM) $(INSTALL_DIR)
 

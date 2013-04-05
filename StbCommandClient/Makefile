@@ -18,13 +18,22 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA  02110-1301 USA
 #
 
-PROGRAM = StbCommandClient
+PROGRAM = $(BUILD_TARGET)StbCommandClient
 C_SOURCES = $(wildcard src/*.c)
 
-all: $(PROGRAM)
+all: $(BUILD_TARGET) $(PROGRAM)
+
+ifneq ($(BUILD_TARGET),)
+$(BUILD_TARGET):
+	mkdir -p $@
+endif
 
 $(PROGRAM): $(C_SOURCES)
 	$(CC) -o $@ $(CFLAGS) -fPIC $(C_SOURCES)
+
+install: all
+	mkdir -p $(ROOTFS)/opt/elecard/bin
+	install -m0755 $(PROGRAM) $(ROOTFS)/opt/elecard/bin/
 
 clean:
 	rm -f $(PROGRAM)
