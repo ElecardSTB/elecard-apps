@@ -366,7 +366,7 @@ endif
 
 ifeq ($(ENABLE_USE_CJSON),1)
 	LOCAL_CFLAGS += -I$(PRJROOT)/src/project/elecard/apps/cJSON/include
-	LOCAL_CFLAGS += -I$(PRJROOT)/src/apps/cJSON/include \
+	LOCAL_CFLAGS += -I$(PRJROOT)/src/apps/cJSON/include
 	LOCAL_LDFLAGS += -lcjson
 endif
 
