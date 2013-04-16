@@ -3374,8 +3374,10 @@ void dvb_init(void)
 		dvbInstances[i].fe_type = fe_info.type;
 		// FIXME: Linux DVB API v5.5 (kernel-3.3) supports DTV_ENUM_DELSYS property.
 		// What a pity we are using ancient kernels!
-		if (strstr(fe_info.name, "CXD2820R"))
+		if(strstr(fe_info.name, "CXD2820R") ||
+			strstr(fe_info.name, "MN88472")) {
 			appControlInfo.tunerInfo[tuner].caps = tunerMultistandard | tunerDVBC | tunerDVBT | tunerDVBT2;
+		}
 		appControlInfo.tunerInfo[tuner].status = tunerInactive;
 		eprintf("%s[%d]: %s (%s) caps: %02x\n", __FUNCTION__, i,
 			fe_info.name, fe_typeNames[fe_info.type], appControlInfo.tunerInfo[tuner].caps);

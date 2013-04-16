@@ -831,6 +831,8 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			if (selected < 0)
 				selected = 0;
 			break;
+		default:
+			  break;
 		}
 	} else
 	{
