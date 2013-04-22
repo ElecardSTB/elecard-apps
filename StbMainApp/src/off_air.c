@@ -1057,7 +1057,7 @@ static int offair_multiviewNext(int direction, void* pArg)
 		do
 		{
 			newIndex = (newIndex + offair_serviceCount + indexdiff) % offair_serviceCount;
-		} while (newIndex != channelIndex && (!can_play(newIndex) || !has_video(newIndex));
+		} while (newIndex != channelIndex && (!can_play(newIndex) || !has_video(newIndex)));
 		if( newIndex == channelIndex )
 		{
 			return -1;
