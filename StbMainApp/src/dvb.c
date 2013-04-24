@@ -953,7 +953,7 @@ int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_
 		uint8_t ucmd[4] = { 0xe0, 0x10, 0x39, appControlInfo.dvbsInfo.diseqc.uncommited-1 };
 		dvb_diseqcSend(tuner, frontend_fd, ucmd, 4);
 	}
-	int is_vertical = media ? media->dvb_s.polarization == 0x01 : appControlInfo.dvbsInfo.polarization == SEC_VOLTAGE_13;
+	int is_vertical = media ? media->dvb_s.polarization == 0x01 : appControlInfo.dvbsInfo.polarization != 0;
 	int port = appControlInfo.dvbsInfo.diseqc.type == diseqcSwitchMulti ?
 	           appControlInfo.dvbsInfo.diseqc.port & 1 :
 	           appControlInfo.dvbsInfo.diseqc.port;
@@ -3374,8 +3374,10 @@ void dvb_init(void)
 		dvbInstances[i].fe_type = fe_info.type;
 		// FIXME: Linux DVB API v5.5 (kernel-3.3) supports DTV_ENUM_DELSYS property.
 		// What a pity we are using ancient kernels!
-		if (strstr(fe_info.name, "CXD2820R"))
+		if(strstr(fe_info.name, "CXD2820R") ||
+			strstr(fe_info.name, "MN88472")) {
 			appControlInfo.tunerInfo[tuner].caps = tunerMultistandard | tunerDVBC | tunerDVBT | tunerDVBT2;
+		}
 		appControlInfo.tunerInfo[tuner].status = tunerInactive;
 		eprintf("%s[%d]: %s (%s) caps: %02x\n", __FUNCTION__, i,
 			fe_info.name, fe_typeNames[fe_info.type], appControlInfo.tunerInfo[tuner].caps);

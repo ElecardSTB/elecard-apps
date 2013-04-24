@@ -833,6 +833,8 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			if (selected < 0)
 				selected = 0;
 			break;
+		default:
+			  break;
 		}
 	} else
 	{
@@ -1057,7 +1059,7 @@ static int offair_multiviewNext(int direction, void* pArg)
 		do
 		{
 			newIndex = (newIndex + offair_serviceCount + indexdiff) % offair_serviceCount;
-		} while (newIndex != channelIndex && (!can_play(newIndex) || !has_video(newIndex));
+		} while (newIndex != channelIndex && (!can_play(newIndex) || !has_video(newIndex)));
 		if( newIndex == channelIndex )
 		{
 			return -1;
@@ -1999,10 +2001,8 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 void offair_fillDVBTOutputMenu(int which)
 {
-	//int position = 0;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 	EIT_service_t *service;
-	int i, selectedMenuItem;
 	int radio, scrambled, type = -1;
 	__u32 lastFreqency = 0, serviceFrequency;
 	char lastChar = 0, curChar, *serviceName, *str;
@@ -2012,7 +2012,8 @@ void offair_fillDVBTOutputMenu(int which)
 
 	//dprintf("%s: got %d channels for layer %d\n", __FUNCTION__, dvb_getNumberOfChannels(), which);
 
-	for( i = 0; i < offair_indexCount; ++i )
+	int selectedMenuItem = MENU_ITEM_BACK;
+	for (int i = 0; i < offair_indexCount; ++i )
 	{
 		service = offair_services[offair_indeces[i]].service;
 		scrambled = dvb_getScrambled( service );
@@ -2050,6 +2051,9 @@ void offair_fillDVBTOutputMenu(int which)
 			break;
 		default: ;
 		}
+		if (appControlInfo.dvbInfo.channel == offair_indeces[i])
+			selectedMenuItem = interface_getMenuEntryCount(channelMenu);
+
 		if (offair_serviceCount < 10)
 			sprintf(channelEntry, "%d",   offair_indeces[i]);
 		else if (offair_serviceCount < 100)
@@ -2062,21 +2066,10 @@ void offair_fillDVBTOutputMenu(int which)
 		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(which, offair_indeces[i]),
 			scrambled ? thumbnail_billed : ( radio ? thumbnail_radio : thumbnail_channels));
 	}
-
 	if (offair_indexCount == 0) {
 		strcpy(channelEntry, _T("NO_CHANNELS"));
 		interface_addMenuEntryDisabled(channelMenu, channelEntry, thumbnail_info);
 	}
-
-	if( appControlInfo.dvbInfo.channel < 0 || appControlInfo.dvbInfo.channel == CHANNEL_CUSTOM || offair_serviceCount == 0 )
-		selectedMenuItem = MENU_ITEM_BACK;
-	else {
-		selectedMenuItem = 0;
-		for ( i = 0; i < appControlInfo.dvbInfo.channel; i++)
-			if( offair_services[i].service != NULL )
-				selectedMenuItem++;
-	}
-
 	interface_setSelectedItem(channelMenu, selectedMenuItem);
 }
 

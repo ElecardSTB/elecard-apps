@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/un.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,18 +52,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <unistd.h>
 
-
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
 
 #define LISTEN_PATH				"/var/run/frontpanel" //socket
-#define BOARD_NAME_PROMSVYAZ	"stb840_promSvyaz"
-#define BOARD_NAME_CH7162		"stb840_ch7162"
-#define PATH_PROMSVYAZ			"/sys/devices/platform/tm1668/text"
-#define PATH_CH7162				"/sys/devices/platform/ct1628/text"
-#define BRIGHTNESS_PROMSVYAZ	"/sys/devices/platform/tm1668/brightness"
-#define BRIGHTNESS_CH7162		"/sys/devices/platform/ct1628/brightness"
+
+#define DEVICE_TM1668_PATH		"/sys/devices/platform/tm1668"
+#define DEVICE_CT1628_PATH		"/sys/devices/platform/ct1628"
 
 #define MAX_TIMEOUT				60
 #define DELAY_TIMER_MIN			100
@@ -128,7 +125,8 @@ uint32_t		g_t2 = TIME_OTHER_SLEEP_TEXT;
 
 BoardTypes_t	g_board = UNKNOWN;
 char			*g_frontpanelPath = NULL;
-char			*g_frontpanelBrightness = NULL;
+char			g_frontpanelText[256];
+char			g_frontpanelBrightness[256];
 
 const char		g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
 int32_t			g_brightness = 4;
@@ -157,28 +155,30 @@ struct argHandler_s handlers[] = {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
-
-void CheckBoardType()
+int32_t CheckControllerType(void)
 {
-	char *boardName;
-	boardName = getenv("board_name");
-	if(boardName) {
-		if(strncmp(boardName, BOARD_NAME_PROMSVYAZ, sizeof(BOARD_NAME_PROMSVYAZ) - 1) == 0) {
-			g_board = PROMSVYAZ;
-			g_frontpanelPath = PATH_PROMSVYAZ;
-			g_frontpanelBrightness = BRIGHTNESS_PROMSVYAZ;
-		} else if(strncmp(boardName, BOARD_NAME_CH7162, sizeof(BOARD_NAME_CH7162) - 1) == 0) {
-			g_board = CH7162;
-			g_frontpanelPath = PATH_CH7162;
-			g_frontpanelBrightness = BRIGHTNESS_CH7162;
+	uint32_t	i;
+	struct {
+		char *name;
+		char *path;
+	} ctrl_paths[] = {
+		{"ct1628", DEVICE_CT1628_PATH},
+		{"tm1668", DEVICE_TM1668_PATH},
+	};
+
+	for(i = 0; i < sizeof(ctrl_paths) / sizeof(*ctrl_paths); i++) {
+		struct stat st;
+		if(stat(ctrl_paths[i].path, &st) == 0) {
+			fprintf(stdout, "frontpaneld: found %s controller\n", ctrl_paths[i].name);
+			g_frontpanelPath = ctrl_paths[i].path;
+			snprintf(g_frontpanelBrightness, sizeof(g_frontpanelBrightness), "%s/brightness", g_frontpanelPath);
+			snprintf(g_frontpanelText, sizeof(g_frontpanelText), "%s/text", g_frontpanelPath);
+			return 0;
 		}
 	}
-	if(g_board == UNKNOWN) {
-		fprintf(stderr, "frontpaneld: board_name=%s not supported\n", boardName ? boardName : "(null)");
-		exit(1);
-	}
+	fprintf(stderr, "frontpaneld: not found supported frontpanel conrollers!!!\n");
+	return -1;
 }
-
 
 timer_t CreateTimer(int signo)
 {
@@ -257,7 +257,7 @@ void GetCurrentTime(char *buf)
 void SetFrontpanelText(const char *buffer)
 {
 	FILE *f;
-	f = fopen(g_frontpanelPath, "w");
+	f = fopen(g_frontpanelText, "w");
 	if(f != 0) {
 		fwrite(buffer, 5, 5, f);
 		fclose(f);
@@ -317,7 +317,7 @@ void Quit()
 
 static void SetBrightness(int brightness)
 {
-	FILE *f;
+	FILE	*f;
 	f = fopen(g_frontpanelBrightness, "w");
 	if(f != 0) {
 		fprintf(f, "%d", brightness);
@@ -670,7 +670,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	CheckBoardType();
+	if(CheckControllerType() != 0) {
+		exit(1);
+	}
 	if(daemonize) {
 		if(daemon(0, 0)) {
 			perror("Failed to daemonize");

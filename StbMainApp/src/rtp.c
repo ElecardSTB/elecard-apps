@@ -2000,8 +2000,9 @@ static int rtp_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd,
 
 	dprintf("%s: cmd %d selected %d pArg 0x%08x (%d %d)\n", __FUNCTION__, cmd->command, streamNumber, pArg, which, STREAM_INFO_GET_STREAM(pArg));
 
-	if( cmd->command == interfaceCommandRefresh )
-	{
+//TODO: handle interfaceCommandTV on STB840 PromSvyaz only
+	if( (cmd->command == interfaceCommandRefresh) ||
+		(cmd->command == interfaceCommandTV)) {
 		rtp_cleanupPlaylist(screenMain);
 		interface_displayMenu(1);
 
