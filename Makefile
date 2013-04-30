@@ -19,7 +19,6 @@ build-apps:
 	make CC=sh4-linux-gcc -C StbCommandClient
 	make CC=sh4-linux-gcc -C mdevmonitor
 ifeq ($(CONFIG_ELECD_ENABLE),y)
-#in output.c StbMainApp.c uses RELEASE_TYPE and REVISION defines, so we should rebuild them
 	make CROSS_COMPILE=sh4-linux- RELEASE_TYPE="$(REVISION) built on $(HOSTNAME)" COMPILE_TIME="$(DATE_READABLE)" -C ./StbMainApp all
 endif
 

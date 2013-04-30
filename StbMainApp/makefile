@@ -734,7 +734,7 @@ endif
 
 #include $(PRJROOT)/etc/application_last.mk
 #else
-all: build
+all: build install
 
 PROG_TARGET = $(OBJ_DIR)/StbMainApp
 
@@ -759,6 +759,7 @@ $(PROG_TARGET): $(OBJECTS) $(ADD_LIBS) $(DEPENDS_EXTRA) force
 	$(call if_changed,ld_out_o)
 
 install: build $(DATA_DIR) $(INSTALL_BIN_DIR) $(INSTALL_EXTRA)
+	@echo 'INSTALL $(PROG_TARGET) -> $(INSTALL_BIN_DIR)'
 	$(Q)install -m0755 $(PROG_TARGET) $(INSTALL_BIN_DIR)
 
 clean:
