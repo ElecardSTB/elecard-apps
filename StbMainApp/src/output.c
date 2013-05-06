@@ -58,6 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "messages.h"
 #include "Stb225.h"
 #include "wpa_ctrl.h"
+#include "garb.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -2404,6 +2405,29 @@ static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 
 	return 1;
 }
+
+#ifdef STSDK
+static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
+{
+	int32_t cur_val;
+
+	cur_val = currentmeter_getValue();
+	if(cur_val >= 0) {
+		char info[MENU_ENTRY_INFO_LENGTH];
+		
+		currentmeter_setCalibrateValue(cur_val);
+		snprintf(info, sizeof(info), "%d", cur_val);
+		setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_VAR_NAME, info);
+
+		snprintf(info, sizeof(info), _T("CURRENTMETER_CALIBRATE_SUCCESS"), cur_val);
+		interface_showMessageBox(info, thumbnail_yes, 0);
+	} else {
+		interface_showMessageBox(_T("CURRENTMETER_CALIBRATE_ERROR"), thumbnail_error, 0);
+	}
+
+	return 1;
+}
+#endif
 
 static int output_resetSettings(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -6134,6 +6158,11 @@ void output_fillOutputMenu(void)
 #endif
 
 #ifdef STSDK
+	if(currentmeter_isExist()) {
+		str = _T("CURRENTMETER_CALIBRATE");
+		interface_addMenuEntry(outputMenu, str, output_calibrateCurrentMeter, NULL, thumbnail_configure);
+	}
+
 	str = _T("UPDATES");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &UpdateMenu, settings_updates);
 #endif

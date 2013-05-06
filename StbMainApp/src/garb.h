@@ -29,27 +29,36 @@
 //
 //////////////////////////////////////////////////////////////////////////
 
-/***********************************************
-* INCLUDE FILES                                *
-************************************************/
-
+/******************************************************************
+* INCLUDE FILES                                                   *
+*******************************************************************/
 #include "interface.h"
+#include "defines.h"
+
+/******************************************************************
+* EXPORTED MACROS                                                 *
+*******************************************************************/
+#define GARB_CONFIG_FILE CONFIG_DIR "/garb.conf"
+#define CURRENTMETER_CALIBRATE_CONFIG_VAR_NAME "CURRENTMETER_CALIBRATE_VALUE"
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES                                   *
 *******************************************************************/
+void garb_init(void);
+void garb_terminate(void);
 
-void garb_init();
-void garb_terminate();
-
-void garb_askViewership();
-void garb_resetViewership();
-void garb_checkViewership();
-void garb_showStats();
+void garb_askViewership(void);
+void garb_resetViewership(void);
+void garb_checkViewership(void);
+void garb_showStats(void);
 
 void garb_startWatching(int channel);
 void garb_stopWatching(int channel);
 
-void garb_drawViewership();
+void garb_drawViewership(void);
+
+int32_t currentmeter_isExist(void);
+int32_t currentmeter_getValue(void);
+void currentmeter_setCalibrateValue(uint32_t val);
 
 #endif // __GARB_H
