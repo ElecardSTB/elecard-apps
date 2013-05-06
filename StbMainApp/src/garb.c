@@ -34,6 +34,7 @@
 #include "debug.h"
 #include "StbMainApp.h"
 #include "off_air.h"
+#include "output.h"
 #include "l10n.h"
 #include <cJSON.h>
 #include <service.h>
@@ -43,6 +44,11 @@
 #include <time.h>
 #include <errno.h>
 #include <string.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/ioctl.h>
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -62,8 +68,14 @@
 #define MAX_GUESTS  16
 
 #define GARB_TEST
-#define GARB_CONFIG CONFIG_DIR "/garb.json"
-#define GARB_FDD    CONFIG_DIR "/garb.fdd"
+#define GARB_CONFIG_JSON			CONFIG_DIR "/garb.json"
+#define GARB_FDD					CONFIG_DIR "/garb.fdd"
+
+#define CURRENTMETER_I2C_BUS		"/dev/i2c-3"
+#define CURRENTMETER_I2C_ADDR		0x1e
+#define CURRENTMETER_I2C_REG_ID		0x00
+#define CURRENTMETER_I2C_REG_VAL	0x04
+#define CURRENTMETER_I2C_ID			0x1e
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -117,6 +129,7 @@ typedef struct
 		list_element_t *tail;
 	} history;
 	pthread_t thread;
+	pthread_t thread_current;
 } garbState_t;
 
 /******************************************************************
@@ -129,6 +142,8 @@ static void garb_test();
 static void garb_save();
 static void garb_load();
 static void *garb_thread(void *notused);
+static void *currentmeter_thread(void *notused);
+static void currentmeter_close(void);
 
 static void garb_printMembers(char text[]);
 static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
@@ -148,13 +163,18 @@ static inline int get_start_time(const struct tm *t)
 static garbState_t garb_info;
 static int viewership_offset = 0;
 static int garb_quiz_index  = MAX_VIEWERS-1;
+static int32_t currentmeter_i2c_bus = -1;
+static uint32_t currentmeter_calibrate_value = 20;
 
-static inline int viewer_count()
+/******************************************************************
+* FUNCTION IMPLEMENTATION                                         *
+*******************************************************************/
+static inline int viewer_count(void)
 {
 	return garb_info.hh.count + garb_info.registered.guest_count;
 }
 
-void garb_init()
+void garb_init(void)
 {
 	memset(&garb_info, 0, sizeof(garb_info));
 	garb_info.watching.channel = CHANNEL_NONE;
@@ -164,10 +184,14 @@ void garb_init()
 	garb_test();
 #endif
 	pthread_create(&garb_info.thread, 0, garb_thread, 0);
+	pthread_create(&garb_info.thread_current, 0, currentmeter_thread, 0);
 }
 
-void garb_terminate()
+void garb_terminate(void)
 {
+	pthread_cancel(garb_info.thread_current);
+	pthread_join(garb_info.thread_current, NULL);
+	currentmeter_close();
 	pthread_cancel(garb_info.thread);
 	pthread_join(garb_info.thread, NULL);
 	garb_save();
@@ -350,7 +374,7 @@ static void garb_printMembers(char text[])
 	strcat(text, "\n\nTo answer, use numeric remote buttons\n");
 }
 
-void garb_checkViewership()
+void garb_checkViewership(void)
 {
 	if (time(0) - garb_info.last_stop > VIEWERSHIP_TIMEOUT)
 		garb_resetViewership();
@@ -360,14 +384,14 @@ void garb_checkViewership()
 	}
 }
 
-void garb_askViewership()
+void garb_askViewership(void)
 {
 	char text[MAX_MESSAGE_BOX_LENGTH];
 	garb_printMembers(text);
 	interface_showConfirmationBox(text, thumbnail_account_active, garb_viewershipCallback, NULL);
 }
 
-void garb_resetViewership()
+void garb_resetViewership(void)
 {
 	garb_info.registered.guest_count = 0;
 	garb_info.watching.viewers = 0;
@@ -388,9 +412,9 @@ static void add_member(char id, const char *name)
 	garb_info.hh.count++;
 }
 
-void garb_load()
+void garb_load(void)
 {
-	int fd = open(GARB_CONFIG, O_RDONLY);
+	int fd = open(GARB_CONFIG_JSON, O_RDONLY);
 	if (fd < 0) {
 		eprintf("%s: failed to open garb config: %s\n", __FUNCTION__, strerror(errno));
 		return;
@@ -432,7 +456,7 @@ void garb_load()
 }
 
 #ifdef GARB_TEST
-void garb_test()
+void garb_test(void)
 {
 	if (garb_info.hh.count > 0)
 		return;
@@ -449,7 +473,7 @@ void garb_test()
 }
 #endif
 
-void garb_save()
+void garb_save(void)
 {
 	rename(GARB_FDD, GARB_FDD ".prev");
 	FILE *f = fopen(GARB_FDD, "w");
@@ -614,7 +638,124 @@ void *garb_thread(void *notused)
 	return NULL;
 }
 
-void garb_showStats()
+static int32_t currentmeter_open(void)
+{
+	if(currentmeter_i2c_bus >= 0) {
+		return 0;
+	}
+
+	currentmeter_i2c_bus = open(CURRENTMETER_I2C_BUS, O_RDWR);
+	if(currentmeter_i2c_bus < 0) {
+		fprintf(stderr, "Error: Could not open device `%s': %s\n",
+				CURRENTMETER_I2C_BUS, strerror(errno));
+		if(errno == EACCES)
+			fprintf(stderr, "Run as root?\n");
+		return -1;
+	}
+	return 0;
+}
+
+static void currentmeter_close(void)
+{
+	if(currentmeter_i2c_bus >= 0)
+		close(currentmeter_i2c_bus);
+}
+
+static uint8_t currentmeter_readReg(uint8_t reg_addr)
+{
+	struct i2c_rdwr_ioctl_data	work_queue;
+	struct i2c_msg				msg[2];
+	int32_t						ret;
+	uint8_t						read_reg;
+
+	if(currentmeter_open() != 0) {
+		return -1;
+	}
+
+	work_queue.nmsgs = 2;
+	work_queue.msgs = msg;
+
+	msg[0].addr = CURRENTMETER_I2C_ADDR;
+	msg[0].flags = 0;
+	msg[0].len = 1;
+	msg[0].buf = &reg_addr;
+
+	msg[1].addr = CURRENTMETER_I2C_ADDR;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = 1;
+	msg[1].buf = &read_reg;
+
+	ret = ioctl(currentmeter_i2c_bus, I2C_RDWR, &work_queue);
+	if(ret < 0) {
+		printf("%s:%s()[%d]: ERROR!! while reading i2c: ret=%d\n", __FILE__, __func__, __LINE__, ret);
+		return ret;
+	}
+	return read_reg;
+}
+
+int32_t currentmeter_isExist(void)
+{
+	if(currentmeter_open() != 0) {
+		return 0;
+	}
+	if(currentmeter_readReg(CURRENTMETER_I2C_REG_ID) != CURRENTMETER_I2C_ID) {
+		printf("%s:%s()[%d]: Unknown device!!!\n", __FILE__, __func__, __LINE__);
+		return 0;
+	}
+	return 1;
+}
+
+int32_t currentmeter_getValue(void)
+{
+	uint8_t cur_val;
+	if(currentmeter_open() != 0) {
+		return -1;
+	}
+	cur_val = currentmeter_readReg(CURRENTMETER_I2C_REG_VAL);
+	return cur_val;
+}
+
+void currentmeter_setCalibrateValue(uint32_t val)
+{
+	currentmeter_calibrate_value = val;
+}
+
+static void *currentmeter_thread(void *notused)
+{
+	uint32_t isAlive = 1;
+	static char calibr_val[MENU_ENTRY_INFO_LENGTH];
+
+	if(!currentmeter_isExist()) {
+		return NULL;
+	}
+	if(getParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_VAR_NAME, "", calibr_val)) {
+		currentmeter_setCalibrateValue(atoi(calibr_val));
+	}
+
+	while(1) {
+		uint8_t cur_val;
+		int32_t has_power;
+		int32_t state_changed;
+
+		cur_val = currentmeter_getValue();
+//		printf("%s:%s()[%d]: cur_val=%d\n", __FILE__, __func__, __LINE__, cur_val);
+		has_power = cur_val > (currentmeter_calibrate_value >> 1);
+		state_changed = isAlive ? !has_power : has_power;
+		if(state_changed) {
+//			printf("%s:%s()[%d]: cur_val=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
+//						__FILE__, __func__, __LINE__, cur_val, has_power, state_changed, isAlive);
+			isAlive = !isAlive;
+			if(isAlive) { //if TV switched on we should offer to chose viewer
+				garb_checkViewership();
+			}
+		}
+		sleep(1);
+	}
+
+	return NULL;
+}
+
+void garb_showStats(void)
 {
 	char text[MAX_MESSAGE_BOX_LENGTH] = {0};
 	char line[BUFFER_SIZE];
@@ -624,51 +765,52 @@ void garb_showStats()
 	struct tm t;
 	time_t end;
 
-	if (garb_info.history.head == NULL)
+	if (garb_info.history.head == NULL) {
 		strcpy(text, _T("LOADING"));
-	else
-	for (list_element_t *el = garb_info.history.head; el; el = el->next) {
-		hist = el->data;
-		service = NULL;
-		if (hist->channel != CHANNEL_NONE)
-			service = offair_getService(hist->channel);
-		name = service ? dvb_getServiceName(service) : "Many";
-		end = mktime(&hist->start) + hist->duration;
-		localtime_r(&end, &t);
-		size_t off =
-		snprintf(line, sizeof(line), "%s: %02d:%02d:%02d-%02d:%02d:%02d ",
-			name,
-			hist->start.tm_hour, hist->start.tm_min, hist->start.tm_sec,
-			t.tm_hour, t.tm_min, t.tm_sec);
-		for (int i = 0; i < garb_info.hh.count; i++) {
-			if (hist->members & (1 << i))
-				line[off++] = garb_info.hh.members[i].id;
+	} else {
+		for (list_element_t *el = garb_info.history.head; el; el = el->next) {
+			hist = el->data;
+			service = NULL;
+			if (hist->channel != CHANNEL_NONE)
+				service = offair_getService(hist->channel);
+			name = service ? dvb_getServiceName(service) : "Many";
+			end = mktime(&hist->start) + hist->duration;
+			localtime_r(&end, &t);
+			size_t off = snprintf(line, sizeof(line), "%s: %02d:%02d:%02d-%02d:%02d:%02d ",
+									name,
+									hist->start.tm_hour, hist->start.tm_min, hist->start.tm_sec,
+									t.tm_hour, t.tm_min, t.tm_sec);
+			for (int i = 0; i < garb_info.hh.count; i++) {
+				if (hist->members & (1 << i))
+					line[off++] = garb_info.hh.members[i].id;
+			}
+			for (int i = 0; i < hist->guest_count; i++)
+				off += sprintf(line+off, "%u", hist->guests[i]);
+			line[off] = '\n';
+			line[off+1] = 0;
+			strcat(text, line);
 		}
-		for (int i = 0; i < hist->guest_count; i++)
-			off += sprintf(line+off, "%u", hist->guests[i]);
-		line[off] = '\n';
-		line[off+1] = 0;
-		strcat(text, line);
 	}
 	interface_showMessageBox(text, thumbnail_epg, 0);
 }
 
-void garb_drawViewership()
+void garb_drawViewership(void)
 {
-	if ( !interfaceInfo.showMenu &&
-	     interfacePlayControl.enabled &&
-	     interfacePlayControl.visibleFlag)
+	if(	!interfaceInfo.showMenu &&
+		interfacePlayControl.enabled &&
+		interfacePlayControl.visibleFlag)
 	{
 		char text[MAX_MESSAGE_BOX_LENGTH] = {0};
-		if (garb_info.watching.viewers == 0)
+		if (garb_info.watching.viewers == 0) {
 			strcpy(text, _T("LOGIN"));
-		else
-		for (int i = 0; i < garb_info.hh.count; i++)
-			if (garb_info.registered.members & (1 << i)) {
-				if (text[0])
-					strcat(text, "\n");
-				strcat(text, garb_info.hh.members[i].name);
-			}
+		} else {
+			for (int i = 0; i < garb_info.hh.count; i++)
+				if (garb_info.registered.members & (1 << i)) {
+					if (text[0])
+						strcat(text, "\n");
+					strcat(text, garb_info.hh.members[i].name);
+				}
+		}
 		for (int i = 0; i < garb_info.registered.guest_count; i++)
 			sprintf(text+strlen(text), "\n%u", garb_info.registered.guests[i]);
 		interface_displayTextBox(interfaceInfo.clientX, interfaceInfo.clientY, text, NULL, 0, NULL, 0);
