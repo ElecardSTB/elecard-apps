@@ -30,6 +30,9 @@
 STAGINGDIR ?= $(STAGING_DIR)
 ROOTFS ?= $(TARGET_DIR)
 
+# Force use bash
+SHELL := /bin/bash
+
 # Platform overrides
 # -----------------------------------------------------------------------------
 ifeq ($(ARCH),mips)
