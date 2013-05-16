@@ -30,6 +30,9 @@
 STAGINGDIR ?= $(STAGING_DIR)
 ROOTFS ?= $(TARGET_DIR)
 
+# Force use bash
+SHELL := /bin/bash
+
 # Platform overrides
 # -----------------------------------------------------------------------------
 ifeq ($(ARCH),mips)
@@ -596,13 +599,18 @@ echo-cmd = $(if $($(quiet)cmd_$(1)),\
 
 make-cmd = $(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
 
-if_changed = $(if $(strip $(any-prereq) $(arg-check)),                       \
-	@set -e;                                                             \
-	rm -f $(get_cmd_file_4target);                                       \
-	$(echo-cmd) $(cmd_$(1));                                             \
+if_changed = $(if $(strip $(any-prereq) $(arg-check)),					\
+	@set -e;									\
+	rm -f $(get_cmd_file_4target);							\
+	$(echo-cmd) $(cmd_$(1));							\
+	if [ -e "$(get_cmd_file_4target)" ]; then					\
+		sed -i "s%.*:%deps_$@ :=%" $(get_cmd_file_4target);			\
+		echo -e "\n$@: \$$(deps_$@)\n\$$(deps_$@):" >>$(get_cmd_file_4target);	\
+	fi;										\
 	echo -e '\n\ncmd_$@ := $(make-cmd)' >> $(get_cmd_file_4target);)
 
 #	echo "$(any-prereq) $(arg-check)"; \
+
 
 GEN_DEP_FILE_FLAGS = -MD -MF $(get_cmd_file_4target)
 

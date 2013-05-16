@@ -74,10 +74,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pthread.h>
 
 #include <directfb_keynames.h>
+
+#ifdef STB82
 // for DirectFB memory access in interface_animateSurface()
 #include <core/system.h>
 #include <display/idirectfbsurface.h>
-#ifdef STB82
 #include <core/surfaces.h>
 #include <phStbSystemManager.h>
 #endif
