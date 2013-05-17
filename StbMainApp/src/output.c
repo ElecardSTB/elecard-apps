@@ -2774,7 +2774,7 @@ static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	if (option == optionSymbolRate)
 	{
-		if (val < DVB_MIN_FREQUENCY_STEP || val > DVB_MAX_FREQUENCY_STEP) {
+		if (val < DVB_MIN_SYMBOLRATE || val > DVB_MAX_SYMBOLRATE) {
 			eprintf("%s: invalid frequency step %u\n", __FUNCTION__, val);
 			interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_error, 0);
 			return -1;
