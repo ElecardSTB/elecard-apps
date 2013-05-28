@@ -72,6 +72,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define LITTLE_INTEVAL			60000
 #define ADDITION_INTERVAL		100000
 
+#define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof(arr[0]))
+
 /*#define DBG(x...) \
 do { \
 	time_t ts = time(NULL); \
@@ -90,7 +92,7 @@ do { \
 ************************************************/
 
 typedef enum {NONE, TIME, STATUS, NOTIFY} MessageType_t;
-typedef enum {UNKNOWN, PROMSVYAZ, CH7162} BoardTypes_t;
+typedef enum {UNKNOWN, PROMSVYAZ, CH7162, STB850} BoardType_t;
 typedef int (*ArgHandler)(char *, char *);
 struct argHandler_s {
 	char		*argName;
@@ -123,7 +125,7 @@ timer_t			g_messageTimer;
 uint32_t		g_t1 = TIME_FIRST_SLEEP_TEXT;
 uint32_t		g_t2 = TIME_OTHER_SLEEP_TEXT;
 
-BoardTypes_t	g_board = UNKNOWN;
+BoardType_t		g_board = UNKNOWN;
 char			*g_frontpanelPath = NULL;
 char			g_frontpanelText[256];
 char			g_frontpanelBrightness[256];
@@ -155,6 +157,37 @@ struct argHandler_s handlers[] = {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
+int32_t CheckBoardType(void)
+{
+	char *boardName;
+	struct {
+		BoardType_t	boardType;
+		char		*name;
+//		uint32_t	nameLen;
+	} boards[] = {
+		{PROMSVYAZ,	"stb840_promSvyaz"},
+		{CH7162,	"stb840_ch7162"},
+		{STB850,	"stb850"},
+	};
+
+	boardName = getenv("board_name");
+	if(boardName) {
+		uint32_t i;
+		for(i = 0; i < ARRAY_SIZE(boards); i++) {
+			if(strncmp(boardName, boards[i].name, strlen(boards[i].name)) == 0) {
+//				fprintf(stderr, "frontpaneld: Detected board=%s\n", boards[i].name);
+				g_board = boards[i].boardType;
+				break;
+			}
+		}
+	}
+	if(g_board == UNKNOWN) {
+		fprintf(stderr, "frontpaneld: Cant detect board!!! board_name=%s\n", boardName ? boardName : "(null)");
+		return -1;
+	}
+	return 0;
+}
+
 int32_t CheckControllerType(void)
 {
 	uint32_t	i;
@@ -670,6 +703,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	CheckBoardType();
+	if(g_board == STB850) {//until not released frontpanel oled driver
+		exit(1);
+	}
 	if(CheckControllerType() != 0) {
 		exit(1);
 	}
