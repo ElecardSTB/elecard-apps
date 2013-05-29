@@ -63,6 +63,8 @@ typedef enum
 	elcmd_setvmode,
 	elcmd_listvmode,
 	elcmd_listvoutput,
+	elcmd_listvinput,
+	elcmd_setvinput,
 	elcmd_getaudio,
 	elcmd_setaudio,
 	elcmd_setzoom,
@@ -71,6 +73,7 @@ typedef enum
 	elcmd_dvbscan,
 	elcmd_dvbtune,
 	elcmd_dvbdiseqc,
+	elcmd_tvscan,
 	elcmd_subtitle,
 	elcmd_reclist,
 	elcmd_getstream,
@@ -104,6 +107,8 @@ typedef enum
 	case elcmd_setvmode: \
 	case elcmd_listvmode: \
 	case elcmd_listvoutput: \
+	case elcmd_listvinput: \
+	case elcmd_setvinput: \
 	case elcmd_getaudio: \
 	case elcmd_setaudio: \
 	case elcmd_setzoom: \
@@ -113,6 +118,7 @@ typedef enum
 	case elcmd_dvbscan: \
 	case elcmd_dvbtune: \
 	case elcmd_dvbdiseqc: \
+	case elcmd_tvscan: \
 	case elcmd_subtitle: \
 	case elcmd_reclist
 

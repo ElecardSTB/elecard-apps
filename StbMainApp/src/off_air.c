@@ -1538,6 +1538,8 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		case interfaceCommandStop:
 		case interfaceCommandOk:
 			// Disable play/stop and playcontrol buttons activation
+			offair_stopVideo(screenMain, 1);
+			interface_showMenu(1, 1);
 			return 0;
 		case interfaceCommandSubtitle:
 			if (appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
