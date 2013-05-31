@@ -65,6 +65,7 @@ typedef enum
 	elcmd_listvoutput,
 	elcmd_listvinput,
 	elcmd_setvinput,
+	elcmd_disablevinput,
 	elcmd_getaudio,
 	elcmd_setaudio,
 	elcmd_setzoom,
@@ -109,6 +110,7 @@ typedef enum
 	case elcmd_listvoutput: \
 	case elcmd_listvinput: \
 	case elcmd_setvinput: \
+	case elcmd_disablevinput: \
 	case elcmd_getaudio: \
 	case elcmd_setaudio: \
 	case elcmd_setzoom: \
