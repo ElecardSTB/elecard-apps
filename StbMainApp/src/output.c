@@ -234,6 +234,16 @@ typedef struct
 	char key[IW_ENCODING_TOKEN_MAX+1];
 	int showAdvanced;
 } outputWifiInfo_t;
+#ifdef STSDK
+
+#define numberOfInputs 4
+inputNames_t g_videoInputNames[numberOfInputs] = {
+	{"input_hdmi_0",  "HDMI 0"},
+	{"input_hdmi_1",  "HDMI 1"},
+	{"input_cvbs",    "CVBS"},
+	{"input_scart",   "SCART"}
+};
+#endif
 #endif
 
 /******************************************************************
@@ -264,6 +274,8 @@ static int output_enterNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_leaveNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_checkInputs();
+static int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterGraphicsModeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
@@ -440,7 +452,9 @@ static interfaceListMenu_t GraphicsModeMenu;
 static interfaceListMenu_t TimeZoneMenu;
 static interfaceListMenu_t InterfaceMenu;
 static interfaceListMenu_t PlaybackMenu;
-
+#ifdef STSDK
+static interfaceListMenu_t InputsSubMenu;
+#endif
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
 static interfaceListMenu_t NetworkSubMenu;
@@ -502,6 +516,8 @@ static interfaceListMenu_t UpdateMenu;
 videoOutput_t	*p_mainVideoOutput = NULL;
 static char		previousFormat[64]; //this needs for cancel switching video output format
 static uint32_t	isToggleContinues = 0; //this indicates that "togle vfmt" button pressed several times without apply/cancaling format
+
+videoInput_t g_mainInput = {0};
 #endif
 
 #define GRAPHICS_MODE_COUNT 4
@@ -787,6 +803,131 @@ static int output_tryNewVideoMode_Event(void* pArg)
 	interface_showConfirmationBox(_T("CONFIRM_FORMAT_CHANGE"), thumbnail_warning, output_confirmFormat, pArg);
 	return 1;
 }
+
+static int output_setInput(interfaceMenu_t *pMenu, void* pArg)
+{
+	if (!pMenu || !pArg) {
+		eprintf ("%s: Error setting input.\n", __FUNCTION__);
+		return 0;
+	}
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON        *param = cJSON_CreateString(pArg);
+	cJSON        *res   = NULL;
+
+	eprintf("%s: set %s\n", __FUNCTION__, (char*)pArg);
+
+	st_rpcSync (elcmd_setvinput, param, &type, &res);
+	st_isOk(type, res, __FUNCTION__);
+	cJSON_Delete(res);
+	cJSON_Delete(param);
+#endif
+	return 0;
+}
+
+static int output_checkInputs()
+{
+	elcdRpcType_t   type;
+	int32_t         ret;
+	cJSON           *list;
+	
+	ret = st_rpcSync(elcmd_listvinput, NULL, &type, &list);
+	//eprintf("%s: ret = %d\n", __FUNCTION__, ret);
+
+	if (/*ret != 0 || */type != elcdRpcResult) return 0;
+	if (!list) return 0;
+	if (list->type != cJSON_Array) return 0;
+
+	if (cJSON_GetArraySize(list) > 0) return 1;
+	return 0;
+}
+
+static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
+{
+	int32_t			selected = MENU_ITEM_BACK;
+	interfaceMenu_t	*inputsMenu = &InputsSubMenu.baseMenu; 
+	elcdRpcType_t	type;
+	cJSON			*list;
+	int32_t			ret;
+
+	int32_t  icon = thumbnail_channels;
+
+	interface_clearMenuEntries(inputsMenu);
+
+	g_mainInput.inputCount = 0;
+	g_mainInput.currentInput = NULL;
+
+	ret = st_rpcSync(elcmd_listvinput, NULL, &type, &list);
+	if (ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array)
+	{
+		cJSON * inputItem;
+		char * name = NULL;
+		char * isSelected = NULL;
+		uint32_t i, j;
+		
+		for (i = 0; (inputItem = cJSON_GetArrayItem(list, i)) != NULL; i++) {
+			name = objGetString(inputItem, "name", NULL);
+			if (!name) continue;
+			isSelected = objGetString(inputItem, "selected", NULL);
+			
+			for(j = 0; j < numberOfInputs; j++) {
+				if (strcmp(g_videoInputNames[j].name, name) == 0)
+				{
+					interface_addMenuEntry(inputsMenu, g_videoInputNames[j].displayName, output_setInput, name, icon);
+					g_mainInput.inputCount ++;
+					
+					if (isSelected && !strcmp(isSelected, "1")) 
+					{
+						g_mainInput.currentInput = &g_videoInputNames[j];
+						selected = interface_getMenuEntryCount(inputsMenu) - 1;
+					}
+					break;
+				}
+			}
+		}
+	} else {
+		if (type == elcdRpcError && list && list->type == cJSON_String) {
+			eprintf("%s: failed to get video inputs: %s\n", __FUNCTION__, list->valuestring);
+		}
+	}
+	if (list) cJSON_Delete(list);
+
+	interface_setSelectedItem(inputsMenu, selected);
+}
+
+int output_toggleInputs(void)
+{
+	uint32_t i, next = 0;
+	
+	if (g_mainInput.inputCount == 0){
+		if (output_checkInputs() == 0) return -1;
+		output_fillInputsMenu (&InputsSubMenu, NULL);
+	}
+	
+	interfaceMenu_t *inputsMenu = &InputsSubMenu.baseMenu; 
+	uint8_t menuEntryCount = interface_getMenuEntryCount(inputsMenu);
+
+	interface_switchMenu(interfaceInfo.currentMenu, inputsMenu);
+	interface_menuActionShowMenu(interfaceInfo.currentMenu, inputsMenu);
+
+	next = inputsMenu->selectedItem + 1;
+	if (next > (g_mainInput.inputCount - 1)) next = 0;
+	
+	inputsMenu->selectedItem = next;
+
+	for(i = 0; i < numberOfInputs; i++) {
+		if (strcmp(g_videoInputNames[i].displayName, inputsMenu->menuEntry[next].info) == 0)
+		{
+			g_mainInput.currentInput = &g_videoInputNames[i];
+		}
+	}
+
+	output_setInput(inputsMenu, g_mainInput.currentInput->name);
+
+	return 0;
+}
+
+
 
 /**
  * This function switch into "Output format" menu and toggle output video modes.
@@ -4192,6 +4333,12 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_PASSWORD
 
+int output_enterInputsMenu(interfaceMenu_t *videoMenu, void* notused)
+{
+	output_fillInputsMenu (videoMenu, NULL);
+	return 0;
+};
+
 int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 {
 	char *str;
@@ -5846,6 +5993,12 @@ void output_fillOutputMenu(void)
 	str = _T("VIDEO_CONFIG");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
+#if (defined STSDK)
+	if (output_checkInputs() > 0){
+		str = _T("INPUTS_CONFIG");
+		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
+	}
+#endif
 
 #ifdef ENABLE_DVB
 #ifdef HIDE_EXTRA_FUNCTIONS
@@ -5910,6 +6063,13 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
+#ifdef STSDK
+	if (output_checkInputs() > 0){
+		eprintf("%s: createListMenu...\n", __FUNCTION__);
+		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
+			interfaceListMenuIconThumbnail, output_enterInputsMenu, NULL, NULL);
+	}
+#endif
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,

@@ -234,6 +234,7 @@ INFO=Information
 INFO_SEND_FAILED=Unable to Send Information
 INFO_SENDING=Sending Data...
 INFO_SENT=Information Sent
+INPUTS_CONFIG=Inputs
 INTERFACE=Interface
 INTERFACE_SIZE=Interface Items Size
 INTERNET_BROWSING=Internet Browsing

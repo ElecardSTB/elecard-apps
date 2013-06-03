@@ -60,6 +60,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
+/// TODO : remove it when actual codes will be ready
+#define DIKS_SOURCE    0
+#define DIKS_LETTER_A  0
+#define DIKS_LETTER_B  0
+#define DIKS_LETTER_C  0
+#define DIKS_LETTER_D  0
+#define DIKS_LETTER_E  0
+#define DIKS_LETTER_F  0
+#define DIKS_LETTER_G  0
+#define DIKS_LETTER_H  0
+
+
 #define _M (interfaceMenu_t*)
 #define SET_NUMBER(number) (void*)(intptr_t)(number)
 #define GET_NUMBER(parg)   (int)(intptr_t)(parg)
@@ -405,6 +417,16 @@ typedef enum
 	interfaceCommandSearch =                     DIKS_CUSTOM1,
 	interfaceCommandEpg =                        DIKS_EPG,
 	interfaceCommandZoom =                       DIKS_ZOOM,
+
+	interfaceCommandSource =                     DIKS_SOURCE,
+	interfaceCommandLetterA =                    DIKS_LETTER_A,
+	interfaceCommandLetterB =                    DIKS_LETTER_B,
+	interfaceCommandLetterC =                    DIKS_LETTER_C,
+	interfaceCommandLetterD =                    DIKS_LETTER_D,
+	interfaceCommandLetterE =                    DIKS_LETTER_E,
+	interfaceCommandLetterF =                    DIKS_LETTER_F,
+	interfaceCommandLetterG =                    DIKS_LETTER_G,
+	interfaceCommandLetterH =                    DIKS_LETTER_H,
 
 	interfaceCommandCount
 } interfaceCommand_t;

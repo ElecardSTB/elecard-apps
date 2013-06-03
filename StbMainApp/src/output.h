@@ -73,6 +73,18 @@ typedef struct {
 										//It mean that receiver can inform about supported (and native) modes.
 
 } videoOutput_t;
+
+
+typedef struct {
+	char  *name;
+	char  *displayName;
+} inputNames_t;
+
+typedef struct {
+	//interfaceListMenu_t * menu;
+	inputNames_t * currentInput;
+	uint32_t inputCount;
+} videoInput_t;
 #endif
 
 /*******************
@@ -152,6 +164,7 @@ int output_setZoom(zoomPreset_t preset);
 #ifdef STSDK
 int output_readInterfacesFile(void);
 int output_toggleOutputModes(void);
+int output_toggleInputs(void);
 
 void output_onUpdate(int found);
 #endif

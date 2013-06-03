@@ -238,6 +238,7 @@ INFO_SEND_FAILED=Не удалось отправить данные
 INFO_SENDING=Идет отправка данных анкеты...
 INFO_SENT=Данные отправлены успешно
 INFO=Информация
+INPUTS_CONFIG=Видеовход
 INTERFACE=Интерфейс
 INTERFACE_SIZE=Размер элементов интерфейса
 INTERNET_BROWSING=Доступ в Интернет

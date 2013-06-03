@@ -1551,6 +1551,10 @@ void *keyThread(void *pArg)
 					output_toggleOutputModes();
 					continue;
 				}
+				if (event.input.key_symbol == DIKS_SOURCE) { // Source
+					output_toggleInputs();
+					continue;
+				}
 #endif
 
 				memcpy(&currentpress, &event.input.timestamp, sizeof(struct timeval));
