@@ -156,6 +156,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_DVB
 	/** @def ENABLE_TELETEXT Enable DVB Teletext
 	 */
+	#define ENABLE_ANALOGTV
 #ifdef LINUX_DVB_API_DEMUX
 	#define ENABLE_TELETEXT
 #endif
@@ -493,6 +494,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #ifndef PROFILE_LOCATIONS_PATH
 	#define PROFILE_LOCATIONS_PATH   "/profile/operator/locations"
+#endif
+
+/** Default Analog TV channel file which contains available channel list
+ */
+#ifndef ANALOGTV_CHANNEL_FILE
+	#define ANALOGTV_CHANNEL_FILE   CONFIG_DIR "/analog.conf"
 #endif
 
 /***********************************************************

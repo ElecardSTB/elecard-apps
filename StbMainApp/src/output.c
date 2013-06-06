@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "media.h"
 
 #include "dvb.h"
+#include "analogtv.h"
 #include "rtp.h"
 #include "pvr.h"
 #include "md5.h"
@@ -234,16 +235,7 @@ typedef struct
 	char key[IW_ENCODING_TOKEN_MAX+1];
 	int showAdvanced;
 } outputWifiInfo_t;
-#ifdef STSDK
 
-#define numberOfInputs 4
-inputNames_t g_videoInputNames[numberOfInputs] = {
-	{"input_hdmi_0",  "HDMI 0"},
-	{"input_hdmi_1",  "HDMI 1"},
-	{"input_cvbs",    "CVBS"},
-	{"input_scart",   "SCART"}
-};
-#endif
 #endif
 
 /******************************************************************
@@ -276,6 +268,7 @@ static int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceComma
 static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_checkInputs();
 static int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterGraphicsModeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
@@ -454,6 +447,9 @@ static interfaceListMenu_t InterfaceMenu;
 static interfaceListMenu_t PlaybackMenu;
 #ifdef STSDK
 static interfaceListMenu_t InputsSubMenu;
+#ifdef ENABLE_ANALOGTV
+static interfaceListMenu_t AnalogTvSubMenu;
+#endif
 #endif
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
@@ -517,7 +513,9 @@ videoOutput_t	*p_mainVideoOutput = NULL;
 static char		previousFormat[64]; //this needs for cancel switching video output format
 static uint32_t	isToggleContinues = 0; //this indicates that "togle vfmt" button pressed several times without apply/cancaling format
 
-videoInput_t g_mainInput = {0};
+static uint32_t g_inputCount = 0;
+static char inputNames[MENU_ENTRY_INFO_LENGTH][32];
+
 #endif
 
 #define GRAPHICS_MODE_COUNT 4
@@ -804,23 +802,31 @@ static int output_tryNewVideoMode_Event(void* pArg)
 	return 1;
 }
 
-static int output_setInput(interfaceMenu_t *pMenu, void* pArg)
+int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 {
-	if (!pMenu || !pArg) {
+	if (!pArg) {
 		eprintf ("%s: Error setting input.\n", __FUNCTION__);
 		return 0;
 	}
 #ifdef STSDK
 	elcdRpcType_t type;
-	cJSON        *param = cJSON_CreateString(pArg);
 	cJSON        *res   = NULL;
 
 	eprintf("%s: set %s\n", __FUNCTION__, (char*)pArg);
 
-	st_rpcSync (elcmd_setvinput, param, &type, &res);
+	if (strcmp(pArg, INPUT_NONE) == 0){
+		st_rpcSync (elcmd_disablevinput, NULL, &type, &res);
+	}
+	else {
+		cJSON * param = cJSON_CreateObject();
+		if (param){
+			cJSON_AddItemToObject(param, "input", cJSON_CreateString(pArg));
+		}
+		st_rpcSync (elcmd_setvinput, param, &type, &res);
+		cJSON_Delete(param);
+	}
 	st_isOk(type, res, __FUNCTION__);
 	cJSON_Delete(res);
-	cJSON_Delete(param);
 #endif
 	return 0;
 }
@@ -845,7 +851,7 @@ static int output_checkInputs()
 static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 {
 	int32_t			selected = MENU_ITEM_BACK;
-	interfaceMenu_t	*inputsMenu = &InputsSubMenu.baseMenu; 
+	interfaceMenu_t	*inputsMenu = &InputsSubMenu.baseMenu;
 	elcdRpcType_t	type;
 	cJSON			*list;
 	int32_t			ret;
@@ -853,36 +859,32 @@ static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 	int32_t  icon = thumbnail_channels;
 
 	interface_clearMenuEntries(inputsMenu);
-
-	g_mainInput.inputCount = 0;
-	g_mainInput.currentInput = NULL;
+	g_inputCount = 0;
 
 	ret = st_rpcSync(elcmd_listvinput, NULL, &type, &list);
 	if (ret == 0 && type == elcdRpcResult && list && list->type == cJSON_Array)
 	{
 		cJSON * inputItem;
-		char * name = NULL;
-		char * isSelected = NULL;
+		int isSelected = 0;
 		uint32_t i, j;
+		cJSON * value;
 		
 		for (i = 0; (inputItem = cJSON_GetArrayItem(list, i)) != NULL; i++) {
-			name = objGetString(inputItem, "name", NULL);
-			if (!name) continue;
-			isSelected = objGetString(inputItem, "selected", NULL);
+			value = cJSON_GetObjectItem(inputItem, "name");
+			if (!value || value->type != cJSON_String) continue;
 			
-			for(j = 0; j < numberOfInputs; j++) {
-				if (strcmp(g_videoInputNames[j].name, name) == 0)
-				{
-					interface_addMenuEntry(inputsMenu, g_videoInputNames[j].displayName, output_setInput, name, icon);
-					g_mainInput.inputCount ++;
-					
-					if (isSelected && !strcmp(isSelected, "1")) 
-					{
-						g_mainInput.currentInput = &g_videoInputNames[j];
-						selected = interface_getMenuEntryCount(inputsMenu) - 1;
-					}
-					break;
-				}
+			sprintf (inputNames[g_inputCount], cJSON_GetObjectItem(inputItem, "name")->valuestring);
+			eprintf("%s: interface_addMenuEntry %s\n", __FUNCTION__, inputNames[g_inputCount]);
+
+			interface_addMenuEntry(inputsMenu, inputNames[g_inputCount], output_setInput, inputNames[g_inputCount], icon);
+			g_inputCount++;
+
+			value = cJSON_GetObjectItem(inputItem, "selected");
+			if (!value) continue;
+			isSelected = value->valueint;
+			if (isSelected == 1)
+			{
+				selected = interface_getMenuEntryCount(inputsMenu) - 1;
 			}
 		}
 	} else {
@@ -899,7 +901,7 @@ int output_toggleInputs(void)
 {
 	uint32_t i, next = 0;
 	
-	if (g_mainInput.inputCount == 0){
+	if (g_inputCount == 0){
 		if (output_checkInputs() == 0) return -1;
 		output_fillInputsMenu (&InputsSubMenu, NULL);
 	}
@@ -911,18 +913,12 @@ int output_toggleInputs(void)
 	interface_menuActionShowMenu(interfaceInfo.currentMenu, inputsMenu);
 
 	next = inputsMenu->selectedItem + 1;
-	if (next > (g_mainInput.inputCount - 1)) next = 0;
+	eprintf ("%s: menuEntryCount = %d\n", __FUNCTION__, menuEntryCount);
+	if (next > (menuEntryCount - 1)) next = 0;		// todo : check if menuEntryCount == real input count
 	
 	inputsMenu->selectedItem = next;
 
-	for(i = 0; i < numberOfInputs; i++) {
-		if (strcmp(g_videoInputNames[i].displayName, inputsMenu->menuEntry[next].info) == 0)
-		{
-			g_mainInput.currentInput = &g_videoInputNames[i];
-		}
-	}
-
-	output_setInput(inputsMenu, g_mainInput.currentInput->name);
+	output_setInput(inputsMenu, inputsMenu->menuEntry[next].info);
 
 	return 0;
 }
@@ -4333,9 +4329,33 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_PASSWORD
 
-int output_enterInputsMenu(interfaceMenu_t *videoMenu, void* notused)
+static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
-	output_fillInputsMenu (videoMenu, NULL);
+	int32_t selected = MENU_ITEM_BACK;
+	int32_t icon = thumbnail_channels;
+	interfaceMenu_t * tvMenu = &AnalogTvSubMenu.baseMenu;
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	char * str;
+	
+	interface_clearMenuEntries(tvMenu);
+	
+	str = _T("ANALOGTV_SCAN_ALL");
+	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
+
+	str = _T("ANALOGTV_SCAN_RANGE");
+	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);	/// TODO : set range after calling dialog &(analogtv_freq_range_t)
+
+	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_service_count);
+	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, NULL, thumbnail_scan);
+	
+	interface_setSelectedItem(tvMenu, selected);
+
+	return 0;
+}
+
+int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused)
+{
+	output_fillInputsMenu (pMenu, NULL);
 	return 0;
 };
 
@@ -5999,6 +6019,11 @@ void output_fillOutputMenu(void)
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
 #endif
+#ifdef ENABLE_ANALOGTV
+	/// TODO : check whether analog tuner presents
+	str = _T("ANALOGTV_CONFIG");
+	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &AnalogTvSubMenu, settings_dvb);
+#endif
 
 #ifdef ENABLE_DVB
 #ifdef HIDE_EXTRA_FUNCTIONS
@@ -6065,10 +6090,14 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 #ifdef STSDK
 	if (output_checkInputs() > 0){
-		eprintf("%s: createListMenu...\n", __FUNCTION__);
 		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterInputsMenu, NULL, NULL);
 	}
+#endif
+#ifdef ENABLE_ANALOGTV
+	/// TODO : check whether analog tuner presents
+	createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
+		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
 #endif
 
 #ifdef ENABLE_3D

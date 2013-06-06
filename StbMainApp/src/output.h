@@ -74,15 +74,9 @@ typedef struct {
 
 } videoOutput_t;
 
-
-typedef struct {
-	char  *name;
-	char  *displayName;
-} inputNames_t;
-
 typedef struct {
 	//interfaceListMenu_t * menu;
-	inputNames_t * currentInput;
+	char * currentInput;
 	uint32_t inputCount;
 } videoInput_t;
 #endif
@@ -164,7 +158,10 @@ int output_setZoom(zoomPreset_t preset);
 #ifdef STSDK
 int output_readInterfacesFile(void);
 int output_toggleOutputModes(void);
+
+#define INPUT_NONE "None"
 int output_toggleInputs(void);
+int output_setInput(interfaceMenu_t *pMenu, void* pArg);
 
 void output_onUpdate(int found);
 #endif
