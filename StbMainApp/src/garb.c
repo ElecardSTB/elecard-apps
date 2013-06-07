@@ -663,7 +663,7 @@ static void currentmeter_close(void)
 		close(currentmeter_i2c_bus);
 }
 
-static uint8_t currentmeter_readReg(uint8_t reg_addr)
+static uint8_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
 {
 	struct i2c_rdwr_ioctl_data	work_queue;
 	struct i2c_msg				msg[2];
@@ -692,34 +692,49 @@ static uint8_t currentmeter_readReg(uint8_t reg_addr)
 		printf("%s:%s()[%d]: ERROR!! while reading i2c: ret=%d\n", __FILE__, __func__, __LINE__, ret);
 		return ret;
 	}
-	return read_reg;
+	*value = read_reg;
+	return 0;
 }
 
 int32_t currentmeter_isExist(void)
 {
-	return 1;
+	uint8_t val;
+
 	if(currentmeter_open() != 0) {
 		return 0;
 	}
-	if(currentmeter_readReg(CURRENTMETER_I2C_REG_ID) != CURRENTMETER_I2C_ID) {
+	if(currentmeter_readReg(CURRENTMETER_I2C_REG_ID, &val) != 0) {
+		printf("%s:%s()[%d]: Cant read value!!!\n", __FILE__, __func__, __LINE__);
+		return 0;
+	}
+	return 1; //now we use chip without id, so skip checking
+	if(val != CURRENTMETER_I2C_ID) {
 		printf("%s:%s()[%d]: Unknown device!!!\n", __FILE__, __func__, __LINE__);
 		return 0;
 	}
 	return 1;
 }
 
-int32_t currentmeter_getValue(void)
+int32_t currentmeter_getValue(uint32_t *watt)
 {
-	uint8_t cur_val;
-	int32_t watt;
+	uint32_t cur_val;
+	uint8_t val;
 
 	if(currentmeter_open() != 0) {
 		return -1;
 	}
-	cur_val = (currentmeter_readReg(CURRENTMETER_I2C_REG_VAL) << 8) + currentmeter_readReg(CURRENTMETER_I2C_REG_VAL + 1);
-	watt = ((220 * cur_val) / 1000);
 
-	return watt;
+	if(currentmeter_readReg(CURRENTMETER_I2C_REG_VAL, &val) != 0) {
+		return -1;
+	}
+	cur_val = val << 8;
+	if(currentmeter_readReg(CURRENTMETER_I2C_REG_VAL + 1, &val) != 0) {
+		return -1;
+	}
+	cur_val += val;
+
+	*watt = ((220 * cur_val) / 1000);
+	return 0;
 }
 
 void currentmeter_setCalibrateValue(uint32_t val)
@@ -729,7 +744,7 @@ void currentmeter_setCalibrateValue(uint32_t val)
 
 static void *currentmeter_thread(void *notused)
 {
-	uint32_t isAlive = 1;
+	uint32_t isAlive = 0;
 	static char calibr_val[MENU_ENTRY_INFO_LENGTH];
 
 	if(!currentmeter_isExist()) {
@@ -740,25 +755,28 @@ static void *currentmeter_thread(void *notused)
 	}
 
 	while(1) {
-		uint8_t cur_val;
+		uint32_t cur_val = 0;
 		int32_t has_power;
 		int32_t state_changed;
 
-		cur_val = currentmeter_getValue();
+		if(currentmeter_getValue(&cur_val) != 0) {
+			printf("%s:%s()[%d]: Cant get current power consumprion\n", __FILE__, __func__, __LINE__);
+			continue;
+		}
 //		printf("%s:%s()[%d]: cur_val=%d\n", __FILE__, __func__, __LINE__, cur_val);
 
-		has_power = cur_val > (currentmeter_calibrate_value >> 1);
+		has_power = cur_val > (currentmeter_calibrate_value >> 2);
 		state_changed = isAlive ? !has_power : has_power;
 		if(state_changed) {
-//			printf("%s:%s()[%d]: cur_val=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
-//						__FILE__, __func__, __LINE__, cur_val, has_power, state_changed, isAlive);
+			printf("%s:%s()[%d]: cur_val=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
+						__FILE__, __func__, __LINE__, cur_val, has_power, state_changed, isAlive);
 			isAlive = !isAlive;
 			if(isAlive) { //if TV switched on we should offer to chose viewer
 				garb_checkViewership();
 			}
 		}
-		sleep(1)
-;	}
+		sleep(1);
+	}
 
 	return NULL;
 }

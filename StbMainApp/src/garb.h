@@ -58,7 +58,7 @@ void garb_stopWatching(int channel);
 void garb_drawViewership(void);
 
 int32_t currentmeter_isExist(void);
-int32_t currentmeter_getValue(void);
+int32_t currentmeter_getValue(uint32_t *watt);
 void currentmeter_setCalibrateValue(uint32_t val);
 
 #endif // __GARB_H

@@ -2410,10 +2410,9 @@ static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 #ifdef STSDK
 static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
 {
-	int32_t cur_val;
+	uint32_t cur_val;
 
-	cur_val = currentmeter_getValue();
-	if(cur_val >= 0) {
+	if(currentmeter_getValue(&cur_val) == 0) {
 		char info[MENU_ENTRY_INFO_LENGTH];
 		
 		currentmeter_setCalibrateValue(cur_val);
