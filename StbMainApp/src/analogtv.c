@@ -94,6 +94,8 @@ typedef struct {
 analog_service_t * analogtv_services = NULL;
 int analogtv_service_count = 0;
 
+analogtv_freq_range_t analogtv_range = {40000, 960000};
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -107,16 +109,17 @@ static pmysem_t analogtv_semaphore;
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
 
-void analogtv_clearServiceList(int permanent)
+int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 {
+	int permanent = (int)pArg;
 	mysem_get(analogtv_semaphore);
 	free(analogtv_services);
 	analogtv_services = NULL;
 	analogtv_service_count = 0;
 	mysem_release(analogtv_semaphore);
 	
-	if (permanent) remove(appControlInfo.tvInfo.channelConfigFile);
-	return;
+	if (permanent > 0) remove(appControlInfo.tvInfo.channelConfigFile);
+	return 0;
 }
 
 int analogtv_readServicesFromFile ()
@@ -124,7 +127,7 @@ int analogtv_readServicesFromFile ()
 	if (!helperFileExists(appControlInfo.tvInfo.channelConfigFile)) return -1;
 
 	int res = 0;
-	analogtv_clearServiceList(0);
+	analogtv_clearServiceList(NULL, 0);
 
 	/// TODO : read from XML file and set analogtv_service_count
 
@@ -136,6 +139,10 @@ int analogtv_readServicesFromFile ()
 int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STSDK
+	//char buf [256];
+	//interface_sliderShow(1,1);
+	//sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
+	//interface_showMessageBox(buf, thumbnail_info, 5000);
 
 	uint32_t from_freq, to_freq;
 
@@ -158,8 +165,7 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	cJSON *params = cJSON_CreateObject();
 	cJSON *result = NULL;
 	elcdRpcType_t type = elcdRpcInvalid;
-	int res = -1;
-	
+
 	if (!params)
 	{
 		eprintf("%s: out of memory\n", __FUNCTION__);
@@ -169,7 +175,7 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	cJSON_AddItemToObject(params, "from_freq", cJSON_CreateNumber(from_freq));
 	cJSON_AddItemToObject(params, "to_freq", cJSON_CreateNumber(to_freq));
 
-	res = st_rpcSync(elcmd_tvscan, params, &type, &result );
+	st_rpcSync(elcmd_tvscan, params, &type, &result );
 	if (result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0)
 	{
 		/// TODO
@@ -181,6 +187,22 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	cJSON_Delete(params);
 #endif
 
+	return 0;
+}
+
+int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
+{
+	if (!pArg) return -1;
+	analogtv_range.from_freq = *((uint32_t *)pArg);
+	eprintf ("%s: from_freq = %d\n", __FUNCTION__, analogtv_range.from_freq);
+	return 0;
+}
+
+int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
+{
+	if (!pArg) return -1;
+	analogtv_range.to_freq = *((uint32_t *)pArg);
+	eprintf ("%s: to_freq = %d\n", __FUNCTION__, analogtv_range.to_freq);
 	return 0;
 }
 

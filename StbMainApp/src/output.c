@@ -812,8 +812,6 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 	elcdRpcType_t type;
 	cJSON        *res   = NULL;
 
-	eprintf("%s: set %s\n", __FUNCTION__, (char*)pArg);
-
 	if (strcmp(pArg, INPUT_NONE) == 0){
 		st_rpcSync (elcmd_disablevinput, NULL, &type, &res);
 	}
@@ -833,14 +831,12 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_checkInputs()
 {
-	elcdRpcType_t   type;
-	int32_t         ret;
+	elcdRpcType_t   type = elcdRpcInvalid;
 	cJSON           *list;
-	
-	ret = st_rpcSync(elcmd_listvinput, NULL, &type, &list);
-	//eprintf("%s: ret = %d\n", __FUNCTION__, ret);
 
-	if (/*ret != 0 || */type != elcdRpcResult) return 0;
+	st_rpcSync(elcmd_listvinput, NULL, &type, &list);
+	
+	if (type != elcdRpcResult) return 0;
 	if (!list) return 0;
 	if (list->type != cJSON_Array) return 0;
 
@@ -851,7 +847,7 @@ static int output_checkInputs()
 static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 {
 	int32_t			selected = MENU_ITEM_BACK;
-	interfaceMenu_t	*inputsMenu = &InputsSubMenu.baseMenu;
+	interfaceMenu_t	*inputsMenu = &(InputsSubMenu.baseMenu);
 	elcdRpcType_t	type;
 	cJSON			*list;
 	int32_t			ret;
@@ -866,7 +862,7 @@ static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 	{
 		cJSON * inputItem;
 		int isSelected = 0;
-		uint32_t i, j;
+		uint32_t i;
 		cJSON * value;
 		
 		for (i = 0; (inputItem = cJSON_GetArrayItem(list, i)) != NULL; i++) {
@@ -874,7 +870,6 @@ static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 			if (!value || value->type != cJSON_String) continue;
 			
 			sprintf (inputNames[g_inputCount], cJSON_GetObjectItem(inputItem, "name")->valuestring);
-			eprintf("%s: interface_addMenuEntry %s\n", __FUNCTION__, inputNames[g_inputCount]);
 
 			interface_addMenuEntry(inputsMenu, inputNames[g_inputCount], output_setInput, inputNames[g_inputCount], icon);
 			g_inputCount++;
@@ -899,15 +894,15 @@ static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 
 int output_toggleInputs(void)
 {
-	uint32_t i, next = 0;
+	uint32_t next = 0;
 	
 	if (g_inputCount == 0){
 		if (output_checkInputs() == 0) return -1;
-		output_fillInputsMenu (&InputsSubMenu, NULL);
+		output_fillInputsMenu (NULL, NULL);
 	}
 	
 	interfaceMenu_t *inputsMenu = &InputsSubMenu.baseMenu; 
-	uint8_t menuEntryCount = interface_getMenuEntryCount(inputsMenu);
+	uint32_t menuEntryCount = interface_getMenuEntryCount(inputsMenu);
 
 	interface_switchMenu(interfaceInfo.currentMenu, inputsMenu);
 	interface_menuActionShowMenu(interfaceInfo.currentMenu, inputsMenu);
@@ -4332,7 +4327,6 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	int32_t selected = MENU_ITEM_BACK;
-	int32_t icon = thumbnail_channels;
 	interfaceMenu_t * tvMenu = &AnalogTvSubMenu.baseMenu;
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char * str;
@@ -4343,7 +4337,13 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
 
 	str = _T("ANALOGTV_SCAN_RANGE");
-	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);	/// TODO : set range after calling dialog &(analogtv_freq_range_t)
+	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, &analogtv_range, thumbnail_scan);
+	
+	sprintf(buf, "%s: %u KHZ", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freq);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(analogtv_range.from_freq), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
+
+	sprintf(buf, "%s: %u KHZ", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freq);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freq), thumbnail_configure); // SET_NUMBER(optionHighFreq)
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_service_count);
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, NULL, thumbnail_scan);

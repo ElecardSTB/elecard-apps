@@ -66,6 +66,7 @@ typedef struct {
 * EXPORTED DATA                                *
 ************************************************/
 extern int analogtv_service_count;
+extern analogtv_freq_range_t analogtv_range;
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
@@ -98,7 +99,10 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg);
  *   @param[in]  filename  Channel file name
  */
 
-void analogtv_clearServiceList(int permanent);
+int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
+
+int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
+int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
 
 #endif /* ENABLE_ANALOGTV */
 
