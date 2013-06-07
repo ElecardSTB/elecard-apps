@@ -406,6 +406,16 @@ typedef enum
 	interfaceCommandEpg =                        DIKS_EPG,
 	interfaceCommandZoom =                       DIKS_ZOOM,
 
+	interfaceCommandSource =                     DIKS_CUSTOM2,
+	interfaceCommandLetterA =                    DIKS_CAPITAL_A,
+	interfaceCommandLetterB =                    DIKS_CAPITAL_B,
+	interfaceCommandLetterC =                    DIKS_CAPITAL_C,
+	interfaceCommandLetterD =                    DIKS_CAPITAL_D,
+	interfaceCommandLetterE =                    DIKS_CAPITAL_E,
+	interfaceCommandLetterF =                    DIKS_CAPITAL_F,
+	interfaceCommandLetterG =                    DIKS_CAPITAL_G,
+	interfaceCommandLetterH =                    DIKS_CAPITAL_H,
+
 	interfaceCommandCount
 } interfaceCommand_t;
 

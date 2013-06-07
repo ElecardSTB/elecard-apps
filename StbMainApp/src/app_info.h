@@ -286,6 +286,13 @@ typedef struct
 	int                  reportedSignalStatus;
 } stb810_dvbInfo;
 
+typedef struct
+{
+	char channelConfigFile[256];
+	int active;
+	int channel;
+} stb810_tvInfo;
+
 typedef struct __stb810_dvbCommonInfo
 {
 	char                 channelConfigFile[256];
@@ -729,6 +736,9 @@ typedef struct __stb810_controlInfo
 	stb810_dvbsInfo      dvbsInfo;
 	stb810_dvbCommonInfo dvbCommonInfo;
 	stb810_teletextInfo  teletextInfo;
+#endif
+#ifdef ENABLE_ANALOGTV
+	stb810_tvInfo        tvInfo;
 #endif
 	stb810_offairInfo    offairInfo;
 #ifdef ENABLE_PVR

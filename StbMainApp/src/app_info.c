@@ -959,6 +959,9 @@ void appInfo_init(void)
 	appControlInfo.dvbcInfo.fe.highFrequency      = 860000;
 	appControlInfo.dvbcInfo.fe.frequencyStep      =   8000;
 #endif
+#ifdef ENABLE_ANALOGTV
+	strcpy(appControlInfo.tvInfo.channelConfigFile, ANALOGTV_CHANNEL_FILE);
+#endif
 	appControlInfo.dvbcInfo.fe.inversion          = 0;
 	appControlInfo.dvbcInfo.modulation            = QAM_64;
 	appControlInfo.dvbcInfo.symbolRate            = 6875;

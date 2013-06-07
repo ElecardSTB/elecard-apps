@@ -2881,6 +2881,13 @@ void gfx_stopVideoProviders (int which)
 		offair_stopVideo(which, 1);
 	}
 #endif
+#ifdef ENABLE_ANALOGTV
+	if (appControlInfo.tvInfo.active)
+	{
+		/* Stop any analog TV playback */
+		analogtv_stop();
+	}
+#endif
 }
 
 #ifdef STSDK
@@ -4330,6 +4337,14 @@ static void gfx_formatChange ()
 	{
 		/* Stop any DVB playback on Main*/
 		offair_stopVideo(screenMain, 1);
+	}
+#endif
+#ifdef ENABLE_ANALOGTV
+	/*Stop tv playback*/
+	if (appControlInfo.tvInfo.active)
+	{
+		/* Stop any NT playback on Main*/
+		analogtv_stop();
 	}
 #endif
 	/*Now shutdown all DirectFB stuff*/
