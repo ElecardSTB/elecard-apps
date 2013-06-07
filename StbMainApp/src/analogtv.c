@@ -190,22 +190,6 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
-{
-	if (!pArg) return -1;
-	analogtv_range.from_freq = *((uint32_t *)pArg);
-	eprintf ("%s: from_freq = %d\n", __FUNCTION__, analogtv_range.from_freq);
-	return 0;
-}
-
-int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
-{
-	if (!pArg) return -1;
-	analogtv_range.to_freq = *((uint32_t *)pArg);
-	eprintf ("%s: to_freq = %d\n", __FUNCTION__, analogtv_range.to_freq);
-	return 0;
-}
-
 void analogtv_stopScan ()
 {
 	/// TODO

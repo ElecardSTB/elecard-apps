@@ -4324,6 +4324,64 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_PASSWORD
 
+
+int analogtv_setRange(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	int option = GET_NUMBER(pArg);
+	uint32_t val;
+	if (!value) return 1;
+
+	val = strtoul (value, NULL, 10);
+	if (option == 0) { // low
+		if (val != analogtv_range.from_freq){
+			analogtv_range.from_freq = val;
+			eprintf ("%s: from_freq = %d\n", __FUNCTION__, analogtv_range.from_freq);
+		}
+	}
+	else {
+		if (val != analogtv_range.to_freq){
+			analogtv_range.to_freq = val;
+			eprintf ("%s: from_freq = %d\n", __FUNCTION__, analogtv_range.to_freq);
+		}
+	}
+	interface_displayMenu(1);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static char* analogtv_getRange (int index, void* pArg)
+{
+	if (index == 0){
+		static char buffer[32];
+		int id = GET_NUMBER(pArg);
+		if (id == 0) sprintf(buffer, "%u", analogtv_range.from_freq);
+		else sprintf (buffer, "%u", analogtv_range.to_freq);
+		return buffer;
+	}
+	return NULL;
+}
+
+int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
+{
+	if (!pArg) return -1;
+	analogtv_range.from_freq = *((uint32_t *)pArg);
+
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_LOW_FREQ"));
+
+	return interface_getText(pMenu, buf, "\\d+", analogtv_setRange, analogtv_getRange, 0, 0);
+}
+
+int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
+{
+	if (!pArg) return -1;
+	analogtv_range.to_freq = *((uint32_t *)pArg);
+
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_HIGH_FREQ"));
+
+	return interface_getText(pMenu, buf, "\\d+", analogtv_setRange, analogtv_getRange, 0, 1);
+}
+
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	int32_t selected = MENU_ITEM_BACK;
@@ -4339,10 +4397,10 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	str = _T("ANALOGTV_SCAN_RANGE");
 	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, &analogtv_range, thumbnail_scan);
 	
-	sprintf(buf, "%s: %u KHZ", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freq);
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freq);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(analogtv_range.from_freq), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
 
-	sprintf(buf, "%s: %u KHZ", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freq);
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freq);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freq), thumbnail_configure); // SET_NUMBER(optionHighFreq)
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_service_count);
