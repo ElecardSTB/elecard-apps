@@ -72,10 +72,11 @@
 #define GARB_FDD					CONFIG_DIR "/garb.fdd"
 
 #define CURRENTMETER_I2C_BUS		"/dev/i2c-3"
-#define CURRENTMETER_I2C_ADDR		0x1e
+//#define CURRENTMETER_I2C_ADDR		0x1e
+#define CURRENTMETER_I2C_ADDR		0x50
 #define CURRENTMETER_I2C_REG_ID		0x00
 //#define CURRENTMETER_I2C_REG_VAL	0x04
-#define CURRENTMETER_I2C_REG_VAL	0x50
+#define CURRENTMETER_I2C_REG_VAL	0x00
 #define CURRENTMETER_I2C_ID			0x1e
 
 /***********************************************
@@ -696,6 +697,7 @@ static uint8_t currentmeter_readReg(uint8_t reg_addr)
 
 int32_t currentmeter_isExist(void)
 {
+	return 1;
 	if(currentmeter_open() != 0) {
 		return 0;
 	}
@@ -709,11 +711,15 @@ int32_t currentmeter_isExist(void)
 int32_t currentmeter_getValue(void)
 {
 	uint8_t cur_val;
+	int32_t watt;
+
 	if(currentmeter_open() != 0) {
 		return -1;
 	}
-	cur_val = currentmeter_readReg(CURRENTMETER_I2C_REG_VAL);
-	return cur_val;
+	cur_val = (currentmeter_readReg(CURRENTMETER_I2C_REG_VAL) << 8) + currentmeter_readReg(CURRENTMETER_I2C_REG_VAL + 1);
+	watt = ((220 * cur_val) / 1000);
+
+	return watt;
 }
 
 void currentmeter_setCalibrateValue(uint32_t val)
@@ -740,7 +746,7 @@ static void *currentmeter_thread(void *notused)
 
 		cur_val = currentmeter_getValue();
 //		printf("%s:%s()[%d]: cur_val=%d\n", __FILE__, __func__, __LINE__, cur_val);
-		printf("HELLO FROM CM\n");
+
 		has_power = cur_val > (currentmeter_calibrate_value >> 1);
 		state_changed = isAlive ? !has_power : has_power;
 		if(state_changed) {
