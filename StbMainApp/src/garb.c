@@ -663,7 +663,7 @@ static void currentmeter_close(void)
 		close(currentmeter_i2c_bus);
 }
 
-static uint8_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
+static int32_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
 {
 	struct i2c_rdwr_ioctl_data	work_queue;
 	struct i2c_msg				msg[2];
@@ -744,9 +744,10 @@ void currentmeter_setCalibrateValue(uint32_t val)
 
 static void *currentmeter_thread(void *notused)
 {
-	uint32_t isAlive = 0;
+	uint32_t isAlive = 1;
 	static char calibr_val[MENU_ENTRY_INFO_LENGTH];
 
+//	sleep(1);
 	if(!currentmeter_isExist()) {
 		return NULL;
 	}
