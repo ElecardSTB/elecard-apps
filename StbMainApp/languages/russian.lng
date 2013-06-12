@@ -12,6 +12,7 @@ ADD_URL=Добавить URL
 ADD=Добавить
 ALL=Все
 ALL_FILES=Все файлы
+ANALOGTV_CHANNELS=Список аналоговых ТВ каналов
 ANALOGTV_CLEAR=Очистить список каналов
 ANALOGTV_CONFIG=Аналоговое ТВ
 ANALOGTV_LOW_FREQ=Нижняя частота сканирования
