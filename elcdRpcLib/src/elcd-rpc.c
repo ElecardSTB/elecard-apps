@@ -80,6 +80,7 @@ const char* rpc_cmd_names[] = {
 [elcmd_dvbtune]     = "dvbtune",
 [elcmd_dvbdiseqc]   = "dvbdiseqc",
 [elcmd_tvscan]      = "tvscan",
+[elcmd_tvtune]      = "tvtune",
 [elcmd_subtitle]    = "subtitle",
 [elcmd_recstart]    = "recstart",
 [elcmd_recstop]     = "recstop",
