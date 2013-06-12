@@ -52,15 +52,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * EXPORTED MACROS                              *
 ************************************************/
-#define MIN_FREQUENCY_HZ  (  40000000)
+#define MIN_FREQUENCY_HZ  (  43000000)
 #define MAX_FREQUENCY_HZ  ( 960000000)
 
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
 typedef struct {
-	uint32_t from_freq;
-	uint32_t to_freq;
+	uint32_t from_freqKHz;
+	uint32_t to_freqKHz;
 } analogtv_freq_range_t;
 /***********************************************
 * EXPORTED DATA                                *
@@ -103,6 +103,11 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
+
+void analogtv_addMenuEntry(interfaceMenu_t *pMenu);
+void analogtv_initMenu(interfaceMenu_t *pParent);
+void analogtv_fillMenu(void);
+uint32_t analogtv_getChannelCount(void);
 
 #endif /* ENABLE_ANALOGTV */
 

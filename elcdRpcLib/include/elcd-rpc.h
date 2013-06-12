@@ -75,6 +75,7 @@ typedef enum
 	elcmd_dvbtune,
 	elcmd_dvbdiseqc,
 	elcmd_tvscan,
+	elcmd_tvtune,
 	elcmd_subtitle,
 	elcmd_reclist,
 	elcmd_getstream,
@@ -121,6 +122,7 @@ typedef enum
 	case elcmd_dvbtune: \
 	case elcmd_dvbdiseqc: \
 	case elcmd_tvscan: \
+	case elcmd_tvtune: \
 	case elcmd_subtitle: \
 	case elcmd_reclist
 

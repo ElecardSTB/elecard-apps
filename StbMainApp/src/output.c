@@ -4356,15 +4356,15 @@ int analogtv_setRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	val = strtoul (value, NULL, 10);
 	if (option == 0) { // low
-		if (val != analogtv_range.from_freq){
-			analogtv_range.from_freq = val;
-			eprintf ("%s: from_freq = %d\n", __FUNCTION__, analogtv_range.from_freq);
+		if (val != analogtv_range.from_freqKHz){
+			analogtv_range.from_freqKHz = val;
+			eprintf ("%s: from_freq = %d KHz\n", __FUNCTION__, analogtv_range.from_freqKHz);
 		}
 	}
 	else {
-		if (val != analogtv_range.to_freq){
-			analogtv_range.to_freq = val;
-			eprintf ("%s: from_freq = %d\n", __FUNCTION__, analogtv_range.to_freq);
+		if (val != analogtv_range.to_freqKHz){
+			analogtv_range.to_freqKHz = val;
+			eprintf ("%s: to_freq = %d KHz\n", __FUNCTION__, analogtv_range.to_freqKHz);
 		}
 	}
 	interface_displayMenu(1);
@@ -4376,8 +4376,8 @@ static char* analogtv_getRange (int index, void* pArg)
 	if (index == 0){
 		static char buffer[32];
 		int id = GET_NUMBER(pArg);
-		if (id == 0) sprintf(buffer, "%u", analogtv_range.from_freq);
-		else sprintf (buffer, "%u", analogtv_range.to_freq);
+		if (id == 0) sprintf(buffer, "%u", analogtv_range.from_freqKHz);
+		else sprintf (buffer, "%u", analogtv_range.to_freqKHz);
 		return buffer;
 	}
 	return NULL;
@@ -4386,7 +4386,7 @@ static char* analogtv_getRange (int index, void* pArg)
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
 {
 	if (!pArg) return -1;
-	analogtv_range.from_freq = *((uint32_t *)pArg);
+	analogtv_range.from_freqKHz = *((uint32_t *)pArg);
 
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_LOW_FREQ"));
@@ -4397,12 +4397,12 @@ int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
 {
 	if (!pArg) return -1;
-	analogtv_range.to_freq = *((uint32_t *)pArg);
+	analogtv_range.to_freqKHz = *((uint32_t *)pArg);
 
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_HIGH_FREQ"));
 
-	return interface_getText(pMenu, buf, "\\d+", analogtv_setRange, analogtv_getRange, 0, 1);
+	return interface_getText(pMenu, buf, "\\d+", analogtv_setRange, analogtv_getRange, 0, (void *)1);
 }
 
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
@@ -4420,14 +4420,14 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	str = _T("ANALOGTV_SCAN_RANGE");
 	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, &analogtv_range, thumbnail_scan);
 	
-	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freq);
-	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(analogtv_range.from_freq), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freqKHz);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(analogtv_range.from_freqKHz), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
 
-	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freq);
-	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freq), thumbnail_configure); // SET_NUMBER(optionHighFreq)
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freqKHz);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freqKHz), thumbnail_configure); // SET_NUMBER(optionHighFreq)
 
-	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_service_count);
-	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, NULL, thumbnail_scan);
+	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
+	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);
 	
 	interface_setSelectedItem(tvMenu, selected);
 

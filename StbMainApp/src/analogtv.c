@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "playlist.h"
 #include "sem.h"
 #include "stsdk.h"
+#include "gfx.h"
 
 #include <fcntl.h>
 #include <stdint.h>
@@ -92,9 +93,12 @@ typedef struct {
 ************************************************/
 
 analog_service_t * analogtv_services = NULL;
-int analogtv_service_count = 0;
 
-analogtv_freq_range_t analogtv_range = {40000, 960000};
+static interfaceListMenu_t AnalogTVOutputMenu;
+static uint32_t		analogtv_channelFreq[128];
+static uint32_t		analogtv_channelCount = 0;
+
+analogtv_freq_range_t analogtv_range = {MIN_FREQUENCY_HZ / 1000, MAX_FREQUENCY_HZ / 1000};
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -115,28 +119,50 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 	mysem_get(analogtv_semaphore);
 	free(analogtv_services);
 	analogtv_services = NULL;
-	analogtv_service_count = 0;
+	analogtv_channelCount = 0;
 	mysem_release(analogtv_semaphore);
 	
 	if (permanent > 0) remove(appControlInfo.tvInfo.channelConfigFile);
 	return 0;
 }
 
-int analogtv_readServicesFromFile ()
+
+static int32_t analogtv_parseConfigFile(void)
 {
-	if (!helperFileExists(appControlInfo.tvInfo.channelConfigFile)) return -1;
+	FILE *fd = NULL;
 
-	int res = 0;
-	analogtv_clearServiceList(NULL, 0);
-
-	/// TODO : read from XML file and set analogtv_service_count
-
-	eprintf("%s: loaded %d services\n", __FUNCTION__, analogtv_service_count);
-	
-	return res;
+	analogtv_channelCount = 0;
+	fd = fopen(ANALOGTV_CHANNEL_FILE, "r");
+	if(fd == NULL) {
+		dprintf("Error opening %s\n", ANALOGTV_CHANNEL_FILE);
+		return -1;
+	}
+	while(!feof(fd)) {
+		uint32_t freq;
+		if(fscanf(fd, "%u\n", &freq) != 1)
+			break;
+		analogtv_channelFreq[analogtv_channelCount] = freq;
+		analogtv_channelCount++;
+	}
+	fclose(fd);
+	return 0;
 }
 
-int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
+// int analogtv_readServicesFromFile ()
+// {
+// 	if (!helperFileExists(appControlInfo.tvInfo.channelConfigFile)) return -1;
+// 
+// 	int res = 0;
+// 	analogtv_clearServiceList(NULL, 0);
+// 
+// 	/// TODO : read from XML file and set analogtv_channelCount
+// 
+// 	eprintf("%s: loaded %d services\n", __FUNCTION__, analogtv_channelCount);
+// 	
+// 	return res;
+// }
+
+int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STSDK
 	//char buf [256];
@@ -147,8 +173,8 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	uint32_t from_freq, to_freq;
 
 	if (pArg != NULL){
-		from_freq = ((analogtv_freq_range_t*)pArg)->from_freq;
-		to_freq = ((analogtv_freq_range_t*)pArg)->to_freq;
+		from_freq = ((analogtv_freq_range_t*)pArg)->from_freqKHz * KHZ;
+		to_freq = ((analogtv_freq_range_t*)pArg)->to_freqKHz * KHZ;
 		
 		if (from_freq > to_freq){
 			uint32_t tmp = from_freq;
@@ -166,8 +192,7 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	cJSON *result = NULL;
 	elcdRpcType_t type = elcdRpcInvalid;
 
-	if (!params)
-	{
+	if(!params) {
 		eprintf("%s: out of memory\n", __FUNCTION__);
 		return -1;
 	}
@@ -176,12 +201,11 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg)
 	cJSON_AddItemToObject(params, "to_freq", cJSON_CreateNumber(to_freq));
 
 	st_rpcSync(elcmd_tvscan, params, &type, &result );
-	if (result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0)
-	{
+	if(result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0) {
 		/// TODO
 		
 		// elcd dumped services to file. read it
-		analogtv_readServicesFromFile();
+		analogtv_parseConfigFile();
 	}
 	cJSON_Delete(result);
 	cJSON_Delete(params);
@@ -211,7 +235,7 @@ void analogtv_init(void)
 	/// TODO: additional setup
 
 	mysem_create(&analogtv_semaphore);
-	analogtv_readServicesFromFile();
+	analogtv_parseConfigFile();
 }
 
 void analogtv_terminate(void)
@@ -221,9 +245,78 @@ void analogtv_terminate(void)
 	analogtv_stop();
 
 	free(analogtv_services);
-	analogtv_service_count = 0;
+	analogtv_channelCount = 0;
 
 	mysem_destroy(analogtv_semaphore);
+}
+
+static int analogtv_activateMenu(interfaceMenu_t *pMenu, void *pArg)
+{
+	analogtv_fillMenu();
+	return 0;
+}
+
+static int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
+{
+	uint32_t freq = *((uint32_t *)pArg);
+	char cmd[32];
+
+	snprintf(cmd, sizeof(cmd), "tv://%u", freq);
+	printf("%s[%d]: *** cmd=%s\n", __FILE__, __LINE__, cmd);
+
+	return  gfx_startVideoProvider(cmd, 0, 0, NULL);
+}
+
+void analogtv_addMenuEntry(interfaceMenu_t *pMenu)
+{
+	char buf[256];
+	char *p_str;
+// 	uint32_t count = analogtv_getChannelCount();
+
+// 	if(count > 0) {
+// 		snprintf(buf, sizeof(buf), "%s (%d)", _T("ANALOGTV_CHANNELS"), count);
+// 		p_str = buf;
+// 	} else {
+		p_str = _T("ANALOGTV_CHANNELS");
+// 	}
+// printf("%s[%d]: *** p_str=%s\n", __FILE__, __LINE__, p_str);
+	interface_addMenuEntry2(pMenu, p_str, 1, interface_menuActionShowMenu, &AnalogTVOutputMenu, thumbnail_channels);
+	return;
+}
+
+void analogtv_initMenu(interfaceMenu_t *pParent)
+{
+	createListMenu(&AnalogTVOutputMenu, _T("ANALOGTV_CHANNELS"), thumbnail_channels, /*offair_icons*/NULL, pParent,
+		interfaceListMenuIconThumbnail, analogtv_activateMenu, NULL, NULL);
+	return;
+}
+
+uint32_t analogtv_getChannelCount(void)
+{
+	analogtv_parseConfigFile();
+	return analogtv_channelCount;
+}
+
+void analogtv_fillMenu(void)
+{
+	interfaceMenu_t *channelMenu = _M &AnalogTVOutputMenu;
+	uint32_t i;
+
+	analogtv_parseConfigFile();
+	interface_clearMenuEntries(channelMenu);
+
+	if(analogtv_channelCount == 0) {
+		interface_addMenuEntryDisabled(channelMenu, _T("NO_CHANNELS"), thumbnail_info);
+	}
+	for(i = 0; i < analogtv_channelCount; i++) {
+		char channelEntry[32];
+
+		sprintf(channelEntry, "TV Program %02d", i + 1);
+		interface_addMenuEntry(channelMenu, channelEntry, analogtv_activateChannel, analogtv_channelFreq + i, thumbnail_channels);
+	}
+//	interface_setSelectedItem(channelMenu, selectedMenuItem);
+
+	return;
 }
 
 #endif /* ENABLE_ANALOGTV */

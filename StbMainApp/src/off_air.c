@@ -3252,6 +3252,8 @@ void offair_fillDVBTMenu()
 		sprintf(buf,"%s", _T("MAIN_LAYER"));
 	interface_addMenuEntry2(dvbtMenu, buf, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, &DVBTOutputMenu, thumbnail_channels);
 
+	analogtv_addMenuEntry(dvbtMenu);
+
 	if ( offair_epgEnabled() )
 		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_services != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
 	else
@@ -4047,6 +4049,7 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 
 	offair_fillDVBTMenu();
 	offair_initDVBTOutputMenu((interfaceMenu_t*)&DVBTMenu, screenMain);
+	analogtv_initMenu((interfaceMenu_t*)&DVBTMenu);
 
 	wizard_init();
 #ifdef ENABLE_STATS

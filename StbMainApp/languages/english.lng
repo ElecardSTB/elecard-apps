@@ -12,6 +12,7 @@ ADDR_MODE_STATIC=Static
 ADD_URL=Add URL
 ALL=All
 ALL_FILES=All Files
+ANALOGTV_CHANNELS=Analog TV channels
 ANALOGTV_CLEAR=Clear channel list
 ANALOGTV_CONFIG=Analog TV
 ANALOGTV_LOW_FREQ=Lower frequency limit
