@@ -58,6 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #include "teletext.h"
 #include "stsdk.h"
+#include "analogtv.h"
 
 #ifdef STBPNX
 #include <phStbRpc_Common.h>
@@ -863,7 +864,6 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 {
-	char desc[BUFFER_SIZE];
 	int which = GET_NUMBER(pArg);
 
 	dprintf("%s: in %d\n", __FUNCTION__, button);
@@ -885,7 +885,8 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 #ifdef ENABLE_PVR
 		if (pvr_isPlayingDVB(which)) {
 			pvr_stopRecordingDVB(which);
-			if (appControlInfo.dvbInfo.channel > 0) {
+			if(appControlInfo.dvbInfo.channel > 0) {
+				char desc[BUFFER_SIZE];
 				offair_getServiceDescription(current_service(),desc,_T("DVB_CHANNELS"));
 				interface_playControlUpdateDescriptionThumbnail(desc,
 					current_service()->service_descriptor.service_type == 2 ? thumbnail_radio : thumbnail_channels);
@@ -923,8 +924,8 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	} else
 #endif // !STSDK
 #ifdef DVB_FAVORITES
-	if (button == interfacePlayControlAddToPlaylist)
-	{
+	if(button == interfacePlayControlAddToPlaylist) {
+		char desc[BUFFER_SIZE];
 		dprintf("%s: add to playlist %d\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
 		dvb_getServiceURL(current_service(), desc);
 		eprintf("offair: Add to Playlist '%s'\n", desc);
