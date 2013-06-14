@@ -269,7 +269,7 @@ static int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 
 void analogtv_addMenuEntry(interfaceMenu_t *pMenu)
 {
-	char buf[256];
+//	char buf[256];
 	char *p_str;
 // 	uint32_t count = analogtv_getChannelCount();
 

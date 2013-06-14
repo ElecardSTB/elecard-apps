@@ -382,6 +382,15 @@ const char *interface_commandName(interfaceCommand_t cmd)
 	case interfaceCommandSearch:     return "Search";
 	case interfaceCommandEpg:        return "Epg";
 	case interfaceCommandZoom:       return "Zoom";
+	case interfaceCommandSource:     return "Source";
+	case interfaceCommandLetterA:    return "A";
+	case interfaceCommandLetterB:    return "B";
+	case interfaceCommandLetterC:    return "C";
+	case interfaceCommandLetterD:    return "D";
+	case interfaceCommandLetterE:    return "E";
+	case interfaceCommandLetterF:    return "F";
+	case interfaceCommandLetterG:    return "G";
+	case interfaceCommandLetterH:    return "H";
 	case interfaceCommandCount: break;
 	}
 	static DirectFBKeySymbolNames(directfb_keynames);
