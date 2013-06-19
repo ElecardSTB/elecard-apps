@@ -744,10 +744,10 @@ void currentmeter_setCalibrateValue(uint32_t val)
 
 static void *currentmeter_thread(void *notused)
 {
-	uint32_t isAlive = 1;
+	uint32_t isAlive = 0;
 	static char calibr_val[MENU_ENTRY_INFO_LENGTH];
 
-//	sleep(1);
+	sleep(2);
 	if(!currentmeter_isExist()) {
 		return NULL;
 	}
@@ -773,7 +773,9 @@ static void *currentmeter_thread(void *notused)
 						__FILE__, __func__, __LINE__, cur_val, has_power, state_changed, isAlive);
 			isAlive = !isAlive;
 			if(isAlive) { //if TV switched on we should offer to chose viewer
-				garb_checkViewership();
+				//garb_checkViewership();
+				eprintf("%s:%s()[%d]: garb_askViewership.\n", __FILE__, __func__, __LINE__);
+				garb_askViewership();
 			}
 		}
 		sleep(1);
