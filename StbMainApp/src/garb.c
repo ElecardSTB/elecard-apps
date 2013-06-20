@@ -767,7 +767,7 @@ static void *currentmeter_thread(void *notused)
 //		printf("%s:%s()[%d]: cur_val=%d\n", __FILE__, __func__, __LINE__, cur_val);
 
 		//has_power = cur_val > (currentmeter_calibrate_value >> 2);
-		has_power = (uint32_t)((float32_t)cur_val > (currentmeter_calibrate_value * 0.42));
+		has_power = (uint32_t)((double)cur_val > (currentmeter_calibrate_value * 0.42));
 		state_changed = isAlive ? !has_power : has_power;
 		if(state_changed) {
 			printf("%s:%s()[%d]: cur_val=%d, calibrate=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
