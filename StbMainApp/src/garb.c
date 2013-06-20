@@ -72,8 +72,8 @@
 #define GARB_FDD					CONFIG_DIR "/garb.fdd"
 
 #define CURRENTMETER_I2C_BUS		"/dev/i2c-3"
-//#define CURRENTMETER_I2C_ADDR		0x1e
-#define CURRENTMETER_I2C_ADDR		0x50
+#define CURRENTMETER_I2C_ADDR		0x1e
+//#define CURRENTMETER_I2C_ADDR		0x50
 #define CURRENTMETER_I2C_REG_ID		0x00
 //#define CURRENTMETER_I2C_REG_VAL	0x04
 #define CURRENTMETER_I2C_REG_VAL	0x00
@@ -766,15 +766,15 @@ static void *currentmeter_thread(void *notused)
 		}
 //		printf("%s:%s()[%d]: cur_val=%d\n", __FILE__, __func__, __LINE__, cur_val);
 
-		has_power = cur_val > (currentmeter_calibrate_value >> 2);
+		//has_power = cur_val > (currentmeter_calibrate_value >> 2);
+		has_power = (uint32_t)((float32_t)cur_val > (currentmeter_calibrate_value * 0.42));
 		state_changed = isAlive ? !has_power : has_power;
 		if(state_changed) {
-			printf("%s:%s()[%d]: cur_val=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
-						__FILE__, __func__, __LINE__, cur_val, has_power, state_changed, isAlive);
+			printf("%s:%s()[%d]: cur_val=%d, calibrate=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
+						__FILE__, __func__, __LINE__, cur_val, currentmeter_calibrate_value, has_power, state_changed, isAlive);
 			isAlive = !isAlive;
 			if(isAlive) { //if TV switched on we should offer to chose viewer
 				//garb_checkViewership();
-				eprintf("%s:%s()[%d]: garb_askViewership.\n", __FILE__, __func__, __LINE__);
 				garb_askViewership();
 			}
 		}
