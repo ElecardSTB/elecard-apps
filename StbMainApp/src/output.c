@@ -390,6 +390,10 @@ static void output_fillBlankingMenu(void);
 #endif
 
 #ifdef STSDK
+
+static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg);
+static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg);
+
 static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 
 static int output_writeInterfacesFile(void);
@@ -452,6 +456,7 @@ static interfaceListMenu_t InputsSubMenu;
 static interfaceListMenu_t AnalogTvSubMenu;
 #endif
 #endif
+static interfaceListMenu_t CurrentmeterSubMenu;
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
 static interfaceListMenu_t NetworkSubMenu;
@@ -2408,22 +2413,51 @@ static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 }
 
 #ifdef STSDK
+static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg)
+{
+	int32_t selected = MENU_ITEM_BACK;
+	interfaceMenu_t * calibrMenu = &CurrentmeterSubMenu.baseMenu;
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	char * str;
+
+	interface_clearMenuEntries(calibrMenu);
+
+	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_HIGH_VALUE"), currentmeter.high_value, _T("WATT"));
+	interface_addMenuEntry(calibrMenu, buf, output_calibrateCurrentMeter, SET_NUMBER(1), thumbnail_configure);
+
+	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_LOW_VALUE"), currentmeter.low_value, _T("WATT"));
+	interface_addMenuEntry(calibrMenu, buf, output_calibrateCurrentMeter, SET_NUMBER(0), thumbnail_configure);
+
+	interface_setSelectedItem(calibrMenu, selected);
+
+	return 0;
+}
+
 static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
 {
+	int isHigh = GET_NUMBER(pArg);
 	uint32_t cur_val;
 
 	if(currentmeter_getValue(&cur_val) == 0) {
 		char info[MENU_ENTRY_INFO_LENGTH];
-		
-		currentmeter_setCalibrateValue(cur_val);
-		snprintf(info, sizeof(info), "%d", cur_val);
-		setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_VAR_NAME, info);
 
+		if (isHigh == 1) {
+			currentmeter_setCalibrateHighValue(cur_val);
+			snprintf(info, sizeof(info), "%d", cur_val);
+			setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_HIGH, info);
+		}
+		else {
+			currentmeter_setCalibrateLowValue(cur_val);
+			snprintf(info, sizeof(info), "%d", cur_val);
+			setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_LOW, info);
+		}
 		snprintf(info, sizeof(info), _T("CURRENTMETER_CALIBRATE_SUCCESS"), cur_val);
 		interface_showMessageBox(info, thumbnail_yes, 0);
-	} else {
+	}
+	else {
 		interface_showMessageBox(_T("CURRENTMETER_CALIBRATE_ERROR"), thumbnail_error, 0);
 	}
+	output_redrawMenu(pMenu);
 
 	return 1;
 }
@@ -6141,7 +6175,9 @@ void output_fillOutputMenu(void)
 #ifdef STSDK
 	if(currentmeter_isExist()) {
 		str = _T("CURRENTMETER_CALIBRATE");
-		interface_addMenuEntry(outputMenu, str, output_calibrateCurrentMeter, NULL, thumbnail_configure);
+		//interface_addMenuEntry(outputMenu, str, output_calibrateCurrentMeter, NULL, thumbnail_configure);
+		//interface_addMenuEntry(outputMenu, str, output_enterCalibrateMenu, &CurrentmeterSubMenu, thumbnail_configure);
+		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &CurrentmeterSubMenu, thumbnail_configure);
 	}
 
 	str = _T("UPDATES");
@@ -6185,6 +6221,12 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
 #endif
+
+	if (currentmeter_isExist()){
+		createListMenu(&CurrentmeterSubMenu, _T("CURRENTMETER_CALIBRATE"), settings_dvb, NULL, _M &OutputMenu,
+			interfaceListMenuIconThumbnail, output_enterCalibrateMenu, NULL, NULL);
+	}
+
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,
