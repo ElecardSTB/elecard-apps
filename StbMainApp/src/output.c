@@ -2418,7 +2418,6 @@ static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg)
 	int32_t selected = MENU_ITEM_BACK;
 	interfaceMenu_t * calibrMenu = &CurrentmeterSubMenu.baseMenu;
 	char buf[MENU_ENTRY_INFO_LENGTH];
-	char * str;
 
 	interface_clearMenuEntries(calibrMenu);
 

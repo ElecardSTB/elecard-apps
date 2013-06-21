@@ -749,42 +749,37 @@ void currentmeter_setCalibrateLowValue(uint32_t val)
 	currentmeter.low_value = val;
 }
 
-static int32_t currentmeter_hasPower(uint32_t value)
+static int32_t currentmeter_hasPower(void)
 {
-	return (value > (currentmeter.low_value + (currentmeter.high_value - currentmeter.low_value)/4));
+	uint32_t cur_val = 0;
+	if(currentmeter_getValue(&cur_val) != 0) {
+		printf("%s:%s()[%d]: Cant get current power consumprion\n", __FILE__, __func__, __LINE__);
+		return 0;
+	}
+	return (value > (currentmeter.low_value + ((currentmeter.high_value - currentmeter.low_value) >> 2)));
 }
 
-int32_t currentmeter_isStateChanged (uint32_t value, uint32_t * previousState)
+static int32_t currentmeter_isPoweredOn(void)
 {
+	static uint32_t previousState = 0;
 	int32_t has_power;
 	int32_t state_changed;
 
-	has_power = currentmeter_hasPower(value);
-	state_changed = (*previousState) ? !has_power : has_power;
+	has_power = currentmeter_hasPower();
+	state_changed = previousState ? !has_power : has_power;
 	
-	if(state_changed) 
-	{
-		*previousState = !(*previousState);
-		return 1;
+	if(state_changed) {
+		previousState = !previousState;
 	}
-	return 0;
-}
 
-int32_t currentmeter_isJustPoweredOn(uint32_t value, uint32_t * previousState)
-{
-	if (currentmeter_isStateChanged(value, previousState)) 
-	{
-		if ((*previousState) == 1){
-			return 1;
-		}
+	if(previousState) {
+		return 1;
 	}
 	return 0;
 }
 
 static void *currentmeter_thread(void *notused)
 {
-	uint32_t isAlive = 0;
-	static char calibr_val[MENU_ENTRY_INFO_LENGTH];
 
 	sleep(2);
 	if(!currentmeter_isExist()) {
@@ -792,21 +787,15 @@ static void *currentmeter_thread(void *notused)
 	}
 
 	while(1) {
-		uint32_t cur_val = 0;
-		
-		if (currentmeter.high_value == 0 || 
-			currentmeter.low_value == 0  || 
-			(currentmeter.high_value == currentmeter.low_value))
+		if(currentmeter.high_value == 0 ||
+			currentmeter.low_value == 0 ||
+			((currentmeter.high_value - currentmeter.low_value) < 5))
 		{
 			sleep (5);
 			continue;
 		}
-		if(currentmeter_getValue(&cur_val) != 0) {
-			printf("%s:%s()[%d]: Cant get current power consumprion\n", __FILE__, __func__, __LINE__);
-			continue;
-		}
-		if (currentmeter_isJustPoweredOn(cur_val, &isAlive))
-		{
+
+		if(currentmeter_isJustPoweredOn()) {
 			garb_askViewership();
 		}
 		sleep(1);
