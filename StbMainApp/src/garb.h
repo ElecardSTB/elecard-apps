@@ -36,10 +36,21 @@
 #include "defines.h"
 
 /******************************************************************
+* EXPORTED TYPEDEFS
+*******************************************************************/
+
+typedef struct {
+	uint32_t high_value;
+	uint32_t low_value;
+	int32_t i2c_bus;
+} currentmeter_t;
+
+/******************************************************************
 * EXPORTED MACROS                                                 *
 *******************************************************************/
 #define GARB_CONFIG_FILE CONFIG_DIR "/garb.conf"
-#define CURRENTMETER_CALIBRATE_CONFIG_VAR_NAME "CURRENTMETER_CALIBRATE_VALUE"
+#define CURRENTMETER_CALIBRATE_CONFIG_HIGH "CURRENTMETER_CALIBRATE_HIGH"
+#define CURRENTMETER_CALIBRATE_CONFIG_LOW  "CURRENTMETER_CALIBRATE_LOW"
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES                                   *
@@ -59,6 +70,11 @@ void garb_drawViewership(void);
 
 int32_t currentmeter_isExist(void);
 int32_t currentmeter_getValue(uint32_t *watt);
-void currentmeter_setCalibrateValue(uint32_t val);
+void currentmeter_setCalibrateHighValue(uint32_t val);
+void currentmeter_setCalibrateLowValue(uint32_t val);
 
+/******************************************************************
+* EXPORTED DATA                                                   *
+*******************************************************************/
+extern currentmeter_t currentmeter;
 #endif // __GARB_H

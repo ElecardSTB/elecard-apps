@@ -165,9 +165,7 @@ static inline int get_start_time(const struct tm *t)
 static garbState_t garb_info;
 static int viewership_offset = 0;
 static int garb_quiz_index  = MAX_VIEWERS-1;
-static int32_t currentmeter_i2c_bus = -1;
-static uint32_t currentmeter_calibrate_value = 20;
-
+currentmeter_t currentmeter;
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
@@ -178,6 +176,10 @@ static inline int viewer_count(void)
 
 void garb_init(void)
 {
+	currentmeter.high_value = 0;
+	currentmeter.low_value = 0;
+	currentmeter.i2c_bus = -1;
+	
 	memset(&garb_info, 0, sizeof(garb_info));
 	garb_info.watching.channel = CHANNEL_NONE;
 	garb_resetViewership();
@@ -642,12 +644,12 @@ void *garb_thread(void *notused)
 
 static int32_t currentmeter_open(void)
 {
-	if(currentmeter_i2c_bus >= 0) {
+	if(currentmeter.i2c_bus >= 0) {
 		return 0;
 	}
 
-	currentmeter_i2c_bus = open(CURRENTMETER_I2C_BUS, O_RDWR);
-	if(currentmeter_i2c_bus < 0) {
+	currentmeter.i2c_bus = open(CURRENTMETER_I2C_BUS, O_RDWR);
+	if(currentmeter.i2c_bus < 0) {
 		fprintf(stderr, "Error: Could not open device `%s': %s\n",
 				CURRENTMETER_I2C_BUS, strerror(errno));
 		if(errno == EACCES)
@@ -659,8 +661,8 @@ static int32_t currentmeter_open(void)
 
 static void currentmeter_close(void)
 {
-	if(currentmeter_i2c_bus >= 0)
-		close(currentmeter_i2c_bus);
+	if(currentmeter.i2c_bus >= 0)
+		close(currentmeter.i2c_bus);
 }
 
 static int32_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
@@ -687,7 +689,7 @@ static int32_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
 	msg[1].len = 1;
 	msg[1].buf = &read_reg;
 
-	ret = ioctl(currentmeter_i2c_bus, I2C_RDWR, &work_queue);
+	ret = ioctl(currentmeter.i2c_bus, I2C_RDWR, &work_queue);
 	if(ret < 0) {
 		printf("%s:%s()[%d]: ERROR!! while reading i2c: ret=%d\n", __FILE__, __func__, __LINE__, ret);
 		return ret;
@@ -737,9 +739,46 @@ int32_t currentmeter_getValue(uint32_t *watt)
 	return 0;
 }
 
-void currentmeter_setCalibrateValue(uint32_t val)
+void currentmeter_setCalibrateHighValue(uint32_t val)
 {
-	currentmeter_calibrate_value = val;
+	currentmeter.high_value = val;
+}
+
+void currentmeter_setCalibrateLowValue(uint32_t val)
+{
+	currentmeter.low_value = val;
+}
+
+static int32_t currentmeter_hasPower(uint32_t value)
+{
+	return (value > (currentmeter.low_value + (currentmeter.high_value - currentmeter.low_value)/4));
+}
+
+int32_t currentmeter_isStateChanged (uint32_t value, uint32_t * previousState)
+{
+	int32_t has_power;
+	int32_t state_changed;
+
+	has_power = currentmeter_hasPower(value);
+	state_changed = (*previousState) ? !has_power : has_power;
+	
+	if(state_changed) 
+	{
+		*previousState = !(*previousState);
+		return 1;
+	}
+	return 0;
+}
+
+int32_t currentmeter_isJustPoweredOn(uint32_t value, uint32_t * previousState)
+{
+	if (currentmeter_isStateChanged(value, previousState)) 
+	{
+		if ((*previousState) == 1){
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static void *currentmeter_thread(void *notused)
@@ -751,32 +790,24 @@ static void *currentmeter_thread(void *notused)
 	if(!currentmeter_isExist()) {
 		return NULL;
 	}
-	if(getParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_VAR_NAME, "", calibr_val)) {
-		currentmeter_setCalibrateValue(atoi(calibr_val));
-	}
 
 	while(1) {
 		uint32_t cur_val = 0;
-		int32_t has_power;
-		int32_t state_changed;
-
+		
+		if (currentmeter.high_value == 0 || 
+			currentmeter.low_value == 0  || 
+			(currentmeter.high_value == currentmeter.low_value))
+		{
+			sleep (5);
+			continue;
+		}
 		if(currentmeter_getValue(&cur_val) != 0) {
 			printf("%s:%s()[%d]: Cant get current power consumprion\n", __FILE__, __func__, __LINE__);
 			continue;
 		}
-//		printf("%s:%s()[%d]: cur_val=%d\n", __FILE__, __func__, __LINE__, cur_val);
-
-		//has_power = cur_val > (currentmeter_calibrate_value >> 2);
-		has_power = (uint32_t)((double)cur_val > (currentmeter_calibrate_value * 0.42));
-		state_changed = isAlive ? !has_power : has_power;
-		if(state_changed) {
-			printf("%s:%s()[%d]: cur_val=%d, calibrate=%d, has_power=%d, state_changed=%d, isAlive=%d\n",
-						__FILE__, __func__, __LINE__, cur_val, currentmeter_calibrate_value, has_power, state_changed, isAlive);
-			isAlive = !isAlive;
-			if(isAlive) { //if TV switched on we should offer to chose viewer
-				//garb_checkViewership();
-				garb_askViewership();
-			}
+		if (currentmeter_isJustPoweredOn(cur_val, &isAlive))
+		{
+			garb_askViewership();
 		}
 		sleep(1);
 	}
