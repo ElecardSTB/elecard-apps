@@ -158,6 +158,8 @@ static inline int get_start_time(const struct tm *t)
 	return t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec;
 }
 
+static int32_t currentmeter_hasPower(void);
+
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
@@ -479,8 +481,17 @@ void garb_test(void)
 
 void garb_save(void)
 {
-	rename(GARB_FDD, GARB_FDD ".prev");
-	FILE *f = fopen(GARB_FDD, "w");
+	EIT_service_t *service;
+	time_t now;
+	int32_t cm;
+
+	time(&now);
+
+	if (currentmeter_hasPower()) cm = 2;
+	else cm = 0;
+
+	//rename(GARB_FDD, GARB_FDD ".prev");
+	FILE *f = fopen(GARB_FDD, "a");
 	if (!f) {
 		eprintf("%s: failed to create file: %s\n", __FUNCTION__, strerror(errno));
 		return;
@@ -488,21 +499,28 @@ void garb_save(void)
 	garbWatchHistory_t *hist;
 	for (list_element_t *el = garb_info.history.head; el; el = el->next) {
 		hist = el->data;
+		service = NULL;
 		if (hist->channel != CHANNEL_NONE) {
-			fprintf(f, "%06d %d %d %c %ld %d 0 %02d ",
-				garb_info.hh.number,
-				garb_info.hh.device,
-				get_start_time(&hist->start),
-				'T',
-				hist->duration,
-				hist->channel,
-				0x02);
+			service = offair_getService(hist->channel);
+			fprintf(f, "%ld:tc%d:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:",
+				now,
+				cm,
+				1,
+				service->common.service_id,
+				service->common.transport_stream_id,
+				service->program_map.program_map_PID,
+				service->original_network_id,
+				1,
+				service->common.media_id,
+				service->service_descriptor.service_type,
+				dvb_getScrambled(service),
+				service->service_descriptor.EIT_schedule_flag);
 			for (int i = 0; i < garb_info.hh.count; i++)
-				if (hist-> members & (1 << i))
-					fprintf(f, "%c", garb_info.hh.members[i].id);
-			for (int i = 0; i < hist->guest_count; i++)
-				fprintf(f, "%u", hist->guests[i]);
+				if (hist-> members & (1 << i)){
+					fprintf(f, ";%c;", garb_info.hh.members[i].id);
+				}
 			fprintf(f, "\n");
+			fflush(f);
 		}
 	}
 	fclose(f);
@@ -636,7 +654,9 @@ void *garb_thread(void *notused)
 		garb_gatherStats(now);
 		garb_save();
 		localtime_r(&now, &t);
-		timeout = WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD);
+		//timeout = WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD);
+		timeout = 1;
+
 		sleep(timeout);
 	}
 	return NULL;
