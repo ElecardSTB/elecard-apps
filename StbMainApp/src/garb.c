@@ -756,7 +756,7 @@ static int32_t currentmeter_hasPower(void)
 		printf("%s:%s()[%d]: Cant get current power consumprion\n", __FILE__, __func__, __LINE__);
 		return 0;
 	}
-	return (value > (currentmeter.low_value + ((currentmeter.high_value - currentmeter.low_value) >> 2)));
+	return (cur_val > (currentmeter.low_value + ((currentmeter.high_value - currentmeter.low_value) >> 2)));
 }
 
 static int32_t currentmeter_isPoweredOn(void)
@@ -795,7 +795,7 @@ static void *currentmeter_thread(void *notused)
 			continue;
 		}
 
-		if(currentmeter_isJustPoweredOn()) {
+		if(currentmeter_isPoweredOn()) {
 			garb_askViewership();
 		}
 		sleep(1);
