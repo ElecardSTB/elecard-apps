@@ -53,6 +53,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FREE(x) if(x) { dfree(x); (x) = NULL; }
 
+#define ARRAY_SIZE(arr)	(sizeof(arr)/sizeof(*arr))
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
