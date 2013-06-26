@@ -2420,10 +2420,10 @@ static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg)
 
 	interface_clearMenuEntries(calibrMenu);
 
-	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_HIGH_VALUE"), currentmeter.high_value, _T("WATT"));
+	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_HIGH_VALUE"), currentmeter_getCalibrateHighValue(), _T("WATT"));
 	interface_addMenuEntry(calibrMenu, buf, output_calibrateCurrentMeter, SET_NUMBER(1), thumbnail_configure);
 
-	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_LOW_VALUE"), currentmeter.low_value, _T("WATT"));
+	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_LOW_VALUE"), currentmeter_getCalibrateLowValue(), _T("WATT"));
 	interface_addMenuEntry(calibrMenu, buf, output_calibrateCurrentMeter, SET_NUMBER(0), thumbnail_configure);
 
 	interface_setSelectedItem(calibrMenu, selected);

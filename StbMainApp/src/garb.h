@@ -39,12 +39,6 @@
 * EXPORTED TYPEDEFS
 *******************************************************************/
 
-typedef struct {
-	uint32_t high_value;
-	uint32_t low_value;
-	int32_t i2c_bus;
-} currentmeter_t;
-
 /******************************************************************
 * EXPORTED MACROS                                                 *
 *******************************************************************/
@@ -70,11 +64,13 @@ void garb_drawViewership(void);
 
 int32_t currentmeter_isExist(void);
 int32_t currentmeter_getValue(uint32_t *watt);
+uint32_t currentmeter_getCalibrateHighValue(void);
+uint32_t currentmeter_getCalibrateLowValue(void);
 void currentmeter_setCalibrateHighValue(uint32_t val);
 void currentmeter_setCalibrateLowValue(uint32_t val);
 
 /******************************************************************
 * EXPORTED DATA                                                   *
 *******************************************************************/
-extern currentmeter_t currentmeter;
+
 #endif // __GARB_H

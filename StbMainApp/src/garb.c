@@ -35,6 +35,7 @@
 #include "StbMainApp.h"
 #include "off_air.h"
 #include "output.h"
+#include "stsdk.h"
 #include "l10n.h"
 #include <cJSON.h>
 #include <service.h>
@@ -72,8 +73,8 @@
 #define GARB_FDD					CONFIG_DIR "/garb.fdd"
 
 #define CURRENTMETER_I2C_BUS		"/dev/i2c-3"
-#define CURRENTMETER_I2C_ADDR		0x1e
-//#define CURRENTMETER_I2C_ADDR		0x50
+#define CURRENTMETER_I2C_ADDR1		0x1e
+#define CURRENTMETER_I2C_ADDR2		0x50
 #define CURRENTMETER_I2C_REG_ID		0x00
 //#define CURRENTMETER_I2C_REG_VAL	0x04
 #define CURRENTMETER_I2C_REG_VAL	0x00
@@ -134,6 +135,14 @@ typedef struct
 	pthread_t thread_current;
 } garbState_t;
 
+typedef struct {
+	uint32_t high_value;
+	uint32_t low_value;
+	int32_t i2c_bus_fd;
+	int32_t i2c_addr;
+	int32_t isExist;
+} currentmeter_t;
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                                      *
 *******************************************************************/
@@ -144,13 +153,16 @@ static void garb_test();
 static void garb_save();
 static void garb_load();
 static void *garb_thread(void *notused);
-static void *currentmeter_thread(void *notused);
-static void currentmeter_close(void);
 
 static void garb_printMembers(char text[]);
 static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int garb_quizSexCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
+
+static void *currentmeter_thread(void *notused);
+static int32_t currentmeter_init(void);
+static int32_t currentmeter_term(void);
+static int32_t currentmeter_hasPower(void);
 
 static void addWatchHistory(int channel, time_t now, time_t duration);
 static inline int get_start_time(const struct tm *t)
@@ -158,16 +170,14 @@ static inline int get_start_time(const struct tm *t)
 	return t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec;
 }
 
-static int32_t currentmeter_hasPower(void);
-
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
-
 static garbState_t garb_info;
 static int viewership_offset = 0;
 static int garb_quiz_index  = MAX_VIEWERS-1;
-currentmeter_t currentmeter;
+static currentmeter_t currentmeter;
+
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
@@ -178,10 +188,7 @@ static inline int viewer_count(void)
 
 void garb_init(void)
 {
-	currentmeter.high_value = 0;
-	currentmeter.low_value = 0;
-	currentmeter.i2c_bus = -1;
-	
+
 	memset(&garb_info, 0, sizeof(garb_info));
 	garb_info.watching.channel = CHANNEL_NONE;
 	garb_resetViewership();
@@ -189,6 +196,8 @@ void garb_init(void)
 #ifdef GARB_TEST
 	garb_test();
 #endif
+	currentmeter_init();
+
 	pthread_create(&garb_info.thread, 0, garb_thread, 0);
 	pthread_create(&garb_info.thread_current, 0, currentmeter_thread, 0);
 }
@@ -197,7 +206,7 @@ void garb_terminate(void)
 {
 	pthread_cancel(garb_info.thread_current);
 	pthread_join(garb_info.thread_current, NULL);
-	currentmeter_close();
+	currentmeter_term();
 	pthread_cancel(garb_info.thread);
 	pthread_join(garb_info.thread, NULL);
 	garb_save();
@@ -483,12 +492,8 @@ void garb_save(void)
 {
 	EIT_service_t *service;
 	time_t now;
-	int32_t cm;
 
 	time(&now);
-
-	if (currentmeter_hasPower()) cm = 2;
-	else cm = 0;
 
 	//rename(GARB_FDD, GARB_FDD ".prev");
 	FILE *f = fopen(GARB_FDD, "a");
@@ -504,7 +509,7 @@ void garb_save(void)
 			service = offair_getService(hist->channel);
 			fprintf(f, "%ld:tc%d:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:",
 				now,
-				cm,
+				currentmeter_hasPower() ? 2 : 0,
 				1,
 				service->common.service_id,
 				service->common.transport_stream_id,
@@ -664,12 +669,12 @@ void *garb_thread(void *notused)
 
 static int32_t currentmeter_open(void)
 {
-	if(currentmeter.i2c_bus >= 0) {
+	if(currentmeter.i2c_bus_fd >= 0) {
 		return 0;
 	}
 
-	currentmeter.i2c_bus = open(CURRENTMETER_I2C_BUS, O_RDWR);
-	if(currentmeter.i2c_bus < 0) {
+	currentmeter.i2c_bus_fd = open(CURRENTMETER_I2C_BUS, O_RDWR);
+	if(currentmeter.i2c_bus_fd < 0) {
 		fprintf(stderr, "Error: Could not open device `%s': %s\n",
 				CURRENTMETER_I2C_BUS, strerror(errno));
 		if(errno == EACCES)
@@ -679,10 +684,11 @@ static int32_t currentmeter_open(void)
 	return 0;
 }
 
-static void currentmeter_close(void)
+static int32_t currentmeter_term(void)
 {
-	if(currentmeter.i2c_bus >= 0)
-		close(currentmeter.i2c_bus);
+	if(currentmeter.i2c_bus_fd >= 0)
+		close(currentmeter.i2c_bus_fd);
+	return 0;
 }
 
 static int32_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
@@ -692,24 +698,20 @@ static int32_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
 	int32_t						ret;
 	uint8_t						read_reg;
 
-	if(currentmeter_open() != 0) {
-		return -1;
-	}
-
 	work_queue.nmsgs = 2;
 	work_queue.msgs = msg;
 
-	msg[0].addr = CURRENTMETER_I2C_ADDR;
+	msg[0].addr = currentmeter.i2c_addr;
 	msg[0].flags = 0;
 	msg[0].len = 1;
 	msg[0].buf = &reg_addr;
 
-	msg[1].addr = CURRENTMETER_I2C_ADDR;
+	msg[1].addr = currentmeter.i2c_addr;
 	msg[1].flags = I2C_M_RD;
 	msg[1].len = 1;
 	msg[1].buf = &read_reg;
 
-	ret = ioctl(currentmeter.i2c_bus, I2C_RDWR, &work_queue);
+	ret = ioctl(currentmeter.i2c_bus_fd, I2C_RDWR, &work_queue);
 	if(ret < 0) {
 		printf("%s:%s()[%d]: ERROR!! while reading i2c: ret=%d\n", __FILE__, __func__, __LINE__, ret);
 		return ret;
@@ -718,23 +720,74 @@ static int32_t currentmeter_readReg(uint8_t reg_addr, uint8_t *value)
 	return 0;
 }
 
+static int32_t currentmeter_init(void)
+{
+//	uint8_t val;
+	uint8_t i;
+	uint8_t try_i2c_addr[] = {
+		CURRENTMETER_I2C_ADDR1,
+		CURRENTMETER_I2C_ADDR2,
+	};
+
+	memset(&currentmeter, 0, sizeof(currentmeter));
+	currentmeter.i2c_bus_fd = -1;
+
+#if (defined STSDK)
+	if(st_getBoardId() != eSTB850) {
+		eprintf("%s(): Current meter enabled for STB850 only\n", __func__);
+		return -1;
+	}
+#endif
+	if(currentmeter_open() != 0) {
+		return -1;
+	}
+	for(i = 0; i < ARRAY_SIZE(try_i2c_addr); i++) {
+		struct i2c_smbus_ioctl_data args;
+		int32_t ret;
+
+		if(ioctl(currentmeter.i2c_bus_fd, I2C_SLAVE, try_i2c_addr[i]) < 0) {
+			if (errno == EBUSY) {
+				printf("%s(): i2c address 0x%02x in use\n", __func__, try_i2c_addr[i]);
+			} else {
+				fprintf(stderr, "%s(): Error: Could not set address to 0x%02x: %s\n",
+						__func__, try_i2c_addr[i], strerror(errno));
+			}
+			continue;
+		}
+
+		args.read_write = I2C_SMBUS_WRITE;
+		args.command = 0;
+		args.size = I2C_SMBUS_BYTE;
+		args.data = NULL;
+		ret = ioctl(currentmeter.i2c_bus_fd, I2C_SMBUS, &args);
+		if(ret == 0) {
+			eprintf("%s(): Found current meter, i2c addr=0x%02x\n", __func__, try_i2c_addr[i]);
+			currentmeter.i2c_addr = try_i2c_addr[i];
+			currentmeter.isExist = 1;
+			break;
+		}
+	}
+
+	if(currentmeter.isExist == 0) {
+		eprintf("%s(): Warning: No any current meter found\n", __func__);
+	}
+	return 0;
+
+	//now we use chip without id, so skip checking
+// 	if(currentmeter_readReg(CURRENTMETER_I2C_REG_ID, &val) != 0) {
+// 		printf("%s:%s()[%d]: Cant read value!!!\n", __FILE__, __func__, __LINE__);
+// 		return 0;
+// 	}
+// 	if(val != CURRENTMETER_I2C_ID) {
+// 		printf("%s:%s()[%d]: Unknown device!!!\n", __FILE__, __func__, __LINE__);
+// 		return 0;
+// 	}
+// 	return 1;
+}
+
 int32_t currentmeter_isExist(void)
 {
-	uint8_t val;
-
-	if(currentmeter_open() != 0) {
-		return 0;
-	}
-	if(currentmeter_readReg(CURRENTMETER_I2C_REG_ID, &val) != 0) {
-		printf("%s:%s()[%d]: Cant read value!!!\n", __FILE__, __func__, __LINE__);
-		return 0;
-	}
-	return 1; //now we use chip without id, so skip checking
-	if(val != CURRENTMETER_I2C_ID) {
-		printf("%s:%s()[%d]: Unknown device!!!\n", __FILE__, __func__, __LINE__);
-		return 0;
-	}
-	return 1;
+	return currentmeter.isExist;
 }
 
 int32_t currentmeter_getValue(uint32_t *watt)
@@ -742,7 +795,7 @@ int32_t currentmeter_getValue(uint32_t *watt)
 	uint32_t cur_val;
 	uint8_t val;
 
-	if(currentmeter_open() != 0) {
+	if(!currentmeter_isExist()) {
 		return -1;
 	}
 
@@ -759,6 +812,16 @@ int32_t currentmeter_getValue(uint32_t *watt)
 	return 0;
 }
 
+uint32_t currentmeter_getCalibrateHighValue(void)
+{
+	return currentmeter.high_value;
+}
+
+uint32_t currentmeter_getCalibrateLowValue(void)
+{
+	return currentmeter.low_value;
+}
+
 void currentmeter_setCalibrateHighValue(uint32_t val)
 {
 	currentmeter.high_value = val;
@@ -772,6 +835,7 @@ void currentmeter_setCalibrateLowValue(uint32_t val)
 static int32_t currentmeter_hasPower(void)
 {
 	uint32_t cur_val = 0;
+
 	if(currentmeter_getValue(&cur_val) != 0) {
 		printf("%s:%s()[%d]: Cant get current power consumprion\n", __FILE__, __func__, __LINE__);
 		return 0;
