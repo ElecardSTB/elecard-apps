@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_DVB
 #include <linux/dvb/frontend.h>
 #endif
+#include <linux/board_id.h>
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -135,6 +136,8 @@ int  st_applyZoom(zoomPreset_t preset);
  * @return >0 if needed restart after hdmi output mode changes.
  */
 int st_needRestart(void);
+
+g_board_type_t st_getBoardId(void);
 
 #ifdef __cplusplus
 }

@@ -121,8 +121,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FORMAT_CHANGE_TIMEOUT       (15)
 
-#define ARRAY_SIZE(arr)				(sizeof(arr)/sizeof(*arr))
-
 #define DVB_MIN_SYMBOLRATE               100
 #define DVB_MAX_SYMBOLRATE             60000
 #define DVB_MIN_FREQUENCY_C            47000

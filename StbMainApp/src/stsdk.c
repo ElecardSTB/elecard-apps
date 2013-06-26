@@ -137,6 +137,8 @@ static inline unsigned int get_id()
 }
 static int needRestart = 0;
 
+g_board_type_t g_board_id = eSTB830;
+
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
@@ -209,6 +211,12 @@ int st_init(void)
 	}
 	cJSON_Delete(result);
 #endif
+
+	FILE *board_id_fd = fopen("/proc/board/id", "r");
+	if(board_id_fd) {
+		fscanf(board_id_fd, "%d", (int *)&g_board_id);
+		fclose(board_id_fd);
+	}
 
 	return res;
 }
@@ -756,6 +764,11 @@ int st_applyZoom(zoomPreset_t preset)
 	cJSON_Delete(param);
 	cJSON_Delete(res);
 	return ret;
+}
+
+g_board_type_t st_getBoardId(void)
+{
+	return g_board_id;
 }
 
 #endif // STSDK
