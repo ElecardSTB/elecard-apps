@@ -506,23 +506,26 @@ void garb_save(void)
 		hist = el->data;
 		service = NULL;
 		if (hist->channel != CHANNEL_NONE) {
-			service = offair_getService(hist->channel);
-			fprintf(f, "%ld:tc%d:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:",
+			service = offair_getService(garb_info.watching.channel);
+			fprintf(f, "%ld:tc%d:%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:",
 				now,
 				currentmeter_hasPower() ? 2 : 0,
 				1,
+				0,
+				1,
 				service->common.service_id,
 				service->common.transport_stream_id,
-				service->program_map.program_map_PID,
+				//service->program_map.program_map_PID,
 				service->original_network_id,
-				1,
+				//1,
 				service->common.media_id,
 				service->service_descriptor.service_type,
 				dvb_getScrambled(service),
 				service->service_descriptor.EIT_schedule_flag);
 			for (int i = 0; i < garb_info.hh.count; i++)
 				if (hist-> members & (1 << i)){
-					fprintf(f, ";%c;", garb_info.hh.members[i].id);
+					if (!cm) fprintf(f, ";X");
+					else fprintf(f, ";%c", garb_info.hh.members[i].id);
 				}
 			fprintf(f, "\n");
 			fflush(f);
