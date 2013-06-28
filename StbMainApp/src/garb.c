@@ -526,6 +526,7 @@ void garb_save(void)
 				dvb_getScrambled(service),
 				service->service_descriptor.EIT_schedule_flag);
 			if(hasPower && hist->members) {
+				//printf("HHCount - %d\n", garb_info.hh.count);
 				for(int i = 0; i < garb_info.hh.count; i++) {
 					if(hist->members & (1 << i)) {
 						fprintf(f, "%c", garb_info.hh.members[i].id);
