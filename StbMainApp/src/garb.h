@@ -42,9 +42,6 @@
 /******************************************************************
 * EXPORTED MACROS                                                 *
 *******************************************************************/
-#define GARB_CONFIG_FILE CONFIG_DIR "/garb.conf"
-#define CURRENTMETER_CALIBRATE_CONFIG_HIGH "CURRENTMETER_CALIBRATE_HIGH"
-#define CURRENTMETER_CALIBRATE_CONFIG_LOW  "CURRENTMETER_CALIBRATE_LOW"
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES                                   *

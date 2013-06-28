@@ -80,6 +80,10 @@
 #define CURRENTMETER_I2C_REG_VAL	0x00
 #define CURRENTMETER_I2C_ID			0x1e
 
+#define GARB_CONFIG_FILE CONFIG_DIR "/garb.conf"
+#define CURRENTMETER_CALIBRATE_CONFIG_HIGH "CURRENTMETER_CALIBRATE_HIGH"
+#define CURRENTMETER_CALIBRATE_CONFIG_LOW  "CURRENTMETER_CALIBRATE_LOW"
+
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
@@ -733,6 +737,7 @@ static int32_t currentmeter_init(void)
 {
 //	uint8_t val;
 	uint8_t i;
+	char buf[256];
 	uint8_t try_i2c_addr[] = {
 		CURRENTMETER_I2C_ADDR1,
 		CURRENTMETER_I2C_ADDR2,
@@ -775,6 +780,13 @@ static int32_t currentmeter_init(void)
 			currentmeter.isExist = 1;
 			break;
 		}
+	}
+
+	if(getParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_HIGH, "", buf)) {
+		currentmeter.high_value = atoi(buf);
+	}
+	if(getParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_LOW, "", buf)) {
+		currentmeter.low_value = atoi(buf);
 	}
 
 	if(currentmeter.isExist == 0) {
@@ -833,12 +845,24 @@ uint32_t currentmeter_getCalibrateLowValue(void)
 
 void currentmeter_setCalibrateHighValue(uint32_t val)
 {
-	currentmeter.high_value = val;
+	if(currentmeter.high_value != val) {
+		char buf[32];
+		currentmeter.high_value = val;
+
+		snprintf(buf, sizeof(buf), "%d", val);
+		setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_HIGH, buf);
+	}
 }
 
 void currentmeter_setCalibrateLowValue(uint32_t val)
 {
-	currentmeter.low_value = val;
+	if(currentmeter.low_value != val) {
+		char buf[32];
+		currentmeter.low_value = val;
+
+		snprintf(buf, sizeof(buf), "%d", val);
+		setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_LOW, buf);
+	}
 }
 
 static int32_t currentmeter_hasPower(void)
@@ -853,20 +877,17 @@ static int32_t currentmeter_hasPower(void)
 
 static int32_t currentmeter_isPoweredOn(void)
 {
-	static uint32_t previousState = 0;
-	int32_t has_power;
-	int32_t state_changed;
+	static int32_t savedState = 0;
+	int32_t curState;
 
-	has_power = currentmeter_hasPower();
-	state_changed = previousState ? !has_power : has_power;
-	
-	if(state_changed) {
-		previousState = !previousState;
+	curState = currentmeter_hasPower();
+	if(savedState != curState) {
+		savedState = curState;
+		if(savedState) {
+			return 1;
+		}
 	}
 
-	if(previousState) {
-		return 1;
-	}
 	return 0;
 }
 

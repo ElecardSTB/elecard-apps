@@ -2438,15 +2438,10 @@ static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
 	if(currentmeter_getValue(&cur_val) == 0) {
 		char info[MENU_ENTRY_INFO_LENGTH];
 
-		if (isHigh == 1) {
+		if(isHigh == 1) {
 			currentmeter_setCalibrateHighValue(cur_val);
-			snprintf(info, sizeof(info), "%d", cur_val);
-			setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_HIGH, info);
-		}
-		else {
+		} else {
 			currentmeter_setCalibrateLowValue(cur_val);
-			snprintf(info, sizeof(info), "%d", cur_val);
-			setParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_LOW, info);
 		}
 		snprintf(info, sizeof(info), _T("CURRENTMETER_CALIBRATE_SUCCESS"), cur_val);
 		interface_showMessageBox(info, thumbnail_yes, 0);
