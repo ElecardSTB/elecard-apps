@@ -212,12 +212,6 @@ int st_init(void)
 	cJSON_Delete(result);
 #endif
 
-	FILE *board_id_fd = fopen("/proc/board/id", "r");
-	if(board_id_fd) {
-		fscanf(board_id_fd, "%d", (int *)&g_board_id);
-		fclose(board_id_fd);
-	}
-
 	return res;
 }
 
@@ -768,6 +762,16 @@ int st_applyZoom(zoomPreset_t preset)
 
 g_board_type_t st_getBoardId(void)
 {
+	static int init = 0;
+	if(init == 0) {
+		FILE *board_id_fd = fopen("/proc/board/id", "r");
+		if(board_id_fd) {
+			fscanf(board_id_fd, "%d", (int *)&g_board_id);
+			fclose(board_id_fd);
+		}
+		init = 1;
+	}
+
 	return g_board_id;
 }
 
