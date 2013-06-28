@@ -492,6 +492,7 @@ void garb_save(void)
 {
 	EIT_service_t *service;
 	time_t now;
+	int32_t hasPower = currentmeter_hasPower();
 
 	time(&now);
 
@@ -509,7 +510,7 @@ void garb_save(void)
 			service = offair_getService(garb_info.watching.channel);
 			fprintf(f, "%ld:tc%d:%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:",
 				now,
-				currentmeter_hasPower() ? 2 : 0,
+				hasPower ? 2 : 0,
 				1,
 				0,
 				1,
@@ -522,11 +523,16 @@ void garb_save(void)
 				service->service_descriptor.service_type,
 				dvb_getScrambled(service),
 				service->service_descriptor.EIT_schedule_flag);
-			for (int i = 0; i < garb_info.hh.count; i++)
-				if (hist-> members & (1 << i)){
-					if (!cm) fprintf(f, ";X");
-					else fprintf(f, ";%c", garb_info.hh.members[i].id);
+			if(hasPower && hist->members) {
+				fprintf(f, ";");
+				for(int i = 0; i < garb_info.hh.count; i++) {
+					if(hist->members & (1 << i)) {
+						fprintf(f, "%c", garb_info.hh.members[i].id);
+					}
 				}
+			} else {
+				fprintf(f, ";X");
+			}
 			fprintf(f, "\n");
 			fflush(f);
 		}
