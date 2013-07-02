@@ -69,8 +69,8 @@
 #define MAX_GUESTS  16
 
 #define GARB_TEST
-#define GARB_CONFIG_JSON			CONFIG_DIR "/garb.json"
-#define GARB_FDD					CONFIG_DIR "/garb.fdd"
+#define GARB_DIR					"/var/etc/garb/"
+#define GARB_CONFIG_JSON			GARB_DIR "config.json"
 
 #define CURRENTMETER_I2C_BUS		"/dev/i2c-3"
 #define CURRENTMETER_I2C_ADDR1		0x1e
@@ -109,8 +109,8 @@ typedef struct
 typedef struct
 {
 	struct hh {
-		int number;
-		int device;
+		char number[256];
+		char device[256];
 		int count;
 		houseHoldMember_t members[MAX_VIEWERS];
 	} hh;
@@ -154,8 +154,10 @@ typedef struct {
 #ifdef GARB_TEST
 static void garb_test();
 #endif
-static void garb_save();
-static void garb_load();
+static int32_t garb_save(void);
+static int32_t garb_save_guest(uint32_t guestId, uint32_t guestAnswers);
+
+static void garb_load(void);
 static void *garb_thread(void *notused);
 
 static void garb_printMembers(char text[]);
@@ -195,6 +197,7 @@ void garb_init(void)
 
 	memset(&garb_info, 0, sizeof(garb_info));
 	garb_info.watching.channel = CHANNEL_NONE;
+	time(&garb_info.last_stop);
 	garb_resetViewership();
 	garb_load();
 #ifdef GARB_TEST
@@ -340,8 +343,10 @@ int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 			for (; i<garb_info.watching.guest_count; i++)
 				if (garb_info.registered.guests[garb_quiz_index] == garb_info.watching.guests[i])
 					break;
-			if (i == garb_info.watching.guest_count)
+			if(i == garb_info.watching.guest_count) {
 				garb_info.watching.guests[garb_info.watching.guest_count++] = garb_info.registered.guests[garb_quiz_index];
+				garb_save_guest(garb_info.watching.guest_count, garb_info.registered.guests[garb_quiz_index]);
+			}
 #ifdef DEBUG
 			eprintf("%s: add guest %2d %u\n", __func__, garb_quiz_index, garb_info.registered.guests[garb_quiz_index]);
 			eprintf("%s: register guests %d:\n", __func__, garb_info.registered.guest_count);
@@ -395,9 +400,10 @@ static void garb_printMembers(char text[])
 
 void garb_checkViewership(void)
 {
-	if (time(0) - garb_info.last_stop > VIEWERSHIP_TIMEOUT)
+	if(time(0) - garb_info.last_stop > VIEWERSHIP_TIMEOUT) {
 		garb_resetViewership();
-	if (garb_info.watching.viewers == 0) {
+	}
+	if(garb_info.watching.viewers == 0) {
 		viewership_offset = 0;
 		garb_askViewership();
 	}
@@ -434,13 +440,13 @@ static void add_member(char id, const char *name)
 void garb_load(void)
 {
 	int fd = open(GARB_CONFIG_JSON, O_RDONLY);
-	if (fd < 0) {
-		eprintf("%s: failed to open garb config: %s\n", __FUNCTION__, strerror(errno));
+	if(fd < 0) {
+		eprintf("%s: failed to open garb config (%s): %s\n", __FUNCTION__, GARB_CONFIG_JSON, strerror(errno));
 		return;
 	}
 	char buffer[BUFFER_SIZE];
 	ssize_t rd_len = read(fd, buffer, sizeof(buffer)-1);
-	if (rd_len <= 0) {
+	if(rd_len <= 0) {
 		eprintf("%s: failed to read garb config: %s\n", __FUNCTION__, strerror(errno));
 		close(fd);
 		return;
@@ -448,30 +454,31 @@ void garb_load(void)
 	close(fd);
 	buffer[rd_len] = 0;
 	cJSON *config = cJSON_Parse(buffer);
-	if (!config) {
-		eprintf("%s: failed to parse garb config\n", __FUNCTION__);
+	if(!config) {
+		eprintf("%s: failed to parse garb config:\n%s\n", __FUNCTION__, cJSON_GetErrorPtr());
 		return;
 	}
 
-	garb_info.hh.number = objGetInt(config, "number", 0);
-	garb_info.hh.device = objGetInt(config, "device", 0);
+	strncpy(garb_info.hh.number, objGetString(config, "sample_id", "unknown"), sizeof(garb_info.hh.number));
+	strncpy(garb_info.hh.device, objGetString(config, "unit_serno", "unknown"), sizeof(garb_info.hh.device));
 	garb_info.hh.count  = 0;
 	garb_info.watching.viewers = 0;
 	garb_info.registered.guest_count  = 0;
 
 	cJSON *members = cJSON_GetObjectItem(config, "members");
 	cJSON *m;
-	for (int i = 0; (m = cJSON_GetArrayItem(members, i)); i++) {
+	for(int i = 0; (m = cJSON_GetArrayItem(members, i)); i++) {
 		char  *id = objGetString(m, "id", NULL);
 		if (!id)
 			continue;
 		char *name = objGetString(m, "name", NULL);
 		add_member(id[0], name);
 	}
-	if (garb_info.hh.count == 0)
+	if(garb_info.hh.count == 0) {
 		eprintf("%s: (!) no HH members specified!\n", __FUNCTION__);
+	}
 
-	free(config);
+	cJSON_Delete(config);
 }
 
 #ifdef GARB_TEST
@@ -480,37 +487,99 @@ void garb_test(void)
 	if (garb_info.hh.count > 0)
 		return;
 	eprintf("%s: in\n", __FUNCTION__);
-	if (garb_info.hh.number == 0)
-		garb_info.hh.number = 123456;
-	if (garb_info.hh.device == 0)
-		garb_info.hh.device = 2;
+	if((garb_info.hh.number[0] == 0) || (strcmp(garb_info.hh.number, "unknown") == 0)) {
+		strncpy(garb_info.hh.number, "123456", sizeof(garb_info.hh.number));
+	}
+	if((garb_info.hh.device[0] == 0) || (strcmp(garb_info.hh.device, "unknown") == 0)) {
+		strncpy(garb_info.hh.device, "elc22233", sizeof(garb_info.hh.device));
+	}
 	add_member('A', "Афанасий");
 	add_member('B', "Борис");
 	add_member('C', "Тимофей");
-	for (int i=3; i<MAX_VIEWERS-2; i++)
+	for(int i=3; i<MAX_VIEWERS-2; i++) {
 		add_member('A'+i, NULL);
+	}
 }
 #endif
 
-void garb_save(void)
+static char *garb_getStatisticsFilename(void)
+{
+	time_t now;
+	struct tm t;
+	static struct tm saved_t = {
+		.tm_mday = 0,
+		.tm_mon = 0,
+		.tm_year = 0
+	};
+	static char curStatisticsFilename[256];
+
+	time(&now);
+	now -= 2 * 3600;
+	localtime_r(&now, &t);
+	if((t.tm_mday != saved_t.tm_mday) || (t.tm_mon != saved_t.tm_mon) || (t.tm_year != saved_t.tm_year)) {
+		saved_t = t;
+		snprintf(curStatisticsFilename, sizeof(curStatisticsFilename), GARB_DIR "raw_%s_%s_%4d%02d%02d",
+					garb_info.hh.number, garb_info.hh.device, t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
+	}
+
+	return curStatisticsFilename;
+}
+
+pthread_mutex_t statistics_file_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static int32_t garb_save_guest(uint32_t guestId, uint32_t guestAnswers)
+{
+	FILE *f = NULL;
+	char *fname = NULL;
+	time_t now;
+
+	fname = garb_getStatisticsFilename();
+	if(fname == NULL) {
+		eprintf("%s: failed to get curent statistics filename\n", __FUNCTION__);
+		return -1;
+	}
+	pthread_mutex_lock(&statistics_file_mutex);
+	f = fopen(fname, "a");
+	if(!f) {
+		eprintf("%s: failed to create/append file (%s): %s\n", __FUNCTION__, fname, strerror(errno));
+		return -2;
+	}
+	time(&now);
+	fprintf(f, "%ld;tcG:%d:%d\n", now, guestId, guestAnswers);
+	fflush(f);
+
+	fclose(f);
+	pthread_mutex_unlock(&statistics_file_mutex);
+
+	return 0;
+}
+
+static int32_t garb_save(void)
 {
 	EIT_service_t *service;
 	time_t now;
 	int32_t hasPower = currentmeter_hasPower();
+	char *fname = NULL;
 
 	time(&now);
 
-	//rename(GARB_FDD, GARB_FDD ".prev");
-	FILE *f = fopen(GARB_FDD, "a");
-	if (!f) {
-		eprintf("%s: failed to create file: %s\n", __FUNCTION__, strerror(errno));
-		return;
+	fname = garb_getStatisticsFilename();
+	if(fname == NULL) {
+		eprintf("%s: failed to get curent statistics filename\n", __FUNCTION__);
+		return -1;
 	}
-	garbWatchHistory_t *hist;
-	for (list_element_t *el = garb_info.history.head; el; el = el->next) {
-		hist = el->data;
+	pthread_mutex_lock(&statistics_file_mutex);
+	FILE *f = fopen(fname, "a");
+	if(!f) {
+		eprintf("%s: failed to create/append file (%s): %s\n", __FUNCTION__, fname, strerror(errno));
+		return -2;
+	}
+
+//	garbWatchHistory_t *hist;
+//	for(list_element_t *el = garb_info.history.head; el; el = el->next) {
+//		hist = el->data;
 		service = NULL;
-		if (garb_info.watching.channel != CHANNEL_NONE) {
+		if(garb_info.watching.channel != CHANNEL_NONE) {
 			service = offair_getService(garb_info.watching.channel);
 			fprintf(f, "%ld;tc%d:%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:;",
 				now,
@@ -525,21 +594,29 @@ void garb_save(void)
 				service->service_descriptor.service_type,
 				dvb_getScrambled(service),
 				service->service_descriptor.EIT_schedule_flag);
-			if(hasPower && hist->members) {
+			if(hasPower && garb_info.watching.viewers) { //hist->members
 				//printf("HHCount - %d\n", garb_info.hh.count);
 				for(int i = 0; i < garb_info.hh.count; i++) {
-					if(hist->members & (1 << i)) {
+					if(garb_info.watching.members & (1 << i)) { //hist->members
 						fprintf(f, "%c", garb_info.hh.members[i].id);
 					}
 				}
+				for(int i = 0; i < garb_info.watching.guest_count; i++) {
+					fprintf(f, "%d", i + 1);
+				}
+				fprintf(f, "\n");
 			} else {
-				fprintf(f, "X");
+				fprintf(f, "X\n");
 			}
-			fprintf(f, "\n");
-			fflush(f);
+		} else {
+			fprintf(f, "%ld;tc0:***:X;\n", now);
 		}
-	}
+		fflush(f);
+//	}
 	fclose(f);
+	pthread_mutex_unlock(&statistics_file_mutex);
+
+	return 0;
 }
 
 void garb_startWatching(int channel)
@@ -655,25 +732,27 @@ void garb_gatherStats(time_t now)
 
 void *garb_thread(void *notused)
 {
-	time_t now, timeout;
-	struct tm t;
-
-	time(&now);
-	localtime_r(&now, &t);
-	timeout = WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD);
-	if (timeout  < WATCH_PERIOD)
-		timeout += WATCH_PERIOD;
-	sleep(timeout);
+	time_t now;
+// 	time_t timeout;
+// 	struct tm t;
+// 
+// 	time(&now);
+// 	localtime_r(&now, &t);
+// 	timeout = WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD);
+// 	if (timeout  < WATCH_PERIOD)
+// 		timeout += WATCH_PERIOD;
+// 	sleep(timeout);
+	sleep(5);
 
 	for (;;) {
 		time(&now);
 		garb_gatherStats(now);
 		garb_save();
-		localtime_r(&now, &t);
-		//timeout = WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD);
-		timeout = 1;
+// 		localtime_r(&now, &t);
+// 		timeout = WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD);
+// 		sleep(timeout);
 
-		sleep(timeout);
+		sleep(1);
 	}
 	return NULL;
 }
