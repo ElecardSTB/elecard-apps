@@ -152,7 +152,7 @@ typedef struct {
 *******************************************************************/
 
 #ifdef GARB_TEST
-static void garb_test();
+static void garb_test(void);
 #endif
 static int32_t garb_save(void);
 static int32_t garb_save_guest(uint32_t guestId, uint32_t guestAnswers);
@@ -339,10 +339,12 @@ int garb_quizAgeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, v
 			garb_info.registered.guests[garb_quiz_index] += 1000 * (cmd->command - interfaceCommand0);
 			garb_info.watching.viewers++;
 			garb_info.registered.guest_count++;
-			int i = 0;
-			for (; i<garb_info.watching.guest_count; i++)
+
+			int i;
+			for(i = 0; i < garb_info.watching.guest_count; i++) {
 				if (garb_info.registered.guests[garb_quiz_index] == garb_info.watching.guests[i])
 					break;
+			}
 			if(i == garb_info.watching.guest_count) {
 				garb_info.watching.guests[garb_info.watching.guest_count++] = garb_info.registered.guests[garb_quiz_index];
 				garb_save_guest(garb_info.watching.guest_count, garb_info.registered.guests[garb_quiz_index]);
@@ -419,6 +421,7 @@ void garb_askViewership(void)
 void garb_resetViewership(void)
 {
 	garb_info.registered.guest_count = 0;
+	garb_info.registered.members = 0;
 	garb_info.watching.viewers = 0;
 	garb_info.watching.members = 0;
 	garb_info.watching.guest_count = 0;
@@ -545,7 +548,7 @@ static int32_t garb_save_guest(uint32_t guestId, uint32_t guestAnswers)
 		return -2;
 	}
 	time(&now);
-	fprintf(f, "%ld;tcG:%d:%d\n", now, guestId, guestAnswers);
+	fprintf(f, "%ld;tcG:%d:%d\n", now, guestId + garb_info.hh.count, guestAnswers);
 	fflush(f);
 
 	fclose(f);
@@ -556,12 +559,10 @@ static int32_t garb_save_guest(uint32_t guestId, uint32_t guestAnswers)
 
 static int32_t garb_save(void)
 {
-	EIT_service_t *service;
 	time_t now;
+	static time_t no_channal_time = 0;
 	int32_t hasPower = currentmeter_hasPower();
 	char *fname = NULL;
-
-	time(&now);
 
 	fname = garb_getStatisticsFilename();
 	if(fname == NULL) {
@@ -575,44 +576,52 @@ static int32_t garb_save(void)
 		return -2;
 	}
 
-//	garbWatchHistory_t *hist;
-//	for(list_element_t *el = garb_info.history.head; el; el = el->next) {
-//		hist = el->data;
-		service = NULL;
-		if(garb_info.watching.channel != CHANNEL_NONE) {
-			service = offair_getService(garb_info.watching.channel);
-			fprintf(f, "%ld;tc%d:%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:;",
-				now,
-				hasPower ? 2 : 0,
-				1,
-				0,
-				1,
-				service->common.service_id,
-				service->common.transport_stream_id,
-				service->original_network_id,
-				service->common.media_id,
-				service->service_descriptor.service_type,
-				dvb_getScrambled(service),
-				service->service_descriptor.EIT_schedule_flag);
-			if(hasPower && garb_info.watching.viewers) { //hist->members
-				//printf("HHCount - %d\n", garb_info.hh.count);
-				for(int i = 0; i < garb_info.hh.count; i++) {
-					if(garb_info.watching.members & (1 << i)) { //hist->members
-						fprintf(f, "%c", garb_info.hh.members[i].id);
-					}
+	time(&now);
+	if(!garb_info.watching.viewers) {
+		//if there is now viewers, we should show "tc0"
+		hasPower = 0;
+	}
+	if(garb_info.watching.channel != CHANNEL_NONE) {
+		EIT_service_t *service = NULL;
+		service = offair_getService(garb_info.watching.channel);
+		fprintf(f, "%ld;tc%d:%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:;",
+			now,
+			hasPower ? 2 : 0,
+			1,
+			0,
+			1,
+			service->common.service_id,
+			service->common.transport_stream_id,
+			service->original_network_id,
+			service->common.media_id,
+			service->service_descriptor.service_type,
+			dvb_getScrambled(service),
+			service->service_descriptor.EIT_schedule_flag);
+		if(garb_info.watching.viewers) { //hist->members
+			//printf("HHCount - %d\n", garb_info.hh.count);
+			for(int i = 0; i < garb_info.hh.count; i++) {
+				if(garb_info.watching.members & (1 << i)) { //hist->members
+					fprintf(f, "%c", garb_info.hh.members[i].id);
 				}
-				for(int i = 0; i < garb_info.watching.guest_count; i++) {
-					fprintf(f, "%d", i + 1);
-				}
-				fprintf(f, "\n");
-			} else {
-				fprintf(f, "X\n");
 			}
+			for(int i = 0; i < garb_info.watching.guest_count; i++) {
+				fprintf(f, "%d", i + garb_info.hh.count + 1);
+			}
+			fprintf(f, "\n");
 		} else {
-			fprintf(f, "%ld;tc0:***:X;\n", now);
+			fprintf(f, "X\n");
 		}
-		fflush(f);
-//	}
+		no_channal_time = 0;
+	} else {
+		if(no_channal_time == 0) {
+			no_channal_time = now;
+		} else {
+			if((now - no_channal_time) > 5) {
+				fprintf(f, "%ld;tc0:***:X;\n", now);
+			}
+		}
+	}
+	fflush(f);
 	fclose(f);
 	pthread_mutex_unlock(&statistics_file_mutex);
 
@@ -952,22 +961,6 @@ static int32_t currentmeter_hasPower(void)
 	return (cur_val > (currentmeter.low_value + ((currentmeter.high_value - currentmeter.low_value) >> 2)));
 }
 
-static int32_t currentmeter_isPoweredOn(void)
-{
-	static int32_t savedState = 0;
-	int32_t curState;
-
-	curState = currentmeter_hasPower();
-	if(savedState != curState) {
-		savedState = curState;
-		if(savedState) {
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
 static void *currentmeter_thread(void *notused)
 {
 
@@ -977,6 +970,9 @@ static void *currentmeter_thread(void *notused)
 	}
 
 	while(1) {
+		static int32_t savedState = 0;
+		int32_t curState;
+
 		if(currentmeter.high_value == 0 ||
 			currentmeter.low_value == 0 ||
 			((currentmeter.high_value - currentmeter.low_value) < 5))
@@ -985,9 +981,18 @@ static void *currentmeter_thread(void *notused)
 			continue;
 		}
 
-		if(currentmeter_isPoweredOn()) {
-			garb_askViewership();
+		curState = currentmeter_hasPower();
+		if(savedState != curState) {
+			savedState = curState;
+			if(savedState) {
+				//just power on
+				garb_askViewership();
+			} else {
+				//just power off
+				garb_resetViewership();
+			}
 		}
+
 		sleep(1);
 	}
 
