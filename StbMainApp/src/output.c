@@ -583,6 +583,7 @@ stbTimeZoneDesc_t timezones[] = {
 	{"Etc/GMT-0", "(GMT) Western Europe Time, London, Lisbon, Casablanca"},
 	{"Etc/GMT-1", "(GMT +1:00) Brussels, Copenhagen, Madrid, Paris"},
 	{"Etc/GMT-2", "(GMT +2:00) Kaliningrad, South Africa"},
+	{"Europe/Sofia", "(GMT +2:00) Bulgaria, Sofia"},
 	{"Etc/GMT-3", "(GMT +3:00) Baghdad, Riyadh, Moscow, St. Petersburg"},
 	{"Etc/GMT-4", "(GMT +4:00) Abu Dhabi, Muscat, Baku, Tbilisi"},
 	{"Etc/GMT-5", "(GMT +5:00) Ekaterinburg, Islamabad, Karachi, Tashkent"},
