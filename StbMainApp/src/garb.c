@@ -223,6 +223,31 @@ void garb_terminate(void)
 	free_elements(&garb_info.history.head);
 }
 
+#define LEDSCTRL_FILE	"/sys/devices/platform/ct1628/text"
+static int32_t garb_switchLeds(uint32_t members)
+{
+	char str[16];
+	int32_t i;
+	int32_t j = 0;
+	FILE *fd;
+
+	fd = fopen(LEDSCTRL_FILE, "w");
+	if(fd == NULL) {
+		eprintf("%s: failed to create/append file (%s): %s\n", __FUNCTION__, LEDSCTRL_FILE, strerror(errno));
+		return -1;
+	}
+	for(i = 0; i < garb_info.hh.count; i++) {
+		if(members & (1 << i)) {
+			str[j] = 'A' + i;
+			j++;
+		}
+	}
+	str[j] = 0;
+	fputs(str, fd);
+	fclose(fd);
+	return 0;
+}
+
 static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	dprintf("%s: %d %s\n", __func__, interface_commandName(cmd->command));
@@ -260,6 +285,7 @@ static int garb_viewershipCallback(interfaceMenu_t *pMenu, pinterfaceCommandEven
 					garb_info.watching.members |= mask;
 				}
 				garb_info.registered.members ^= mask;
+				garb_switchLeds(garb_info.registered.members);
 			} else
 			if (index < viewer_count()) {
 				index -= garb_info.hh.count;
@@ -617,7 +643,7 @@ static int32_t garb_save(void)
 			no_channal_time = now;
 		} else {
 			if((now - no_channal_time) > 5) {
-				fprintf(f, "%ld;tc0:***:X;\n", now);
+				fprintf(f, "%ld;tc0:***;X\n", now);
 			}
 		}
 	}
