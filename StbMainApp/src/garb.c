@@ -894,6 +894,24 @@ static int32_t currentmeter_init(void)
 		}
 	}
 
+	if(currentmeter.isExist && (currentmeter.i2c_addr == CURRENTMETER_I2C_ADDR2)) {
+		uint8_t reg0, reg1;
+		uint16_t reg16;
+		int32_t ret;
+
+		ret = currentmeter_readReg(CURRENTMETER_I2C_REG_VAL, &reg0);
+		ret |= currentmeter_readReg(CURRENTMETER_I2C_REG_VAL + 1, &reg1);
+		if(ret != 0) {
+			return -1;
+		}
+
+		reg16 = (reg0 << 8) | reg1;
+		if((reg16 == 0xffff) || (reg16 == 0x5354 /*"ST"*/)) {
+			eprintf("%s(): Current meter is likely eeprom, so dont use it\n", __func__);
+			currentmeter.isExist = 0;
+		}
+	}
+
 	if(getParam(GARB_CONFIG_FILE, CURRENTMETER_CALIBRATE_CONFIG_HIGH, "", buf)) {
 		currentmeter.high_value = atoi(buf);
 	}
