@@ -124,6 +124,7 @@ typedef struct
 
 	struct watching {
 		int      viewers;
+		stb810_streamSource type;
 		int      channel;
 		time_t   start_time;
 		uint32_t members;
@@ -607,22 +608,47 @@ static int32_t garb_save(void)
 		//if there is now viewers, we should show "tc0"
 		hasPower = 0;
 	}
-	if(garb_info.watching.channel != CHANNEL_NONE) {
-		EIT_service_t *service = NULL;
-		service = offair_getService(garb_info.watching.channel);
-		fprintf(f, "%ld;tc%d:%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:;",
-			now,
-			hasPower ? 2 : 0,
-			1,
-			0,
-			1,
-			service->common.service_id,
-			service->common.transport_stream_id,
-			service->original_network_id,
-			service->common.media_id,
-			service->service_descriptor.service_type,
-			dvb_getScrambled(service),
-			service->service_descriptor.EIT_schedule_flag);
+
+//	if(garb_info.watching.channel != CHANNEL_NONE) {
+	if(garb_info.watching.type != streamSourceNone) {
+		//print time and power state
+		fprintf(f, "%ld;tc%d:", now, hasPower ? 2 : 0);
+
+		//print channel
+		switch(garb_info.watching.type) {
+			case streamSourceDVB:
+			{
+				EIT_service_t *service = NULL;
+				service = offair_getService(garb_info.watching.channel);
+				fprintf(f, "%X:%X:%X:%X:%X:%X:%X:%X:%X:%X:;",
+					1,
+					0,
+					1,
+					service->common.service_id,
+					service->common.transport_stream_id,
+					service->original_network_id,
+					service->common.media_id,
+					service->service_descriptor.service_type,
+					dvb_getScrambled(service),
+					service->service_descriptor.EIT_schedule_flag);
+				break;
+			}
+			case streamSourceAnalogTV:
+			{
+				uint32_t freqMHz;
+				uint32_t freqKHz;
+				freqMHz = garb_info.watching.channel / 1000000;
+				freqKHz = (garb_info.watching.channel - freqMHz * 1000000) / 1000;
+
+				fprintf(f, "ATV:%d:%d;", freqMHz, freqKHz);
+				break;
+			}
+			default:
+				fprintf(f, "notSupported;");
+				break;
+		}
+
+		//print viewers
 		if(garb_info.watching.viewers) { //hist->members
 			//printf("HHCount - %d\n", garb_info.hh.count);
 			for(int i = 0; i < garb_info.hh.count; i++) {
@@ -654,15 +680,31 @@ static int32_t garb_save(void)
 	return 0;
 }
 
-void garb_startWatching(int channel)
+int32_t garb_startWatching(stb810_streamSource type, void *pArg)
 {
+	int32_t channel = CHANNEL_NONE;
+	switch(type) {
+		case streamSourceDVB:
+		case streamSourceAnalogTV:
+			channel = *((int32_t *)pArg);
+			break;
+		default:
+			garb_info.watching.channel = CHANNEL_NONE;
+			garb_info.watching.type = streamSourceNone;
+			eprintf("%s: Not supported channel type: %d\n", __func__, type);
+			return -1;
+	}
+
+	garb_info.watching.channel = channel;
+	garb_info.watching.type = type;
 	dprintf("%s: %d\n", __func__, channel);
 	time(&garb_info.watching.start_time);
-	garb_info.watching.channel = channel;
 	garb_info.watching.members = garb_info.registered.members;
 	memcpy(garb_info.watching.guests, garb_info.registered.guests, garb_info.registered.guest_count);
 	garb_info.watching.guest_count = garb_info.registered.guest_count;
 	garb_checkViewership();
+
+	return 0;
 }
 
 static inline int sane_check(time_t watched)
@@ -670,8 +712,19 @@ static inline int sane_check(time_t watched)
 	return watched > 0 && watched <= 2*WATCH_PERIOD;
 }
 
-void garb_stopWatching(int channel)
+int32_t garb_stopWatching(stb810_streamSource type, void *pArg)
 {
+	int32_t channel = CHANNEL_NONE;
+	switch(type) {
+		case streamSourceDVB:
+		case streamSourceAnalogTV:
+			channel = *((int32_t *)pArg);
+			break;
+		default:
+//			channel = CHANNEL_NONE;
+//			return -1;
+			break;
+	}
 	dprintf("%s: %d\n", __func__, channel);
 	time(&garb_info.last_stop);
 	time_t duration = garb_info.last_stop - garb_info.watching.start_time;
@@ -681,7 +734,9 @@ void garb_stopWatching(int channel)
 		addWatchHistory(channel, duration, garb_info.last_stop + WATCH_PERIOD - (t.tm_sec % WATCH_PERIOD));
 	}
 	garb_info.watching.channel = CHANNEL_NONE;
+	garb_info.watching.type = streamSourceNone;
 	garb_info.watching.start_time = 0;
+	return 0;
 }
 
 static void addWatchHistory(int channel, time_t now, time_t duration)

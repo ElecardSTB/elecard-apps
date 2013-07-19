@@ -264,7 +264,10 @@ static int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	snprintf(cmd, sizeof(cmd), "tv://%u", freq);
 	printf("%s[%d]: *** cmd=%s\n", __FILE__, __LINE__, cmd);
 
-	return  gfx_startVideoProvider(cmd, 0, 0, NULL);
+	gfx_startVideoProvider(cmd, 0, 0, NULL);
+	garb_startWatching(streamSourceAnalogTV, pArg);
+
+	return 0;
 }
 
 void analogtv_addMenuEntry(interfaceMenu_t *pMenu)

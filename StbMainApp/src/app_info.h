@@ -142,6 +142,7 @@ typedef enum
 	streamSourceDLNA,
 	streamSourceYoutube,
 	streamSourceRutube,
+	streamSourceAnalogTV,
 	streamSources
 } stb810_streamSource;
 

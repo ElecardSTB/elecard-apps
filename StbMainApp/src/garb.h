@@ -34,6 +34,7 @@
 *******************************************************************/
 #include "interface.h"
 #include "defines.h"
+#include "app_info.h"
 
 /******************************************************************
 * EXPORTED TYPEDEFS
@@ -54,8 +55,8 @@ void garb_resetViewership(void);
 void garb_checkViewership(void);
 void garb_showStats(void);
 
-void garb_startWatching(int channel);
-void garb_stopWatching(int channel);
+int32_t garb_startWatching(stb810_streamSource type, void *pArg);
+int32_t garb_stopWatching(stb810_streamSource type, void *pArg);
 
 void garb_drawViewership(void);
 
