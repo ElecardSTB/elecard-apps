@@ -736,7 +736,7 @@ void offair_stopVideo(int which, int reset)
 
 	if (appControlInfo.dvbInfo.active)
 	{
-		garb_stopWatching(appControlInfo.dvbInfo.channel);
+		garb_stopWatching(streamSourceDVB, (void *)&appControlInfo.dvbInfo.channel);
 		interface_playControlSelect(interfacePlayControlStop);
 
 #ifdef ENABLE_DVB_DIAG
@@ -1727,7 +1727,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		gfx_setVideoProviderAudioStream(which, offair_services[appControlInfo.dvbInfo.channel].audio_track);
 	}
 #endif
-	garb_startWatching(appControlInfo.dvbInfo.channel);
+	garb_startWatching(streamSourceDVB, (void *)&appControlInfo.dvbInfo.channel);
 
 	if (dvb_getScrambled(current_service()) != 0 && appControlInfo.offairInfo.dvbShowScrambled != SCRAMBLED_PLAY)
 	{
