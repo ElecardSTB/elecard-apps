@@ -110,6 +110,7 @@ DVB_NO_CHANNELS=DVB Channels are not Configured Yet.\nDo You Wish to Start Autom
 DVB_POLARIZATION=Polarization
 DVB_PROVIDER=DVB Provider
 DVB_QAM_MODULATION=QAM Modulation
+DVB_MODULATION=Modulation
 DVB_SCAN_FREQUENCY=Scan Custom Frequency
 DVB_SCANNING_SERVICE=Retrieving service info...
 DVB_SHOW_SCRAMBLED=Show Scrambled Channels in List

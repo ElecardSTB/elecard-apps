@@ -546,6 +546,12 @@ typedef struct __stb810_dvbcInfo
 	uint32_t             symbolRate;
 } stb810_dvbcInfo;
 
+typedef struct __stb810_atscInfo
+{
+	stb810_dvbfeInfo     fe;
+	fe_modulation_t      modulation;
+} stb810_atscInfo;
+
 typedef enum {
 	dvbsBandK = 0,
 	dvbsBandC,
@@ -733,6 +739,7 @@ typedef struct __stb810_controlInfo
 	stb810_dvbInfo       dvbInfo;
 	stb810_dvbtInfo      dvbtInfo;
 	stb810_dvbcInfo      dvbcInfo;
+	stb810_atscInfo			atscInfo;
 	stb810_dvbsInfo      dvbsInfo;
 	stb810_dvbCommonInfo dvbCommonInfo;
 	stb810_teletextInfo  teletextInfo;

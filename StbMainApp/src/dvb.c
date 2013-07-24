@@ -82,7 +82,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define AUDIO_CHAN_MAX (8)
 
 #define MAX_OFFSETS   (1)
-#define FE_MAX_SUPPORTED (DVBT)
+#define FE_MAX_SUPPORTED (ATSC)
 
 #define MAX_RUNNING   (32)
 
@@ -1005,10 +1005,9 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 	memset(&p, 0, sizeof(p));
 
 	p.frequency = frequency;
-	if (media && media->type == serviceMediaNone)
+	if(media && media->type == serviceMediaNone)
 		media = NULL;
-	if (type == DVBT && (media == NULL || media->type == serviceMediaDVBT))
-	{
+	if(type == DVBT && (media == NULL || media->type == serviceMediaDVBT)) {
 #ifdef DTV_STREAM_ID
 		uint8_t plp_id = media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id;
 		struct dtv_property dtv = { .cmd = DTV_STREAM_ID, .u.data = plp_id, };
@@ -1030,10 +1029,8 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
 		p.inversion = appControlInfo.dvbtInfo.fe.inversion;
 		eprintf("   T: bandwidth %u, invertion %u\n", p.u.ofdm.bandwidth, p.inversion);
-	} else
-	if (type == DVBC && (media == NULL || media->type == serviceMediaDVBC))
-	{
-		if (media != NULL) {
+	} else if (type == DVBC && (media == NULL || media->type == serviceMediaDVBC)) {
+		if(media != NULL) {
 			p.u.qam.modulation  = media->dvb_c.modulation;
 			p.u.qam.symbol_rate = media->dvb_c.symbol_rate;
 		} else {
@@ -1044,17 +1041,17 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		p.u.qam.fec_inner   = FEC_NONE;
 		eprintf("   C: Symbol rate %u, modulation %u invertion %u\n",
 				p.u.qam.symbol_rate, p.u.qam.modulation, p.inversion);
-	} else
-	if (type == DVBS && (media == NULL || media->type == serviceMediaDVBS))
-	{
+	} else if (type == DVBS && (media == NULL || media->type == serviceMediaDVBS)) {
 		p.u.qpsk.symbol_rate = media != NULL ? media->dvb_s.symbol_rate :
 		                       appControlInfo.dvbsInfo.symbolRate*1000;
 		p.u.qpsk.fec_inner   = FEC_NONE;
 		eprintf("   S: Symbol rate %u\n", p.u.qpsk.symbol_rate);
 
 		dvb_diseqcSetup(tuner, frontend_fd, frequency, media);
-	} else
-	{
+	} else if (type == ATSC /*&& (media == NULL || media->type == serviceMediaDVBS)*/) {
+		p.u.vsb.modulation = VSB_8;//TODO
+
+	} else {
 		eprintf("%s[%d]: ERROR: Unsupported frontend type=%s (media %d).\n", __FUNCTION__, tuner,
 			fe_typeNames[type], media ? (int)media->type : -1);
 		return -1;
@@ -1336,7 +1333,7 @@ int dvb_setFrontendType(int adapter, int type)
 			p.u.data = SYS_DVBC_ANNEX_AC; break;
 		case DVBS:
 			p.u.data = SYS_DVBS; break;
-		case FE_ATSC:
+		case ATSC:
 			p.u.data = SYS_ATSC; break;
 		default:
 			eprintf("%s: unknown frontend type %d\n", __FUNCTION__, type);
@@ -1394,8 +1391,9 @@ int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, _
 			}
 			break;
 		case FE_ATSC:
-			eprintf("%s: ATSC FEs not yet supported", __FUNCTION__);
-			return -1;
+			*low_freq  = (appControlInfo.atscInfo.fe.lowFrequency * KHZ);
+			*high_freq = (appControlInfo.atscInfo.fe.highFrequency * KHZ);
+			*freq_step = (appControlInfo.atscInfo.fe.frequencyStep * KHZ);
 			break;
 		default :
 			break;
