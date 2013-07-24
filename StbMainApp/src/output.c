@@ -2854,7 +2854,7 @@ static void getDvbLimits(tunerFormat tuner, uint32_t *min, uint32_t *max)
 			*min = DVB_MIN_FREQUENCY_C;
 			*max = DVB_MAX_FREQUENCY_C;
 			break;
-		default: // DVBT
+		default: // DVBT, ATSC
 			*min = DVB_MIN_FREQUENCY_T;
 			*max = DVB_MAX_FREQUENCY_T;
 	}
@@ -2876,6 +2876,9 @@ static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 				fe = &appControlInfo.dvbsInfo.c_band;
 			else
 				fe = &appControlInfo.dvbsInfo.k_band;
+			break;
+		case ATSC:
+			fe = &appControlInfo.atscInfo.fe;
 			break;
 		default:;
 	}
@@ -2999,6 +3002,19 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
+static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
+{
+	fe_modulation_t atscModulations[] = {VSB_8, VSB_16, QAM_64, QAM_256};
+	static uint32_t curAtscModulation = 0;
+
+	curAtscModulation++;
+	if(curAtscModulation >= ARRAY_SIZE(atscModulations)) {
+		curAtscModulation = 0;
+	}
+	appControlInfo.atscInfo.modulation = atscModulations[curAtscModulation];
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
 static inline char *get_HZprefix(int tunerType)
 {
 	return _T(tunerType == DVBS ? "MHZ" : "KHZ");
@@ -3047,18 +3063,16 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	}
 
 #ifdef STSDK
-	if (dvb_isLinuxTuner(tuner)) {
+	if(dvb_isLinuxTuner(tuner)) {
 #endif
-	sprintf(buf, PROFILE_LOCATIONS_PATH "/%s", appControlInfo.offairInfo.profileLocation);
-	if (getParam(buf, "LOCATION_NAME", NULL, NULL))
-	{
-		str = _T("SETTINGS_WIZARD");
-		interface_addMenuEntry(dvbMenu, str, offair_wizardStart, NULL, thumbnail_scan);
-	}
+		sprintf(buf, PROFILE_LOCATIONS_PATH "/%s", appControlInfo.offairInfo.profileLocation);
+		if(getParam(buf, "LOCATION_NAME", NULL, NULL)) {
+			str = _T("SETTINGS_WIZARD");
+			interface_addMenuEntry(dvbMenu, str, offair_wizardStart, NULL, thumbnail_scan);
+		}
 
-	str = _T("DVB_MONITOR");
-	interface_addMenuEntry(dvbMenu, str, offair_frequencyMonitor, NULL, thumbnail_info);
-
+		str = _T("DVB_MONITOR");
+		interface_addMenuEntry(dvbMenu, str, offair_frequencyMonitor, NULL, thumbnail_info);
 #ifdef STSDK
 	}
 #endif
@@ -3080,13 +3094,12 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbDiagnosticsOnStart, NULL, thumbnail_configure);
 #endif
 
-	if ((appControlInfo.tunerInfo[tuner].caps & tunerMultistandard) == tunerMultistandard) {
+	if((appControlInfo.tunerInfo[tuner].caps & tunerMultistandard) == tunerMultistandard) {
 		snprintf(buf, sizeof(buf), "%s: %s", _T("DVB_MODE"), dvb_getTypeName(tuner));
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbType, NULL, thumbnail_scan);
 	}
 
-	switch (appControlInfo.offairInfo.dvbShowScrambled)
-	{
+	switch(appControlInfo.offairInfo.dvbShowScrambled) {
 		case SCRAMBLED_SHOW: str = _T("ON"); break;
 		case SCRAMBLED_PLAY: str = _T("PLAY"); break;
 		default:             str = _T("OFF");
@@ -3095,10 +3108,10 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
 
 #ifdef STSDK
-	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
+	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
 #endif
-	sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
-	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
+		sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
+		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
 #ifdef STSDK
 	}
 #endif
@@ -3106,16 +3119,13 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
 #endif
-	if (tunerType == DVBC || tunerType == DVBS)
-	{
+	if(tunerType == DVBC || tunerType == DVBS) {
 		sprintf(buf, "%s: %u %s", _T("DVB_SYMBOL_RATE"), getDvbSymbolRate()?*(getDvbSymbolRate()):0, _T("KHZ"));
 		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionSymbolRate), thumbnail_configure);
 	}
-	switch (tunerType)
-	{
+	switch(tunerType) {
 	case DVBT:
-		switch (appControlInfo.dvbtInfo.bandwidth)
-		{
+		switch(appControlInfo.dvbtInfo.bandwidth) {
 			case BANDWIDTH_8_MHZ: sprintf(buf, "%s: 8 %s", _T("DVB_BANDWIDTH"), _T( "MHZ" ) ); break;
 			case BANDWIDTH_7_MHZ: sprintf(buf, "%s: 7 %s", _T("DVB_BANDWIDTH"), _T( "MHZ" ) ); break;
 			case BANDWIDTH_6_MHZ: sprintf(buf, "%s: 6 %s", _T("DVB_BANDWIDTH"), _T( "MHZ" ) ); break;
@@ -3125,8 +3135,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
 		break;
 	case DVBC:
-		switch (appControlInfo.dvbcInfo.modulation)
-		{
+		switch(appControlInfo.dvbcInfo.modulation) {
 			case QAM_16:  str = "QAM16"; break;
 			case QAM_32:  str = "QAM32"; break;
 			case QAM_64:  str = "QAM64"; break;
@@ -3136,6 +3145,17 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		}
 		sprintf(buf, "%s: %s", _T("DVB_QAM_MODULATION"), str);
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
+		break;
+	case ATSC:
+		switch(appControlInfo.atscInfo.modulation) {
+			case VSB_8:		str = "VSB8"; break;
+			case VSB_16:	str = "VSB16"; break;
+			case QAM_64:	str = "QAM64"; break;
+			case QAM_256:	str = "QAM256"; break;
+			default:		str = _T("NOT_AVAILABLE_SHORT");
+		}
+		sprintf(buf, "%s: %s", _T("DVB_MODULATION"), str);
+		interface_addMenuEntry(dvbMenu, buf, output_toggleAtscModulation, NULL, thumbnail_configure);
 		break;
 	case DVBS:
 		sprintf(buf, "%s: %c", _T("DVB_POLARIZATION"), appControlInfo.dvbsInfo.polarization ? 'V' : 'H');
@@ -3150,27 +3170,26 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionHighFreq), thumbnail_configure);
 
 #ifdef STSDK
-	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
+	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
 #endif
-	if (appControlInfo.dvbCommonInfo.adapterSpeed > 0)
-	{
-		sprintf(buf, "%s: %d%%", _T("DVB_SPEED"), 100-100*appControlInfo.dvbCommonInfo.adapterSpeed/10);
-	} else
-	{
-		sprintf(buf, "%s: 1", _T("DVB_SPEED"));
-	}
-	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbSpeed, NULL, thumbnail_configure);
+		if(appControlInfo.dvbCommonInfo.adapterSpeed > 0) {
+			sprintf(buf, "%s: %d%%", _T("DVB_SPEED"), 100-100*appControlInfo.dvbCommonInfo.adapterSpeed/10);
+		} else {
+			sprintf(buf, "%s: 1", _T("DVB_SPEED"));
+		}
+		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbSpeed, NULL, thumbnail_configure);
 
-	sprintf(buf,"%s: %s", _T("DVB_EXT_SCAN") , _T( appControlInfo.dvbCommonInfo.extendedScan == 0 ? "OFF" : "ON" ));
-	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbExtScan, NULL, thumbnail_configure);
+		sprintf(buf,"%s: %s", _T("DVB_EXT_SCAN") , _T( appControlInfo.dvbCommonInfo.extendedScan == 0 ? "OFF" : "ON" ));
+		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbExtScan, NULL, thumbnail_configure);
 
-	sprintf(buf, "%s: %u %s", _T("DVB_STEP_FREQ"), fe->frequencyStep, _T("KHZ"));
-	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)2, thumbnail_configure);
+		sprintf(buf, "%s: %u %s", _T("DVB_STEP_FREQ"), fe->frequencyStep, _T("KHZ"));
+		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)2, thumbnail_configure);
 #ifdef STSDK
 	}
 #endif
-	if (tunerType == DVBS)
+	if(tunerType == DVBS) {
 		interface_addMenuEntry(dvbMenu, "DiSEqC", interface_menuActionShowMenu, &DiSEqCMenu, thumbnail_scan);
+	}
 
 	return 0;
 }

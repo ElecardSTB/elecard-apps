@@ -966,6 +966,12 @@ void appInfo_init(void)
 	appControlInfo.dvbcInfo.modulation            = QAM_64;
 	appControlInfo.dvbcInfo.symbolRate            = 6875;
 
+	appControlInfo.atscInfo.fe.lowFrequency       =  54000;
+	appControlInfo.atscInfo.fe.highFrequency      = 858000;
+	appControlInfo.atscInfo.fe.frequencyStep      =   6000;
+	appControlInfo.atscInfo.fe.inversion          = 0;
+	appControlInfo.atscInfo.modulation            = VSB_8;
+
 	appControlInfo.dvbsInfo.c_band.lowFrequency   =  3700;
 	appControlInfo.dvbsInfo.c_band.highFrequency  =  4200;
 	appControlInfo.dvbsInfo.k_band.lowFrequency   = 10700;

@@ -79,6 +79,7 @@ DVB_NO_CHANNELS=Прием эфирного вещания еще не наст�
 DVB_POLARIZATION=Поляризация
 DVB_PROVIDER=DVB პროვაიდერი
 DVB_QAM_MODULATION=QAM მოდულაციის პოზიციათა რაოდენობა
+DVB_MODULATION=მოდულაციის
 DVB_SCAN_FREQUENCY=სიხშირეს სკანირება
 DVB_SIGNAL_INFO=Сила сигнала (Состояние: %s)
 DVB_SNR=Отношение Сигнал/Шум
