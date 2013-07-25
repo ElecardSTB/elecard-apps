@@ -1114,6 +1114,7 @@ void pvr_recordNow(void)
 	{
 		int channel = offair_getCurrentServiceIndex(screenMain);
 #ifdef STBPVR
+#if !(defined STSDK)
 		char buf[10];
 
 		offair_stopVideo(screenMain, 1);
@@ -1130,6 +1131,7 @@ void pvr_recordNow(void)
 		{
 			interface_showMessageBox( _T("ERR_PVR_RECORD"), thumbnail_error, 5000);
 		}
+#endif
 		pvrEditInfo.job.type = pvrJobTypeDVB;
 		pvrEditInfo.job.info.dvb.channel = channel;
 		pvrEditInfo.job.info.dvb.service = NULL;
@@ -1137,30 +1139,47 @@ void pvr_recordNow(void)
 #ifdef STSDK
 		//offair_stopVideo( screenMain, 1 );
 
-		elcdRpcType_t type;
+		elcdRpcType_t type = elcdRpcResult;
 		cJSON *answer   = NULL;
-		int    ret;
+//		int    ret;
+        char url[128];
 		cJSON *param = cJSON_CreateObject();
-		if (!param)
+    	cJSON *value = cJSON_CreateObject();
+
+        if(!param || !value) {
+			if(param) cJSON_Delete(param);
+			if(value) cJSON_Delete(value);
 			return;
-		char url[24];
+		}
+
+        cJSON_AddItemToObject(param, "method", cJSON_CreateString("recstart"));
 		snprintf(url, sizeof(url), "dvb://%d@%d", channel, st_getTunerIndex(appControlInfo.dvbInfo.tuner));
-		cJSON_AddItemToObject(param, "url", cJSON_CreateString(url));
-		
-		cJSON_AddItemToObject(param, "filename", cJSON_CreateString(appControlInfo.pvrInfo.directory));
-		ret = st_rpcSync( elcmd_recstart, param, &type, &answer );
-		cJSON_Delete(param);
-		(void)ret;
+        cJSON_AddItemToObject(value, "url", cJSON_CreateString(url));
+        cJSON_AddItemToObject(value, "filename", cJSON_CreateString(appControlInfo.pvrInfo.directory));
+        cJSON_AddItemToObject(param, "params", value);
+        cJSON_AddItemToObject(param, "id", cJSON_CreateNumber( 110 ) );
+
+        memset(url, 0, sizeof(url));
+        sprintf(url,cJSON_PrintUnformatted(param));
+
+        cJSON_Delete(param);
+
+        if(!(client_write( &pvr_socket, url, strlen(url)+1 ) > 0 ))
+        {
+	    	eprintf("%s: failed to write \n", __func__);
+			//interface_showMessageBox( _T("ERR_PVR_RECORD"), thumbnail_error, 5000);
+		}
+	
 		if (type == elcdRpcResult && answer && answer->type == cJSON_String && 
 		    strcmp(answer->valuestring, "ok") == 0)
 		{
 			appControlInfo.pvrInfo.dvb.channel = appControlInfo.dvbInfo.channel;
 			offair_fillDVBTMenu();
 		}
-#endif
+#endif //STSDK
 		PvrMenu.baseMenu.pParentMenu = _M &DVBTMenu;
 	} else
-#endif
+#endif //ENABLE_DVB
 	if (appControlInfo.rtpInfo.active)// || appControlInfo.playbackInfo.streamSource == streamSourceIPTV )
 	{
 		rtp_recordNow();
