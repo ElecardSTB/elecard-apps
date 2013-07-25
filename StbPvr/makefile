@@ -27,11 +27,13 @@ endif
 C_SOURCES = $(wildcard src/*.c)
 
 LOCAL_CFLAGS = -Wall -Wextra \
-               -I$(STAGINGDIR)/opt/elecard/include -Iinclude \
+               -Iinclude -I$(STAGINGDIR)/opt/elecard/include \
                -I$(PRJROOT)/src/project/elecard/apps/StbMainApp/include \
                -I$(STAGINGDIR)/usr/include -I$(PRJROOT)/src/apps/StbMainApp/include \
+               -I$(PRJROOT)/src/apps/cJSON/include \
+               -I$(PRJROOT)/src/apps/elcdRpcLib/include/ \
 
-LOCAL_LDFLAGS = -L$(ROOTFS)/opt/elecard/lib -L$(ROOTFS)/usr/lib -lnet -lcommon -lpthread -lcurl
+LOCAL_LDFLAGS  = -L$(ROOTFS)/opt/elecard/lib -L$(ROOTFS)/usr/lib -L$(PRJROOT)/src/apps/cJSON/sh4 -L$(PRJROOT)/src/apps/elcdRpcLib/sh4/ -lelcdrpc -lnet -lcommon -lpthread -lcurl -lcjson
 
 INSTALL_DIR = $(ROOTFS)/opt/elecard/bin
 

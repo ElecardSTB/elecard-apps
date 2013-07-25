@@ -61,6 +61,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA  02110-1301 USA
 #include <signal.h>
 #include <limits.h>
 #include <time.h>
+#include "cJSON.h"
+#include <elcd-rpc.h>
 
 /***********************************************
 * LOCAL MACROS *
@@ -129,6 +131,7 @@ typedef enum
 	dvbRecord_free = 0,
 	dvbRecord_active,
 	dvbRecord_closed,
+    dvbRecord_error,
 } dvb_status_rec;
 
 typedef enum
@@ -2126,12 +2129,84 @@ static inline void pvr_write_status(pvrInfo_t *pvr)
 	http_write_status(pvr);
 }
 
+static int setDvbRecStatus(const int setStatus, const char *URL,const int id)
+{
+    char status[20];
+    FILE* f;
+    f = fopen( STBPVR_STATUSLIST, "w" );
+    if ( f == NULL )
+            return 0;
+
+    switch(setStatus)
+    {
+        case dvbRecord_free:
+            strcpy(status,"free");
+            break;
+        case dvbRecord_active:
+            strcpy(status,"active");
+            break;
+        case dvbRecord_closed:
+            strcpy(status,"closed");
+            break;
+        case dvbRecord_error:
+            strcpy(status,"error");
+            break;
+        default:
+            return 0;
+            break;
+    }
+    fprintf(f,"REC_STATUS=%s\nURL=%s\nID=%d\n", status, URL, id);
+    fclose(f);
+    return 1;
+}
+
+static dvb_status_rec getDvbRecStatus()
+{
+    FILE* f;
+    errno = 0;
+    f = fopen( STBPVR_STATUSLIST, "r" );
+
+    if (errno != 0)
+    {
+        if (errno == ENOENT)
+        {
+            INFO("ERROR read file: %s\n",strerror( errno ));
+            return dvbRecord_free;
+        }
+        return dvbRecord_error;
+    }
+    if ( f == NULL )
+        return dvbRecord_error;
+
+    char buf[MAX_URL];
+    fgets( buf, sizeof(buf), f );
+    fclose(f);
+
+    char *bufStatus;
+    bufStatus = strchr(buf,'=');
+    bufStatus++;
+    bufStatus[strlen(bufStatus)-1] = '\0';
+
+    if (strncasecmp( bufStatus, "free", 4 ) == 0)
+        return dvbRecord_free;
+    else
+    if (strncasecmp( bufStatus, "active", 6 ) == 0)
+        return dvbRecord_active;
+    else
+    if (strncasecmp( bufStatus, "closed", 6 ) == 0)
+        return dvbRecord_closed;
+    else
+    if (strncasecmp( bufStatus, "error", 5 ) == 0)
+        return dvbRecord_error;
+
+    return dvbRecord_error;
+}
+
 static void* pvr_socket_thread(void *arg)
 {
     struct sockaddr_un sa;
     struct stat st;
     int sock = -1;
-    dvb_cmd dvb_cmd_t;
 
 	int socket_fd = -1;
 	int len, channel;
@@ -2210,66 +2285,113 @@ static void* pvr_socket_thread(void *arg)
 
 		INFO("Got: '%s'\n", buf);
 
+                cJSON *params = cJSON_Parse(buf);
+                if (params != NULL && params->type != cJSON_NULL)
+                {
+                    cJSON *values = cJSON_GetObjectItem( params, "method" );
+                    if (values != NULL && values->type != cJSON_NULL)
+                    {
+                        if (strncasecmp( values->valuestring, "recstart", 8 ) == 0)
+                        {
+                            char *url = NULL;
+                            char *file = NULL;
+                            int id = 0;
+                            values = cJSON_GetObjectItem( params, "params" );
+
+                            if (NULL == (url  = objGetString(values, "url", NULL)) ||
+                                NULL == (file = objGetString(values, "filename", NULL)) ||
+                                0    == (id = objGetInt(params, "id", 0)))
+                            {
+                                //error
+                            }
+                            else
+                            {
+                                dvb_status_rec_t = getDvbRecStatus();
+
+                                cJSON *param = cJSON_CreateObject();
+
+                                if (dvb_status_rec_t == dvbRecord_free)
+                                {
+                                    INFO("Rec Start\n");
+                                }
+
+                                if (dvb_status_rec_t == dvbRecord_active)
+                                {
+                                    INFO("Rec Stop\n");
+                                    cJSON_AddItemToObject(param, "method", cJSON_CreateString("recstop"));
+                                    cJSON_AddItemToObject(param, "id", cJSON_CreateNumber( id ));
+                                    memset(buf, '\0', sizeof(buf));
+                                    sprintf(buf,cJSON_PrintUnformatted(param));
+                                }
+
+                                strcpy(sa.sun_path, STBELCD_SOCKET_FILE);
+                                sa.sun_family = AF_UNIX;
+
+                                if( stat( sa.sun_path, &st) < 0)
+                                {
+                                        INFO("error stat %s\n",STBELCD_SOCKET_FILE);
+                                        break;
+                                }
+                                sock = socket(AF_UNIX, SOCK_STREAM, 0);
+
+                                if (sock == -1)
+                                {
+                                        INFO("Failed to create socket\n");
+                                        break;
+                                }
+
+                                int Elcdlen = strlen(sa.sun_path) + sizeof(sa.sun_family);
+                                if (connect(sock, (struct sockaddr *)&sa, Elcdlen) == -1)
+                                {
+                                        INFO("error connect\n");
+                                        break;
+                                }
+
+                                if (send(sock, buf, sizeof(buf), 0) == -1)
+                                {
+                                        INFO("Error send message\n");
+                                        close(sock);
+                                        break;
+                                }
+                                memset(buf,'\0',sizeof(buf));
+                                if (recv(sock, buf, sizeof(buf)-1, 0) == -1)
+                                {
+                                        INFO("Error recv message\n");
+                                        close(sock);
+                                        break;
+                                }
+
+                                INFO("Response: %s\n",buf);
+
+                                param = cJSON_Parse(buf);
+                                char *result = NULL;
+                                result = objGetString(param, "result", NULL);
+
+                                if ((dvb_status_rec_t == dvbRecord_free) && (strncasecmp( result, "ok", 2 ) == 0) )
+                                {
+                                    setDvbRecStatus(dvbRecord_active,url ,id );
+                                }
+
+                                if ((dvb_status_rec_t == dvbRecord_active) && (strncasecmp( result, "ok", 2 ) == 0) )
+                                {
+                                    setDvbRecStatus(dvbRecord_free ,url ,id );
+
+                                }
+                                close(sock);
+                                cJSON_Delete(param);
+
+                            }
+                        } else
+                        if (strncasecmp( values->valuestring, "recstop", 7 ) == 0)
+                        {
+
+                        }
+                    }
+               }
+               cJSON_Delete(params);
+
+
 		switch (*type) {
-			case '{': //elcd
-				//start & stop
-                if (dvb_status_rec_t == dvbRecord_free)
-					dvb_cmd_t = dvbRecord_start;
-				else
-                if (dvb_status_rec_t == dvbRecord_active)
-				{
-					dvb_cmd_t = dvbRecord_stop;
-				    sprintf(buf,"{\"method\":\"recstop\",\"id\":120}");
-				}        
-				strcpy(sa.sun_path, STBELCD_SOCKET_FILE);
-				sa.sun_family = AF_UNIX;
-
-				if( stat( sa.sun_path, &st) < 0)
-				{
-					INFO("error stat %s\n",STBELCD_SOCKET_FILE);
-					break;
-				}
-				sock = socket(AF_UNIX, SOCK_STREAM, 0);
-
-				if (sock == -1)
-				{
-					INFO("Failed to create socket\n");
-					break;
-				}
-
-				int Elcdlen = strlen(sa.sun_path) + sizeof(sa.sun_family);
-				if (connect(sock, (struct sockaddr *)&sa, Elcdlen) == -1)
-				{
-					INFO("error connect\n");
-					break;
-				}
-
-				if (send(sock, buf, sizeof(buf), 0) == -1)
-				{
-					INFO("Error send message\n");
-					close(sock);
-					break;
-				}
-				memset(buf,'\0',sizeof(buf));
-				if (recv(sock, buf, sizeof(buf)-1, 0) == -1)
-				{
-					INFO("Error recv message\n");
-					close(sock);
-					break;
-				}
-
-				INFO("Response: %s\n",buf);
-				if ((dvb_cmd_t == dvbRecord_start) && (strstr(buf,"ok") > 0) )
-				{
-					dvb_status_rec_t = dvbRecord_active;
-				}
-
-				if ((dvb_cmd_t == dvbRecord_stop) && (strstr(buf,"ok") > 0) )
-				{
-					dvb_status_rec_t = dvbRecord_free;
-				}
-				close(sock);
-                break;	
 			case '?': // status?
 				pvr_write_status(pvr);
 				break;
