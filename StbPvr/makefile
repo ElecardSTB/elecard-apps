@@ -51,6 +51,7 @@ $(PROGRAM): $(C_SOURCES) $(HEADERS)
 	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@ $(C_SOURCES)
 
 install: $(PROGRAM)
+	cp include/$(PROGRAM).h $(STAGINGDIR)/opt/elecard/include/
 	install -m0755 $(PROGRAM) $(ROOTFS)/opt/elecard/bin/
 
 clean:

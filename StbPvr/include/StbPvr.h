@@ -40,6 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA  02110-1301 USA
 #define STBPVR_SOCKET_FILE "/tmp/pvr.socket"
 #define STBPVR_PIPE_FILE   "/tmp/pipe_pvr"
 #define STBPVR_FOLDER      "/pvr"
+#define STBELCD_SOCKET_FILE    "/var/run/elcd.sock"
 
 #define STBPVR_DVB_CHANNEL_NONE (-1)
 

@@ -124,6 +124,19 @@ do {\
 * LOCAL TYPEDEFS  *
 *******************************************************************/
 
+typedef enum
+{
+	dvbRecord_free = 0,
+	dvbRecord_active,
+	dvbRecord_closed,
+} dvb_status_rec;
+
+typedef enum
+{
+	dvbRecord_start = 0,
+	dvbRecord_stop,
+} dvb_cmd;
+
 typedef struct
 {
 	int               inversion;
@@ -260,6 +273,7 @@ static int   read_chunk (char * buf, int len);
 static volatile int     exit_app = 0;
 static volatile int     update_required = 1;
 static time_t           notifyTimeout = 10;
+static dvb_status_rec   dvb_status_rec_t = 0;
 
 static struct clientSockets
 {
@@ -2114,6 +2128,11 @@ static inline void pvr_write_status(pvrInfo_t *pvr)
 
 static void* pvr_socket_thread(void *arg)
 {
+    struct sockaddr_un sa;
+    struct stat st;
+    int sock = -1;
+    dvb_cmd dvb_cmd_t;
+
 	int socket_fd = -1;
 	int len, channel;
 	struct sockaddr_un local, remote;
@@ -2192,6 +2211,65 @@ static void* pvr_socket_thread(void *arg)
 		INFO("Got: '%s'\n", buf);
 
 		switch (*type) {
+			case '{': //elcd
+				//start & stop
+                if (dvb_status_rec_t == dvbRecord_free)
+					dvb_cmd_t = dvbRecord_start;
+				else
+                if (dvb_status_rec_t == dvbRecord_active)
+				{
+					dvb_cmd_t = dvbRecord_stop;
+				    sprintf(buf,"{\"method\":\"recstop\",\"id\":120}");
+				}        
+				strcpy(sa.sun_path, STBELCD_SOCKET_FILE);
+				sa.sun_family = AF_UNIX;
+
+				if( stat( sa.sun_path, &st) < 0)
+				{
+					INFO("error stat %s\n",STBELCD_SOCKET_FILE);
+					break;
+				}
+				sock = socket(AF_UNIX, SOCK_STREAM, 0);
+
+				if (sock == -1)
+				{
+					INFO("Failed to create socket\n");
+					break;
+				}
+
+				int Elcdlen = strlen(sa.sun_path) + sizeof(sa.sun_family);
+				if (connect(sock, (struct sockaddr *)&sa, Elcdlen) == -1)
+				{
+					INFO("error connect\n");
+					break;
+				}
+
+				if (send(sock, buf, sizeof(buf), 0) == -1)
+				{
+					INFO("Error send message\n");
+					close(sock);
+					break;
+				}
+				memset(buf,'\0',sizeof(buf));
+				if (recv(sock, buf, sizeof(buf)-1, 0) == -1)
+				{
+					INFO("Error recv message\n");
+					close(sock);
+					break;
+				}
+
+				INFO("Response: %s\n",buf);
+				if ((dvb_cmd_t == dvbRecord_start) && (strstr(buf,"ok") > 0) )
+				{
+					dvb_status_rec_t = dvbRecord_active;
+				}
+
+				if ((dvb_cmd_t == dvbRecord_stop) && (strstr(buf,"ok") > 0) )
+				{
+					dvb_status_rec_t = dvbRecord_free;
+				}
+				close(sock);
+                break;	
 			case '?': // status?
 				pvr_write_status(pvr);
 				break;
