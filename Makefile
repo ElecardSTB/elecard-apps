@@ -18,6 +18,7 @@ build-apps:
 	make CC="sh4-linux-gcc --sysroot=$(STAGINGDIR)" BUILD_TARGET=sh4/ prefix=$(ROOTFS_TARGET)/opt/elecard/ -C ./SambaQuery all install
 	make CC=sh4-linux-gcc -C StbCommandClient
 	make CC=sh4-linux-gcc -C mdevmonitor
+	make CC=sh4-linux-gcc -C StbPvr all install
 ifeq ($(CONFIG_ELECD_ENABLE),y)
 	make CROSS_COMPILE=sh4-linux- RELEASE_TYPE="$(REVISION) built on $(HOSTNAME)" COMPILE_TIME="$(DATE_READABLE)" -C ./StbMainApp all
 endif

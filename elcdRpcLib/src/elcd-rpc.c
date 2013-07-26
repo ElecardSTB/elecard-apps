@@ -95,8 +95,12 @@ const char* rpc_cmd_names[] = {
 
 const char* rpc_cmd_name(elcdRpcCommand_t cmd)
 {
-	/// assert( CMD_VALID(cmd) )
-	return rpc_cmd_names[cmd];
+	if (cmd <= elcmd_cmd_count)
+    /// assert( CMD_VALID(cmd) )
+		return rpc_cmd_names[cmd];
+
+	printf("%s : Error- invalid value cmd\n",__func__);
+    return NULL;
 }
 
 char* rpc_request( const char *cmd, int id, cJSON *value )
