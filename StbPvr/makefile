@@ -22,6 +22,8 @@ PROGRAM = StbPvr
 
 ifeq ($(ARCH),mips)
 include $(PRJROOT)/etc/application_first.mk
+else
+LOCAL_LDFLAGS := -Wl,-rpath-link,'$(STAGINGDIR)/usr/lib' 
 endif
 
 C_SOURCES = $(wildcard src/*.c)
@@ -33,7 +35,7 @@ LOCAL_CFLAGS = -Wall -Wextra \
                -I$(PRJROOT)/src/apps/cJSON/include \
                -I$(PRJROOT)/src/apps/elcdRpcLib/include/ \
 
-LOCAL_LDFLAGS  = -L$(ROOTFS)/opt/elecard/lib -L$(ROOTFS)/usr/lib -L$(PRJROOT)/src/apps/cJSON/sh4 -L$(PRJROOT)/src/apps/elcdRpcLib/sh4/ -lelcdrpc -lnet -lcommon -lpthread -lcurl -lcjson
+LOCAL_LDFLAGS  += -L$(ROOTFS)/opt/elecard/lib -L$(ROOTFS)/usr/lib -L$(PRJROOT)/src/apps/cJSON/sh4 -L$(PRJROOT)/src/apps/elcdRpcLib/sh4/ -lelcdrpc -lnet -lcommon -lpthread -lcurl -lcjson
 
 INSTALL_DIR = $(ROOTFS)/opt/elecard/bin
 
