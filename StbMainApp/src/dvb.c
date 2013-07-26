@@ -267,7 +267,7 @@ static inline int dvb_isLinuxAdapter(int adapter)
 // Low nibble of 4th (data) DiSEqC command byte
 static inline uint8_t diseqc_data_lo(int satellite_position, int is_vertical, uint32_t f_khz)
 {
-	return (satellite_position & 0x03) << 2 | is_vertical << 1 | (f_khz > 11700000);
+	return (satellite_position & 0x03) << 2 | (is_vertical ? 0 : 1) << 1 | (f_khz > 11700000);
 }
 
 static int dvb_diseqcSend (tunerFormat tuner, int frontend_fd, const uint8_t *tx, size_t tx_len);
