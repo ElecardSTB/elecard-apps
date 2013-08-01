@@ -39,9 +39,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "gfx.h"
 #include "interface.h"
+#include "elcd-rpc.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
+#include <poll.h>
+#include <cJSON.h>
+#include <client.h>
+#include <error.h>
 
 /***********************************************
 LOCAL MACROS                                  *
@@ -80,6 +86,7 @@ static int teletext_previousPageNumber(int pageNumber);
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
+pthread_t teletext_thread = 0;
 
 static unsigned int  PesPacketLength = 0;
 static unsigned char PesPacketBuffer[TELETEXT_PES_PACKET_BUFFER_SIZE];
@@ -1439,6 +1446,78 @@ void teletext_displayTeletext()
 			}
 		}
 	}
+}
+
+void *teletext_funThread_t(void *pArg)
+{
+	int fifo_server;
+	char buff[188];
+	int len;
+	
+	fifo_server=open(TELETEXT_pipe_TS,O_RDWR);
+	if ( fifo_server < 0) 
+	{
+		printf("Error in opening file\n");
+	}
+
+	while(1)
+	{
+		pthread_testcancel();
+		memset(buff, '\0', 188);
+		len = read(fifo_server, buff, sizeof(buff));
+		if(len < 0) {
+			printf("%s: %d: errno=%d: %s\n", __func__, __LINE__, errno, strerror(errno));
+			usleep(1000);
+		}
+
+		teletext_readPESPacket(buff, 188);
+	}
+	return NULL;
+}
+	
+
+int teletext_StopThread()
+{
+	if (teletext_thread)
+	{
+		pthread_cancel( teletext_thread );
+		pthread_join ( teletext_thread, NULL);
+		teletext_thread = 0;
+	}	
+	return 1;
+}
+
+int teletext_StartThread()
+{	elcdRpcType_t type;
+	int st;
+	
+	cJSON *result = NULL;
+	cJSON *params = cJSON_CreateObject();
+	cJSON_AddItemToObject(params, "url", cJSON_CreateString(TELETEXT_pipe_TS));
+	
+	st_rpcSync(elcmd_ttxStart, params, &type, &result);
+	
+	if (result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0)
+	{
+		if (teletext_thread != 0 )
+			return 1;
+		
+		cJSON_Delete(result);
+		cJSON_Delete(params);
+		teletext_init();
+		st = pthread_create(&teletext_thread, NULL,  teletext_funThread_t,  NULL);
+		if (st != 0)
+		{
+			printf("%s: ERROR not create thread\n", __func__);
+			return 0;		
+		}
+		return 1;
+	}
+	
+	cJSON_Delete(result);
+	cJSON_Delete(params);
+		
+	return 0;
 }
 
 #endif /* ENABLE_TELETEXT */

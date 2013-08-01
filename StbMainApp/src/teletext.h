@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #define TELETEXT_PACKET_BUFFER_SIZE (5*TS_PACKET_SIZE)
+#define TELETEXT_pipe_TS "/tmp/ttx.ts"
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -65,6 +66,8 @@ void teletext_readPESPacket(unsigned char *buf, size_t size);
 
 /* Displays teletext */
 void teletext_displayTeletext(void);
+int teletext_StartThread(void);
+int teletext_StopThread();
 
 #endif /* ENABLE_TELETEXT */
 

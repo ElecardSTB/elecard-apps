@@ -1755,6 +1755,10 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 	interface_playControlSelect(interfacePlayControlPlay);
 	interface_displayMenu(1);
 
+#if (defined STSDK) && (defined ENABLE_TELETEXT)
+	appControlInfo.teletextInfo.exists = teletext_StartThread(); 
+#endif 
+
 	dprintf("%s: done\n", __FUNCTION__);
 }
 

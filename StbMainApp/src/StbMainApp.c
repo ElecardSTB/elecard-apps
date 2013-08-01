@@ -504,6 +504,9 @@ interfaceCommand_t parseEvent(DFBEvent *event)
 			ADD_HANDLER(DIKS_FAVORITES, interfaceCommandWeb)
 			ADD_HANDLER(DIKS_AUX, interfaceCommandTeletext)
 #endif
+			
+			ADD_HANDLER(DIKS_TEXT, interfaceCommandTeletext)
+			
 			ADD_HANDLER(DIKS_RED, interfaceCommandRed)
 			ADD_HANDLER(DIKS_GREEN, interfaceCommandGreen)
 			ADD_HANDLER(DIKS_YELLOW, interfaceCommandYellow)

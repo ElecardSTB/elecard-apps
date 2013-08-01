@@ -157,7 +157,6 @@ struct dvb_instance {
 	int fda;
 	int fdp;
 	int fdt;
-	int fdin;
 
 	// device setup data
 	struct dmx_pes_filter_params filterv;
@@ -168,7 +167,6 @@ struct dvb_instance {
 #endif
 	struct dmx_pes_filter_params filtera;
 	struct dmx_pes_filter_params filterp;
-	struct dmx_pes_filter_params filtert;
 	struct dvb_frontend_parameters tuner;
 
 #ifdef ENABLE_PVR
@@ -189,10 +187,14 @@ struct dvb_instance {
 #ifdef ENABLE_MULTI_VIEW
 	pthread_t multi_thread;
 #endif
-#ifdef ENABLE_TELETEXT
-	pthread_t teletext_thread;
-#endif
+
 #endif // LINUX_DVB_API_DEMUX
+	#ifdef ENABLE_TELETEXT
+	pthread_t teletext_thread;
+	
+	int fdin;
+	struct dmx_pes_filter_params filtert;
+#endif
 };
 
 enum table_type {
@@ -2234,6 +2236,14 @@ static void dvb_instanceClose (struct dvb_instance * dvb)
 		dvb->fe_tracker_Thread = 0;
 	}
 #ifdef ENABLE_TELETEXT
+
+#ifdef STSDK ///????
+	printf("TTX_stop_pthread\n");
+	teletext_StopThread();
+	appControlInfo.teletextInfo.status = teletextStatus_disabled;
+	appControlInfo.teletextInfo.exists = 0;
+	interfaceInfo.teletext.show = 0;
+#endif
 	if (dvb->teletext_thread) {
 		pthread_cancel (dvb->teletext_thread);
 		pthread_join (dvb->teletext_thread, NULL);
@@ -2242,7 +2252,7 @@ static void dvb_instanceClose (struct dvb_instance * dvb)
 		appControlInfo.teletextInfo.exists = 0;
 		interfaceInfo.teletext.show = 0;
 	}
-#endif
+#endif //ENABLE_TELETEXT
 	CLOSE_FD(dvb->adapter, "frontend",       dvb->fdf);
 
 #ifdef LINUX_DVB_API_DEMUX
