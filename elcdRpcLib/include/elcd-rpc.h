@@ -90,6 +90,8 @@ typedef enum
 	elcmd_stop,
 	elcmd_recstart,
 	elcmd_recstop,
+	elcmd_ttxStart,
+	elcmd_ttxStop,
 // todo: put new commands before this line,
 // then add matching entry to rpc_cmd_names array in rpc.c
 	elcmd_cmd_count,
