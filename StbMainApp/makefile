@@ -110,6 +110,7 @@ ENABLE_TELETES ?= 0
 ENABLE_3DRENDERING ?= 0
 ENABLE_GSTREAMER ?= 0
 ENABLE_USE_CJSON ?= 0
+ENABLE_TELETEXT ?= 0
 
 TEST_SERVER ?= 1
 
@@ -359,6 +360,10 @@ ifeq ($(ENABLE_USE_CJSON),1)
 	LOCAL_CFLAGS += -I$(PRJROOT)/src/project/elecard/apps/cJSON/include
 	LOCAL_CFLAGS += -I$(PRJROOT)/src/apps/cJSON/include
 	LOCAL_LDFLAGS += -lcjson
+endif
+
+ifeq ($(ENABLE_TELETEXT),1)
+	LOCAL_CFLAGS += -DENABLE_TELETEXT
 endif
 
 # -----------------------------------------------------------------------------
