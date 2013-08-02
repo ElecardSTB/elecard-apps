@@ -96,6 +96,7 @@ ENABLE_BROWSER ?= 0
 ENABLE_XWORKS ?= 0
 ENABLE_DLNA ?= 0
 ENABLE_VIDIMAX ?= 0
+ENABLE_FUSION ?= 0
 ENABLE_EXPAT ?= 0
 ENABLE_PPP ?= 0
 ENABLE_WIFI ?= 0
@@ -362,8 +363,8 @@ ifeq ($(ENABLE_USE_CJSON),1)
 	LOCAL_LDFLAGS += -lcjson
 endif
 
-ifeq ($(ENABLE_TELETEXT),1)
-	LOCAL_CFLAGS += -DENABLE_TELETEXT
+ifeq ($(ENABLE_FUSION),1)
+    LOCAL_CFLAGS += -DENABLE_FUSION=$(ENABLE_FUSION)
 endif
 
 # -----------------------------------------------------------------------------
