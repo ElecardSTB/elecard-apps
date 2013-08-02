@@ -74,6 +74,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #include "garb.h"
 
+#ifdef ENABLE_FUSION
+#include "fusion.h"
+#endif
+
 #ifdef STB225
 #include "Stb225.h"
 #include <linux/fb.h>
@@ -1891,6 +1895,9 @@ void initialize(int argc, char *argv[])
 
 	interface_init();
 	menu_init();
+#ifdef ENABLE_FUSION
+	fusion_init();
+#endif
 
 	// Menus should already be initialized
 	signal(SIGUSR1, usr1_signal_handler);
@@ -1964,6 +1971,9 @@ void cleanup()
 #endif
 
 	menu_cleanup();
+#ifdef ENABLE_FUSION
+	fusion_cleanup();
+#endif
 
 	sound_term();
 
