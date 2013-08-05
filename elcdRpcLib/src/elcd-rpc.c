@@ -85,6 +85,8 @@ const char* rpc_cmd_names[] = {
 [elcmd_recstart]    = "recstart",
 [elcmd_recstop]     = "recstop",
 [elcmd_reclist]     = "reclist",
+[elcmd_ttxStart]     = "ttxStart",
+[elcmd_ttxStop]     = "ttxStop",
 // todo: make sure this array match elcdRpcCommand_t enum in rpc.h
 [elcmd_cmd_count]   = NULL,
 };
