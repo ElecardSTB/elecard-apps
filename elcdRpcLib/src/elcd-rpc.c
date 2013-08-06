@@ -85,7 +85,7 @@ const char* rpc_cmd_names[] = {
 [elcmd_recstart]    = "recstart",
 [elcmd_recstop]     = "recstop",
 [elcmd_reclist]     = "reclist",
-[elcmd_ttxStart]     = "ttxStart",
+[elcmd_ttxStart]    = "ttxStart",
 [elcmd_ttxStop]     = "ttxStop",
 // todo: make sure this array match elcdRpcCommand_t enum in rpc.h
 [elcmd_cmd_count]   = NULL,
@@ -97,36 +97,39 @@ const char* rpc_cmd_names[] = {
 
 const char* rpc_cmd_name(elcdRpcCommand_t cmd)
 {
-	if (cmd <= elcmd_cmd_count)
-    /// assert( CMD_VALID(cmd) )
+	if(cmd <= elcmd_cmd_count) {
 		return rpc_cmd_names[cmd];
+	}
 
-	printf("%s : Error- invalid value cmd\n",__func__);
-    return NULL;
+	printf("%s:%s(): ERROR - invalid value: cmd=%d, count=%d\n", __FILE__, __func__, cmd, elcmd_cmd_count);
+    return rpc_cmd_names[elcmd_none];
 }
 
 char* rpc_request( const char *cmd, int id, cJSON *value )
 {
-	/// assert( CMD_VALID(cmd) && value != NULL );
-	cJSON *array  = NULL;
+	cJSON *array = NULL;
 
-	if( !value || value->type != cJSON_Array )
-	{
+	if(cmd == NULL) {
+		printf("%s:%s(): ERROR cmd=NULL!!!\n", __FILE__, __func__);
+		cmd = rpc_cmd_names[elcmd_none];
+	}
+	if(!value || value->type != cJSON_Array) {
 		array = cJSON_CreateArray();
-		if( value )
+		if(value)
 			cJSON_AddItemReferenceToArray(array, value);
-	} else
+	} else {
 		array = value;
+	}
 
-	cJSON *req    = cJSON_CreateObject();
-	cJSON_AddItemToObject( req, "method", cJSON_CreateString( cmd ) );
+	cJSON *req = cJSON_CreateObject();
+	cJSON_AddItemToObject( req, "method", cJSON_CreateString(cmd) );
 	cJSON_AddItemReferenceToObject(req, "params", array );
-	cJSON_AddItemToObject( req, "id",     cJSON_CreateNumber( id ) );
+	cJSON_AddItemToObject( req, "id",     cJSON_CreateNumber(id) );
 
 	char *str = cJSON_PrintUnformatted(req);
 
-	if( array != value )
-		cJSON_Delete( array );
+	if(array != value)
+		cJSON_Delete(array);
 	cJSON_Delete(req);
 
 	return str;
