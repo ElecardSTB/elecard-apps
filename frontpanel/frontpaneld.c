@@ -51,12 +51,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unistd.h>
 #include <string.h>
 #include <unistd.h>
+#include <linux/fb.h>
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+
+#include "table_raw_gray41_b.h"
 
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
 
 #define LISTEN_PATH				"/var/run/frontpanel" //socket
+
+#define FONT_CHAR_WIDTH				20
+#define FONT_CHAR_HEIGHT			22
+#define FONT_COLUMN_NUMBER			16
+
+#define FRAMEBUFFER_WIDTH				128
+#define FRAMEBUFFER_HEIGHT				32
+#define FRAMEBUFFER_SIZE				512
+
+#define FRAMEBUFFER_DEVICE_NAME		"/dev/fb0"
 
 #define DEVICE_TM1668_PATH		"/sys/devices/platform/tm1668"
 #define DEVICE_CT1628_PATH		"/sys/devices/platform/ct1628"
@@ -74,6 +92,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof(arr[0]))
 
+
 /*#define DBG(x...) \
 do { \
 	time_t ts = time(NULL); \
@@ -86,6 +105,7 @@ do { \
 #ifndef DBG
 #define DBG(x...)
 #endif
+
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -137,6 +157,13 @@ rollTextInfo_t	g_rollTextInfo;
 MessageType_t	g_messageType = TIME;
 MessageType_t	g_beQuiet = 0;
 
+typedef struct {
+	uint32_t 				fd;
+	unsigned char 				mask[FRAMEBUFFER_SIZE];
+} fbInfo_t;
+
+fbInfo_t				g_fbInfo;
+
 struct argHandler_s handlers[] = {
 	{"time",	ArgHandler_Time},
 	{"t",		ArgHandler_Time},
@@ -157,6 +184,82 @@ struct argHandler_s handlers[] = {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
+
+int32_t FrameBufferInit(void)
+{
+	g_fbInfo.fd = open(FRAMEBUFFER_DEVICE_NAME, O_RDWR);
+
+	return 0;
+}
+
+void FrameBufferClose(void)
+{
+	close(g_fbInfo.fd);
+}
+
+void UpdateDisplay(void)
+{	
+	FrameBufferInit();
+	write(g_fbInfo.fd, g_fbInfo.mask, FRAMEBUFFER_SIZE);	
+	FrameBufferClose();
+}
+
+void SetPixel(uint32_t x, uint32_t y)
+{
+	g_fbInfo.mask[y*FONT_COLUMN_NUMBER+x/8] = g_fbInfo.mask[y*FONT_COLUMN_NUMBER+x/8] | 1 << x%8;	
+}
+
+
+void AddChar(uint32_t x, uint32_t y, uint8_t ch)
+{
+	uint32_t line, byteInLine;
+
+	uint32_t startBite = (ch % FONT_COLUMN_NUMBER) * FONT_CHAR_WIDTH +
+				(ch / FONT_COLUMN_NUMBER) * FONT_CHAR_HEIGHT * FONT_CHAR_WIDTH * FONT_COLUMN_NUMBER;
+
+	for (line = y; line < y+FONT_CHAR_HEIGHT; line++)
+	{
+		for (byteInLine = x; byteInLine < x+FONT_CHAR_WIDTH; byteInLine++)
+		{
+			if (table_raw_gray41_on_bits[startBite/8] & (1 << startBite%8))
+			{
+				SetPixel(byteInLine, line);
+			}
+			startBite++;
+		}
+		startBite += FONT_CHAR_WIDTH * (FONT_COLUMN_NUMBER - 1);
+	}
+}
+
+void AddString(uint32_t x0, uint32_t y0, const char* str)
+{
+	uint32_t i;
+
+	for(i = 0; i < FRAMEBUFFER_SIZE; i++)
+		g_fbInfo.mask[i] = 0x00;
+
+	i = 0;
+	// Draw glyphs one by one
+	while(*str) {
+		AddChar(x0 + i, y0, *str);
+		str++;
+		i += FONT_CHAR_WIDTH >> 1;
+	}
+	UpdateDisplay();
+}
+
+int32_t StringWidth(const char* str)
+{
+	uint32_t	len;
+	if(str == NULL)
+		return 0;
+	len = strlen(str);
+	if(len == 0)
+		return 0;
+
+	return ((len - 1) * (FONT_CHAR_WIDTH >> 1) + FONT_CHAR_WIDTH);
+}
+
 int32_t CheckBoardType(void)
 {
 	char *boardName;
@@ -255,7 +358,7 @@ void AddColon(char *buf)
 		if(buf[1] >= '0' && buf[1] <= '9') {
 			buf[1] = g_digitsWithColon[buf[1] - '0'];
 		}
-	} else {//CH7162 board
+	} else if (g_board == CH7162) {//CH7162 board
 		int32_t	temp;
 		int32_t	textLen = strlen(buf);
 
@@ -264,6 +367,8 @@ void AddColon(char *buf)
 		}
 		buf[4] = '8';
 		buf[5] = 0;
+	} else if(g_board == STB850) { //STB850			
+		buf[2] = ':';
 	}
 }
 
@@ -275,31 +380,50 @@ void GetCurrentTime(char *buf)
 
 	t = time(NULL);
 	area = localtime(&t);
+	
+	if(g_board == STB850){
+		sprintf(buf, "%02d %02d", area->tm_hour, area->tm_min);
+	} else {		
+		sprintf(buf, "%02d%02d", area->tm_hour, area->tm_min);
+	}
+	
 
-	sprintf(buf, "%02d", area->tm_hour);
 	if(buf[0] == '0')
 		buf[0] = ' ';
-	sprintf(buf + 2, "%02d", area->tm_min);
 
 	if(colon) {
 		AddColon(buf);
 	}
 	colon = !colon;
+	
 }
 
 void SetFrontpanelText(const char *buffer)
 {
-	FILE *f;
-	f = fopen(g_frontpanelText, "w");
-	if(f != 0) {
-		fwrite(buffer, 5, 5, f);
-		fclose(f);
+	if(g_board == STB850){
+		AddString(5, 15, buffer);
 	}
+	else {
+		FILE *f;
+		f = fopen(g_frontpanelText, "w");
+		if(f != 0) {
+			fwrite(buffer, 5, 5, f);
+			fclose(f);
+		}
+	}	
 }
 
 void DisplayCurentText()
 {
-	char tmpBuf[6];
+	int32_t bufSize;
+
+	if(g_board == STB850){
+		bufSize = ((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH))/(FONT_CHAR_WIDTH >> 1))+1;
+	} else {
+		bufSize = 6;
+	}
+
+	char	tmpBuf[bufSize];
 	
 	switch(g_messageType) {
 		case NOTIFY:
@@ -308,8 +432,13 @@ void DisplayCurentText()
 			if(g_rollTextInfo.textOffset > g_rollTextInfo.textLength) {
 				g_rollTextInfo.textOffset = 0;
 			}
-
-			strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, 4);
+			if(g_board == STB850){
+				strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, bufSize);
+			}
+			else {
+				strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, 4);
+			}
+			
 			SetFrontpanelText(tmpBuf);
 			break;
 		case TIME:
@@ -317,14 +446,14 @@ void DisplayCurentText()
 			SetFrontpanelText(tmpBuf);
 			break;
 		case NONE:
-			strncpy(tmpBuf, "     ", 4);
+			strncpy(tmpBuf, "     ", bufSize);
 			SetFrontpanelText(tmpBuf);
 			break;
 		default:
 			break;
 	}
-
-	tmpBuf[5] = 0;
+	if(g_board != STB850)
+		tmpBuf[5] = 0;
 	DBG("%s: type %d text=\"%s\"\n", __func__, g_messageType, tmpBuf);
 }
 
@@ -339,7 +468,6 @@ void ShowTime()
 	}
 	DisplayCurentText();
 }
-
 
 void Quit()
 {
@@ -374,35 +502,63 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 	StopTimer(g_delayTimer);
 	StopTimer(g_messageTimer);
 	if(timeout > 0) {
-		char	tmpBuf[6];
+				
 		int32_t	textLen;
 
-		while((*newText == ' ') || (*newText == '\t')) {
+		/*while((*newText == ' ') || (*newText == '\t')) {
 			newText++;
-		}
+		}*/
 		//if message incapsulate into '' or "", skip this characters
-		if((*newText == '\'') || (*newText == '\"')) {
+		/*if((*newText == '\'') || (*newText == '\"')) {
 			newText++;
 		}
 		Helper_TerminateText(newText, '\'');
-		Helper_TerminateText(newText, '\"');
+		Helper_TerminateText(newText, '\"');*/
 
 		textLen = strlen(newText);
 		DBG("%s: '%s' (%d)\n", __func__, newText, textLen);
+		
+		int32_t bufSize;		
 
+		if(g_board == STB850){
+			bufSize = ((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH))/(FONT_CHAR_WIDTH >> 1))+1;;
+		} else {
+			bufSize = 6;
+		}
+		
+		char	tmpBuf[bufSize];
+				
 		if((textLen > 2) && (newText[2] == ':') && (textLen < 6)) {//"xx:xx" format
 			memcpy(tmpBuf, newText, 2);
 			strcpy(tmpBuf + 2, newText + 3);
 			AddColon(tmpBuf);
 		} else {
-			strncpy(tmpBuf, newText, 4);
+			if(g_board == STB850){
+				if (StringWidth(newText) < FRAMEBUFFER_WIDTH)
+				{
+					strncpy(tmpBuf, newText, textLen);
+				}
+				else {
+					strncpy(tmpBuf, newText, bufSize);
 
-			if(textLen > 4) { //roll the text if it contain more than 4 characters
-				g_rollTextInfo.textLength = textLen;
-				g_rollTextInfo.textOffset = 0;
-				strcpy(g_rollTextInfo.text, newText);
-				SetTimer(g_delayTimer, g_t1, g_t2);
-			}
+					if(textLen > bufSize) { 
+						g_rollTextInfo.textLength = textLen;
+						g_rollTextInfo.textOffset = 0;
+						strcpy(g_rollTextInfo.text, newText);
+						SetTimer(g_delayTimer, g_t1, g_t2);
+					}
+				}
+					
+			} else {
+				strncpy(tmpBuf, newText, 4);
+
+				if(textLen > 4) { //roll the text if it contain more than 4 characters
+					g_rollTextInfo.textLength = textLen;
+					g_rollTextInfo.textOffset = 0;
+					strcpy(g_rollTextInfo.text, newText);
+					SetTimer(g_delayTimer, g_t1, g_t2);
+				}
+			}			
 		}
 		SetFrontpanelText(tmpBuf);
 
@@ -590,6 +746,7 @@ static int ArgHandler_Brightness(char *input, char *output)
 	return 0;
 }
 
+
 int MainLoop()
 {
 	struct sockaddr_un sa, ca;
@@ -704,9 +861,9 @@ int main(int argc, char **argv)
 	}
 
 	CheckBoardType();
-	if(g_board == STB850) {//until not released frontpanel oled driver
-		exit(1);
-	}
+	//if(g_board == STB850) {//until not released frontpanel oled driver
+	//	exit(1);
+	//}
 	if(CheckControllerType() != 0) {
 		exit(1);
 	}
