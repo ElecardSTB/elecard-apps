@@ -53,10 +53,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unistd.h>
 #include <linux/fb.h>
 
-#include <unistd.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/ioctl.h>
+#include <dirent.h>
+#include <linux/board_id.h>
 
 #include "table_raw_gray41_b.h"
 
@@ -67,14 +66,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define LISTEN_PATH				"/var/run/frontpanel" //socket
 
 #define FONT_CHAR_WIDTH				20
-#define FONT_CHAR_HEIGHT			22
+#define FONT_CHAR_HEIGHT			21
 #define FONT_COLUMN_NUMBER			16
 
 #define FRAMEBUFFER_WIDTH				128
 #define FRAMEBUFFER_HEIGHT				32
 #define FRAMEBUFFER_SIZE				512
-
-#define FRAMEBUFFER_DEVICE_NAME		"/dev/fb0"
 
 #define DEVICE_TM1668_PATH		"/sys/devices/platform/tm1668"
 #define DEVICE_CT1628_PATH		"/sys/devices/platform/ct1628"
@@ -112,7 +109,6 @@ do { \
 ************************************************/
 
 typedef enum {NONE, TIME, STATUS, NOTIFY} MessageType_t;
-typedef enum {UNKNOWN, PROMSVYAZ, CH7162, STB850} BoardType_t;
 typedef int (*ArgHandler)(char *, char *);
 struct argHandler_s {
 	char		*argName;
@@ -145,10 +141,11 @@ timer_t			g_messageTimer;
 uint32_t		g_t1 = TIME_FIRST_SLEEP_TEXT;
 uint32_t		g_t2 = TIME_OTHER_SLEEP_TEXT;
 
-BoardType_t		g_board = UNKNOWN;
+g_board_type_t		g_board;
 char			*g_frontpanelPath = NULL;
 char			g_frontpanelText[256];
 char			g_frontpanelBrightness[256];
+char			g_framebuffer_name[256];
 
 const char		g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
 int32_t			g_brightness = 4;
@@ -187,7 +184,7 @@ struct argHandler_s handlers[] = {
 
 int32_t FrameBufferInit(void)
 {
-	g_fbInfo.fd = open(FRAMEBUFFER_DEVICE_NAME, O_RDWR);
+	g_fbInfo.fd = open(g_framebuffer_name, O_RDWR);
 
 	return 0;
 }
@@ -262,32 +259,26 @@ int32_t StringWidth(const char* str)
 
 int32_t CheckBoardType(void)
 {
-	char *boardName;
-	struct {
-		BoardType_t	boardType;
-		char		*name;
-//		uint32_t	nameLen;
-	} boards[] = {
-		{PROMSVYAZ,	"stb840_promSvyaz"},
-		{CH7162,	"stb840_ch7162"},
-		{STB850,	"stb850"},
-	};
+	FILE *fd;
+	int n;
+	if((fd = fopen("/proc/board/id", "r")) == 0) {
+		fprintf(stderr, "frontpaneld: File with board name not exist!");
+		return -1;
+	} 
+	fscanf(fd, "%d", &n);
+	fclose(fd);
 
-	boardName = getenv("board_name");
-	if(boardName) {
-		uint32_t i;
-		for(i = 0; i < ARRAY_SIZE(boards); i++) {
-			if(strncmp(boardName, boards[i].name, strlen(boards[i].name)) == 0) {
-//				fprintf(stderr, "frontpaneld: Detected board=%s\n", boards[i].name);
-				g_board = boards[i].boardType;
-				break;
-			}
-		}
-	}
-	if(g_board == UNKNOWN) {
-		fprintf(stderr, "frontpaneld: Cant detect board!!! board_name=%s\n", boardName ? boardName : "(null)");
+	if (n == 1) {
+		g_board = eSTB840_PromSvyaz;
+	} else if (n == 3) {
+		g_board = eSTB840_ch7162;
+	} else if (n == 6) {
+		g_board = eSTB850;
+	} else {
+		fprintf(stderr, "frontpaneld: Cant detect board!!!\n");
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -313,6 +304,28 @@ int32_t CheckControllerType(void)
 		}
 	}
 	fprintf(stderr, "frontpaneld: not found supported frontpanel conrollers!!!\n");
+	return -1;
+}
+
+int32_t CheckFrameBuffer(void)
+{
+	DIR *dir = opendir("/sys/devices/platform/ssd1307/graphics");
+	struct dirent *entry;
+
+	if (!dir) {
+		fprintf(stderr, "frontpaneld: Graphic directory not exist!");
+		return -1;
+	};
+
+	while ((entry = readdir(dir)) != NULL) {
+		if((strcmp(entry->d_name,".") != 0) && (strcmp(entry->d_name,"..") != 0)) {
+			sprintf(g_framebuffer_name, "/dev/%s", entry->d_name);
+			closedir(dir);
+			return 0;
+		};
+    	};
+	
+	fprintf(stderr, "frontpaneld: Directory with bramebuffer not exist!");
 	return -1;
 }
 
@@ -354,11 +367,11 @@ void StopTimer(timer_t timerid)
 
 void AddColon(char *buf)
 {
-	if(g_board == PROMSVYAZ) {
+	if(g_board == eSTB840_PromSvyaz) {
 		if(buf[1] >= '0' && buf[1] <= '9') {
 			buf[1] = g_digitsWithColon[buf[1] - '0'];
 		}
-	} else if (g_board == CH7162) {//CH7162 board
+	} else if (g_board == eSTB840_ch7162) {//eSTB840_ch7162 board
 		int32_t	temp;
 		int32_t	textLen = strlen(buf);
 
@@ -367,7 +380,7 @@ void AddColon(char *buf)
 		}
 		buf[4] = '8';
 		buf[5] = 0;
-	} else if(g_board == STB850) { //STB850			
+	} else if(g_board == eSTB850) { //eSTB850			
 		buf[2] = ':';
 	}
 }
@@ -381,7 +394,7 @@ void GetCurrentTime(char *buf)
 	t = time(NULL);
 	area = localtime(&t);
 	
-	if(g_board == STB850){
+	if(g_board == eSTB850){
 		sprintf(buf, "%02d %02d", area->tm_hour, area->tm_min);
 	} else {		
 		sprintf(buf, "%02d%02d", area->tm_hour, area->tm_min);
@@ -400,8 +413,8 @@ void GetCurrentTime(char *buf)
 
 void SetFrontpanelText(const char *buffer)
 {
-	if(g_board == STB850){
-		AddString(5, 15, buffer);
+	if(g_board == eSTB850){
+		AddString(5, 5, buffer);
 	}
 	else {
 		FILE *f;
@@ -417,7 +430,7 @@ void DisplayCurentText()
 {
 	int32_t bufSize;
 
-	if(g_board == STB850){
+	if(g_board == eSTB850){
 		bufSize = ((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH))/(FONT_CHAR_WIDTH >> 1))+1;
 	} else {
 		bufSize = 6;
@@ -432,7 +445,7 @@ void DisplayCurentText()
 			if(g_rollTextInfo.textOffset > g_rollTextInfo.textLength) {
 				g_rollTextInfo.textOffset = 0;
 			}
-			if(g_board == STB850){
+			if(g_board == eSTB850){
 				strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, bufSize);
 			}
 			else {
@@ -452,7 +465,7 @@ void DisplayCurentText()
 		default:
 			break;
 	}
-	if(g_board != STB850)
+	if(g_board != eSTB850)
 		tmpBuf[5] = 0;
 	DBG("%s: type %d text=\"%s\"\n", __func__, g_messageType, tmpBuf);
 }
@@ -520,7 +533,7 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 		
 		int32_t bufSize;		
 
-		if(g_board == STB850){
+		if(g_board == eSTB850){
 			bufSize = ((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH))/(FONT_CHAR_WIDTH >> 1))+1;;
 		} else {
 			bufSize = 6;
@@ -533,7 +546,7 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 			strcpy(tmpBuf + 2, newText + 3);
 			AddColon(tmpBuf);
 		} else {
-			if(g_board == STB850){
+			if(g_board == eSTB850){
 				if (StringWidth(newText) < FRAMEBUFFER_WIDTH)
 				{
 					strncpy(tmpBuf, newText, textLen);
@@ -861,12 +874,14 @@ int main(int argc, char **argv)
 	}
 
 	CheckBoardType();
-	//if(g_board == STB850) {//until not released frontpanel oled driver
-	//	exit(1);
-	//}
+
 	if(CheckControllerType() != 0) {
 		exit(1);
 	}
+	
+	if (g_board == eSTB850)
+		CheckFrameBuffer();
+
 	if(daemonize) {
 		if(daemon(0, 0)) {
 			perror("Failed to daemonize");

@@ -4,7 +4,7 @@ PROGRAM=$(BUILD_TARGET)frontpanel
 #src=frontpanel.c
 src=$(wildcard *.c)
 
-LOCAL_CFLAGS = -Wall -Wextra
+LOCAL_CFLAGS = -Wall -Wextra -I$(KDIR)/include
 LOCAL_LDFLAGS = -lrt
 #$(error "CROSS_COMPILE=$(CROSS_COMPILE)")
 all: $(PROGRAM)
