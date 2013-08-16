@@ -57,6 +57,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sdp.h>
 #include <service.h>
 
+#include <linux/dvb/version.h>
+
 #ifdef ENABLE_DVB
 
 /***********************************************
@@ -536,7 +538,7 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 	return dvb_getAdapter(tuner) < ADAPTER_COUNT;
 }
 
-int dvb_isTunerT2(tunerFormat tuner);
+int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
 /** @} */
 

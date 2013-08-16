@@ -734,6 +734,7 @@ typedef struct __stb810_networkInfo
  */
 typedef struct __stb810_controlInfo
 {
+	int		dvbApiVersion;
 #ifdef ENABLE_DVB
 	stb810_tunerInfo     tunerInfo[inputTuners];
 	stb810_dvbInfo       dvbInfo;
