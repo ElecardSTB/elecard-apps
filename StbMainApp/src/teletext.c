@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "gfx.h"
 #include "interface.h"
-#include "elcd-rpc.h"
+#include <elcd-rpc.h>
 
 #include <stdio.h>
 #include <string.h>

@@ -36,9 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #include "defines.h"
-
-#ifdef ENABLE_TELETEXT
-
 #include "dvb.h"
 
 #include <stdlib.h>
@@ -53,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
+#ifdef ENABLE_TELETEXT
 
 void teletext_init(void);
 
@@ -68,7 +66,12 @@ void teletext_readPESPacket(unsigned char *buf, size_t size);
 void teletext_displayTeletext(void);
 int teletext_StartThread(void);
 int teletext_StopThread();
+#else //#ifdef ENABLE_TELETEXT
 
-#endif /* ENABLE_TELETEXT */
+//define fake macros
+#define teletext_init(...)
+#define teletext_readPESPacket(...)
+
+#endif //#else //#ifdef ENABLE_TELETEXT
 
 #endif

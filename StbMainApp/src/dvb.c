@@ -189,12 +189,11 @@ struct dvb_instance {
 #endif
 
 #endif // LINUX_DVB_API_DEMUX
-	#ifdef ENABLE_TELETEXT
+
+	//teletext
 	pthread_t teletext_thread;
-	
 	int fdin;
 	struct dmx_pes_filter_params filtert;
-#endif
 };
 
 enum table_type {
@@ -990,15 +989,14 @@ int dvb_diseqcSend(tunerFormat tuner, int frontend_fd, const uint8_t* tx, size_t
 	dprintf("%s: sending %d: %02x %02x %02x %02x %02x %02x\n", __FUNCTION__, tx_len, tx[0], tx[1], tx[2],
 		tx_len > 3 ? tx[3] : 0, tx_len > 4 ? tx[4] : 0, tx_len > 5 ? tx[5] : 0);
 
-//	if(!dvb_isLinuxTuner(tuner)) {
-	if(!1) {
+	if(dvb_isLinuxTuner(tuner)) {
+		cmd.msg_len = tx_len;
+		memcpy(cmd.msg, tx, cmd.msg_len);
+		ioctl_or_abort(tuner, frontend_fd, FE_DISEQC_SEND_MASTER_CMD, &cmd);
+	} else {
 		st_sendDiseqc(tuner, tx, tx_len);
-		return 0;
 	}
 
-	cmd.msg_len = tx_len;
-	memcpy(cmd.msg, tx, cmd.msg_len);
-	ioctl_or_abort(tuner, frontend_fd, FE_DISEQC_SEND_MASTER_CMD, &cmd);
 	return 0;
 }
 
@@ -1016,16 +1014,13 @@ int dvb_diseqcSend(tunerFormat tuner, int frontend_fd, const uint8_t* tx, size_t
 	
 int dvb_checkFrontend(tunerFormat tuner)
 {
-	int i, fd;
-	struct dtv_properties dtv_prop;
+	int fd;
+	struct dtv_properties		dtv_prop;
 	struct dvb_frontend_info	info;
 	fe_delivery_system_t		current_sys;
-	int				num_systems=0;
-	fe_delivery_system_t		systems[20];
-	struct dtv_property		dvb_prop[DTV_MAX_COMMAND];
+	struct dtv_property			dvb_prop[DTV_MAX_COMMAND];
 	
-	if ((fd = dvb_getFrontendInfo(dvb_getAdapter(tuner), O_RDONLY, &info)) < 0)
-	{
+	if((fd = dvb_getFrontendInfo(dvb_getAdapter(tuner), O_RDONLY, &info)) < 0) {
 	    close(fd);
 	    return -1;
 	}
@@ -1058,6 +1053,9 @@ int dvb_checkFrontend(tunerFormat tuner)
 		}		
 	} else {
 #ifdef DTV_ENUM_DELSYS
+		int32_t num_systems;
+		int32_t i;
+
 		dvb_prop[0].cmd = DTV_ENUM_DELSYS;
 		dtv_prop.num = 1;
 		dtv_prop.props = dvb_prop;
@@ -1066,8 +1064,8 @@ int dvb_checkFrontend(tunerFormat tuner)
 			return -1;
 		}
 		num_systems = dvb_prop[0].u.buffer.len;
-		
-		if (num_systems == 0) {
+
+		if(num_systems == 0) {
 			close(fd);
 			return -1;
 		}
@@ -1076,29 +1074,27 @@ int dvb_checkFrontend(tunerFormat tuner)
 		} else {
 			appControlInfo.tunerInfo[tuner].caps = 0;
 		}
-		
-		for (i = 0; i < num_systems; i++){
-			systems[i] = dvb_prop[0].u.buffer.data[i];
-			switch((int)systems[i])
-			{
+
+		for(i = 0; i < num_systems; i++) {
+			fe_delivery_system_t delSys = dvb_prop[0].u.buffer.data[i];
+			switch(delSys) {
 			  case SYS_DVBC_ANNEX_A:
-			    appControlInfo.tunerInfo[tuner].caps |= tunerDVBC;
-			    break;
+				appControlInfo.tunerInfo[tuner].caps |= tunerDVBC;
+				break;
 			  case SYS_DVBS:
-			    appControlInfo.tunerInfo[tuner].caps |= tunerDVBS;
-			    break;
+				appControlInfo.tunerInfo[tuner].caps |= tunerDVBS;
+				break;
 			  case SYS_DVBT:
-			    appControlInfo.tunerInfo[tuner].caps |= tunerDVBT;
-			    break;
+				appControlInfo.tunerInfo[tuner].caps |= tunerDVBT;
+				break;
 			  case SYS_DVBT2:
-			    appControlInfo.tunerInfo[tuner].caps |= tunerDVBT2;
-			    break;
+				appControlInfo.tunerInfo[tuner].caps |= tunerDVBT2;
+				break;
 			  case SYS_ATSC:
-			    appControlInfo.tunerInfo[tuner].caps |= tunerATSC;
-			    break;
+				appControlInfo.tunerInfo[tuner].caps |= tunerATSC;
+				break;
 			  default:
-			    eprintf("%s: unknown frontend type %d\n", __FUNCTION__, systems[i]);
-//			    return -1;
+				eprintf("%s: unknown frontend type %d\n", __FUNCTION__, delSys);
 				continue;
 			}
 		}
@@ -1623,8 +1619,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 #ifdef STSDK
 	cJSON *params = cJSON_CreateObject();
-	if (!params)
-	{
+	if(!params) {
 		eprintf("%s[%d]: out of memory\n", __FUNCTION__, tuner);
 		return -1;
 	}
@@ -1720,8 +1715,6 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 			int found;
 			dprintf("%s[%d]: Check main freq: %u\n", __FUNCTION__, tuner, f);
 			do {
-				
-					st_setTuneParams(tuner, params, NULL);
 				found = (1== dvb_checkFrequency(dvb_getType(tuner), &f, frontend_fd, tuner,
 							  &match_ber, fe_info.frequency_stepsize, NULL, NULL));
 				if (appControlInfo.dvbCommonInfo.extendedScan)
@@ -1733,7 +1726,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 						verbose("%s[%d]: Check lower freq %u\n", __FUNCTION__, tuner, f);
 						found = (1== dvb_checkFrequency(dvb_getType(tuner), &f, frontend_fd, tuner,
 									  &match_ber, fe_info.frequency_stepsize, NULL, NULL));
-						if (found)
+						if(found)
 							break;
 						f = frequency + offset;
 						verbose("%s[%d]: Check higher freq %u\n", __FUNCTION__, tuner, f);
@@ -1741,42 +1734,41 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 									  &match_ber, fe_info.frequency_stepsize, NULL, NULL));
 					}
 				}
-				if (found)
-				{
+				if(found) {
 					eprintf("%s[%d]: Found something on %u, search channels!\n", __FUNCTION__, tuner, f);
 					SCAN_MESSAGE("DVB[%d]: Found something on %u, search channels!\n", tuner, f);
 					/* Scan for channels within this frequency / transport stream */
-	#ifdef STSDK
+#ifdef STSDK
 					p_freq->valueint = st_frequency(tuner, f);
 					p_freq->valuedouble = (double)p_freq->valueint;
 					res = st_rpcSync(elcmd_dvbtune, params, &type, &result );
 					cJSON_Delete(result); // ignore
-					result = NULL;				
-					
+					result = NULL;
+
 					eprintf("%s[%d]: scanning %6u\n", __FUNCTION__, tuner, f);
 					res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
 					cJSON_Delete(result);
-					if (res != 0 || type != elcdRpcResult)
+					if(res != 0 || type != elcdRpcResult) {
 						eprintf("%s[%d]: scan failed\n", __FUNCTION__, tuner);
-					else
+					} else {
 						dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
-	#else
+					}
+#else
 					dvb_scanForServices (f, demux_devname, NULL);
-	#endif // STSDK
+#endif // STSDK
 					SCAN_MESSAGE("DVB[%d]: Found %d channels ...\n", tuner, dvb_getNumberOfServices());
 					dprintf("%s[%d]: Found %d channels ...\n", __FUNCTION__, tuner, dvb_getNumberOfServices());
-				} else
-				{
+				} else {
 					eprintf("%s[%d]: ... NOTHING f= %u \n", __FUNCTION__, tuner, f);
 				}
-				if (pFunction != NULL && pFunction(f, dvb_getNumberOfServices(), tuner, 0, 0) == -1)
-				{
+				if(pFunction != NULL && pFunction(f, dvb_getNumberOfServices(), tuner, 0, 0) == -1) {
 					dprintf("%s[%d]: aborted by user\n", __FUNCTION__, tuner);
 					break;
 				}
-				
-				if (found && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
-				    appControlInfo.dvbtInfo.plp_id < 3)
+
+				if(	found &&
+					(dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
+					(appControlInfo.dvbtInfo.plp_id < 3))
 				{
 					appControlInfo.dvbtInfo.plp_id++;
 					dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
@@ -1784,7 +1776,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 					found = 0;
 					appControlInfo.dvbtInfo.plp_id = 0;
 				}
-			}while(found);
+			} while(found);
 		}
 
 		close(frontend_fd);
@@ -2138,6 +2130,7 @@ static void dvb_demuxerInit (struct dvb_instance * dvb, DvbMode_t mode)
 #endif
 
 #endif /* !defined STBTI */
+
 	dvb->filtert.input    = DMX_IN_FRONTEND;
 	dvb->filtert.output   = DMX_OUT_TS_TAP;
 	dvb->filtert.pes_type = DMX_PES_TELETEXT;
@@ -2382,7 +2375,6 @@ static void dvb_instanceClose (struct dvb_instance * dvb)
 		pthread_cancel (dvb->fe_tracker_Thread);
 		dvb->fe_tracker_Thread = 0;
 	}
-#ifdef ENABLE_TELETEXT
 
 #ifdef STSDK ///????
 	printf("TTX_stop_pthread\n");
@@ -2391,7 +2383,7 @@ static void dvb_instanceClose (struct dvb_instance * dvb)
 	appControlInfo.teletextInfo.exists = 0;
 	interfaceInfo.teletext.show = 0;
 #endif
-	if (dvb->teletext_thread) {
+	if(dvb->teletext_thread) {
 		pthread_cancel (dvb->teletext_thread);
 		pthread_join (dvb->teletext_thread, NULL);
 		dvb->teletext_thread = 0;
@@ -2399,7 +2391,7 @@ static void dvb_instanceClose (struct dvb_instance * dvb)
 		appControlInfo.teletextInfo.exists = 0;
 		interfaceInfo.teletext.show = 0;
 	}
-#endif //ENABLE_TELETEXT
+
 	CLOSE_FD(dvb->adapter, "frontend",       dvb->fdf);
 
 #ifdef LINUX_DVB_API_DEMUX
@@ -2541,7 +2533,6 @@ static void *dvb_multiThread(void *pArg)
 }
 #endif // ENABLE_MULTI_VIEW
 
-#ifdef ENABLE_TELETEXT
 static void *dvb_teletextThread(void *pArg)
 {
 	struct dvb_instance *dvb = (struct dvb_instance *)pArg;
@@ -2573,7 +2564,6 @@ static void *dvb_teletextThread(void *pArg)
 
 	return NULL;
 }
-#endif
 
 #ifdef ENABLE_DVB_PVR
 static void dvb_pvrThreadTerm(void* pArg)
@@ -3427,7 +3417,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 			}
 			pthread_detach(dvb->fe_tracker_Thread);
 		}
-#ifdef ENABLE_TELETEXT
+
 #ifdef ENABLE_MULTI_VIEW
         if( dvb->mode != DvbMode_Multi )
 #endif
@@ -3444,7 +3434,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 				}
 			}
 		}
-#endif /* ENABLE_TELETEXT */
+
 #ifdef ENABLE_MULTI_VIEW
 		if( dvb->mode == DvbMode_Multi )
 		{

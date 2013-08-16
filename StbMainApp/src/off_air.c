@@ -1721,10 +1721,11 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 
 		dprintf("%s: dvb_startDVB\n", __FUNCTION__);
 		dvb_startDVB(param);
+	}
 #ifdef STSDK
-	} else {
+	else {
 		cJSON *params = cJSON_CreateObject();
-		if (!params) {
+		if(!params) {
 			eprintf("%s: out of memory\n", __FUNCTION__);
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			return;
@@ -1742,8 +1743,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		st_rpcSync( elcmd_dvbtune, params, &type, &result );
 		cJSON_Delete(params);
 		cJSON_Delete(result);
-		if( type != elcdRpcResult )
-		{
+		if(type != elcdRpcResult) {
 			eprintf("%s: tune failed\n", __FUNCTION__);
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			return;
@@ -1816,12 +1816,9 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 #ifndef HIDE_EXTRA_FUNCTIONS
 static int offair_startStopDVB(interfaceMenu_t *pMenu, void* pArg)
 {
-	if ( appControlInfo.dvbInfo.active )
-	{
+	if(appControlInfo.dvbInfo.active) {
 		offair_stopVideo(GET_NUMBER(pArg), 1);
-	}
-	else
-	{
+	} else {
 		offair_startVideo(GET_NUMBER(pArg));
 	}
 	return 0;
@@ -1829,14 +1826,7 @@ static int offair_startStopDVB(interfaceMenu_t *pMenu, void* pArg)
 
 static int offair_debugToggle(interfaceMenu_t *pMenu, void* pArg)
 {
-	if ( appControlInfo.offairInfo.tunerDebug )
-	{
-		appControlInfo.offairInfo.tunerDebug = 0;
-	}
-	else
-	{
-		appControlInfo.offairInfo.tunerDebug = 1;
-	}
+	appControlInfo.offairInfo.tunerDebug = appControlInfo.offairInfo.tunerDebug ? 0 : 1;
 	offair_fillDVBTMenu();
 	interface_displayMenu(1);
 	return 0;
@@ -3290,7 +3280,9 @@ void offair_fillDVBTMenu()
 		sprintf(buf,"%s", _T("MAIN_LAYER"));
 	interface_addMenuEntry2(dvbtMenu, buf, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, &DVBTOutputMenu, thumbnail_channels);
 
+#ifdef ENABLE_ANALOGTV
 	analogtv_addMenuEntry(dvbtMenu);
+#endif
 
 	if ( offair_epgEnabled() )
 		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_services != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
@@ -4087,7 +4079,9 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 
 	offair_fillDVBTMenu();
 	offair_initDVBTOutputMenu((interfaceMenu_t*)&DVBTMenu, screenMain);
+#ifdef ENABLE_ANALOGTV
 	analogtv_initMenu((interfaceMenu_t*)&DVBTMenu);
+#endif
 
 	wizard_init();
 #ifdef ENABLE_STATS
