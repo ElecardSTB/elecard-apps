@@ -2377,7 +2377,7 @@ static void dvb_instanceClose (struct dvb_instance * dvb)
 		dvb->fe_tracker_Thread = 0;
 	}
 
-#ifdef STSDK ///????
+#if (defined STSDK) && (defined ENABLE_TELETEXT)
 	printf("TTX_stop_pthread\n");
 	teletext_StopThread();
 	appControlInfo.teletextInfo.status = teletextStatus_disabled;
