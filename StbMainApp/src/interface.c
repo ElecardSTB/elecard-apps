@@ -6209,9 +6209,6 @@ void interface_showMenu(int showFlag, int redrawFlag)
 	{
 		interfaceInfo.showMenu = showFlag;
 	}
-#ifdef ENABLE_FUSION
-	if (interfaceInfo.showMenu) interfaceInfo.showMenu = 0;
-#endif
 	if ( !interfaceInfo.showMenu )
 	{
 		if (interfacePlayControl.showOnStart && (interfacePlayControl.enabled || interfaceSlideshowControl.enabled))

@@ -335,7 +335,7 @@ int fusion_selectStreamToPlayNow()
 		diff1 = difftime(now, mktime(&FusionObject.response.playlist.files[i+1].timestamp));
 
 #ifdef FUSION_TEST
-		eprintf ("%s(%d): diff0 = %f, diff1 = %f\n", __FUNCTION__, __LINE__, diff0, diff1);
+		//eprintf ("%s(%d): diff0 = %f, diff1 = %f\n", __FUNCTION__, __LINE__, diff0, diff1);
 #endif
 
 		if (diff0 > 0 && diff1 < 0){ 
@@ -371,23 +371,20 @@ void * fusion_threadManagePlayback (void * pArg)
 			}
 			else if (currentIndex == FUSION_ERR_LATE){
 #ifdef FUSION_TEST
-				eprintf ("%s(%d): WARNING! Too late to play any files. Exit thread.\n", __FUNCTION__, __LINE__);
+				//eprintf ("%s(%d): WARNING! Too late to play any files. Exit thread.\n", __FUNCTION__, __LINE__);
+				eprintf ("%s(%d): WARNING! Too late to play any files.\n", __FUNCTION__, __LINE__);
 #endif
-				FusionObject.threadManagePlayback = 0;
-				pthread_exit((void*)&exitStatus);
-				return NULL;
+				//FusionObject.threadManagePlayback = 0;
+				//pthread_exit((void*)&exitStatus);
+				//return NULL;
 			}
 			else {
 				pthread_mutex_lock(&FusionObject.mutexUpdatePlaylist);
-#ifdef FUSION_TEST
-				eprintf ("%s(%d): Play file %d, %s\n", __FUNCTION__, __LINE__, currentIndex, 
-					FusionObject.response.playlist.files[currentIndex].url);
-#endif
+				
 				if (strcmp(playingUrl, FusionObject.response.playlist.files[currentIndex].url) != 0){
 					snprintf (playingUrl, FUSION_MAX_URL_LEN, FusionObject.response.playlist.files[currentIndex].url);
-					
 #ifdef FUSION_TEST
-					eprintf ("%s(%d): Try to stop any playing..\n", __FUNCTION__, __LINE__);
+					eprintf ("%s(%d): Play file %d, %s\n", __FUNCTION__, __LINE__, currentIndex, FusionObject.response.playlist.files[currentIndex].url);
 #endif
 					media_pauseOrStop(GFX_STOP);	// test
 					
@@ -438,6 +435,14 @@ void fusion_getPlaylistFull ()
     }
 	*/
 	
+	char setDateString[256];
+	cJSON * jsonServerDate = cJSON_GetObjectItem(root, "date");
+	if (jsonServerDate){
+		sprintf (setDateString, "date --set \"%s\"", jsonServerDate->valuestring);
+		eprintf ("%s: Set date form server: %s\n", __FUNCTION__, setDateString);
+		system(setDateString);
+	}
+
 	cJSON * jsonPlaylist = cJSON_GetObjectItem(root, "playlist");
 	if (jsonPlaylist){
 		cJSON * jsonDate = cJSON_GetObjectItem(jsonPlaylist, "date");
@@ -465,9 +470,9 @@ void fusion_getPlaylistFull ()
 					mktime(&datestart);
 
 #ifdef FUSION_TEST
-					eprintf ("%s: %s(%d): timestamp %04d-%02d-%02d %02d-%02d-%02d, file = %s\n", __FILE__, __FUNCTION__, __LINE__, 
-						datestart.tm_year + 1900, datestart.tm_mon + 1, datestart.tm_mday, datestart.tm_hour, datestart.tm_min, datestart.tm_sec,
-						jsonItem->valuestring);
+					//eprintf ("%s: %s(%d): timestamp %04d-%02d-%02d %02d-%02d-%02d, file = %s\n", __FILE__, __FUNCTION__, __LINE__, 
+					//	datestart.tm_year + 1900, datestart.tm_mon + 1, datestart.tm_mday, datestart.tm_hour, datestart.tm_min, datestart.tm_sec,
+					//	jsonItem->valuestring);
 #endif
 					FusionObject.response.playlist.files[i].timestamp = datestart;
 				}
