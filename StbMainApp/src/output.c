@@ -4393,7 +4393,7 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif // ENABLE_PASSWORD
 
-
+#ifdef ENABLE_ANALOGTV
 int analogtv_setRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int option = GET_NUMBER(pArg);
@@ -4479,6 +4479,7 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 
 	return 0;
 }
+#endif // ENABLE_ANALOGTV
 
 int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused)
 {

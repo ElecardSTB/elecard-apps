@@ -200,6 +200,13 @@ void menu_buildMainMenu()
 */
 
 #ifndef ENABLE_VIDIMAX
+#ifdef ENABLE_FUSION
+	{
+		output_buildMenu(_M &interfaceMainMenu);
+		str = _T("SETTINGS");
+		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
+	}
+#else // if ENABLE_FUSION
 #ifdef ENABLE_DVB
 	 
 #ifdef HIDE_EXTRA_FUNCTIONS
@@ -330,6 +337,7 @@ void menu_buildMainMenu()
 		str = _T("SETTINGS");
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
 	}
+#endif // if not ENABLE_FUSION
 #else // NOT ENABLE_VIDIMAX
 //#ifdef ENABLE_VIDIMAX	
 	vidimax_buildCascadedMenu(_M &interfaceMainMenu);
@@ -464,7 +472,11 @@ void menu_init()
 		interfaceInfo.currentMenu = _M &DVBTOutputMenu;
 	else
 #endif
+#ifdef ENABLE_FUSION
+		interfaceInfo.currentMenu = _M &OutputMenu;
+#else
 		interfaceInfo.currentMenu = _M &interfaceMainMenu;
+#endif
 
 #ifdef ENABLE_PROVIDER_PROFILES
 	output_checkProfile();
@@ -484,7 +496,12 @@ void menu_init()
 		interface_showSplash(0, 0, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 1, 1);
 #endif
 	} else
+	
+#ifdef ENABLE_FUSION
+		interface_showMenu(0, 1);
+#else
 		interface_showMenu(1, 1);
+#endif
 
 	interface_splashCleanup();
 }
