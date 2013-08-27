@@ -58,11 +58,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #include "teletext.h"
 #include "stsdk.h"
-#include "garb.h"
-
-#ifdef ENABLE_ANALOGTV
-#include "analogtv.h"
-#endif
 
 #ifdef STBPNX
 #include <phStbRpc_Common.h>
