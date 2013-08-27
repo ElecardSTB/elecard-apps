@@ -2405,6 +2405,14 @@ static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 	return 1;
 }
 
+static int output_statusReport(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
+{
+	system(CREATE_REPORT_FILE);
+	interface_showMessageBox(_T("STATUS_REPORT_COMPLETE"), thumbnail_configure, 3000);
+
+	return 0;
+}
+
 static int output_resetSettings(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showConfirmationBox(_T("RESET_SETTINGS_CONFIRM"), thumbnail_question, output_confirmReset, pArg);
@@ -6138,12 +6146,16 @@ void output_fillOutputMenu(void)
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &UpdateMenu, settings_updates);
 #endif
 
+	str = _T("STATUS_REPORT");
+	interface_addMenuEntry(outputMenu, str, (void*)output_statusReport, NULL, thumbnail_configure);
+
 	str = _T("RESET_SETTINGS");
 #ifndef ENABLE_PASSWORD
 	interface_addMenuEntry(outputMenu, str, output_resetSettings, NULL, thumbnail_warning);
 #else
 	interface_addMenuEntry(outputMenu, str, output_askPassword, (void*)output_resetSettings, thumbnail_warning);
 #endif
+
 }
 
 void output_buildMenu(interfaceMenu_t *pParent)

@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ********************/
 
 #define MAX_PASSWORD_LENGTH (128)
+#define CREATE_REPORT_FILE "/opt/elecard/bin/create-report.sh"
 
 /*********************
 * EXPORTED TYPEDEFS  *
