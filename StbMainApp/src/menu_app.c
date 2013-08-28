@@ -198,15 +198,19 @@ void menu_buildMainMenu()
 /*
 	interface_addMenuEntry(_M &interfaceMainMenu, str, 0, NULL, NULL, IMAGE_DIR "splash.png");
 */
-
-#ifndef ENABLE_VIDIMAX
 #ifdef ENABLE_FUSION
+	media_buildMediaMenu(_M &interfaceMainMenu);
 	{
 		output_buildMenu(_M &interfaceMainMenu);
+#ifdef ENABLE_STATS
+		stats_buildMenu(_M &OutputMenu);
+#endif
 		str = _T("SETTINGS");
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
 	}
 #else // if ENABLE_FUSION
+
+#ifndef ENABLE_VIDIMAX
 #ifdef ENABLE_DVB
 	 
 #ifdef HIDE_EXTRA_FUNCTIONS
@@ -337,7 +341,6 @@ void menu_buildMainMenu()
 		str = _T("SETTINGS");
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
 	}
-#endif // if not ENABLE_FUSION
 #else // NOT ENABLE_VIDIMAX
 //#ifdef ENABLE_VIDIMAX	
 	vidimax_buildCascadedMenu(_M &interfaceMainMenu);
@@ -441,6 +444,7 @@ void menu_buildMainMenu()
 	}
 
 #endif // ENABLE_VIDIMAX
+#endif // ENABLE_FUSION
 	/*
 	str = _T("MUSIC");
 	interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, NULL, IMAGE_DIR "thumbnail_music.png");
@@ -474,6 +478,7 @@ void menu_init()
 #endif
 #ifdef ENABLE_FUSION
 		interfaceInfo.currentMenu = _M &OutputMenu;
+		eprintf ("%s: Fusion: Set output menu as first screen\n", __FUNCTION__);
 #else
 		interfaceInfo.currentMenu = _M &interfaceMainMenu;
 #endif
@@ -497,11 +502,7 @@ void menu_init()
 #endif
 	} else
 	
-#ifdef ENABLE_FUSION
-		interface_showMenu(0, 1);
-#else
-		interface_showMenu(1, 1);
-#endif
+	interface_showMenu(1, 1);
 
 	interface_splashCleanup();
 }

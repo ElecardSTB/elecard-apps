@@ -32,6 +32,7 @@
 /******************************************************************
 * INCLUDE FILES                                                   *
 *******************************************************************/
+#ifdef ENABLE_DVB
 #include "interface.h"
 #include "defines.h"
 #include "app_info.h"
@@ -70,5 +71,5 @@ void currentmeter_setCalibrateLowValue(uint32_t val);
 /******************************************************************
 * EXPORTED DATA                                                   *
 *******************************************************************/
-
+#endif //ENABLE_DVB
 #endif // __GARB_H

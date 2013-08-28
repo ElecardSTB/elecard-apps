@@ -29,7 +29,7 @@
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
-
+#ifdef ENABLE_DVB
 #include "garb.h"
 #include "debug.h"
 #include "StbMainApp.h"
@@ -1159,3 +1159,4 @@ void garb_drawViewership(void)
 		interface_displayTextBox(interfaceInfo.clientX, interfaceInfo.clientY, text, NULL, 0, NULL, 0);
 	}
 }
+#endif // ENABLE_DVB

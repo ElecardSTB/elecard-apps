@@ -388,10 +388,10 @@ static void output_fillBlankingMenu(void);
 #endif
 
 #ifdef STSDK
-
+#ifdef ENABLE_DVB
 static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg);
 static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg);
-
+#endif
 static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 
 static int output_writeInterfacesFile(void);
@@ -454,7 +454,9 @@ static interfaceListMenu_t InputsSubMenu;
 static interfaceListMenu_t AnalogTvSubMenu;
 #endif
 #endif
+#ifdef ENABLE_DVB
 static interfaceListMenu_t CurrentmeterSubMenu;
+#endif
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
 static interfaceListMenu_t NetworkSubMenu;
@@ -2412,6 +2414,7 @@ static int output_confirmReset(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 }
 
 #ifdef STSDK
+#ifdef ENABLE_DVB
 static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg)
 {
 	int32_t selected = MENU_ITEM_BACK;
@@ -2454,6 +2457,7 @@ static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
 
 	return 1;
 }
+#endif
 #endif
 
 static int output_resetSettings(interfaceMenu_t *pMenu, void* pArg)
@@ -6186,13 +6190,14 @@ void output_fillOutputMenu(void)
 #endif
 
 #ifdef STSDK
+#ifdef ENABLE_DVB
 	if(currentmeter_isExist()) {
 		str = _T("CURRENTMETER_CALIBRATE");
 		//interface_addMenuEntry(outputMenu, str, output_calibrateCurrentMeter, NULL, thumbnail_configure);
 		//interface_addMenuEntry(outputMenu, str, output_enterCalibrateMenu, &CurrentmeterSubMenu, thumbnail_configure);
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &CurrentmeterSubMenu, thumbnail_configure);
 	}
-
+#endif
 	str = _T("UPDATES");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &UpdateMenu, settings_updates);
 #endif
@@ -6234,12 +6239,12 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
 #endif
-
+#ifdef ENABLE_DVB
 	if (currentmeter_isExist()){
 		createListMenu(&CurrentmeterSubMenu, _T("CURRENTMETER_CALIBRATE"), settings_dvb, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterCalibrateMenu, NULL, NULL);
 	}
-
+#endif
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,
