@@ -985,15 +985,17 @@ int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_
 
 int dvb_diseqcSend(tunerFormat tuner, int frontend_fd, const uint8_t* tx, size_t tx_len)
 {
+	struct dvb_diseqc_master_cmd cmd;
+
 	dprintf("%s: sending %d: %02x %02x %02x %02x %02x %02x\n", __FUNCTION__, tx_len, tx[0], tx[1], tx[2],
 		tx_len > 3 ? tx[3] : 0, tx_len > 4 ? tx[4] : 0, tx_len > 5 ? tx[5] : 0);
-#ifdef STSDK
-	if (!dvb_isLinuxTuner(tuner)) {
+
+//	if(!dvb_isLinuxTuner(tuner)) {
+	if(!1) {
 		st_sendDiseqc(tuner, tx, tx_len);
 		return 0;
 	}
-#endif
-	struct dvb_diseqc_master_cmd cmd;
+
 	cmd.msg_len = tx_len;
 	memcpy(cmd.msg, tx, cmd.msg_len);
 	ioctl_or_abort(tuner, frontend_fd, FE_DISEQC_SEND_MASTER_CMD, &cmd);
@@ -1623,7 +1625,6 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 	__u32 frequency;
 	__u32 low_freq = 0, high_freq = 0, freq_step = 0;
 	struct dvb_frontend_info fe_info;
-	int current_frequency_number = 1, max_frequency_number = 0;
 
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 #ifdef STSDK
@@ -1638,8 +1639,7 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 	cJSON *result = NULL;
 	elcdRpcType_t type = elcdRpcInvalid;
 	int res = -1;
-	if (!dvb_isLinuxTuner(tuner))
-	{
+	if(!dvb_isLinuxTuner(tuner)) {
 		cJSON *p_freq = cJSON_CreateNumber(0);
 		cJSON_AddItemToObject(params, "frequency", p_freq);
 
@@ -1838,8 +1838,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 	elcdRpcType_t type = elcdRpcInvalid;
 	st_setTuneParams(tuner, params, media);
 
-	if (!dvb_isLinuxTuner(tuner))
-	{
+	if(!dvb_isLinuxTuner(tuner)) {
 		dvb_diseqcSetup(tuner, -1, frequency, media);
 
 		if (dvb_getType(tuner) == DVBS)
@@ -1851,8 +1850,7 @@ int dvb_frequencyScan( tunerFormat tuner, __u32 frequency, EIT_media_config_t *m
 			cJSON_AddItemToObject(params, "start", cJSON_CreateNumber( frequency/KHZ ) );
 			cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber( frequency/KHZ ) );
 		}
-	} else
-	{
+	} else {
 		if ((frontend_fd = dvb_openFrontend(dvb_getAdapter(tuner), O_RDWR)) < 0)
 		{
 			cJSON_Delete(params);

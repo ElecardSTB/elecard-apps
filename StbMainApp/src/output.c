@@ -3019,9 +3019,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbTuner, NULL, thumbnail_scan);
 	}
 
-#ifdef STSDK
 	if(dvb_isLinuxTuner(tuner)) {
-#endif
 		sprintf(buf, PROFILE_LOCATIONS_PATH "/%s", appControlInfo.offairInfo.profileLocation);
 		if(getParam(buf, "LOCATION_NAME", NULL, NULL)) {
 			str = _T("SETTINGS_WIZARD");
@@ -3030,9 +3028,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 
 		str = _T("DVB_MONITOR");
 		interface_addMenuEntry(dvbMenu, str, offair_frequencyMonitor, NULL, thumbnail_info);
-#ifdef STSDK
 	}
-#endif
 
 	str = _T("DVB_INSTALL");
 	interface_addMenuEntry(dvbMenu, str, offair_serviceScan, NULL, thumbnail_scan);
@@ -3064,14 +3060,10 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %s", _T("DVB_SHOW_SCRAMBLED"), str);
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
 
-#ifdef STSDK
 	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
-#endif
 		sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
-#ifdef STSDK
 	}
-#endif
 #ifdef STBPNX
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
@@ -3126,9 +3118,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %u %s", _T("DVB_HIGH_FREQ"),fe->highFrequency, get_HZprefix(tunerType));
 	interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionHighFreq), thumbnail_configure);
 
-#ifdef STSDK
 	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
-#endif
 		if(appControlInfo.dvbCommonInfo.adapterSpeed > 0) {
 			sprintf(buf, "%s: %d%%", _T("DVB_SPEED"), 100-100*appControlInfo.dvbCommonInfo.adapterSpeed/10);
 		} else {
@@ -3141,9 +3131,8 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 
 		sprintf(buf, "%s: %u %s", _T("DVB_STEP_FREQ"), fe->frequencyStep, _T("KHZ"));
 		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)2, thumbnail_configure);
-#ifdef STSDK
 	}
-#endif
+
 	if(tunerType == DVBS) {
 		interface_addMenuEntry(dvbMenu, "DiSEqC", interface_menuActionShowMenu, &DiSEqCMenu, thumbnail_scan);
 	}
