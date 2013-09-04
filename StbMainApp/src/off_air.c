@@ -4509,6 +4509,7 @@ int offair_findCapableTuner(EIT_service_t *service)
 		case serviceMediaDVBT: type = tunerDVBT; break;
 		case serviceMediaDVBC: type = tunerDVBC; break;
 		case serviceMediaDVBS: type = tunerDVBS; break;
+		case serviceMediaATSC: type = tunerATSC; break;
 		default: return -1;
 	}
 	for (tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++)
