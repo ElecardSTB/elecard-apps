@@ -400,9 +400,10 @@ static void SetLine(int line,
 
 		// Using this buffer to start a brand new page.
 		m_nPage = (mag << 8) | unham(data[0], data[1]); // The lower two (hex) numbers of page
+		m_nPage = (((m_nPage & 0xF00) >> 8 ) * 100) + ((m_nPage & 0xF0) >> 4) * 10 + (m_nPage & 0xF);
 
-		appControlInfo.teletextInfo.cyrillic[(m_nPage/256)*100 + ((m_nPage-(m_nPage/256)*256)/16)*10 + m_nPage-((m_nPage/256)*256 + ((m_nPage-(m_nPage/256)*256)/16)*16)] =
-			((unham(data[6], data[7]) >> 5) & 0x07);
+
+		appControlInfo.teletextInfo.cyrillic[m_nPage] =	((unham(data[6], data[7]) >> 5) & 0x07);
 
 		m_Valid = 1;
 		if(outSubtitle && appControlInfo.teletextInfo.subtitleFlag && interfaceInfo.teletext.show)
@@ -411,11 +412,11 @@ static void SetLine(int line,
 			outSubtitle = 0;
 	}
 
-	if (m_Valid)
+	if (m_Valid && (mag == m_nPage / 100))
 	{
 		int text_index = 0;
 
-		if (line <= last_line)
+		if (line <= 24)
 		{
 			if (line == 0)
 			{
@@ -461,7 +462,7 @@ static void SetLine(int line,
 				memcpy(appControlInfo.teletextInfo.time, &teletext_subtitle_line_text[26], 14);
 
 			if(row<lineCount-1)
-				memcpy(&page[row][0], teletext_subtitle_line_text, rowCount);
+				memcpy(&page[line][0], teletext_subtitle_line_text, rowCount);
 
 			if(outSubtitle)
 			{
@@ -470,9 +471,9 @@ static void SetLine(int line,
 					memcpy(&appControlInfo.teletextInfo.subtitle[row][0], teletext_subtitle_line_text, rowCount);
 				}
 			}
-			else if(row==lineCount-2)
+			else if(row == 20)
 			{
-				appControlInfo.teletextInfo.pageNumber = (page[0][4]-48)*100+(page[0][5]-48)*10+page[0][6]-48;
+				appControlInfo.teletextInfo.pageNumber = m_nPage;
 
 				if(appControlInfo.teletextInfo.status < teletextStatus_finished)
 				{
@@ -481,7 +482,7 @@ static void SetLine(int line,
 
 					if(appControlInfo.teletextInfo.status==teletextStatus_begin)
 					{
-						writingEnd=(page[0][4]-48)*100+(page[0][5]-48)*10+page[0][6]-48;
+						writingEnd = m_nPage;
 						appControlInfo.teletextInfo.status=teletextStatus_processing;
 					}
 				}
@@ -504,7 +505,7 @@ static int ProcessPesPacket(void)
 {
 	int stream_id = PesPacketBuffer[3];
 
-	if ( (stream_id == 0xbd) && ( (PesPacketBuffer[PesPacketBuffer[8] + 9] >= 0x10) && (PesPacketBuffer[PesPacketBuffer[8] + 9] <= 0x1f) ) )
+	//if ( (stream_id == 0xbd) && ( (PesPacketBuffer[PesPacketBuffer[8] + 9] >= 0x10) && (PesPacketBuffer[PesPacketBuffer[8] + 9] <= 0x1f) ) )
 	{
 		//int PTS_DTS_flags = (PesPacketBuffer[7] & 0xb0) >> 6;
 		unsigned int k, j;
@@ -542,7 +543,7 @@ static int ProcessPesPacket(void)
 
 		return 1;
 	}
-	else
+	//else
 	{
 		// "This is not a private data type 1 stream - are you sure you specified the correct PID?
 		return 0;
@@ -596,7 +597,7 @@ void teletext_readPESPacket(unsigned char *buf, size_t size)
 		// Check payload start indicator.
 		if (ts_buf[1] & 0x40)
 		{
-			if (!PesPacketDirty && CheckPesPacket())
+			if (!PesPacketDirty )//&& CheckPesPacket())
 			{
 				if (!ProcessPesPacket())
 				{
@@ -1451,7 +1452,7 @@ void teletext_displayTeletext()
 void *teletext_funThread_t(void *pArg)
 {
 	int fifo_server;
-	char buff[188];
+	char buff[1880];
 	int len;
 	
 	fifo_server=open(TELETEXT_pipe_TS,O_RDWR);
@@ -1463,14 +1464,14 @@ void *teletext_funThread_t(void *pArg)
 	while(1)
 	{
 		pthread_testcancel();
-		memset(buff, '\0', 188);
+		memset(buff, '\0', 1880);
 		len = read(fifo_server, buff, sizeof(buff));
 		if(len < 0) {
 			printf("%s: %d: errno=%d: %s\n", __func__, __LINE__, errno, strerror(errno));
 			usleep(1000);
 		}
 
-		teletext_readPESPacket(buff, 188);
+		teletext_readPESPacket(buff, len);
 	}
 	return NULL;
 }
