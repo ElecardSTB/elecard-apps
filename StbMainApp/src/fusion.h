@@ -125,19 +125,32 @@
 #define FUSION_ERR_LEN        (128)
 #define FUSION_CMD_LEN        (128)
 #define FUSION_KEY_LEN        (33)
+#define FUSION_YESNO_LEN      (3)
 #define FUSION_SERVER_LEN     FUSION_URL_LEN
 
 #define FUSION_UPDATE_HOUR    2
 #define FUSION_UPDATE_MIN     0
 #define FUSION_UPDATE_SEC     0
 
-#define FUSION_FILECHECK_TIMEOUT_MS (60*1000)
+#define FUSION_FILECHECK_TIMEOUT_MS  (10 * 1000)
+#define FUSION_FLASHCHECK_TIMEOUT_MS (10 * 1000)
+#define FUSION_WAIT_READY_MS         (5  * 1000)
 
 #define FUSION_ERR_EARLY (-1)
 #define FUSION_ERR_LATE  (-2)
 
 #define FUSION_DEFAULT_SERVER_PATH   "http://public.tv/clients/index.php"
-#define FUSION_TEST_USERKEY         "3a194c01a085e01730cfe5d72976a14f"
+#define FUSION_TEST_USERKEY          "3a194c01a085e01730cfe5d72976a14f"
+
+#define FUSION_DEFAULT_DUMP_SETTING  "YES"
+#define FUSION_DUMP_PATH             "/mnt/sda1/fusion/"
+#define USB_ROOT "/mnt/sda1/"
+#define YES 1
+#define NO  0
+
+#define KILOBYTE 1024
+#define MEGABYTE KILOBYTE*KILOBYTE
+#define GIGABYTE KILOBYTE*MEGABYTE
 
 #define SAFE_DELETE(x) if(x){free(x);(x)=NULL;}
 
@@ -171,6 +184,8 @@ typedef struct {
 	//char timestamp [FUSION_TIMESTAMP_LEN];
 	struct tm timestamp;
 	char url[FUSION_MAX_URL_LEN];
+	char filename[PATH_MAX];
+	char readyToPlay;
 } fusion_file_t;
 
 typedef struct {
@@ -190,14 +205,25 @@ typedef struct {
 typedef struct {
 	char server[FUSION_SERVER_LEN];
 	char userKey[FUSION_KEY_LEN];
+	unsigned char dumpSetting;
 	fusion_response_t response;
 	
 	pthread_mutex_t mutexUpdatePlaylist;
+	pthread_mutex_t mutexCheckFlash;
+	pthread_mutex_t mutexDownloadFile;
 	pthread_t threadUpdatePlaylist;
 	pthread_t threadManagePlayback;
+	pthread_t threadCheckFlash;
+	pthread_t threadDownloadFiles;
 	
-	//char playingUrl[FUSION_MAX_URL_LEN];
 	char stopRequested;
+	FILE * currentDumpFile;
+	char currentDumpPath[PATH_MAX];
+	char filesDownloaded;
+	
+	unsigned long long flashTotalSize;
+	unsigned long long flashUsedSize;
+	unsigned long long flashAvailSize;
 	
 } fusion_object_t;
 

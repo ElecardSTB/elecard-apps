@@ -199,6 +199,18 @@ void menu_buildMainMenu()
 	interface_addMenuEntry(_M &interfaceMainMenu, str, 0, NULL, NULL, IMAGE_DIR "splash.png");
 */
 #ifdef ENABLE_FUSION
+
+#ifdef ENABLE_FAVORITES
+	playlist_buildMenu(_M &interfaceMainMenu);
+	str = _T("PLAYLIST");
+	interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &playlistMenu, thumbnail_favorites);
+#endif
+
+#ifdef ENABLE_USB
+	str = _T("RECORDED");
+	interface_addMenuEntry(_M &interfaceMainMenu, str, media_initUSBBrowserMenu, SET_NUMBER(mediaVideo), thumbnail_usb);
+#endif
+
 	media_buildMediaMenu(_M &interfaceMainMenu);
 	{
 		output_buildMenu(_M &interfaceMainMenu);
