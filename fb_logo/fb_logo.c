@@ -44,9 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // USE_BITMAP_FILE
 
-#ifdef USE_BITMAP_FILE
-#define LOGO_PATH "/opt/elecard/share/elecard_logo.bmp"
-#else
+#ifndef USE_BITMAP_FILE
 #include "logo.c"
 #endif
 
@@ -99,6 +97,16 @@ typedef struct {
 	uint32_t nimpcolors;
 } BITMAPINFOHEADER;
 
+
+typedef struct {
+	struct fb_fix_screeninfo *p_finfo;
+	struct fb_var_screeninfo *p_vinfo;
+	char *fb_p;
+
+	//logo top left corner
+	int32_t logo_x;
+	int32_t logo_y;
+} fb_logo_t;
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -162,6 +170,142 @@ void draw_indicator(char *dest, int x, int y,
 				squareInfo[progress].x, squareInfo[progress].y);
 }
 
+// Draw load indicator
+int32_t animateLogo(fb_logo_t *config)
+{
+	uint32_t	progress = 0;
+	uint32_t	erase = 0;
+	struct fb_fix_screeninfo *p_finfo = config->p_finfo;
+	struct fb_var_screeninfo *p_vinfo = config->p_vinfo;
+
+	while(g_keep_alive) {
+		draw_indicator(config->fb_p, config->logo_x, config->logo_y,
+						p_vinfo->xoffset, p_vinfo->yoffset,
+						p_vinfo->bits_per_pixel, p_finfo->line_length,
+						erase, progress);
+
+		usleep (300*1000);
+
+		progress++;
+		if(progress > PROGRESS_MAX) {
+			progress = 0;
+			erase = !erase;
+		}
+	}
+
+	// Finish load indicator
+	for(progress = 0; progress <= PROGRESS_MAX; progress++) {
+		draw_indicator(config->fb_p, config->logo_x, config->logo_y,
+						p_vinfo->xoffset, p_vinfo->yoffset,
+						p_vinfo->bits_per_pixel, p_finfo->line_length,
+						0, progress);
+	}
+
+	return 0;
+}
+
+int32_t drawImage_fromFile(fb_logo_t *config, char *filename)
+{
+	size_t	row_size;
+	int32_t	bmp_w;
+	int32_t	bmp_h;
+	int32_t	x;
+	int32_t	y;
+	int32_t	bmp_fd;
+	int32_t	row;
+	bmpfile_magic		bmp_magic;
+	bmpfile_header		bmp_header;
+	BITMAPINFOHEADER	bmp_info;
+	size_t fb_offset = 0;
+	struct fb_fix_screeninfo *p_finfo = config->p_finfo;
+	struct fb_var_screeninfo *p_vinfo = config->p_vinfo;
+
+	bmp_fd = open(filename, O_RDONLY);
+	if(bmp_fd < 0) {
+		fprintf(stderr, "filename=%s\n", filename);
+		perror("Error: failed to open bitmap file");
+		return -1;
+	}
+
+	read(bmp_fd, &bmp_magic,  sizeof(bmp_magic));
+	read(bmp_fd, &bmp_header, sizeof(bmp_header));
+	read(bmp_fd, &bmp_info,   sizeof(bmp_info));
+
+	bmp_w = bmp_info.width  > 0 ? bmp_info.width  : -bmp_info.width;
+	bmp_h = bmp_info.height > 0 ? bmp_info.height : -bmp_info.height;
+
+	printf("%s: %dx%d @ %hu bbp\n", filename, bmp_w, bmp_h, bmp_info.bitspp);
+
+	x = p_vinfo->xoffset + (p_vinfo->xres - p_vinfo->xoffset - bmp_w) / 2;
+	y = p_vinfo->yoffset + (p_vinfo->yres - p_vinfo->yoffset - bmp_h) / 2;
+	config->logo_x = x;
+	config->logo_y = y;
+
+	row_size = 3 * bmp_w;
+	for(row = bmp_h - 1; row >= 0; row--) {
+		fb_offset = (x + p_vinfo->xoffset) * (p_vinfo->bits_per_pixel / 8) + (y + row + p_vinfo->yoffset) * p_finfo->line_length;
+		read(bmp_fd, config->fb_p + fb_offset, row_size);
+	}
+	close(bmp_fd);
+
+	return 0;
+}
+
+//char *fb_p, struct fb_fix_screeninfo *p_finfo, struct fb_var_screeninfo *p_vinfo
+int32_t drawImage_fromBuffer(fb_logo_t *config, const uint8_t *bmpBuffer, uint32_t bmpBufferSize)
+{
+	int32_t	bmp_w;
+	int32_t	bmp_h;
+	int32_t	x;
+	int32_t	y;
+	int32_t	row;
+	size_t fb_offset = 0;
+	size_t row_size;
+	size_t bmp_offset;
+	struct fb_fix_screeninfo *p_finfo = config->p_finfo;
+	struct fb_var_screeninfo *p_vinfo = config->p_vinfo;
+
+//Cant use bmp_header and bmp_info as pointers, because sizeof(bmpfile_magic) = 2, this provoke unaligned access
+//	bmpfile_magic    bmp_magic;
+//	bmpfile_header   bmp_header;
+	BITMAPINFOHEADER bmp_info;
+
+	bmp_offset = sizeof(bmpfile_magic) + sizeof(bmpfile_header) + sizeof(BITMAPINFOHEADER);
+	if(bmpBufferSize < bmp_offset) {
+		printf("ERROR: bmpBufferSize=%d < bmp_offset=%d!!!\n", bmpBufferSize, bmp_offset);
+		return -1;
+	}
+
+//	memcpy(&bmp_magic, bmpBuffer, sizeof(bmpfile_magic));
+//	memcpy(&bmp_header, bmpBuffer + sizeof(bmpfile_magic), sizeof(bmpfile_header));
+	memcpy(&bmp_info, bmpBuffer + sizeof(bmpfile_magic) + sizeof(bmpfile_header), sizeof(BITMAPINFOHEADER));
+
+	bmp_w = bmp_info.width  > 0 ? bmp_info.width  : -bmp_info.width;
+	bmp_h = bmp_info.height > 0 ? bmp_info.height : -bmp_info.height;
+
+	if(bmpBufferSize < bmp_offset + (bmp_w * bmp_h * bmp_info.bitspp) / 8) {
+		printf("Wrong bitmap size!\n");
+		return -1;
+	}
+
+	printf("Bitmap logo: %dx%d @ %hu bbp\n", bmp_w, bmp_h, bmp_info.bitspp);
+
+	x = p_vinfo->xoffset + (p_vinfo->xres - p_vinfo->xoffset - bmp_w) / 2;
+	y = p_vinfo->yoffset + (p_vinfo->yres - p_vinfo->yoffset - bmp_h) / 2;
+	config->logo_x = x;
+	config->logo_y = y;
+
+	row_size = 3 * bmp_w;
+
+	for(row = bmp_h - 1; row >= 0; row--) {
+		fb_offset = (x + p_vinfo->xoffset) * (p_vinfo->bits_per_pixel / 8) + (y + row + p_vinfo->yoffset) * p_finfo->line_length;
+		memcpy(config->fb_p + fb_offset, bmpBuffer + bmp_offset, row_size);
+		bmp_offset += row_size;
+	}
+
+	return 0;
+}
+
 int main()
 {
 	int fb_fd = 0;
@@ -169,8 +313,7 @@ int main()
 	struct fb_fix_screeninfo finfo;
 	size_t screensize = 0;
 	char *fb_p = 0;
-	int x = 0, y = 0;
-	size_t fb_offset = 0;
+	fb_logo_t fb_logo_config;
 
 	signal(SIGINT,  signal_handler);
 	signal(SIGTERM, signal_handler);
@@ -184,14 +327,14 @@ int main()
 	printf("The framebuffer device was opened successfully.\n");
 
 	// Get fixed screen information
-	if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
+	if(ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
 		perror("Error reading fixed information");
 		close(fb_fd);
 		exit(2);
 	}
 
 	// Get variable screen information
-	if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
+	if(ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
 		perror("Error reading variable information");
 		close(fb_fd);
 		exit(3);
@@ -204,7 +347,7 @@ int main()
 
 	// Map the device to memory
 	fb_p = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
-	if (fb_p == (void*)-1) {
+	if(fb_p == (void*)-1) {
 		perror("Error: failed to map framebuffer device to memory");
 		close(fb_fd);
 		exit(4);
@@ -214,121 +357,20 @@ int main()
 	// clear screen
 	memset(fb_p, 0, screensize);
 
-	x = vinfo.xres / 2;
-	y = vinfo.yres / 2;
+	fb_logo_config.p_finfo = &finfo;
+	fb_logo_config.p_vinfo = &vinfo;
+	fb_logo_config.fb_p = fb_p;
 
 	// Draw bitmap logo
 #ifdef USE_BITMAP_FILE
-{
-	int bmp_fd = open(LOGO_PATH, O_RDONLY);
-	if (bmp_fd < 0)
-	{
-		perror("Error: failed to open bitmap file");
-		goto bmp_finish;
-	}
-
-	int bmp_w = 0;
-	int bmp_h = 0;
-	bmpfile_magic    bmp_magic;
-	bmpfile_header   bmp_header;
-	BITMAPINFOHEADER bmp_info;
-
-	read(bmp_fd, &bmp_magic,  sizeof(bmp_magic));
-	read(bmp_fd, &bmp_header, sizeof(bmp_header));
-	read(bmp_fd, &bmp_info,   sizeof(bmp_info));
-
-	bmp_w = bmp_info.width  > 0 ? bmp_info.width  : -bmp_info.width;
-	bmp_h = bmp_info.height > 0 ? bmp_info.height : -bmp_info.height;
-
-	printf("%s: %dx%d @ %hu bbp\n", LOGO_PATH, bmp_w, bmp_h, bmp_info.bitspp);
-
-	x = vinfo.xoffset + (vinfo.xres - vinfo.xoffset - bmp_w) / 2;
-	y = vinfo.yoffset + (vinfo.yres - vinfo.yoffset - bmp_h) / 2;
-
-	size_t row_size = 3*bmp_w;
-
-	int row;
-	for (row = bmp_h-1; row >= 0; row--)
-	{
-		fb_offset = (x + vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (y + row + vinfo.yoffset) * finfo.line_length;
-		read(bmp_fd, fb_p+fb_offset, row_size);
-	}
-	close(bmp_fd);
-
-bmp_finish:;
-}
+	drawImage_fromFile(&fb_logo_config, USE_BITMAP_FILE);
 #else
-{
-	int bmp_w = 0;
-	int bmp_h = 0;
+	drawImage_fromBuffer(&fb_logo_config, bmp_data, sizeof(bmp_data));
+#endif //USE_BITMAP_FILE
 
-//Cant use bmp_header and bmp_info as pointers, because sizeof(bmpfile_magic) = 2, this provoke unaligned access
-//	bmpfile_magic    bmp_magic;
-//	bmpfile_header   bmp_header;
-	BITMAPINFOHEADER bmp_info;
-
-	size_t bmp_offset = sizeof(bmpfile_magic) + sizeof(bmpfile_header) + sizeof(BITMAPINFOHEADER);
-
-	if (sizeof(bmp_data) < bmp_offset)
-		goto bmp_finish;
-
-//	memcpy(&bmp_magic, bmp_data, sizeof(bmpfile_magic));
-//	memcpy(&bmp_header, bmp_data + sizeof(bmpfile_magic), sizeof(bmpfile_header));
-	memcpy(&bmp_info, bmp_data + sizeof(bmpfile_magic) + sizeof(bmpfile_header), sizeof(BITMAPINFOHEADER));
-
-	bmp_w = bmp_info.width  > 0 ? bmp_info.width  : -bmp_info.width;
-	bmp_h = bmp_info.height > 0 ? bmp_info.height : -bmp_info.height;
-
-	if (sizeof(bmp_data) < bmp_offset + (bmp_w * bmp_h * bmp_info.bitspp) / 8) {
-		printf("Wrong bitmap size!\n");
-		goto bmp_finish;
-	}
-
-	printf("Bitmap logo: %dx%d @ %hu bbp\n", bmp_w, bmp_h, bmp_info.bitspp);
-
-	x = vinfo.xoffset + (vinfo.xres - vinfo.xoffset - bmp_w) / 2;
-	y = vinfo.yoffset + (vinfo.yres - vinfo.yoffset - bmp_h) / 2;
-
-	size_t row_size = 3 * bmp_w;
-
-	int row;
-	for (row = bmp_h - 1; row >= 0; row--) {
-		fb_offset = (x + vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (y + row + vinfo.yoffset) * finfo.line_length;
-		memcpy(fb_p + fb_offset, bmp_data + bmp_offset, row_size);
-		bmp_offset += row_size;
-	}
-bmp_finish:;
-}
-#endif // USE_BITMAP_FILE
-
-	// Draw load indicator
-{
-	uint32_t	progress = 0;
-	uint32_t	erase = 0;
-
-	while (g_keep_alive)
-	{
-		draw_indicator(fb_p, x, y,
-		               vinfo.xoffset, vinfo.yoffset,
-		               vinfo.bits_per_pixel, finfo.line_length,
-		               erase, progress);
-
-		usleep (300*1000);
-
-		progress++;
-		if (progress > PROGRESS_MAX) {
-			progress = 0;
-			erase = !erase;
-		}
-	}
-
-	// Finish load indicator
-	for (progress = 0; progress<=PROGRESS_MAX; progress++)
-		draw_indicator(fb_p, x, y,
-		               vinfo.xoffset, vinfo.yoffset,
-		               vinfo.bits_per_pixel, finfo.line_length,
-		               0, progress);
-}
+#ifdef ANIMATE_ELECARD_LOGO
+	animateLogo(&fb_logo_config);
+#endif
 
 	printf("Closing framebuffer\n");
 	munmap(fb_p, screensize);

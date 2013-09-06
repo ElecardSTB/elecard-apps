@@ -379,6 +379,10 @@ ifeq ($(ARCH),sh4)
 DEFAULTS_DIR =  $(ROOTFS)/etc/defaults/elecard/StbMainApp
 SYSTEM_CONFIG_DIR := /var/etc
 TARGET_CONFIG_DIR := $(SYSTEM_CONFIG_DIR)/elecard/StbMainApp
+
+LINUXTV_VERSION := $(shell grep -E "^LINUXTV_VERSION :=" $(BUILDROOT)/packages/buildroot/package/elecard/linuxtv/linuxtv.mk | cut -d ' ' -f 3)
+LOCAL_CFLAGS += -I$(BUILDROOT)/packages/buildroot/output_rootfs/build/linuxtv-$(LINUXTV_VERSION)/linux/include/uapi
+
 endif #$(ARCH) == sh4
 
 ifeq ($(ARCH),mips)
