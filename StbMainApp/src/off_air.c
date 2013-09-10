@@ -1673,10 +1673,9 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
 #endif
 
-#ifdef STSDK
-	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner))
-#endif
-	interface_addEvent(offair_updateEPG, SET_NUMBER(which), 1000, 1);
+	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
+		interface_addEvent(offair_updateEPG, SET_NUMBER(which), 1000, 1);
+	}
 #ifdef ENABLE_STATS
 	time(&statsInfo.endTime);
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
@@ -1694,36 +1693,34 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 
 	dprintf("%s: Start video on tuner %d (%d)\n", __FUNCTION__, appControlInfo.dvbInfo.tuner, dvb_getAdapter(appControlInfo.dvbInfo.tuner));
 
-#ifdef STSDK
-	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
-#endif
-
+	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
 #ifdef STBTI
-	sprintf(filename, "ln -s /dev/dvb/adapter%d/dvr0 %s", appControlInfo.dvbInfo.tuner, OFFAIR_MULTIVIEW_FILENAME);
-	system(filename);
-	strcpy(filename, OFFAIR_MULTIVIEW_FILENAME);
+		sprintf(filename, "ln -s /dev/dvb/adapter%d/dvr0 %s", appControlInfo.dvbInfo.tuner, OFFAIR_MULTIVIEW_FILENAME);
+		system(filename);
+		strcpy(filename, OFFAIR_MULTIVIEW_FILENAME);
 #else
 #ifdef ENABLE_MULTI_VIEW
-	if( param->mode == DvbMode_Multi )
-	{
-		sprintf(filename, OFFAIR_MULTIVIEW_INFOFILE);
-	} else
+		if(param->mode == DvbMode_Multi) {
+			sprintf(filename, OFFAIR_MULTIVIEW_INFOFILE);
+		} else
 #endif // ENABLE_MULTI_VIEW
-	sprintf(filename, "/dev/dvb/adapter%d/demux0", appControlInfo.dvbInfo.tuner);
+		{
+			sprintf(filename, "/dev/dvb/adapter%d/demux0", appControlInfo.dvbInfo.tuner);
+		}
 #endif // !STBTI
 #ifdef STB6x8x
-	sprintf(qualifier, "%s%s%s%s%s",
-		"", // (which==screenPip) ? ":SD:NoSpdif:I2S1" : "",
-		audio_type == streamTypeAudioAC3 ? ":AC3" : "",
-		video_type == streamTypeVideoH264 ? ":H264" : ( video_type == streamTypeVideoMPEG2 ? ":MPEG2" : ""),
-		audio_type == streamTypeAudioAAC ? ":AAC" : AUDIO_MPEG,
-		(appControlInfo.soundInfo.rcaOutput==1) ? "" : ":I2S0");
+		sprintf(qualifier, "%s%s%s%s%s",
+			"", // (which==screenPip) ? ":SD:NoSpdif:I2S1" : "",
+			audio_type == streamTypeAudioAC3 ? ":AC3" : "",
+			video_type == streamTypeVideoH264 ? ":H264" : ( video_type == streamTypeVideoMPEG2 ? ":MPEG2" : ""),
+			audio_type == streamTypeAudioAAC ? ":AAC" : AUDIO_MPEG,
+			(appControlInfo.soundInfo.rcaOutput==1) ? "" : ":I2S0");
 
-	dprintf("%s: Qualifier: %s\n", __FUNCTION__, qualifier);
+		dprintf("%s: Qualifier: %s\n", __FUNCTION__, qualifier);
 #endif // STB6x8x
 
-	dprintf("%s: dvb_startDVB\n", __FUNCTION__);
-	dvb_startDVB(param);
+		dprintf("%s: dvb_startDVB\n", __FUNCTION__);
+		dvb_startDVB(param);
 #ifdef STSDK
 	} else {
 		cJSON *params = cJSON_CreateObject();
@@ -1787,10 +1784,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 	appControlInfo.dvbInfo.savedSignalStatus = signalStatusNoStatus;
 	appControlInfo.dvbInfo.reportedSignalStatus = 0;
 
-#ifdef STSDK
-	if (dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner))
-#endif
-	{
+	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
 		offair_setStateCheckTimer(which, 1);
 		offair_setInfoUpdateTimer(which, 1);
 	}
@@ -4515,6 +4509,7 @@ int offair_findCapableTuner(EIT_service_t *service)
 		case serviceMediaDVBT: type = tunerDVBT; break;
 		case serviceMediaDVBC: type = tunerDVBC; break;
 		case serviceMediaDVBS: type = tunerDVBS; break;
+		case serviceMediaATSC: type = tunerATSC; break;
 		default: return -1;
 	}
 	for (tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++)

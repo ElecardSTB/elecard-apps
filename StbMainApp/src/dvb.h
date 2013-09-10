@@ -533,10 +533,15 @@ static inline int dvb_getAdapter(tunerFormat tuner)
 	return appControlInfo.tunerInfo[tuner].adapter;
 }
 
+#ifdef STSDK
 static inline int dvb_isLinuxTuner(tunerFormat tuner)
 {
 	return dvb_getAdapter(tuner) < ADAPTER_COUNT;
 }
+#else
+// not linux tuners has on boards with STSDK only
+#define dvb_isLinuxTuner(tuner) 1
+#endif
 
 int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
