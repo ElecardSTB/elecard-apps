@@ -6103,11 +6103,17 @@ void output_fillOutputMenu(void)
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
 #endif
+
+
 #ifdef ENABLE_ANALOGTV
-	/// TODO : check whether analog tuner presents
-	str = _T("ANALOGTV_CONFIG");
-	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &AnalogTvSubMenu, settings_dvb);
+	if (st_getBoardId()==eSTB850)
+	{
+		/// TODO : check whether analog tuner presents
+		str = _T("ANALOGTV_CONFIG");
+		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, 			&AnalogTvSubMenu, settings_dvb);
+	}
 #endif
+
 
 #ifdef ENABLE_DVB
 #ifdef HIDE_EXTRA_FUNCTIONS
@@ -6183,9 +6189,12 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	}
 #endif
 #ifdef ENABLE_ANALOGTV
-	/// TODO : check whether analog tuner presents
-	createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
+	if (st_getBoardId()==eSTB850)
+	{
+		/// TODO : check whether analog tuner presents
+		createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M 		&OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
+	}
 #endif
 
 #ifdef ENABLE_3D
