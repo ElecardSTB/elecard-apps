@@ -791,6 +791,7 @@ typedef struct __stb810_controlInfo
 #ifdef ENABLE_VIDIMAX
 	stb810_vidimaxInfo  vidimaxInfo;
 #endif
+	int		countInputs;
 } stb810_controlInfo;
 
 typedef struct _stbTimeZoneDesc_t

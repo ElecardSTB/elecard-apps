@@ -896,7 +896,7 @@ int output_toggleInputs(void)
 	uint32_t next = 0;
 	
 	if (g_inputCount == 0){
-		if (output_checkInputs() == 0) return -1;
+		if (appControlInfo.countInputs == 0) return -1;
 		output_fillInputsMenu (NULL, NULL);
 	}
 	
@@ -6098,7 +6098,8 @@ void output_fillOutputMenu(void)
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
 #if (defined STSDK)
-	if (output_checkInputs() > 0){
+	appControlInfo.countInputs = output_checkInputs();
+	if (appControlInfo.countInputs > 0){
 		str = _T("INPUTS_CONFIG");
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
@@ -6183,7 +6184,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 #ifdef STSDK
-	if (output_checkInputs() > 0){
+	if (appControlInfo.countInputs > 0){
 		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterInputsMenu, NULL, NULL);
 	}
