@@ -366,6 +366,10 @@ ifeq ($(ENABLE_TELETEXT),1)
 	LOCAL_CFLAGS += -DENABLE_TELETEXT
 endif
 
+ifeq ($(ENABLE_FUSION),1)
+    LOCAL_CFLAGS += -DENABLE_FUSION=$(ENABLE_FUSION)
+endif
+
 # -----------------------------------------------------------------------------
 # File layout
 # -----------------------------------------------------------------------------
