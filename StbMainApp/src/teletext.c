@@ -1,4 +1,3 @@
-
 /*
  teletext.c
 
@@ -28,24 +27,24 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifdef ENABLE_TELETEXT
 
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
 
 #include "teletext.h"
-
-#ifdef ENABLE_TELETEXT
-
 #include "gfx.h"
 #include "interface.h"
-#include <elcd-rpc.h>
+#include "debug.h"
+#include "stsdk.h"
 
+#include <elcd-rpc.h>
+#include <stdio.h>
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <poll.h>
-#include <cJSON.h>
 #include <client.h>
 #include <error.h>
 
@@ -68,6 +67,38 @@ LOCAL MACROS                                  *
 
 #define TELETEXT_PES_PACKET_BUFFER_SIZE		(65536)	//I do not why
 
+
+/***********************************************
+* LOCAL TYPEDEFS                               *
+************************************************/
+typedef enum {
+	teletextStatus_disabled = 0,
+	teletextStatus_begin,
+	teletextStatus_processing,
+	teletextStatus_demand,
+	teletextStatus_finished,
+	teletextStatus_ready
+} teletextStatus_t;
+
+typedef struct {
+	uint32_t			enabled;
+	int32_t				selectedPage;
+
+	uint32_t			exists;
+	teletextStatus_t	status;
+	int32_t				pageNumber;
+	uint8_t				text[1000][25][40];
+	uint8_t				subtitle[25][40];
+	uint8_t				cyrillic[1000];
+	uint32_t			fresh[3];
+	uint32_t			freshCounter;
+	uint32_t			nextPage[3];
+	uint32_t			previousPage;
+	uint8_t				time[14];
+	int32_t				subtitlePage;
+	uint32_t			subtitleFlag;
+} teletextInfo_t;
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -80,13 +111,16 @@ LOCAL MACROS                                  *
 */
 static void teletext_convToCyrillic(unsigned char c, unsigned char *str);
 
-static int teletext_nextPageNumber(int pageNumber);
-static int teletext_previousPageNumber(int pageNumber);
+static int32_t teletext_nextPageNumber(int32_t pageNumber);
+static int32_t teletext_previousPageNumber(int32_t pageNumber);
 
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
 pthread_t teletext_thread = 0;
+teletextInfo_t teletextInfo;
+
+int32_t tt_fd = -1;
 
 static unsigned int  PesPacketLength = 0;
 static unsigned char PesPacketBuffer[TELETEXT_PES_PACKET_BUFFER_SIZE];
@@ -198,65 +232,69 @@ static const unsigned char cyrillic_table[256] =
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
 ********************************************************************************/
+uint32_t teletext_isEnable(void)
+{
+	return teletextInfo.enabled;
+}
 
-void teletext_init()
+uint32_t teletext_enable(uint32_t enable)
+{
+	teletextInfo.enabled = enable;
+	return 0;
+}
+
+void teletext_init(void)
 {
 	int page;
 
-	appControlInfo.teletextInfo.status = teletextStatus_disabled;
-	appControlInfo.teletextInfo.subtitlePage = -1;
-	appControlInfo.teletextInfo.subtitleFlag = 0;
-	appControlInfo.teletextInfo.freshCounter = 0;
+	teletextInfo.status = teletextStatus_disabled;
+	teletextInfo.subtitlePage = -1;
+	teletextInfo.subtitleFlag = 0;
+	teletextInfo.freshCounter = 0;
 
-	memset(appControlInfo.teletextInfo.text, 0 ,sizeof(appControlInfo.teletextInfo.text));
+	memset(teletextInfo.text, 0 ,sizeof(teletextInfo.text));
 	for( page=0; page<1000; page++ )
 	{
-		appControlInfo.teletextInfo.text[page][0][0]=
-		appControlInfo.teletextInfo.text[page][0][1]=
-		appControlInfo.teletextInfo.text[page][0][2]=
-		appControlInfo.teletextInfo.text[page][0][3]=32;
+		teletextInfo.text[page][0][0]=
+		teletextInfo.text[page][0][1]=
+		teletextInfo.text[page][0][2]=
+		teletextInfo.text[page][0][3]=32;
 
-		appControlInfo.teletextInfo.text[page][0][4]=page/100+48;
-		appControlInfo.teletextInfo.text[page][0][5]=page/10 -
-			(appControlInfo.teletextInfo.text[page][0][4]-48)*10 + 48;
-		appControlInfo.teletextInfo.text[page][0][6]=page-
-			(appControlInfo.teletextInfo.text[page][0][4]-48)*100 -
-			(appControlInfo.teletextInfo.text[page][0][5]-48)*10 + 48;
+		teletextInfo.text[page][0][4]=page/100+48;
+		teletextInfo.text[page][0][5]=page/10 -
+			(teletextInfo.text[page][0][4]-48)*10 + 48;
+		teletextInfo.text[page][0][6]=page-
+			(teletextInfo.text[page][0][4]-48)*100 -
+			(teletextInfo.text[page][0][5]-48)*10 + 48;
 	}
 }
 
-static int teletext_nextPageNumber(int pageNumber)
+static int32_t teletext_nextPageNumber(int32_t pageNumber)
 {
-	int teletext_nextPageNumber;
+	int32_t nextPage = pageNumber;
 
-	teletext_nextPageNumber = pageNumber;
-	do
-	{
-		if(teletext_nextPageNumber==999)
-			teletext_nextPageNumber=0;
-		else
-			teletext_nextPageNumber++;
-	}
-	while (((appControlInfo.teletextInfo.text[teletext_nextPageNumber][0][2] !='P' ) && (appControlInfo.teletextInfo.subtitlePage != teletext_nextPageNumber)) && (pageNumber != teletext_nextPageNumber));
+	do {
+		nextPage++;
+		if(nextPage >= 1000) {
+			nextPage = 0;
+		}
+	} while((teletextInfo.text[nextPage][0][2] != 'P') && (teletextInfo.subtitlePage != nextPage) && (pageNumber != nextPage));
 
-	return teletext_nextPageNumber;
+	return nextPage;
 }
 
-static int teletext_previousPageNumber(int pageNumber)
+static int32_t teletext_previousPageNumber(int32_t pageNumber)
 {
-	int previoustPageNumber;
+	int32_t prevPage = pageNumber;
 
-	previoustPageNumber = pageNumber;
-	do
-	{
-		if(previoustPageNumber==0)
-			previoustPageNumber=999;
-		else
-			previoustPageNumber--;
-	}
-	while (((appControlInfo.teletextInfo.text[previoustPageNumber][0][2] !='P' ) && (appControlInfo.teletextInfo.subtitlePage != previoustPageNumber)) && (pageNumber != previoustPageNumber));
+	do {
+		prevPage--;
+		if(prevPage < 0) {
+			prevPage = 999;
+		}
+	} while((teletextInfo.text[prevPage][0][2] != 'P') && (teletextInfo.subtitlePage != prevPage) && (pageNumber != prevPage));
 
-	return previoustPageNumber;
+	return prevPage;
 }
 
 static void teletext_convToCyrillic(unsigned char c, char unsigned *str)
@@ -395,18 +433,18 @@ static void SetLine(int line,
 
 	if (line == 0)
 	{
-		if(!appControlInfo.teletextInfo.status)
-			appControlInfo.teletextInfo.status=teletextStatus_begin;
+		if(!teletextInfo.status)
+			teletextInfo.status=teletextStatus_begin;
 
 		// Using this buffer to start a brand new page.
 		m_nPage = (mag << 8) | unham(data[0], data[1]); // The lower two (hex) numbers of page
 		m_nPage = (((m_nPage & 0xF00) >> 8 ) * 100) + ((m_nPage & 0xF0) >> 4) * 10 + (m_nPage & 0xF);
 
 
-		appControlInfo.teletextInfo.cyrillic[m_nPage] =	((unham(data[6], data[7]) >> 5) & 0x07);
+		teletextInfo.cyrillic[m_nPage] =	((unham(data[6], data[7]) >> 5) & 0x07);
 
 		m_Valid = 1;
-		if(outSubtitle && appControlInfo.teletextInfo.subtitleFlag && interfaceInfo.teletext.show)
+		if(outSubtitle && teletextInfo.subtitleFlag && teletext_isEnable())
 			interface_displayMenu(1);
 		if(outSubtitle)
 			outSubtitle = 0;
@@ -423,13 +461,13 @@ static void SetLine(int line,
 				if((data[8]==32) && (data[9]==32) && (data[10]==32))	//Subtitles
 				{
 					outSubtitle=1;
-					if(appControlInfo.teletextInfo.subtitlePage == -1)
+					if(teletextInfo.subtitlePage == -1)
 					{
-						appControlInfo.teletextInfo.subtitlePage = (m_nPage/256)*100 +
+						teletextInfo.subtitlePage = (m_nPage/256)*100 +
 							((m_nPage-(m_nPage/256)*256)/16)*10 +
 							m_nPage-((m_nPage/256)*256 + ((m_nPage-(m_nPage/256)*256)/16)*16);
 					}
-					memset(appControlInfo.teletextInfo.subtitle, ' ', lineCount*rowCount);
+					memset(teletextInfo.subtitle, ' ', lineCount*rowCount);
 					row = lineCount-5;
 				}
 				else													//Usual page
@@ -459,7 +497,7 @@ static void SetLine(int line,
 			}
 
 			if (line == 0)
-				memcpy(appControlInfo.teletextInfo.time, &teletext_subtitle_line_text[26], 14);
+				memcpy(teletextInfo.time, &teletext_subtitle_line_text[26], 14);
 
 			if(row<lineCount-1)
 				memcpy(&page[line][0], teletext_subtitle_line_text, rowCount);
@@ -468,28 +506,28 @@ static void SetLine(int line,
 			{
 				if(row>lineCount-5)
 				{
-					memcpy(&appControlInfo.teletextInfo.subtitle[row][0], teletext_subtitle_line_text, rowCount);
+					memcpy(&teletextInfo.subtitle[row][0], teletext_subtitle_line_text, rowCount);
 				}
 			}
 			else if(row == 20)
 			{
-				appControlInfo.teletextInfo.pageNumber = m_nPage;
+				teletextInfo.pageNumber = m_nPage;
 
-				if(appControlInfo.teletextInfo.status < teletextStatus_finished)
+				if(teletextInfo.status < teletextStatus_finished)
 				{
-					if(writingEnd==appControlInfo.teletextInfo.pageNumber)
-                        appControlInfo.teletextInfo.status = teletextStatus_finished;
+					if(writingEnd==teletextInfo.pageNumber)
+                        teletextInfo.status = teletextStatus_finished;
 
-					if(appControlInfo.teletextInfo.status==teletextStatus_begin)
+					if(teletextInfo.status==teletextStatus_begin)
 					{
 						writingEnd = m_nPage;
-						appControlInfo.teletextInfo.status=teletextStatus_processing;
+						teletextInfo.status=teletextStatus_processing;
 					}
 				}
 
-				memcpy(&appControlInfo.teletextInfo.text[appControlInfo.teletextInfo.pageNumber][0][0], page, (lineCount-1)*rowCount);
+				memcpy(&teletextInfo.text[teletextInfo.pageNumber][0][0], page, (lineCount-1)*rowCount);
 
-				if((timeSec != page[0][39]) && (appControlInfo.teletextInfo.status>=teletextStatus_demand) && (!appControlInfo.teletextInfo.subtitleFlag))
+				if((timeSec != page[0][39]) && (teletextInfo.status>=teletextStatus_demand) && (!teletextInfo.subtitleFlag))
 				{
 					timeSec = page[0][39];
 					interface_displayMenu(1);
@@ -550,59 +588,53 @@ static int ProcessPesPacket(void)
 	}
 }
 
-void teletext_readPESPacket(unsigned char *buf, size_t size)
+static void teletext_readPESPacket(unsigned char *buf, size_t size)
 {
 	unsigned char *ts_buf = buf;
-	int continuity_counter;
-	int adaption_field_control;
-	int discontinuity_indicator;
 	static int tsPacketCounter = -1;
 	static int PesPacketDirty = 0;
 
-	while(size>=188)
-	{
+	while(size >= 188) {
+		int offset;
+		int continuity_counter;
+		int adaption_field_control;
+		int discontinuity_indicator;
+
 		continuity_counter = ts_buf[3] & 0x0f;
 		adaption_field_control = (ts_buf[3] & 0x30) >> 4;
 		discontinuity_indicator = 0;
 
-		if ((adaption_field_control == 2) || (adaption_field_control == 3))
-		{
+		if((adaption_field_control == 2) || (adaption_field_control == 3)) {
 			// adaption_field
-			if (ts_buf[4] > 0)
-			{
+			if(ts_buf[4] > 0) {
 				// adaption_field_length
 				discontinuity_indicator = (ts_buf[5] & 0x80) >> 7;
 			}
 		}
 
 		/* Firstly, check the integrity of the stream */
-		if (tsPacketCounter == -1)
+		if(tsPacketCounter == -1) {
 			tsPacketCounter = continuity_counter;
-		else
-		{
-			if ( (adaption_field_control != 0) && (adaption_field_control != 2) )
-			{
+		} else {
+			if((adaption_field_control != 0) && (adaption_field_control != 2)) {
 				tsPacketCounter++;
 				tsPacketCounter %= 16;
 			}
 		}
 
-		if (tsPacketCounter != continuity_counter)
-		{
-			if (discontinuity_indicator == 0)
+		if(tsPacketCounter != continuity_counter) {
+			if(discontinuity_indicator == 0) {
 				PesPacketDirty = 1;
+			}
 			tsPacketCounter = continuity_counter;
 		}
 
 		// Check payload start indicator.
-		if (ts_buf[1] & 0x40)
-		{
-			if (!PesPacketDirty )//&& CheckPesPacket())
-			{
-				if (!ProcessPesPacket())
-				{
-					size-=188;
-					ts_buf=&ts_buf[188];
+		if(ts_buf[1] & 0x40) {
+			if(!PesPacketDirty ) { //&& CheckPesPacket())
+				if(!ProcessPesPacket()) {
+					size -= 188;
+					ts_buf = ts_buf + 188;
 					continue;
 				}
 			}
@@ -610,39 +642,37 @@ void teletext_readPESPacket(unsigned char *buf, size_t size)
 			PesPacketLength = 0;
 		}
 
-		int i = 4;
-		if ( (adaption_field_control == 2) || (adaption_field_control == 3) )
-		{
-				// Adaption field!!!
-			int adaption_field_length = ts_buf[i++];
-			if (adaption_field_length > 182)
+		if((adaption_field_control == 2) || (adaption_field_control == 3)) {
+			// Adaption field!!!
+			int adaption_field_length = ts_buf[4];
+			if(adaption_field_length > 182)
 				adaption_field_length = 182;
 
-			i += adaption_field_length;
+			offset = 5 + adaption_field_length;
+		} else {
+			offset = 4;
 		}
 
-		if ( (adaption_field_control == 1) || (adaption_field_control == 3) )
-		{
+		if((adaption_field_control == 1) || (adaption_field_control == 3)) {
+			uint32_t dataLength = 188 - offset;
 			// Data
-			if ( (PesPacketLength + (188 - i)) <= sizeof(PesPacketBuffer) )
-			{
-				memcpy(&PesPacketBuffer[PesPacketLength], &ts_buf[i],188-i);
-				PesPacketLength += (188 - i);
+			if((PesPacketLength + dataLength) <= sizeof(PesPacketBuffer)) {
+				memcpy(PesPacketBuffer + PesPacketLength, ts_buf + offset, dataLength);
+				PesPacketLength += dataLength;
 			}
 		}
 
-		size-=188;
-		ts_buf=&ts_buf[188];
+		size -= 188;
+		ts_buf += 188;
 	}
 }
 
-void teletext_displayTeletext()
+void teletext_displayPage(void)
 {
 	int line, column;
 	int red, green, blue, alpha, Lang;
 	int symbolWidth, symbolHeight, horIndent, verIndent, lWidth, rWidth, eHeight, mHeight, emHeight, upText;
 	unsigned char str[2], fu[3];
-	int oldPageNumber=0;
 	int flagDH, flagDW, flagDS;
 	int box;
 	int rowCount = TELETEXT_SYMBOL_ROW_COUNT;
@@ -654,16 +684,13 @@ void teletext_displayTeletext()
 	symbolWidth		= TELETEXT_SYMBOL_WIDTH;
     lWidth			= TELETEXT_SYMBOL_RIGHR_WIDTH;
 	rWidth			= TELETEXT_SYMBOL_LEFT_WIDTH;
-	if(interfaceInfo.screenHeight == 480)
-	{
+	if(interfaceInfo.screenHeight == 480) {
 		symbolHeight	= TELETEXT_SYMBOL_HEIGHT_480I;
 		eHeight			= TELETEXT_SYMBOL_EDGE_HEIGHT_480I;
 		mHeight			= TELETEXT_SYMBOL_MIDDLE_HEIGHT_480I;
 		emHeight		= TELETEXT_SYMBOL_EDGE_HEIGHT_480I + TELETEXT_SYMBOL_MIDDLE_HEIGHT_480I;
 		upText			= 1;		//Text lifting
-	}
-	else
-	{
+	} else {
 		symbolHeight	= TELETEXT_SYMBOL_HEIGHT;
 		eHeight			= TELETEXT_SYMBOL_EDGE_HEIGHT;
 		mHeight			= TELETEXT_SYMBOL_MIDDLE_HEIGHT;
@@ -673,156 +700,144 @@ void teletext_displayTeletext()
 	horIndent		= (interfaceInfo.screenWidth - rowCount*symbolWidth)/2;
 	verIndent		= (interfaceInfo.screenHeight - lineCount*symbolHeight)/2 + symbolHeight;
 
-	if(interfaceInfo.teletext.pageNumber == appControlInfo.teletextInfo.subtitlePage)		//If the subtitles appear suddenly
-		appControlInfo.teletextInfo.subtitleFlag = 1;
+	if(teletextInfo.selectedPage == teletextInfo.subtitlePage) {//If the subtitles appear suddenly
+		teletextInfo.subtitleFlag = 1;
+	}
 
-	if((appControlInfo.teletextInfo.status < teletextStatus_ready)&&(!appControlInfo.teletextInfo.subtitleFlag))
-	{
-		if(appControlInfo.teletextInfo.status==teletextStatus_finished)
-		{
-			appControlInfo.teletextInfo.status = teletextStatus_ready;
+	if((teletextInfo.status < teletextStatus_ready) && !teletextInfo.subtitleFlag) {
+		if(teletextInfo.status == teletextStatus_finished) {
+			teletextInfo.status = teletextStatus_ready;
 		}
 
-		if((appControlInfo.teletextInfo.pageNumber != oldPageNumber) && (appControlInfo.teletextInfo.status < teletextStatus_demand))
-		{
-			oldPageNumber = appControlInfo.teletextInfo.pageNumber;
+		if(teletextInfo.pageNumber && (teletextInfo.status < teletextStatus_demand)) {
 			gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
-			for(column=0;column<25;column++)
-			{
-				if((appControlInfo.teletextInfo.freshCounter) && (column>=4) && (column<=6))
-				{
-					if(column==4)
-					{
-						str[0]=appControlInfo.teletextInfo.fresh[0]+48;
-					}
-					else if(column==5)
-					{
-						if(appControlInfo.teletextInfo.freshCounter == 1)
-							str[0]=' ';
-						else
-						{
-							if(appControlInfo.teletextInfo.freshCounter == 2)
-								str[0]=appControlInfo.teletextInfo.fresh[1]+48;
+			for(column = 0; column < 25; column++) {
+				if((teletextInfo.freshCounter) && (column >= 4) && (column <= 6)) {
+					if(column == 4) {
+						str[0] = teletextInfo.fresh[0] + 48;
+					} else if(column==5) {
+						if(teletextInfo.freshCounter == 1) {
+							str[0] = ' ';
+						} else {
+							if(teletextInfo.freshCounter == 2) {
+								str[0] = teletextInfo.fresh[1] + 48;
+							}
 						}
+					} else if(column == 6) {
+						str[0] = ' ';
 					}
-					else if(column==6)
-						str[0]=' ';
+				} else {
+					str[0]=teletextInfo.text[teletextInfo.pageNumber][0][column];
 				}
-				else
-					str[0]=appControlInfo.teletextInfo.text[appControlInfo.teletextInfo.pageNumber][0][column];
 
-				if(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190)))
-				{
+				if(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190))) {
 					teletext_convToCyrillic(str[0],fu);
 					gfx_drawText(DRAWING_SURFACE, pgfx_font, 255, 255, 255, 0xFF, column*symbolWidth+horIndent, verIndent-upText, (char*) fu, 0, 0);
-				}
-				else
+				} else {
 					gfx_drawText(DRAWING_SURFACE, pgfx_font, 255, 255, 255, 0xFF, column*symbolWidth+horIndent, verIndent-upText, (char*) str, 0, 0);
+				}
 			}
 		}
 	}
 
-	if((appControlInfo.teletextInfo.status >= teletextStatus_demand) || (appControlInfo.teletextInfo.subtitleFlag))
-	{
-		if(!appControlInfo.teletextInfo.subtitleFlag)
-		{
+	if((teletextInfo.status >= teletextStatus_demand) || (teletextInfo.subtitleFlag)) {
+		uint8_t (*curPageTextBuf)[40] = teletextInfo.text[teletextInfo.selectedPage];
+
+		if(!teletextInfo.subtitleFlag) {
 			gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
-			appControlInfo.teletextInfo.nextPage[0] = teletext_nextPageNumber(interfaceInfo.teletext.pageNumber);
-			appControlInfo.teletextInfo.nextPage[1] = teletext_nextPageNumber(appControlInfo.teletextInfo.nextPage[0]);
-			appControlInfo.teletextInfo.nextPage[2] = teletext_nextPageNumber(appControlInfo.teletextInfo.nextPage[1]);
-			appControlInfo.teletextInfo.previousPage = teletext_previousPageNumber(interfaceInfo.teletext.pageNumber);
+			teletextInfo.nextPage[0] = teletext_nextPageNumber(teletextInfo.selectedPage);
+			teletextInfo.nextPage[1] = teletext_nextPageNumber(teletextInfo.nextPage[0]);
+			teletextInfo.nextPage[2] = teletext_nextPageNumber(teletextInfo.nextPage[1]);
+			teletextInfo.previousPage = teletext_previousPageNumber(teletextInfo.selectedPage);
 
-			memset(&appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][0], ' ', rowCount);
+			memset(&curPageTextBuf[lineCount-1][0], ' ', rowCount);
 
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][3]= 0x01;	//red color
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][4]=
-				appControlInfo.teletextInfo.nextPage[0]/100+48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][5]=
-				appControlInfo.teletextInfo.nextPage[0]/10 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][4]-48)*10 + 48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][6]=
-				appControlInfo.teletextInfo.nextPage[0] -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][4]-48)*100 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][5]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][3]= 0x01;	//red color
+			curPageTextBuf[lineCount-1][4]=
+				teletextInfo.nextPage[0]/100+48;
+			curPageTextBuf[lineCount-1][5]=
+				teletextInfo.nextPage[0]/10 -
+				(curPageTextBuf[lineCount-1][4]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][6]=
+				teletextInfo.nextPage[0] -
+				(curPageTextBuf[lineCount-1][4]-48)*100 -
+				(curPageTextBuf[lineCount-1][5]-48)*10 + 48;
 
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][13]= 0x02;	//green color
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][14]=
-				appControlInfo.teletextInfo.nextPage[1]/100+48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][15]=
-				appControlInfo.teletextInfo.nextPage[1]/10 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][14]-48)*10 + 48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][16]=
-				appControlInfo.teletextInfo.nextPage[1] -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][14]-48)*100 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][15]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][13]= 0x02;	//green color
+			curPageTextBuf[lineCount-1][14]=
+				teletextInfo.nextPage[1]/100+48;
+			curPageTextBuf[lineCount-1][15]=
+				teletextInfo.nextPage[1]/10 -
+				(curPageTextBuf[lineCount-1][14]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][16]=
+				teletextInfo.nextPage[1] -
+				(curPageTextBuf[lineCount-1][14]-48)*100 -
+				(curPageTextBuf[lineCount-1][15]-48)*10 + 48;
 
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][23]= 0x03;	//yellow color
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][24]=
-				appControlInfo.teletextInfo.nextPage[2]/100+48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][25]=
-				appControlInfo.teletextInfo.nextPage[2]/10 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][24]-48)*10 + 48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][26]=
-				appControlInfo.teletextInfo.nextPage[2] -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][24]-48)*100 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][25]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][23]= 0x03;	//yellow color
+			curPageTextBuf[lineCount-1][24]=
+				teletextInfo.nextPage[2]/100+48;
+			curPageTextBuf[lineCount-1][25]=
+				teletextInfo.nextPage[2]/10 -
+				(curPageTextBuf[lineCount-1][24]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][26]=
+				teletextInfo.nextPage[2] -
+				(curPageTextBuf[lineCount-1][24]-48)*100 -
+				(curPageTextBuf[lineCount-1][25]-48)*10 + 48;
 
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][33]= 0x06;	//cyan color
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][34]=
-				appControlInfo.teletextInfo.previousPage/100+48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][35]=
-				appControlInfo.teletextInfo.previousPage/10 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][34]-48)*10 + 48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][36]=
-				appControlInfo.teletextInfo.previousPage -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][34]-48)*100 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][lineCount-1][35]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][33]= 0x06;	//cyan color
+			curPageTextBuf[lineCount-1][34]=
+				teletextInfo.previousPage/100+48;
+			curPageTextBuf[lineCount-1][35]=
+				teletextInfo.previousPage/10 -
+				(curPageTextBuf[lineCount-1][34]-48)*10 + 48;
+			curPageTextBuf[lineCount-1][36]=
+				teletextInfo.previousPage -
+				(curPageTextBuf[lineCount-1][34]-48)*100 -
+				(curPageTextBuf[lineCount-1][35]-48)*10 + 48;
 		}
 
-		if(!appControlInfo.teletextInfo.freshCounter)
-		{
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][4]=
-				interfaceInfo.teletext.pageNumber/100+48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][5]=
-				interfaceInfo.teletext.pageNumber/10 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][4]-48)*10 + 48;
-			appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][6]=
-				interfaceInfo.teletext.pageNumber -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][4]-48)*100 -
-				(appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][5]-48)*10 + 48;
+		if(!teletextInfo.freshCounter) {
+			curPageTextBuf[0][4]=
+				teletextInfo.selectedPage/100+48;
+			curPageTextBuf[0][5]=
+				teletextInfo.selectedPage/10 -
+				(curPageTextBuf[0][4]-48)*10 + 48;
+			curPageTextBuf[0][6]=
+				teletextInfo.selectedPage -
+				(curPageTextBuf[0][4]-48)*100 -
+				(curPageTextBuf[0][5]-48)*10 + 48;
 		}
 
-		memcpy(&appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][26], appControlInfo.teletextInfo.time, 14);
+		memcpy(&curPageTextBuf[0][26], teletextInfo.time, 14);
 
-		for(line=0;line<lineCount;line++)
-		{
+		for(line = 0; line < lineCount; line++) {
 			alpha = 1;
 			red = 255;
 			green = 255;
 			blue = 255;
-			Lang = appControlInfo.teletextInfo.cyrillic[interfaceInfo.teletext.pageNumber];
+			Lang = teletextInfo.cyrillic[teletextInfo.selectedPage];
 			flagDH=0;
 			flagDW=0;
 			flagDS=0;
 			box=0;
 
-			for(column=0;column<rowCount;column++)
-			{
-				if(interfaceInfo.teletext.pageNumber!=appControlInfo.teletextInfo.subtitlePage)
-				{
-					if((appControlInfo.teletextInfo.status == teletextStatus_demand) &&
-					   (line==0) && (column>=7) && (column<=10))
+			for(column=0; column < rowCount; column++) {
+				if(teletextInfo.selectedPage != teletextInfo.subtitlePage) {
+					if((teletextInfo.status == teletextStatus_demand) &&
+					   (line == 0) && (column >= 7) && (column <= 10))
 					{
-						if(column==7)
-							str[0]=' ';
-						else
-							str[0]=appControlInfo.teletextInfo.text[appControlInfo.teletextInfo.pageNumber][0][column];
-                    }
-					else
-						str[0]=appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][line][column];
+						if(column == 7) {
+							str[0] = ' ';
+						} else {
+							str[0] = teletextInfo.text[teletextInfo.pageNumber][0][column];
+						}
+                    } else {
+						str[0] = curPageTextBuf[line][column];
+					}
+				} else {
+					str[0]=teletextInfo.subtitle[line][column];
 				}
-				else
-					str[0]=appControlInfo.teletextInfo.subtitle[line][column];
 
 				if(str[0]<0x20)			//Special simbols
 				{
@@ -1050,7 +1065,7 @@ void teletext_displayTeletext()
 
 				if(alpha)	//Text
 				{
-					if((appControlInfo.teletextInfo.cyrillic)&&(Lang)&&(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190))))
+					if((teletextInfo.cyrillic)&&(Lang)&&(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190))))
 					{
 						teletext_convToCyrillic(str[0],fu);
 						gfx_drawText(DRAWING_SURFACE, pgfx_font, red, green, blue, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-upText, (char*) fu, 0, 0);
@@ -1449,76 +1464,237 @@ void teletext_displayTeletext()
 	}
 }
 
-void *teletext_funThread_t(void *pArg)
+static void *teletext_funcThread(void *pArg)
 {
-	int fifo_server;
-	char buff[1880];
-	int len;
+	int32_t fd = (int32_t)pArg;
+	uint8_t buff[TELETEXT_PACKET_BUFFER_SIZE];
+	int32_t len;
+
 	
-	fifo_server=open(TELETEXT_pipe_TS,O_RDWR);
-	if ( fifo_server < 0) 
-	{
-		printf("Error in opening file\n");
-	}
+	struct pollfd pfd[1];
 
-	while(1)
-	{
+	pfd[0].fd = fd;
+	pfd[0].events = POLLIN;
+
+	while(1) {
 		pthread_testcancel();
-		memset(buff, '\0', 1880);
-		len = read(fifo_server, buff, sizeof(buff));
-		if(len < 0) {
-			printf("%s: %d: errno=%d: %s\n", __func__, __LINE__, errno, strerror(errno));
-			usleep(1000);
-		}
 
-		teletext_readPESPacket(buff, len);
+		if(poll(pfd, 1, 100)) {
+			if(pfd[0].revents & POLLIN) {
+
+				pthread_testcancel();
+//				memset(buff, 0, sizeof(buff));
+				len = read(fd, buff, sizeof(buff));
+				if(len < 0) {
+					eprintf("%s: %d: errno=%d: %s\n", __func__, __LINE__, errno, strerror(errno));
+					usleep(1000);
+					continue;
+				}
+
+				dprintf("len=%d\n", len);
+				teletext_readPESPacket(buff, len);
+			}
+		}
 	}
+
 	return NULL;
 }
-	
 
-int teletext_StopThread()
+
+static int32_t teletext_redraw(void)
 {
-	if (teletext_thread)
-	{
-		pthread_cancel( teletext_thread );
-		pthread_join ( teletext_thread, NULL);
-		teletext_thread = 0;
-	}	
-	return 1;
-}
-
-int teletext_StartThread()
-{	elcdRpcType_t type;
-	int st;
-	
-	cJSON *result = NULL;
-	cJSON *params = cJSON_CreateObject();
-	cJSON_AddItemToObject(params, "url", cJSON_CreateString(TELETEXT_pipe_TS));
-	
-	st_rpcSync(elcmd_ttxStart, params, &type, &result);
-	
-	if (result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0)
-	{
-		if (teletext_thread != 0 )
-			return 1;
-		
-		cJSON_Delete(result);
-		cJSON_Delete(params);
-		teletext_init();
-		st = pthread_create(&teletext_thread, NULL,  teletext_funThread_t,  NULL);
-		if (st != 0)
-		{
-			printf("%s: ERROR not create thread\n", __func__);
-			return 0;		
-		}
-		return 1;
+	if(teletextInfo.subtitleFlag == 0) {
+		interface_playControlRefresh(1);
+	} else {
+		interface_playControlHide(1);
 	}
-	
-	cJSON_Delete(result);
-	cJSON_Delete(params);
-		
 	return 0;
 }
 
-#endif /* ENABLE_TELETEXT */
+int32_t teletext_processCommand(pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	if(teletextInfo.exists) {
+		if(cmd->command == interfaceCommandTeletext) {
+			if(teletext_isEnable()) {
+				teletext_enable(0);
+				teletextInfo.subtitleFlag = 0;
+				if(teletextInfo.status == teletextStatus_demand) {
+					teletextInfo.status = teletextStatus_processing;
+				}
+			} else {
+				teletext_enable(1);
+			}
+			teletextInfo.freshCounter = 0;
+			teletextInfo.selectedPage = 100;
+			teletext_redraw();
+			return 0;
+		}
+
+		if(teletext_isEnable() && (!teletextInfo.subtitleFlag)) {
+			if((cmd->command >= interfaceCommand0) && (cmd->command <= interfaceCommand9)) {
+				uint32_t i;
+				teletextInfo.fresh[teletextInfo.freshCounter] = cmd->command - interfaceCommand0;
+				teletextInfo.freshCounter++;
+
+				for(i = 0; i < teletextInfo.freshCounter; i++) {
+					teletextInfo.text[teletextInfo.selectedPage][0][4 + i] =
+						teletextInfo.fresh[i] + 48;
+				}
+
+				for(i = teletextInfo.freshCounter; i < 3; i++) {
+					teletextInfo.text[teletextInfo.selectedPage][0][4 + i] = ' ';
+				}
+
+				if(teletextInfo.freshCounter == 3) {
+					teletextInfo.selectedPage = teletextInfo.fresh[0] * 100 +
+						teletextInfo.fresh[1] * 10 +
+						teletextInfo.fresh[2];
+					teletextInfo.freshCounter = 0;
+
+					if(teletextInfo.selectedPage == teletextInfo.subtitlePage) {
+						teletextInfo.subtitleFlag = 1;
+					} else if(teletextInfo.status != teletextStatus_ready) {
+						teletextInfo.status = teletextStatus_demand;
+					}
+				}
+				teletext_redraw();
+				return 0;
+			} else if(teletextInfo.status >= teletextStatus_demand) {
+				switch (cmd->command) {
+					case interfaceCommandLeft:
+					case interfaceCommandBlue:
+						teletextInfo.selectedPage = teletextInfo.previousPage;
+						break;
+					case interfaceCommandRight:
+					case interfaceCommandRed:
+						teletextInfo.selectedPage = teletextInfo.nextPage[0];
+						break;
+					case interfaceCommandGreen:
+						teletextInfo.selectedPage = teletextInfo.nextPage[1];
+						break;
+					case interfaceCommandYellow:
+						teletextInfo.selectedPage = teletextInfo.nextPage[2];
+						break;
+					default:
+						break;
+				}
+				if(teletextInfo.selectedPage == teletextInfo.subtitlePage) {
+					teletextInfo.subtitleFlag = 1;
+				}
+				teletext_redraw();
+				return 0;
+			}
+		}
+	}
+
+	return -1;
+}
+
+int32_t teletext_isTeletextShowing(void)
+{
+	if( teletextInfo.exists &&
+		teletext_isEnable() &&
+		!teletextInfo.subtitleFlag )
+	{
+		return 1;
+	}
+	return 0;
+}
+
+int32_t teletext_isTeletextReady(void)
+{
+	if(	teletext_isEnable() && 
+		(teletextInfo.status >= teletextStatus_demand) &&
+		!teletextInfo.subtitleFlag )
+	{
+		return 1;
+	}
+	return 0;
+}
+
+#if (defined STSDK)
+static int32_t st_teletext_start(void)
+{
+	elcdRpcType_t type;
+	cJSON *result = NULL;
+	cJSON *params = cJSON_CreateObject();
+	cJSON_AddItemToObject(params, "url", cJSON_CreateString(TELETEXT_pipe_TS));
+
+	st_rpcSync(elcmd_ttxStart, params, &type, &result);
+
+	if(  result &&
+		(result->valuestring != NULL) &&
+		(strcmp(result->valuestring, "ok") == 0))
+	{
+		cJSON_Delete(result);
+		cJSON_Delete(params);
+
+		return 1;
+	}
+
+	cJSON_Delete(result);
+	cJSON_Delete(params);
+
+	return 0;
+}
+#endif
+
+int32_t teletext_start(DvbParam_t *param)
+{
+	int32_t ret = 0;
+	int32_t hasTeletext = 0;
+
+	if(teletext_thread != 0) {
+		return -1;
+	}
+	tt_fd = -1;
+
+#if (defined STSDK)
+	hasTeletext = st_teletext_start();
+	tt_fd = open(TELETEXT_pipe_TS, O_RDONLY);
+	if(tt_fd < 0) {
+		eprintf("Error in opening file %s\n", TELETEXT_pipe_TS);
+		return -2;
+	}
+
+#else
+	if(param->mode != DvbMode_Multi) {
+		hasTeletext = dvb_hasTeletext(param->adapter, &tt_fd);
+	}
+#endif
+	if(hasTeletext && (tt_fd >= 0)) {
+		int32_t st;
+		teletext_init();
+
+		st = pthread_create(&teletext_thread, NULL, teletext_funcThread, (void *)tt_fd);
+		if(st != 0) {
+			eprintf("%s: ERROR not create thread\n", __func__);
+			return 0;
+		}
+		teletextInfo.exists = 1;
+	}
+
+	return ret;
+}
+
+int32_t teletext_stop(void)
+{
+	int32_t ret = 0;
+
+	dprintf("TTX_stop_pthread\n");
+	if(teletext_thread) {
+		pthread_cancel(teletext_thread);
+		pthread_join(teletext_thread, NULL);
+		teletext_thread = 0;
+	}
+	teletextInfo.status = teletextStatus_disabled;
+	teletextInfo.exists = 0;
+	teletext_enable(0);
+#if (defined STSDK)
+	close(tt_fd);
+#endif
+
+	return ret;
+}
+
+#endif //ENABLE_TELETEXT

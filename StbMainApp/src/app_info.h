@@ -583,34 +583,6 @@ typedef struct __stb810_dvbsInfo
 	stb810_diseqcInfo_t  diseqc;
 } stb810_dvbsInfo;
 
-typedef enum __teletextStatus_t
-{
-	teletextStatus_disabled = 0,
-	teletextStatus_begin,
-	teletextStatus_processing,
-	teletextStatus_demand,
-	teletextStatus_finished,
-	teletextStatus_ready
-} teletextStatus_t;
-
-typedef struct __stb810_teletextInfo
-{
-	int                  enabled;
-	int                  exists;
-	teletextStatus_t     status;
-	int                  pageNumber;
-	unsigned char        text[1000][25][40];
-	unsigned char        subtitle[25][40];
-	unsigned char        cyrillic[1000];
-	int                  fresh[3];
-	int                  freshCounter;
-	int                  nextPage[3];
-	int                  previousPage;
-	unsigned char        time[14];
-	int                  subtitlePage;
-	int                  subtitleFlag;
-} stb810_teletextInfo;
-
 typedef enum __serviceSort_t
 {
 	serviceSortNone = 0,
@@ -734,16 +706,15 @@ typedef struct __stb810_networkInfo
  */
 typedef struct __stb810_controlInfo
 {
-	int		dvbApiVersion;
 #ifdef ENABLE_DVB
-	stb810_tunerInfo     tunerInfo[inputTuners];
-	stb810_dvbInfo       dvbInfo;
-	stb810_dvbtInfo      dvbtInfo;
-	stb810_dvbcInfo      dvbcInfo;
+	int						dvbApiVersion;
+	stb810_tunerInfo		tunerInfo[inputTuners];
+	stb810_dvbInfo			dvbInfo;
+	stb810_dvbtInfo			dvbtInfo;
+	stb810_dvbcInfo			dvbcInfo;
+	stb810_dvbsInfo			dvbsInfo;
 	stb810_atscInfo			atscInfo;
-	stb810_dvbsInfo      dvbsInfo;
-	stb810_dvbCommonInfo dvbCommonInfo;
-	stb810_teletextInfo  teletextInfo;
+	stb810_dvbCommonInfo	dvbCommonInfo;
 #endif
 #ifdef ENABLE_ANALOGTV
 	stb810_tvInfo        tvInfo;

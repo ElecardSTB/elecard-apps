@@ -830,12 +830,6 @@ typedef struct
 	int steps;
 } interfaceCustomSlider_t;
 
-typedef struct
-{
-	int show;
-	int pageNumber;
-} interfaceTeletext_t;
-
 typedef int (*customSliderFunction)(int, interfaceCustomSlider_t*, void*);
 
 typedef struct
@@ -884,8 +878,6 @@ typedef struct
 	char cleanUpState;
 
 	char notifyText[MENU_ENTRY_INFO_LENGTH];
-
-	interfaceTeletext_t teletext;
 
 	interfaceEvent_t event[MAX_EVENTS];
 	interfaceMessageBox_t messageBox;
