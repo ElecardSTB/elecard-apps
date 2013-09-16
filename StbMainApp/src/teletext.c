@@ -39,7 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "debug.h"
 #include "stsdk.h"
 
-#include <elcd-rpc.h>
 #include <stdio.h>
 #include <stdio.h>
 #include <string.h>
