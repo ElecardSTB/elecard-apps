@@ -546,6 +546,7 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 			media.dvb_t.centre_frequency = frequency;
 			media.dvb_t.inversion = appControlInfo.dvbtInfo.fe.inversion;
 			media.dvb_t.bandwidth = appControlInfo.dvbtInfo.bandwidth;
+			media.dvb_t.plp_id = appControlInfo.dvbtInfo.plp_id;
 			break;
 		case DVBC:
 			media.type = serviceMediaDVBC;
@@ -1147,10 +1148,10 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 	if(media && media->type == serviceMediaNone)
 		media = NULL;
 	if(type == DVBT && (media == NULL || media->type == serviceMediaDVBT)) {
-#ifdef DTV_DVBT2_PLP_ID_LEGACY		
+#ifdef DTV_STREAM_ID		
 		uint8_t plp_id = media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id;
 		
-		struct dtv_property dtv_plp = { .cmd = DTV_DVBT2_PLP_ID_LEGACY, .u.data = plp_id,};
+		struct dtv_property dtv_plp = { .cmd = DTV_STREAM_ID, .u.data = plp_id,};
 
 		struct dtv_properties cmdseq_plp = { .num = 1, .props = &dtv_plp, };
 		if (ioctl(frontend_fd, FE_SET_PROPERTY, &cmdseq_plp) == -1) {

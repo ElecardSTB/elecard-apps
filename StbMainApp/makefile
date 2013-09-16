@@ -74,6 +74,7 @@ endif # $(ARCH) != sh4
 ifneq ($(UEMD),)             # --- Module ---
 ENABLE_GSTREAMER ?= 1
 ENABLE_DLNA ?= 1
+ROOTFSNFS_DIR := $(BUILDROOT)/rootfs_nfs
 endif
 ifeq ($(ARCH),)              # --- PC x86/x64 ---
 ARCH := x86
@@ -303,8 +304,9 @@ ifeq ($(ENABLE_PVR),1)
 endif
 
 ifeq ($(ENABLE_GSTREAMER),1)
-	GST_LOCAL_CFLAGS  := $(shell pkg-config --cflags gstreamer-0.10) -DENABLE_GSTREAMER=$(ENABLE_GSTREAMER)
-	GST_LOCAL_LDFLAGS := $(shell pkg-config --libs   gstreamer-0.10)
+	GST_VERSION       := $(shell if pkg-config --exists gstreamer-0.10; then echo "0.10"; elif pkg-config --exists gstreamer-1.0; then echo "1.0"; fi)
+	GST_LOCAL_CFLAGS  := $(shell pkg-config --cflags gstreamer-$(GST_VERSION)) -DENABLE_GSTREAMER=$(ENABLE_GSTREAMER)
+	GST_LOCAL_LDFLAGS := $(shell pkg-config --libs   gstreamer-$(GST_VERSION))
 	LOCAL_CFLAGS  += $(GST_LOCAL_CFLAGS)
 	LOCAL_LDFLAGS += $(GST_LOCAL_LDFLAGS)
 endif
@@ -545,6 +547,7 @@ LOCAL_CFLAGS += \
 LOCAL_LDFLAGS += \
 	--sysroot=$(STAGINGDIR) \
 
+INSTALL_EXTRA += install_nfs
 endif
 
 ifneq ($(STBTI),)
@@ -578,7 +581,7 @@ LOCAL_LDFLAGS += \
 DFB_VERSION := -1.4
 CROSS_COMPILE := sh4-linux-
 
-#CONFIG_UNTAR_ROOTFS_FOR_NFS - defined in $(PRJROOT)/.prjconfig
+#CONFIG_UNTAR_ROOTFS_FOR_NFS - defined in $(BUILDROOT)/.prjconfig
 ifdef CONFIG_UNTAR_ROOTFS_FOR_NFS
 INSTALL_EXTRA += install_nfs
 endif
@@ -842,7 +845,7 @@ endif
 
 install_nfs: build
 ifneq ($(ROOTFSNFS_DIR),)
-	@echo 'INSTALL to NFS directory'
+	@echo 'INSTALL to NFS directory: $(ROOTFSNFS_DIR)'
 	$(Q)mkdir -p $(ROOTFSNFS_DIR)/opt/elecard/lib $(ROOTFSNFS_DIR)/opt/elecard/bin $(ROOTFSNFS_DIR)/opt/elecard/share
 	$(Q)install -m0755 $(PROG_TARGET) $(ROOTFSNFS_DIR)/opt/elecard/bin
 	$(Q)rm -rf $(ROOTFSNFS_DIR)/opt/elecard/share/StbMainApp
