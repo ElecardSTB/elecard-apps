@@ -75,6 +75,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define DEVICE_TM1668_PATH		"/sys/devices/platform/tm1668"
 #define DEVICE_CT1628_PATH		"/sys/devices/platform/ct1628"
+#define DEVICE_SSD1307_PATH     "/sys/devices/platform/ssd1307"
 
 #define MAX_TIMEOUT				60
 #define DELAY_TIMER_MIN			100
@@ -130,6 +131,7 @@ static int ArgHandler_Notify(char *input, char *output);
 static int ArgHandler_Status(char *input, char *output);
 static int ArgHandler_Pulse(char *input, char *output);
 static int ArgHandler_Brightness(char *input, char *output);
+static int ArgHandler_OledBrightness(char *input, char *output);
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -143,12 +145,15 @@ uint32_t		g_t2 = TIME_OTHER_SLEEP_TEXT;
 
 g_board_type_t		g_board;
 char			*g_frontpanelPath = NULL;
+char			*g_oledPath = NULL;
 char			g_frontpanelText[256];
 char			g_frontpanelBrightness[256];
+char			g_frontpanelOledBrightness[256];
 char			g_framebuffer_name[256];
 
 const char		g_digitsWithColon[10] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
 int32_t			g_brightness = 4;
+int32_t			g_oledbrightness = 127;
 int32_t			g_timeEnabled = true;
 rollTextInfo_t	g_rollTextInfo;
 MessageType_t	g_messageType = TIME;
@@ -176,6 +181,8 @@ struct argHandler_s handlers[] = {
 	{"p",		ArgHandler_Pulse},
 	{"bright",	ArgHandler_Brightness},
 	{"b",		ArgHandler_Brightness},
+	{"obright",	ArgHandler_OledBrightness},
+	{"o",		ArgHandler_OledBrightness},
 };
 
 /******************************************************************
@@ -307,8 +314,31 @@ int32_t CheckControllerType(void)
 	return -1;
 }
 
-int32_t CheckFrameBuffer(void)
+int32_t  CheckOledControllerType(void)
 {
+	uint32_t	i;
+	struct {
+		char *name;
+		char *path;
+	} ctrl_paths[] = {
+		{"ssd1307", DEVICE_SSD1307_PATH},
+	};
+
+	for(i = 0; i < sizeof(ctrl_paths) / sizeof(*ctrl_paths); i++) {
+		struct stat st;
+		if(stat(ctrl_paths[i].path, &st) == 0) {
+			fprintf(stdout, "frontpaneld: found %s OLED controller\n", ctrl_paths[i].name);
+			g_oledPath = ctrl_paths[i].path;
+			snprintf(g_frontpanelOledBrightness, sizeof(g_frontpanelOledBrightness), "%s/brightness", g_oledPath);
+			return 0;
+		}
+	}
+	fprintf(stderr, "frontpaneld: not found supported OLED conrollers!!!\n");
+	return -1;
+}
+
+int32_t CheckFrameBuffer(void)
+{	
 	DIR *dir = opendir("/sys/devices/platform/ssd1307/graphics");
 	struct dirent *entry;
 
@@ -380,7 +410,7 @@ void AddColon(char *buf)
 		}
 		buf[4] = '8';
 		buf[5] = 0;
-	} else if(g_board == eSTB850) { //eSTB850			
+	} else if(g_board == eSTB850) { //eSTB850	
 		buf[2] = ':';
 	}
 }
@@ -499,6 +529,16 @@ static void SetBrightness(int brightness)
 	}
 }
 
+static void SetOledBrightness(int brightness)
+{
+	FILE	*f;
+	f = fopen(g_frontpanelOledBrightness, "w");
+	if(f != 0) {
+		fprintf(f, "%d", brightness);
+		fclose(f);
+	}
+}
+
 static void Helper_TerminateText(char *text, char terminateSymbol)
 {
 	char	*ptr;
@@ -518,15 +558,15 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 				
 		int32_t	textLen;
 
-		/*while((*newText == ' ') || (*newText == '\t')) {
+		while((*newText == ' ') || (*newText == '\t')) {
 			newText++;
-		}*/
+		}
 		//if message incapsulate into '' or "", skip this characters
-		/*if((*newText == '\'') || (*newText == '\"')) {
+		if((*newText == '\'') || (*newText == '\"')) {
 			newText++;
 		}
 		Helper_TerminateText(newText, '\'');
-		Helper_TerminateText(newText, '\"');*/
+		Helper_TerminateText(newText, '\"');
 
 		textLen = strlen(newText);
 		DBG("%s: '%s' (%d)\n", __func__, newText, textLen);
@@ -564,6 +604,7 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 					
 			} else {
 				strncpy(tmpBuf, newText, 4);
+				tmpBuf[4] = 0;
 
 				if(textLen > 4) { //roll the text if it contain more than 4 characters
 					g_rollTextInfo.textLength = textLen;
@@ -754,11 +795,20 @@ static int ArgHandler_Brightness(char *input, char *output)
 {
 	(void)output;
 	g_brightness = strtol(input, NULL, 10);
+	g_brightness = (g_brightness+1) / 32;    //range casting (0x00..0xFF) -> (0..8)
 	SetBrightness(g_brightness);
 
 	return 0;
 }
 
+static int ArgHandler_OledBrightness(char *input, char *output)
+{
+	(void)output;
+	g_oledbrightness = strtol(input, NULL, 10);
+	SetOledBrightness(g_oledbrightness);
+
+	return 0;
+}
 
 int MainLoop()
 {
@@ -796,6 +846,7 @@ int MainLoop()
 	}
 
 	SetBrightness(g_brightness);
+	SetOledBrightness(g_oledbrightness);
 	ShowTime();
 
 	for(;;) {
@@ -878,9 +929,12 @@ int main(int argc, char **argv)
 	if(CheckControllerType() != 0) {
 		exit(1);
 	}
-	
-	if (g_board == eSTB850)
-		CheckFrameBuffer();
+
+	if (g_board == eSTB850){
+		if (CheckOledControllerType() != 0) exit(1);
+		if (CheckFrameBuffer() != 0) exit(1);
+	}
+
 
 	if(daemonize) {
 		if(daemon(0, 0)) {
