@@ -1,4 +1,3 @@
-
 /*
  off_air.c
 
@@ -759,7 +758,7 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 
 		memset(&nit, 0, sizeof(NIT_table_t));
 		ok = 0 == dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay,
-					    appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL);
+									appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL);
 		if (ok) {
 			interface_refreshMenu(pMenu);
 			output_showDVBMenu(pMenu, NULL);
@@ -776,8 +775,9 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 		{
 			appControlInfo.dvbtInfo.plp_id++;
 			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
-		} else
+		} else {
 			ok = 0;
+		}
 	} while (ok);
 	appControlInfo.dvbtInfo.plp_id = 0;
 	interface_sliderShow(0, 0);
@@ -831,6 +831,7 @@ void offair_stopVideo(int which, int reset)
 #endif
 
 		dprintf("%s: Stop video \n", __FUNCTION__);
+		teletext_stop();
 		dvb_stopDVB(dvb_getAdapter(appControlInfo.dvbInfo.tuner), reset);
 		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
 		appControlInfo.dvbInfo.active = 0;
@@ -1273,14 +1274,13 @@ void offair_displayPlayControl(void)
 			buffer, NULL, 0, NULL, 0);
 	}
 
-	if ( (!interfaceInfo.showMenu &&
-	      ( (interfacePlayControl.enabled && interfacePlayControl.visibleFlag) ||
-	         interfacePlayControl.showState || appControlInfo.dvbInfo.reportedSignalStatus
-#ifdef ENABLE_TELETEXT
-	        || (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-#endif
-	      )
-		 ) && current_service() != NULL )
+	if(	!interfaceInfo.showMenu &&
+		(	(interfacePlayControl.enabled && interfacePlayControl.visibleFlag) ||
+			interfacePlayControl.showState ||
+			appControlInfo.dvbInfo.reportedSignalStatus ||
+			teletext_isTeletextShowing()
+		) && 
+		(current_service() != NULL) )
 	{
 		DFBCHECK( pgfx_font->GetHeight(pgfx_font, &fh) );
 		DFBCHECK( pgfx_font->GetAscender(pgfx_font, &fa) );
@@ -1447,108 +1447,16 @@ int offair_subtitleShow(uint16_t subtitle_pid)
 	return 0;
 }
 
-#ifdef ENABLE_TELETEXT
-static int returnAndRedraw(void)
-{
-	if( appControlInfo.teletextInfo.subtitleFlag == 0 )
-		interface_playControlRefresh(1);
-	else
-		interface_playControlHide(1);
-	return 0;
-}
-#endif // ENABLE_TELETEXT
-
 static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	dprintf("%s: in 0x%08X\n", __FUNCTION__, cmd);
-#ifdef ENABLE_TELETEXT
-	if(appControlInfo.teletextInfo.exists)
-	{
-		if(cmd->command == interfaceCommandTeletext)
-		{
-			if(interfaceInfo.teletext.show == 0)
-				interfaceInfo.teletext.show = 1;
-			else
-			{
-				interfaceInfo.teletext.show = 0;
-				appControlInfo.teletextInfo.subtitleFlag = 0;
-				if(appControlInfo.teletextInfo.status == teletextStatus_demand)
-					appControlInfo.teletextInfo.status = teletextStatus_processing;
-			}
-			appControlInfo.teletextInfo.freshCounter = 0;
-			interfaceInfo.teletext.pageNumber = 100;
-			return returnAndRedraw();
-		}
 
-		if(interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-		{
-			if((cmd->command >= interfaceCommand0) && (cmd->command <= interfaceCommand9))
-			{
-				appControlInfo.teletextInfo.fresh[appControlInfo.teletextInfo.freshCounter] = cmd->command - interfaceCommand0;
-				appControlInfo.teletextInfo.freshCounter++;
-
-				int i;
-				for(i=0;i<appControlInfo.teletextInfo.freshCounter;i++)
-				{
-					appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][4+i]=
-					appControlInfo.teletextInfo.fresh[i]+48;
-				}
-
-				for(i=appControlInfo.teletextInfo.freshCounter;i<3;i++)
-				{
-					appControlInfo.teletextInfo.text[interfaceInfo.teletext.pageNumber][0][4+i]=' ';
-				}
-
-				if(appControlInfo.teletextInfo.freshCounter==3)
-				{
-					interfaceInfo.teletext.pageNumber=appControlInfo.teletextInfo.fresh[0]*100+
-						appControlInfo.teletextInfo.fresh[1]*10+
-						appControlInfo.teletextInfo.fresh[2];
-					appControlInfo.teletextInfo.freshCounter=0;
-
-					if(interfaceInfo.teletext.pageNumber == appControlInfo.teletextInfo.subtitlePage)
-					{
-						appControlInfo.teletextInfo.subtitleFlag=1;
-					}
-					else if (appControlInfo.teletextInfo.status != teletextStatus_ready)
-						appControlInfo.teletextInfo.status = teletextStatus_demand;
-				}
-				return returnAndRedraw();
-			}
-			else if(appControlInfo.teletextInfo.status >= teletextStatus_demand)
-			{
-				switch (cmd->command)
-				{
-					case interfaceCommandLeft:
-					case interfaceCommandBlue:
-						interfaceInfo.teletext.pageNumber = appControlInfo.teletextInfo.previousPage;
-						break;
-					case interfaceCommandRight:
-					case interfaceCommandRed:
-						interfaceInfo.teletext.pageNumber = appControlInfo.teletextInfo.nextPage[0];
-						break;
-					case interfaceCommandGreen:
-						interfaceInfo.teletext.pageNumber = appControlInfo.teletextInfo.nextPage[1];
-						break;
-					case interfaceCommandYellow:
-						interfaceInfo.teletext.pageNumber = appControlInfo.teletextInfo.nextPage[2];
-						break;
-					default:
-						break;
-				}
-				if(interfaceInfo.teletext.pageNumber == appControlInfo.teletextInfo.subtitlePage)
-				{
-					appControlInfo.teletextInfo.subtitleFlag=1;
-				}
-				return returnAndRedraw();
-			}
-		}
+	if(teletext_processCommand(cmd, pArg) == 0) {
+		return 0;
 	}
-#endif // #ifdef ENABLE_TELETEXT
-	if (cmd->source == DID_FRONTPANEL)
-	{
-		switch (cmd->command)
-		{
+
+	if(cmd->source == DID_FRONTPANEL) {
+		switch(cmd->command) {
 			case interfaceCommandRight:
 				cmd->command = interfaceCommandVolumeUp;
 				interface_soundControlProcessCommand(cmd);
@@ -1721,10 +1629,11 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 
 		dprintf("%s: dvb_startDVB\n", __FUNCTION__);
 		dvb_startDVB(param);
+	}
 #ifdef STSDK
-	} else {
+	else {
 		cJSON *params = cJSON_CreateObject();
-		if (!params) {
+		if(!params) {
 			eprintf("%s: out of memory\n", __FUNCTION__);
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			return;
@@ -1742,8 +1651,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		st_rpcSync( elcmd_dvbtune, params, &type, &result );
 		cJSON_Delete(params);
 		cJSON_Delete(result);
-		if( type != elcdRpcResult )
-		{
+		if(type != elcdRpcResult) {
 			eprintf("%s: tune failed\n", __FUNCTION__);
 			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 			return;
@@ -1755,9 +1663,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 #endif // STSDK
 	appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerDVBMain;
 
-	int ret = gfx_startVideoProvider(filename, which, 0, qualifier);
-	if (ret != 0)
-	{
+	if(gfx_startVideoProvider(filename, which, 0, qualifier) != 0) {
 		eprintf("offair: Failed to start video provider '%s'\n", filename);
 		interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
 		dvb_stopDVB(dvb_getAdapter(appControlInfo.dvbInfo.tuner), 1);
@@ -1806,9 +1712,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 	interface_playControlSelect(interfacePlayControlPlay);
 	interface_displayMenu(1);
 
-#if (defined STSDK) && (defined ENABLE_TELETEXT)
-	appControlInfo.teletextInfo.exists = teletext_StartThread(); 
-#endif 
+	teletext_start(param);
 
 	dprintf("%s: done\n", __FUNCTION__);
 }
@@ -1816,12 +1720,9 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 #ifndef HIDE_EXTRA_FUNCTIONS
 static int offair_startStopDVB(interfaceMenu_t *pMenu, void* pArg)
 {
-	if ( appControlInfo.dvbInfo.active )
-	{
+	if(appControlInfo.dvbInfo.active) {
 		offair_stopVideo(GET_NUMBER(pArg), 1);
-	}
-	else
-	{
+	} else {
 		offair_startVideo(GET_NUMBER(pArg));
 	}
 	return 0;
@@ -1829,14 +1730,7 @@ static int offair_startStopDVB(interfaceMenu_t *pMenu, void* pArg)
 
 static int offair_debugToggle(interfaceMenu_t *pMenu, void* pArg)
 {
-	if ( appControlInfo.offairInfo.tunerDebug )
-	{
-		appControlInfo.offairInfo.tunerDebug = 0;
-	}
-	else
-	{
-		appControlInfo.offairInfo.tunerDebug = 1;
-	}
+	appControlInfo.offairInfo.tunerDebug = appControlInfo.offairInfo.tunerDebug ? 0 : 1;
 	offair_fillDVBTMenu();
 	interface_displayMenu(1);
 	return 0;
@@ -3290,7 +3184,9 @@ void offair_fillDVBTMenu()
 		sprintf(buf,"%s", _T("MAIN_LAYER"));
 	interface_addMenuEntry2(dvbtMenu, buf, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, &DVBTOutputMenu, thumbnail_channels);
 
+#ifdef ENABLE_ANALOGTV
 	analogtv_addMenuEntry(dvbtMenu);
+#endif
 
 	if ( offair_epgEnabled() )
 		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_services != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
@@ -4087,7 +3983,9 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 
 	offair_fillDVBTMenu();
 	offair_initDVBTOutputMenu((interfaceMenu_t*)&DVBTMenu, screenMain);
+#ifdef ENABLE_ANALOGTV
 	analogtv_initMenu((interfaceMenu_t*)&DVBTMenu);
+#endif
 
 	wizard_init();
 #ifdef ENABLE_STATS

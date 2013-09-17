@@ -164,7 +164,6 @@ volatile int keyThreadActive;
 
 volatile int flushEventsFlag;
 
-int term;
 char startApp[PATH_MAX] = "";
 
 interfaceCommand_t lastRecvCmd = interfaceCommandNone;
@@ -1656,22 +1655,28 @@ void *keyThread(void *pArg)
 	return NULL;
 }
 
-static void set_to_raw(int tty_fd)
-{
-	struct termios tty_attr;
+static struct termio savemodes;
+static int havemodes = 0;
 
-	tcgetattr(tty_fd,&tty_attr);
-	tty_attr.c_lflag &= ~ICANON;
-	tcsetattr(tty_fd,TCSANOW,&tty_attr);
+static void set_to_raw(void)
+{
+	struct termio modmodes;
+	if(ioctl(fileno(stdin), TCGETA, &savemodes) < 0)
+		return;
+
+	havemodes = 1;
+	modmodes = savemodes;
+	modmodes.c_lflag &= ~ICANON;
+	modmodes.c_cc[VMIN] = 1;
+	modmodes.c_cc[VTIME] = 0;
+	ioctl(fileno(stdin), TCSETAW, &modmodes);
 }
 
-static void set_to_buffered(int tty_fd)
+static void set_to_buffered(void)
 {
-	struct termios tty_attr;
-
-	tcgetattr(tty_fd,&tty_attr);
-	tty_attr.c_lflag |= ICANON;
-	tcsetattr(tty_fd,TCSANOW,&tty_attr);
+	if(!havemodes)
+		return;
+	ioctl(fileno(stdin), TCSETAW, &savemodes);
 }
 
 #ifdef STB225
@@ -1832,6 +1837,27 @@ static void setupFramebuffers(void)
 }
 #endif
 
+#ifdef ENABLE_FUSION
+#define FUSION_STUB "fusion://stub"
+void fusion_startup()
+{
+	sprintf (appControlInfo.mediaInfo.filename, "%s", FUSION_STUB);
+
+	appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
+	appControlInfo.mediaInfo.bHttp = 1;
+
+	//interface_showMenu (0, 0);
+	int result = media_startPlayback();
+	if (result == 0){
+		eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FUSION_STUB);
+	}
+	else {
+		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
+	}
+	return;
+}
+#endif
+
 void initialize(int argc, char *argv[])
 {
 
@@ -1921,10 +1947,12 @@ void initialize(int argc, char *argv[])
 	voip_init();
 #endif
 
-	if (gAllowConsoleInput)
-	{
-		term = open("/dev/fd/0", O_RDWR);
-		set_to_raw(term);
+#ifdef ENABLE_FUSION
+	fusion_startup();
+#endif
+
+	if(gAllowConsoleInput) {
+		set_to_raw();
 	}
 }
 
@@ -2004,10 +2032,8 @@ void cleanup()
 	downloader_cleanup();
 
 	dprintf("%s: close console\n", __FUNCTION__);
-	if (gAllowConsoleInput)
-	{
-		set_to_buffered(term);
-		close(term);
+	if(gAllowConsoleInput) {
+		set_to_buffered();
 	}
 
 #ifdef STB82

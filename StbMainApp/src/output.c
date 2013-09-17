@@ -264,16 +264,16 @@ static int output_enterNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_leaveNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_checkInputs();
-static int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterGraphicsModeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
-
 static int output_enterWANMenu (interfaceMenu_t *wanMenu, void* pArg);
 static int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface);
+
+#ifdef ENABLE_ANALOGTV
+static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused);
+#endif
 #ifdef ENABLE_PPP
 static int output_enterPPPMenu (interfaceMenu_t *pMenu, void* pArg);
 #endif
@@ -387,12 +387,15 @@ static void output_fillBlankingMenu(void);
 #endif
 
 #ifdef STSDK
+static int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 
 static int output_writeInterfacesFile(void);
 static int output_writeDhcpConfig(void);
 
 static int output_toggleAdvancedVideoOutput(interfaceMenu_t *pMenu, void* pArg);
+
+static int output_checkInputs();
 #endif
 static const char* output_getLanModeName(lanMode_t mode);
 static void output_setIfaceMenuName(interfaceMenu_t *pMenu, const char *ifaceName, int wan, lanMode_t lanMode);
@@ -445,9 +448,9 @@ static interfaceListMenu_t InterfaceMenu;
 static interfaceListMenu_t PlaybackMenu;
 #ifdef STSDK
 static interfaceListMenu_t InputsSubMenu;
+#endif
 #ifdef ENABLE_ANALOGTV
 static interfaceListMenu_t AnalogTvSubMenu;
-#endif
 #endif
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
@@ -896,7 +899,7 @@ int output_toggleInputs(void)
 	uint32_t next = 0;
 	
 	if (g_inputCount == 0){
-		if (output_checkInputs() == 0) return -1;
+		if (appControlInfo.countInputs == 0) return -1;
 		output_fillInputsMenu (NULL, NULL);
 	}
 	
@@ -1805,6 +1808,7 @@ static int output_setIP(interfaceMenu_t *pMenu, char *value, void* pOptionIface)
 	int i = OUTPUT_INFO_GET_INDEX(pOptionIface);
 	outputIPOption type = OUTPUT_INFO_GET_TYPE(pOptionIface);
 
+	(void)i; //hide "unused variable" warnings
 	if( value == NULL )
 		return 1;
 
@@ -2549,6 +2553,7 @@ static int output_toggleMode(interfaceMenu_t *pMenu, void* pArg)
 	int i = GET_NUMBER(pArg);
 	int ret = 0;
 
+	(void)i; //hide "unused variable" warnings
 #ifdef STBPNX
 	char value[MENU_ENTRY_INFO_LENGTH];
 	char path[MAX_CONFIG_PATH];
@@ -4340,6 +4345,7 @@ int output_showNetworkMenu(interfaceMenu_t *pMenu, void* pArg)
 #endif // ENABLE_PASSWORD
 
 
+#ifdef ENABLE_ANALOGTV
 int analogtv_setRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	int option = GET_NUMBER(pArg);
@@ -4425,19 +4431,22 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 
 	return 0;
 }
+#endif //#ifdef ENABLE_ANALOGTV
 
+#ifdef STSDK
 int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	output_fillInputsMenu (pMenu, NULL);
 	return 0;
 };
+#endif
 
 int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 {
-	char *str;
-	char buf[MENU_ENTRY_INFO_LENGTH];
-
 #ifdef STB82
+	char buf[MENU_ENTRY_INFO_LENGTH];
+	char *str;
+
 	// assert (videoMenu == (interfaceMenu_t*)&VideoSubMenu);
 	interface_clearMenuEntries(videoMenu);
 
@@ -4488,6 +4497,9 @@ int output_enterVideoMenu(interfaceMenu_t *videoMenu, void* notused)
 			for(i = 0; (output = cJSON_GetArrayItem(list, i)) != NULL; i++) {
 				videoOutput_t	*p_videoOutput;
 				char			*name;
+				char			*str;
+				char			buf[MENU_ENTRY_INFO_LENGTH];
+
 				name = objGetString(output, "name", NULL);
 				if(!name)
 					continue;
@@ -4792,6 +4804,7 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 
 	// Get current LAN mode for future use
 	char *lanMode = (char*)output_getLanModeName(networkInfo.lanMode);
+	(void)lanMode; //hide "unused variable" warnings
 
 	// ------------------ Display current Internet connection ------------------
 #ifdef ENABLE_WIFI
@@ -6087,16 +6100,23 @@ void output_fillOutputMenu(void)
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
 #if (defined STSDK)
-	if (output_checkInputs() > 0){
+	appControlInfo.countInputs = output_checkInputs();
+	if (appControlInfo.countInputs > 0){
 		str = _T("INPUTS_CONFIG");
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
 #endif
+
+
 #ifdef ENABLE_ANALOGTV
-	/// TODO : check whether analog tuner presents
-	str = _T("ANALOGTV_CONFIG");
-	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &AnalogTvSubMenu, settings_dvb);
+	if (st_getBoardId()==eSTB850)
+	{
+		/// TODO : check whether analog tuner presents
+		str = _T("ANALOGTV_CONFIG");
+		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, 			&AnalogTvSubMenu, settings_dvb);
+	}
 #endif
+
 
 #ifdef ENABLE_DVB
 #ifdef HIDE_EXTRA_FUNCTIONS
@@ -6166,15 +6186,18 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 #ifdef STSDK
-	if (output_checkInputs() > 0){
+	if (appControlInfo.countInputs > 0){
 		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterInputsMenu, NULL, NULL);
 	}
 #endif
 #ifdef ENABLE_ANALOGTV
-	/// TODO : check whether analog tuner presents
-	createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
+	if (st_getBoardId()==eSTB850)
+	{
+		/// TODO : check whether analog tuner presents
+		createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M 		&OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
+	}
 #endif
 
 #ifdef ENABLE_3D

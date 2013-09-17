@@ -536,14 +536,21 @@ static inline int dvb_getAdapter(tunerFormat tuner)
 #ifdef STSDK
 static inline int dvb_isLinuxTuner(tunerFormat tuner)
 {
-	return dvb_getAdapter(tuner) < ADAPTER_COUNT;
+	int32_t adapter = dvb_getAdapter(tuner);
+	return (adapter >= 0) && (adapter < ADAPTER_COUNT);
 }
 #else
 // not linux tuners has on boards with STSDK only
 #define dvb_isLinuxTuner(tuner) 1
 #endif
 
-int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
+int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
+
+/** Function return if there has teletext in playing program
+ *   @param[out]  dvr_fd     DVR file descriptor
+ *   @return 1 if has teletext
+ */
+int32_t dvb_hasTeletext(int adapter, int32_t *dvr_fd);
 
 /** @} */
 

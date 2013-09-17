@@ -1919,15 +1919,15 @@ static void interface_animateMenu(int flipFB, int animate)
 	unsigned long long cur, start;
 #endif
 
-	if (appControlInfo.inStandby) return;
-	if (interfaceInfo.cleanUpState) return;
-	if (DRAWING_SURFACE == NULL) return;
+	if(appControlInfo.inStandby) return;
+	if(interfaceInfo.cleanUpState) return;
+	if(DRAWING_SURFACE == NULL) return;
 
 	//dprintf("%s: in\n", __FUNCTION__);
 
 #ifdef ENABLE_VIDIMAX
-	if (appControlInfo.vidimaxInfo.active){	
-		if (vidimax_refreshMenu() == 0){
+	if(appControlInfo.vidimaxInfo.active) {
+		if(vidimax_refreshMenu() == 0) {
 			return;
 		}
 	}
@@ -1935,17 +1935,13 @@ static void interface_animateMenu(int flipFB, int animate)
 
 	mysem_get(interface_semaphore);
 
-#ifdef ENABLE_TELETEXT
-	if ( interfaceInfo.teletext.show && 
-	     appControlInfo.teletextInfo.status>=teletextStatus_demand &&
-	    !appControlInfo.teletextInfo.subtitleFlag)
-	{
-		teletext_displayTeletext();
+	if(teletext_isTeletextReady()) {
+		teletext_displayPage();
 		interface_flipSurface();
 		mysem_release(interface_semaphore);
 		return;
 	}
-#endif
+
 #ifdef SCREEN_TRACE
 	start = getCurrentTime();
 #endif
@@ -1984,15 +1980,13 @@ static void interface_animateMenu(int flipFB, int animate)
 	gfx_drawText(DRAWING_SURFACE, pgfx_font, 255, 255, 255, 255, lx+lw/2-lrect.w/2, ly+lh/2+lrect.h/2, SHOW_LOGO_TEXT, 0, 0);
 #endif
 
-#ifndef STB225
-#ifdef SHOW_LOGO_IMAGE
+#if !(defined STB225) && (defined SHOW_LOGO_IMAGE)
 	/* Show logo image */
-	int lx = interfaceInfo.screenWidth-12;
+	int lx = interfaceInfo.screenWidth - 12;
 	int ly = 12;
 	interface_drawImage(pgfx_frameBuffer, IMAGE_DIR SHOW_LOGO_IMAGE,
-	                    lx, ly, 0, 0, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
-	                    interfaceAlignRight|interfaceAlignTop, NULL, NULL);
-#endif
+						lx, ly, 0, 0, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
+						interfaceAlignRight|interfaceAlignTop, NULL, NULL);
 #endif
 
 	//Kpy.. Special for 3d output, draw line that hides 3D header at the top left coner of the screen
@@ -2006,35 +2000,33 @@ static void interface_animateMenu(int flipFB, int animate)
 // 	Kpy disable logo
 //	interface_drawImage(pgfx_frameBuffer, IMAGE_DIR "logo-elc.png", 40, 40, 20, 25, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, NULL, NULL);
 	{
-	int videoLayer = gfx_getMainVideoLayer();
-	int imgWidth, imgHeight;
-	char outBuf[256];
-	gfx_getVideoPlaybackSize(&imgWidth, &imgHeight);
+		int videoLayer = gfx_getMainVideoLayer();
+		int imgWidth, imgHeight;
+		char outBuf[256];
+		gfx_getVideoPlaybackSize(&imgWidth, &imgHeight);
 
-	if (imgWidth!=0 && imgHeight!=0) {
-		if (appControlInfo.outputInfo.has_3D_TV || interfaceInfo.mode3D==0) {
-			gfx_setSourceRectangle(gfx_getMainVideoLayer(), 0, 0, imgWidth, imgHeight, 1);
-		} else {
-			gfx_setSourceRectangle(gfx_getMainVideoLayer(), 0, 0, imgWidth/2, imgHeight, 1);
+		if(imgWidth!=0 && imgHeight!=0) {
+			if(appControlInfo.outputInfo.has_3D_TV || interfaceInfo.mode3D==0) {
+				gfx_setSourceRectangle(gfx_getMainVideoLayer(), 0, 0, imgWidth, imgHeight, 1);
+			} else {
+				gfx_setSourceRectangle(gfx_getMainVideoLayer(), 0, 0, imgWidth/2, imgHeight, 1);
+			}
+//			gfx_setDestinationRectangle(gfx_getMainVideoLayer(), 0, 0, 1920, 1080, 1);
 		}
-//		gfx_setDestinationRectangle(gfx_getMainVideoLayer(), 0, 0, 1920, 1080, 1);
-	}
 
-	if ( appControlInfo.outputInfo.has_3D_TV && interfaceInfo.mode3D) {
-		if (interfaceInfo.showMenu || interfacePlayControl.visibleFlag || interfaceSlideshowControl.visibleFlag) {
-			gfx_fb1_clear(0x7f, 0x7f, 0x7f, 0xff);
+		if(appControlInfo.outputInfo.has_3D_TV && interfaceInfo.mode3D) {
+			if(interfaceInfo.showMenu || interfacePlayControl.visibleFlag || interfaceSlideshowControl.visibleFlag) {
+				gfx_fb1_clear(0x7f, 0x7f, 0x7f, 0xff);
+			} else {
+				gfx_fb1_clear(0x0, 0x0, 0x0, 0x0);
+			}
 		} else {
 			gfx_fb1_clear(0x0, 0x0, 0x0, 0x0);
 		}
-	} else {
-		gfx_fb1_clear(0x0, 0x0, 0x0, 0x0);
-	}
-		
 	}
 #endif
 
-	if ( !interfaceInfo.showMenu )
-	{
+	if(!interfaceInfo.showMenu) {
 		//dprintf("%s: display play control\n", __FUNCTION__);
 #ifdef ENABLE_MESSAGES
 		interface_displayMessageNotify();
@@ -2043,19 +2035,18 @@ static void interface_animateMenu(int flipFB, int animate)
 		interface_displayLoading();
 		interface_displayNotify();
 		interface_displayCustomSliderInMenu();
-		if ( interfacePlayControl.pDisplay != NULL )
+		if(interfacePlayControl.pDisplay != NULL) {
 			interfacePlayControl.pDisplay();
+		}
 		interface_displaySoundControl();
 		interface_displaySliderControl();
 		interface_displayMessageBox();
 		interface_displayVirtualKeypad();
 		interface_displayCall();
-#ifdef ENABLE_TELETEXT
-		if (interfaceInfo.teletext.show)
-		{
-			teletext_displayTeletext();
+
+		if(teletext_isEnable()) {
+			teletext_displayPage();
 		}
-#endif
 
 		interface_flipSurface();
 
@@ -2111,12 +2102,10 @@ static void interface_animateMenu(int flipFB, int animate)
 	interface_displayMessageBox();
 	interface_displayVirtualKeypad();
 	interface_displayCall();
-#ifdef ENABLE_TELETEXT
-	if (interfaceInfo.teletext.show)
-	{
-		teletext_displayTeletext();
+
+	if(teletext_isEnable()) {
+		teletext_displayPage();
 	}
-#endif
 
 	//dprintf("%s: flip\n", __FUNCTION__);
 
@@ -2697,12 +2686,9 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 	switch ( cmd->command )
 	{
 		case interfaceCommandExit:
-#ifdef ENABLE_TELETEXT
-			if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-			{
-				interfaceInfo.teletext.show=0;
+			if(teletext_isTeletextShowing()) {
+				teletext_enable(0);
 			}
-#endif
 			if (interfaceInfo.inputFocus == inputFocusSlider || interfaceInfo.inputFocus == inputFocusSliderMoving )
 			{
 				interface_playControlSetInputFocus(inputFocusPlayControl);
@@ -2719,12 +2705,7 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			res = 1;
 			break;
 		case interfaceCommandLeft:
-			if (( interfaceInfo.inputFocus == inputFocusSlideshow )
-#ifdef ENABLE_TELETEXT
-				|| (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-#endif
-			)
-			{
+			if((interfaceInfo.inputFocus == inputFocusSlideshow) || teletext_isTeletextShowing()) {
 				break;
 			}
 			if (interfaceInfo.inputFocus == inputFocusSlider || interfaceInfo.inputFocus == inputFocusSliderMoving )
@@ -2774,12 +2755,7 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			}
 			break;
 		case interfaceCommandRight:
-			if (( interfaceInfo.inputFocus == inputFocusSlideshow )
-#ifdef ENABLE_TELETEXT
-				|| (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-#endif
-			)
-			{
+			if((interfaceInfo.inputFocus == inputFocusSlideshow) || teletext_isTeletextShowing()) {
 				break;
 			}
 			if (interfaceInfo.inputFocus == inputFocusSlider || interfaceInfo.inputFocus == inputFocusSliderMoving )
@@ -2830,12 +2806,7 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			break;
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
-			if (( interfaceInfo.inputFocus == inputFocusSlideshow )
-#ifdef ENABLE_TELETEXT
-				|| (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-#endif
-			)
-			{
+			if((interfaceInfo.inputFocus == inputFocusSlideshow) || teletext_isTeletextShowing()) {
 				break;
 			}
 			if (interfaceInfo.inputFocus == inputFocusSlider)
@@ -2888,12 +2859,9 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			}
 			break;
 		case interfaceCommandUp:
-#ifdef ENABLE_TELETEXT
-			if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-			{
+			if(teletext_isTeletextShowing()) {
 				break;
 			}
-#endif
 			if ( interfacePlayControl.visibleFlag )
 			{
 				switch (interfaceInfo.inputFocus)
@@ -2921,12 +2889,9 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			}
 			break;
 		case interfaceCommandDown:
-#ifdef ENABLE_TELETEXT
-			if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-			{
+			if(teletext_isTeletextShowing()) {
 				break;
 			}
-#endif
 			if ( interfacePlayControl.visibleFlag )
 			{
 				switch (interfaceInfo.inputFocus)
@@ -2955,31 +2920,22 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			break;
 		case interfaceCommandMainMenu:
 		case interfaceCommandBack:
-#ifdef ENABLE_TELETEXT
-			if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-			{
-				interfaceInfo.teletext.show=0;
+			if(teletext_isTeletextShowing()) {
+				teletext_enable(0);
 			}
-#endif
 			interface_showMenu(!interfaceInfo.showMenu, 1);
 			res = 1;
 			break;
 		case interfaceCommandChannelUp:
 		case interfaceCommandChannelDown:
-#ifdef ENABLE_TELETEXT
-			if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-			{
-				interfaceInfo.teletext.show=0;
+			if(teletext_isTeletextShowing()) {
+				teletext_enable(0);
 			}
-#endif
-			if (interfacePlayControl.pChannelChange != NULL)
-			{
+			if(interfacePlayControl.pChannelChange != NULL) {
 				interfacePlayControl.pChannelChange(cmd->command == interfaceCommandChannelDown, interfacePlayControl.pArg);
 				res = 1;
-			}
-			else if ( interfaceSlideshowControl.enabled )
-			{
-				res = media_slideshowNext( cmd->command == interfaceCommandChannelDown );
+			} else if(interfaceSlideshowControl.enabled) {
+				res = media_slideshowNext(cmd->command == interfaceCommandChannelDown);
 			}
 			break;
 		case interfaceCommandPrevious:
@@ -3042,12 +2998,9 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 		case interfaceCommand7:
 		case interfaceCommand8:
 		case interfaceCommand9:
-#ifdef ENABLE_TELETEXT
-			if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-			{
+			if(teletext_isTeletextShowing()) {
 				break;
 			}
-#endif
 			if (interfaceChannelControl.pSet != NULL )
 			{
 				interface_removeEvent(interface_channelNumberReset,NULL);
@@ -3102,11 +3055,9 @@ int interface_playControlProcessCommand(pinterfaceCommandEvent_t cmd)
 			}
 			// fall through
 		default:
-			if (
-#ifdef ENABLE_TELETEXT
-				(!(appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))) &&
-#endif
-				interfacePlayControl.enabled && interfacePlayControl.pCallback != NULL )
+			if(!teletext_isTeletextShowing() &&
+				interfacePlayControl.enabled &&
+				(interfacePlayControl.pCallback != NULL))
 			{
 				interfacePlayControlButton_t play_cmd;
 				switch (cmd->command)
@@ -3347,12 +3298,9 @@ pinterfaceCommandEvent_t interface_keypadProcessCommand(pinterfaceCommandEvent_t
 static void interface_enterChannelList()
 {
 #ifdef ENABLE_DVB
-#ifdef ENABLE_TELETEXT
-	if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-	{
-		interfaceInfo.teletext.show=0;
+	if(teletext_isTeletextShowing()) {
+		teletext_enable(0);
 	}
-#endif
 	if ( appControlInfo.playbackInfo.streamSource != streamSourceIPTV && offair_tunerPresent() )
 	{
 		interface_showMenu(1, 0);
@@ -3556,12 +3504,9 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		interface_playControlProcessCommand(cmd);
 	} else if ( cmd->command == interfaceCommandToggleMenu )
 	{
-#ifdef ENABLE_TELETEXT
-		if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-		{
-			interfaceInfo.teletext.show=0;
+		if(teletext_isTeletextShowing()) {
+			teletext_enable(0);
 		}
-#endif
 		interface_showMenu(!interfaceInfo.showMenu, 1);
 /*
 		if (interfaceInfo.currentMenu != NULL && interfaceInfo.currentMenu->selectedItem > 0 && interfaceInfo.currentMenu->selectedItem < interfaceInfo.currentMenu->menuEntryCount)
@@ -3589,12 +3534,10 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		switch (cmd->command)
 		{
 			case interfaceCommandServices:
-#ifdef ENABLE_TELETEXT
-				if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-				{
-					interfaceInfo.teletext.show=0;
+				if(teletext_isTeletextShowing()) {
+					teletext_enable(0);
 				}
-#endif
+
 				if ( interfaceInfo.currentMenu == (interfaceMenu_t*)&OutputMenu )
 				{
 					if (interfaceInfo.showMenu)
@@ -3616,12 +3559,9 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 				}
 			break;
 			case interfaceCommandPhone:
-#ifdef ENABLE_TELETEXT
-				if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-				{
-					interfaceInfo.teletext.show=0;
+				if(teletext_isTeletextShowing()) {
+					teletext_enable(0);
 				}
-#endif
 #ifdef ENABLE_VOIP
 				if (appControlInfo.voipInfo.status == voipStatus_incoming)
 				{
@@ -3654,12 +3594,9 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 	}
 	else if ( interfaceInfo.showMenu )
 	{
-#ifdef ENABLE_TELETEXT
-		if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-		{
-			interfaceInfo.teletext.show=0;
+		if(teletext_isTeletextShowing()) {
+			teletext_enable(0);
 		}
-#endif
 		if ( interfaceInfo.currentMenu != NULL && interfaceInfo.currentMenu->processCommand != NULL )
 		{
 			interfaceInfo.currentMenu->processCommand(interfaceInfo.currentMenu, cmd);
@@ -3669,12 +3606,9 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		interface_playControlProcessCommand(cmd);
 	} else // menu is hidden and play control is disabled
 	{
-#ifdef ENABLE_TELETEXT
-		if (appControlInfo.teletextInfo.exists && interfaceInfo.teletext.show && (!appControlInfo.teletextInfo.subtitleFlag))
-		{
-			interfaceInfo.teletext.show=0;
+		if (teletext_isTeletextShowing()) {
+			teletext_enable(0);
 		}
-#endif
 		interface_showMenu(!interfaceInfo.showMenu, 1);
 	}
 }
@@ -6611,7 +6545,7 @@ void interface_init()
 
 	interfaceInfo.notifyText[0] = 0;
 
-	interfaceInfo.teletext.show = 0;
+	teletext_enable(0);
 
 	interfaceInfo.customSlider = NULL;
 	interfaceInfo.customSliderVisibleInMenu = 0;

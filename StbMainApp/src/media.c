@@ -80,7 +80,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef STBPNX
 #define MEDIA_ROOT "/usb/"
 #endif
-#ifdef STSDK
+#if (defined STSDK) || (defined STBuemd)
 #define MEDIA_ROOT "/mnt/"
 #endif
 #ifndef MEDIA_ROOT

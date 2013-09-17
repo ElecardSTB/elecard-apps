@@ -140,6 +140,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 //#define ENABLE_REGPLAT
 
+/** @def ENABLE_TELETEXT Enable teletext support (defined in Makefile)
+ */
+//#define ENABLE_TELETEXT
+
+/** @def ENABLE_ANALOGTV Enable analog tv support (defined in Makefile)
+ */
+//#define ENABLE_ANALOGTV
+
 #ifdef ENABLE_TELETES
 
 #undef ENABLE_WEB_SERVICES
@@ -154,13 +162,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #ifdef ENABLE_DVB
-	/** @def ENABLE_TELETEXT Enable DVB Teletext
-	 */
-	#define ENABLE_ANALOGTV
-#ifdef LINUX_DVB_API_DEMUX
-	#define ENABLE_TELETEXT
-#endif
-
 	/** @def ENABLE_DVB_DIAG Enable diagnostics mode for DVB
 	 */
 	//#define ENABLE_DVB_DIAG

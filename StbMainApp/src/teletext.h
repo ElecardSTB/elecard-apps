@@ -36,10 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #include "defines.h"
-
-#ifdef ENABLE_TELETEXT
-
 #include "dvb.h"
+#include "interface.h"
 
 #include <stdlib.h>
 
@@ -53,22 +51,36 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
+#ifdef ENABLE_TELETEXT
 
 void teletext_init(void);
 
-/**
-*   @brief Function takes PES packets from buffer of TS packets
-* 
-*   @param buf		I	Packets buffer
-*   @param size	I	Buffer size
-*/
-void teletext_readPESPacket(unsigned char *buf, size_t size);
+int32_t teletext_start(DvbParam_t *param);
+int32_t teletext_stop(void);
+
+int32_t teletext_processCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 
 /* Displays teletext */
-void teletext_displayTeletext(void);
-int teletext_StartThread(void);
-int teletext_StopThread();
+void teletext_displayPage(void);
 
-#endif /* ENABLE_TELETEXT */
+int32_t teletext_isTeletextReady(void);
+int32_t teletext_isTeletextShowing(void);
+uint32_t teletext_isEnable(void);
+uint32_t teletext_enable(uint32_t enable);
+
+#else //ENABLE_TELETEXT
+
+//define fake macros
+#define teletext_init(...)
+#define teletext_start(...)
+#define teletext_stop(...)
+#define teletext_processCommand(...)	-1
+#define teletext_displayPage(...)
+#define teletext_isTeletextReady()		0
+#define teletext_isTeletextShowing()	0
+#define teletext_isEnable()				0
+#define teletext_enable(...)
+
+#endif //ENABLE_TELETEXT
 
 #endif

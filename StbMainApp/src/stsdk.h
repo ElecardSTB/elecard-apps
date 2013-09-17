@@ -1,5 +1,3 @@
-#ifdef STSDK
-
 #ifndef __STSDK_H
 #define __STSDK_H
 
@@ -42,11 +40,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "dvb.h"
 #include "output.h"
 
-#include <elcd-rpc.h>
 #ifdef ENABLE_DVB
 #include <linux/dvb/frontend.h>
 #endif
+#ifdef STSDK
 #include <linux/board_id.h>
+#include <elcd-rpc.h>
+#endif
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -60,6 +60,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define RPC_TIMEOUT (3)
 #define RPC_SCAN_TIMEOUT      (20)
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef STSDK
+
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
@@ -69,11 +75,6 @@ typedef void (*rpcCallback_t)(elcdRpcType_t type, cJSON *result, void* pArg);
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 int  st_init(void);
 void st_terminate(void);
 
@@ -139,9 +140,14 @@ int st_needRestart(void);
 
 g_board_type_t st_getBoardId(void);
 
+#else // STSDK
+
+#define  st_sendDiseqc(args...)
+
+#endif // STSDK
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif // __STSDK_H
-#endif // STSDK
