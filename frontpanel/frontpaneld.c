@@ -65,13 +65,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define LISTEN_PATH				"/var/run/frontpanel" //socket
 
-#define FONT_CHAR_WIDTH				20
-#define FONT_CHAR_HEIGHT			21
-#define FONT_COLUMN_NUMBER			16
+#define FONT_CHAR_WIDTH			20
+#define FONT_CHAR_HEIGHT		21
+#define FONT_COLUMN_NUMBER		16
 
-#define FRAMEBUFFER_WIDTH				128
-#define FRAMEBUFFER_HEIGHT				32
-#define FRAMEBUFFER_SIZE				512
+#define FRAMEBUFFER_WIDTH		128
+#define FRAMEBUFFER_HEIGHT		32
+#define FRAMEBUFFER_SIZE		512
 
 #define DEVICE_TM1668_PATH		"/sys/devices/platform/tm1668"
 #define DEVICE_CT1628_PATH		"/sys/devices/platform/ct1628"
@@ -250,18 +250,6 @@ void AddString(uint32_t x0, uint32_t y0, const char* str)
 		i += FONT_CHAR_WIDTH >> 1;
 	}
 	UpdateDisplay();
-}
-
-int32_t StringWidth(const char* str)
-{
-	uint32_t	len;
-	if(str == NULL)
-		return 0;
-	len = strlen(str);
-	if(len == 0)
-		return 0;
-
-	return ((len - 1) * (FONT_CHAR_WIDTH >> 1) + FONT_CHAR_WIDTH);
 }
 
 int32_t CheckBoardType(void)
@@ -445,8 +433,7 @@ void SetFrontpanelText(const char *buffer)
 {
 	if(g_board == eSTB850){
 		AddString(5, 5, buffer);
-	}
-	else {
+	} else {
 		FILE *f;
 		f = fopen(g_frontpanelText, "w");
 		if(f != 0) {
@@ -456,17 +443,24 @@ void SetFrontpanelText(const char *buffer)
 	}	
 }
 
+//count of symbols contained on oled screen width
+#define OLED_SYMBOL_COUNT (((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH)) / (FONT_CHAR_WIDTH >> 1)) + 1)
+
 void DisplayCurentText()
 {
 	int32_t bufSize;
+	int32_t screenSymbolCount;
 
 	if(g_board == eSTB850){
-		bufSize = ((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH))/(FONT_CHAR_WIDTH >> 1))+1;
+		screenSymbolCount = OLED_SYMBOL_COUNT;
+		bufSize = screenSymbolCount + 1;
 	} else {
+		screenSymbolCount = 4;
 		bufSize = 6;
 	}
 
 	char	tmpBuf[bufSize];
+	tmpBuf[screenSymbolCount] = 0;
 	
 	switch(g_messageType) {
 		case NOTIFY:
@@ -475,13 +469,7 @@ void DisplayCurentText()
 			if(g_rollTextInfo.textOffset > g_rollTextInfo.textLength) {
 				g_rollTextInfo.textOffset = 0;
 			}
-			if(g_board == eSTB850){
-				strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, bufSize);
-			}
-			else {
-				strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, 4);
-			}
-			
+			strncpy(tmpBuf, g_rollTextInfo.text + g_rollTextInfo.textOffset, screenSymbolCount);
 			SetFrontpanelText(tmpBuf);
 			break;
 		case TIME:
@@ -495,8 +483,6 @@ void DisplayCurentText()
 		default:
 			break;
 	}
-	if(g_board != eSTB850)
-		tmpBuf[5] = 0;
 	DBG("%s: type %d text=\"%s\"\n", __func__, g_messageType, tmpBuf);
 }
 
@@ -555,8 +541,9 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 	StopTimer(g_delayTimer);
 	StopTimer(g_messageTimer);
 	if(timeout > 0) {
-				
 		int32_t	textLen;
+		int32_t bufSize;
+		int32_t screenSymbolCount; //count of symbols contained on screen width
 
 		while((*newText == ' ') || (*newText == '\t')) {
 			newText++;
@@ -570,49 +557,30 @@ static int32_t SetMessage(char *newText, int32_t timeout)
 
 		textLen = strlen(newText);
 		DBG("%s: '%s' (%d)\n", __func__, newText, textLen);
-		
-		int32_t bufSize;		
 
-		if(g_board == eSTB850){
-			bufSize = ((FRAMEBUFFER_WIDTH - (FONT_CHAR_WIDTH))/(FONT_CHAR_WIDTH >> 1))+1;;
+
+		if(g_board == eSTB850) {
+			screenSymbolCount = OLED_SYMBOL_COUNT;
+			bufSize = screenSymbolCount + 1;
 		} else {
-			bufSize = 6;
+			screenSymbolCount = 4;
+			bufSize = 6;//one extra byte need for colon in ct1628
 		}
-		
 		char	tmpBuf[bufSize];
-				
-		if((textLen > 2) && (newText[2] == ':') && (textLen < 6)) {//"xx:xx" format
+
+		if((g_board != eSTB850) && (textLen > 2) && (newText[2] == ':') && (textLen < 6)) {//"xx:xx" format for ct1628 and tm16xx
 			memcpy(tmpBuf, newText, 2);
 			strcpy(tmpBuf + 2, newText + 3);
 			AddColon(tmpBuf);
 		} else {
-			if(g_board == eSTB850){
-				if (StringWidth(newText) < FRAMEBUFFER_WIDTH)
-				{
-					strncpy(tmpBuf, newText, textLen);
-				}
-				else {
-					strncpy(tmpBuf, newText, bufSize);
-
-					if(textLen > bufSize) { 
-						g_rollTextInfo.textLength = textLen;
-						g_rollTextInfo.textOffset = 0;
-						strcpy(g_rollTextInfo.text, newText);
-						SetTimer(g_delayTimer, g_t1, g_t2);
-					}
-				}
-					
-			} else {
-				strncpy(tmpBuf, newText, 4);
-				tmpBuf[4] = 0;
-
-				if(textLen > 4) { //roll the text if it contain more than 4 characters
-					g_rollTextInfo.textLength = textLen;
-					g_rollTextInfo.textOffset = 0;
-					strcpy(g_rollTextInfo.text, newText);
-					SetTimer(g_delayTimer, g_t1, g_t2);
-				}
-			}			
+			strncpy(tmpBuf, newText, screenSymbolCount);
+			tmpBuf[screenSymbolCount] = 0;
+			if(textLen > screenSymbolCount) { //roll the text if it contain more than can fit the screen
+				g_rollTextInfo.textLength = textLen;
+				g_rollTextInfo.textOffset = 0;
+				strcpy(g_rollTextInfo.text, newText);
+				SetTimer(g_delayTimer, g_t1, g_t2);
+			}
 		}
 		SetFrontpanelText(tmpBuf);
 
