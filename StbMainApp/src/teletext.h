@@ -48,11 +48,27 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define TELETEXT_PACKET_BUFFER_SIZE (5*TS_PACKET_SIZE)
 #define TELETEXT_pipe_TS "/tmp/ttx.ts"
 
+#define PG_ACTIVE	0x100
+#define BAD_CHAR 0xb8 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
 #ifdef ENABLE_TELETEXT
 
+struct vt_page
+{
+    int pgno, subno;	// the wanted page number
+    int lang;		// language code
+    int flags;		// misc flags (see PG_xxx below)
+    int errors;		// number of single bit errors in page
+    u32 lines;		// 1 bit for each line received
+    u8 data[25][40];	// page contents
+    int flof;		// page has FastText links
+    struct {
+    int pgno;
+    int subno;
+    } link[6]; // FastText links (FLOF)
+};
 void teletext_init(void);
 
 int32_t teletext_start(DvbParam_t *param);

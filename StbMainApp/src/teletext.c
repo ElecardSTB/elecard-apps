@@ -98,6 +98,10 @@ typedef struct {
 	uint32_t			subtitleFlag;
 } teletextInfo_t;
 
+#define DEBUG_TTX 0
+#define debug_print(fmt, ...) \
+	do { if (DEBUG_TTX) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -124,40 +128,111 @@ int32_t tt_fd = -1;
 static unsigned int  PesPacketLength = 0;
 static unsigned char PesPacketBuffer[TELETEXT_PES_PACKET_BUFFER_SIZE];
 
+static const u_int8_t byterev8[256] = {
+        0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
+        0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
+        0x08, 0x88, 0x48, 0xc8, 0x28, 0xa8, 0x68, 0xe8,
+        0x18, 0x98, 0x58, 0xd8, 0x38, 0xb8, 0x78, 0xf8,
+        0x04, 0x84, 0x44, 0xc4, 0x24, 0xa4, 0x64, 0xe4,
+        0x14, 0x94, 0x54, 0xd4, 0x34, 0xb4, 0x74, 0xf4,
+        0x0c, 0x8c, 0x4c, 0xcc, 0x2c, 0xac, 0x6c, 0xec,
+        0x1c, 0x9c, 0x5c, 0xdc, 0x3c, 0xbc, 0x7c, 0xfc,
+        0x02, 0x82, 0x42, 0xc2, 0x22, 0xa2, 0x62, 0xe2,
+        0x12, 0x92, 0x52, 0xd2, 0x32, 0xb2, 0x72, 0xf2,
+        0x0a, 0x8a, 0x4a, 0xca, 0x2a, 0xaa, 0x6a, 0xea,
+        0x1a, 0x9a, 0x5a, 0xda, 0x3a, 0xba, 0x7a, 0xfa,
+        0x06, 0x86, 0x46, 0xc6, 0x26, 0xa6, 0x66, 0xe6,
+        0x16, 0x96, 0x56, 0xd6, 0x36, 0xb6, 0x76, 0xf6,
+        0x0e, 0x8e, 0x4e, 0xce, 0x2e, 0xae, 0x6e, 0xee,
+        0x1e, 0x9e, 0x5e, 0xde, 0x3e, 0xbe, 0x7e, 0xfe,
+        0x01, 0x81, 0x41, 0xc1, 0x21, 0xa1, 0x61, 0xe1,
+        0x11, 0x91, 0x51, 0xd1, 0x31, 0xb1, 0x71, 0xf1,
+        0x09, 0x89, 0x49, 0xc9, 0x29, 0xa9, 0x69, 0xe9,
+        0x19, 0x99, 0x59, 0xd9, 0x39, 0xb9, 0x79, 0xf9,
+        0x05, 0x85, 0x45, 0xc5, 0x25, 0xa5, 0x65, 0xe5,
+        0x15, 0x95, 0x55, 0xd5, 0x35, 0xb5, 0x75, 0xf5,
+        0x0d, 0x8d, 0x4d, 0xcd, 0x2d, 0xad, 0x6d, 0xed,
+        0x1d, 0x9d, 0x5d, 0xdd, 0x3d, 0xbd, 0x7d, 0xfd,
+        0x03, 0x83, 0x43, 0xc3, 0x23, 0xa3, 0x63, 0xe3,
+        0x13, 0x93, 0x53, 0xd3, 0x33, 0xb3, 0x73, 0xf3,
+        0x0b, 0x8b, 0x4b, 0xcb, 0x2b, 0xab, 0x6b, 0xeb,
+        0x1b, 0x9b, 0x5b, 0xdb, 0x3b, 0xbb, 0x7b, 0xfb,
+        0x07, 0x87, 0x47, 0xc7, 0x27, 0xa7, 0x67, 0xe7,
+        0x17, 0x97, 0x57, 0xd7, 0x37, 0xb7, 0x77, 0xf7,
+        0x0f, 0x8f, 0x4f, 0xcf, 0x2f, 0xaf, 0x6f, 0xef,
+        0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff
+};
+
 static const unsigned char unhamtab[256] =
 {
-	0x01, 0xff, 0x81, 0x01, 0xff, 0x00, 0x01, 0xff,
-	0xff, 0x02, 0x01, 0xff, 0x0a, 0xff, 0xff, 0x07,
-	0xff, 0x00, 0x01, 0xff, 0x00, 0x80, 0xff, 0x00,
-	0x06, 0xff, 0xff, 0x0b, 0xff, 0x00, 0x03, 0xff,
-	0xff, 0x0c, 0x01, 0xff, 0x04, 0xff, 0xff, 0x07,
-	0x06, 0xff, 0xff, 0x07, 0xff, 0x07, 0x07, 0x87,
-	0x06, 0xff, 0xff, 0x05, 0xff, 0x00, 0x0d, 0xff,
-	0x86, 0x06, 0x06, 0xff, 0x06, 0xff, 0xff, 0x07,
-	0xff, 0x02, 0x01, 0xff, 0x04, 0xff, 0xff, 0x09,
-	0x02, 0x82, 0xff, 0x02, 0xff, 0x02, 0x03, 0xff,
-	0x08, 0xff, 0xff, 0x05, 0xff, 0x00, 0x03, 0xff,
-	0xff, 0x02, 0x03, 0xff, 0x03, 0xff, 0x83, 0x03,
-	0x04, 0xff, 0xff, 0x05, 0x84, 0x04, 0x04, 0xff,
-	0xff, 0x02, 0x0f, 0xff, 0x04, 0xff, 0xff, 0x07,
-	0xff, 0x05, 0x05, 0x85, 0x04, 0xff, 0xff, 0x05,
-	0x06, 0xff, 0xff, 0x05, 0xff, 0x0e, 0x03, 0xff,
-	0xff, 0x0c, 0x01, 0xff, 0x0a, 0xff, 0xff, 0x09,
-	0x0a, 0xff, 0xff, 0x0b, 0x8a, 0x0a, 0x0a, 0xff,
-	0x08, 0xff, 0xff, 0x0b, 0xff, 0x00, 0x0d, 0xff,
-	0xff, 0x0b, 0x0b, 0x8b, 0x0a, 0xff, 0xff, 0x0b,
-	0x0c, 0x8c, 0xff, 0x0c, 0xff, 0x0c, 0x0d, 0xff,
-	0xff, 0x0c, 0x0f, 0xff, 0x0a, 0xff, 0xff, 0x07,
-	0xff, 0x0c, 0x0d, 0xff, 0x0d, 0xff, 0x8d, 0x0d,
-	0x06, 0xff, 0xff, 0x0b, 0xff, 0x0e, 0x0d, 0xff,
-	0x08, 0xff, 0xff, 0x09, 0xff, 0x09, 0x09, 0x89,
-	0xff, 0x02, 0x0f, 0xff, 0x0a, 0xff, 0xff, 0x09,
-	0x88, 0x08, 0x08, 0xff, 0x08, 0xff, 0xff, 0x09,
-	0x08, 0xff, 0xff, 0x0b, 0xff, 0x0e, 0x03, 0xff,
-	0xff, 0x0c, 0x0f, 0xff, 0x04, 0xff, 0xff, 0x09,
-	0x0f, 0xff, 0x8f, 0x0f, 0xff, 0x0e, 0x0f, 0xff,
-	0x08, 0xff, 0xff, 0x05, 0xff, 0x0e, 0x0d, 0xff,
-	0xff, 0x0e, 0x0f, 0xff, 0x0e, 0x8e, 0xff, 0x0e
+  0x01, 0xff, 0x81, 0x01, 0xff, 0x00, 0x01, 0xff,
+  0xff, 0x02, 0x01, 0xff, 0x0a, 0xff, 0xff, 0x07,
+  0xff, 0x00, 0x01, 0xff, 0x00, 0x80, 0xff, 0x00,
+  0x06, 0xff, 0xff, 0x0b, 0xff, 0x00, 0x03, 0xff,
+  0xff, 0x0c, 0x01, 0xff, 0x04, 0xff, 0xff, 0x07,
+  0x06, 0xff, 0xff, 0x07, 0xff, 0x07, 0x07, 0x87,
+  0x06, 0xff, 0xff, 0x05, 0xff, 0x00, 0x0d, 0xff,
+  0x86, 0x06, 0x06, 0xff, 0x06, 0xff, 0xff, 0x07,
+  0xff, 0x02, 0x01, 0xff, 0x04, 0xff, 0xff, 0x09,
+  0x02, 0x82, 0xff, 0x02, 0xff, 0x02, 0x03, 0xff,
+  0x08, 0xff, 0xff, 0x05, 0xff, 0x00, 0x03, 0xff,
+  0xff, 0x02, 0x03, 0xff, 0x03, 0xff, 0x83, 0x03,
+  0x04, 0xff, 0xff, 0x05, 0x84, 0x04, 0x04, 0xff,
+  0xff, 0x02, 0x0f, 0xff, 0x04, 0xff, 0xff, 0x07,
+  0xff, 0x05, 0x05, 0x85, 0x04, 0xff, 0xff, 0x05,
+  0x06, 0xff, 0xff, 0x05, 0xff, 0x0e, 0x03, 0xff,
+  0xff, 0x0c, 0x01, 0xff, 0x0a, 0xff, 0xff, 0x09,
+  0x0a, 0xff, 0xff, 0x0b, 0x8a, 0x0a, 0x0a, 0xff,
+  0x08, 0xff, 0xff, 0x0b, 0xff, 0x00, 0x0d, 0xff,
+  0xff, 0x0b, 0x0b, 0x8b, 0x0a, 0xff, 0xff, 0x0b,
+  0x0c, 0x8c, 0xff, 0x0c, 0xff, 0x0c, 0x0d, 0xff,
+  0xff, 0x0c, 0x0f, 0xff, 0x0a, 0xff, 0xff, 0x07,
+  0xff, 0x0c, 0x0d, 0xff, 0x0d, 0xff, 0x8d, 0x0d,
+  0x06, 0xff, 0xff, 0x0b, 0xff, 0x0e, 0x0d, 0xff,
+  0x08, 0xff, 0xff, 0x09, 0xff, 0x09, 0x09, 0x89,
+  0xff, 0x02, 0x0f, 0xff, 0x0a, 0xff, 0xff, 0x09,
+  0x88, 0x08, 0x08, 0xff, 0x08, 0xff, 0xff, 0x09,
+  0x08, 0xff, 0xff, 0x0b, 0xff, 0x0e, 0x03, 0xff,
+  0xff, 0x0c, 0x0f, 0xff, 0x04, 0xff, 0xff, 0x09,
+  0x0f, 0xff, 0x8f, 0x0f, 0xff, 0x0e, 0x0f, 0xff,
+  0x08, 0xff, 0xff, 0x05, 0xff, 0x0e, 0x0d, 0xff,
+  0xff, 0x0e, 0x0f, 0xff, 0x0e, 0x8e, 0xff, 0x0e
+};
+
+static unsigned short hammtab[256] =
+{
+    0x0101, 0x100f, 0x0001, 0x0101, 0x100f, 0x0100, 0x0101, 0x100f,
+    0x100f, 0x0102, 0x0101, 0x100f, 0x010a, 0x100f, 0x100f, 0x0107,
+    0x100f, 0x0100, 0x0101, 0x100f, 0x0100, 0x0000, 0x100f, 0x0100,
+    0x0106, 0x100f, 0x100f, 0x010b, 0x100f, 0x0100, 0x0103, 0x100f,
+    0x100f, 0x010c, 0x0101, 0x100f, 0x0104, 0x100f, 0x100f, 0x0107,
+    0x0106, 0x100f, 0x100f, 0x0107, 0x100f, 0x0107, 0x0107, 0x0007,
+    0x0106, 0x100f, 0x100f, 0x0105, 0x100f, 0x0100, 0x010d, 0x100f,
+    0x0006, 0x0106, 0x0106, 0x100f, 0x0106, 0x100f, 0x100f, 0x0107,
+    0x100f, 0x0102, 0x0101, 0x100f, 0x0104, 0x100f, 0x100f, 0x0109,
+    0x0102, 0x0002, 0x100f, 0x0102, 0x100f, 0x0102, 0x0103, 0x100f,
+    0x0108, 0x100f, 0x100f, 0x0105, 0x100f, 0x0100, 0x0103, 0x100f,
+    0x100f, 0x0102, 0x0103, 0x100f, 0x0103, 0x100f, 0x0003, 0x0103,
+    0x0104, 0x100f, 0x100f, 0x0105, 0x0004, 0x0104, 0x0104, 0x100f,
+    0x100f, 0x0102, 0x010f, 0x100f, 0x0104, 0x100f, 0x100f, 0x0107,
+    0x100f, 0x0105, 0x0105, 0x0005, 0x0104, 0x100f, 0x100f, 0x0105,
+    0x0106, 0x100f, 0x100f, 0x0105, 0x100f, 0x010e, 0x0103, 0x100f,
+    0x100f, 0x010c, 0x0101, 0x100f, 0x010a, 0x100f, 0x100f, 0x0109,
+    0x010a, 0x100f, 0x100f, 0x010b, 0x000a, 0x010a, 0x010a, 0x100f,
+    0x0108, 0x100f, 0x100f, 0x010b, 0x100f, 0x0100, 0x010d, 0x100f,
+    0x100f, 0x010b, 0x010b, 0x000b, 0x010a, 0x100f, 0x100f, 0x010b,
+    0x010c, 0x000c, 0x100f, 0x010c, 0x100f, 0x010c, 0x010d, 0x100f,
+    0x100f, 0x010c, 0x010f, 0x100f, 0x010a, 0x100f, 0x100f, 0x0107,
+    0x100f, 0x010c, 0x010d, 0x100f, 0x010d, 0x100f, 0x000d, 0x010d,
+    0x0106, 0x100f, 0x100f, 0x010b, 0x100f, 0x010e, 0x010d, 0x100f,
+    0x0108, 0x100f, 0x100f, 0x0109, 0x100f, 0x0109, 0x0109, 0x0009,
+    0x100f, 0x0102, 0x010f, 0x100f, 0x010a, 0x100f, 0x100f, 0x0109,
+    0x0008, 0x0108, 0x0108, 0x100f, 0x0108, 0x100f, 0x100f, 0x0109,
+    0x0108, 0x100f, 0x100f, 0x010b, 0x100f, 0x010e, 0x0103, 0x100f,
+    0x100f, 0x010c, 0x010f, 0x100f, 0x0104, 0x100f, 0x100f, 0x0109,
+    0x010f, 0x100f, 0x000f, 0x010f, 0x100f, 0x010e, 0x010f, 0x100f,
+    0x0108, 0x100f, 0x100f, 0x0105, 0x100f, 0x010e, 0x010d, 0x100f,
+    0x100f, 0x010e, 0x010f, 0x100f, 0x010e, 0x000e, 0x100f, 0x010e,
 };
 
 static const unsigned char invtab[256] =
@@ -411,134 +486,337 @@ static inline unsigned char unham(unsigned char low, unsigned char high)
 	return (unhamtab[high] << 4) | (unhamtab[low] & 0x0F);
 }
 
-static void SetLine(int line,
-			unsigned char* data,
-			int mag,
-			int last_line)
+int hamm16(u8 *p, int *err)
 {
-	static int writingEnd=0;
-	static unsigned char page[TELETEXT_SYMBOL_LINE_COUNT][TELETEXT_SYMBOL_ROW_COUNT];
-	static int row = 0;
-	static int m_nPage;
-	static int m_Valid = 0;
-	static unsigned char timeSec=0;
-
-	unsigned char tmp[TELETEXT_SYMBOL_ROW_COUNT];
-	unsigned char teletext_subtitle_line_text[TELETEXT_SYMBOL_ROW_COUNT];
-	int column;
-	static int outSubtitle = 0;
-	int rowCount = TELETEXT_SYMBOL_ROW_COUNT;
-	int lineCount = TELETEXT_SYMBOL_LINE_COUNT;
-
-	if (line == 0)
-	{
-		if(!teletextInfo.status)
-			teletextInfo.status=teletextStatus_begin;
-
-		// Using this buffer to start a brand new page.
-		m_nPage = (mag << 8) | unham(data[0], data[1]); // The lower two (hex) numbers of page
-		m_nPage = (((m_nPage & 0xF00) >> 8 ) * 100) + ((m_nPage & 0xF0) >> 4) * 10 + (m_nPage & 0xF);
-
-
-		teletextInfo.cyrillic[m_nPage] =	((unham(data[6], data[7]) >> 5) & 0x07);
-
-		m_Valid = 1;
-		if(outSubtitle && teletextInfo.subtitleFlag && teletext_isEnable())
-			interface_displayMenu(1);
-		if(outSubtitle)
-			outSubtitle = 0;
-	}
-
-	if (m_Valid && (mag == m_nPage / 100))
-	{
-		int text_index = 0;
-
-		if (line <= 24)
-		{
-			if (line == 0)
-			{
-				if((data[8]==32) && (data[9]==32) && (data[10]==32))	//Subtitles
-				{
-					outSubtitle=1;
-					if(teletextInfo.subtitlePage == -1)
-					{
-						teletextInfo.subtitlePage = (m_nPage/256)*100 +
-							((m_nPage-(m_nPage/256)*256)/16)*10 +
-							m_nPage-((m_nPage/256)*256 + ((m_nPage-(m_nPage/256)*256)/16)*16);
-					}
-					memset(teletextInfo.subtitle, ' ', lineCount*rowCount);
-					row = lineCount-5;
-				}
-				else													//Usual page
-				{
-					tmp[0]=' ';
-					tmp[1]=' ';
-					tmp[2]='P';
-					tmp[3]=' ';
-					tmp[4]=data[8];
-					tmp[5]=data[9];
-					tmp[6]=data[10];
-					tmp[7]=' ';
-					row = 0;
-				}
-				memcpy(&tmp[8], data+8, 32);
-			}
-			else
-				memcpy(tmp, data, rowCount);
-
-			for (column = 1; column <= rowCount; column++)
-			{
-				char ch = tmp[column - 1] & 0x7f;
-				if (ch >= ' ')
-					teletext_subtitle_line_text[text_index++] = vtx2iso8559_1_table[ch - 0x20];
-				else
-					teletext_subtitle_line_text[text_index++] = ch;
-			}
-
-			if (line == 0)
-				memcpy(teletextInfo.time, &teletext_subtitle_line_text[26], 14);
-
-			if(row<lineCount-1)
-				memcpy(&page[line][0], teletext_subtitle_line_text, rowCount);
-
-			if(outSubtitle)
-			{
-				if(row>lineCount-5)
-				{
-					memcpy(&teletextInfo.subtitle[row][0], teletext_subtitle_line_text, rowCount);
-				}
-			}
-			else if(row == 20)
-			{
-				teletextInfo.pageNumber = m_nPage;
-
-				if(teletextInfo.status < teletextStatus_finished)
-				{
-					if(writingEnd==teletextInfo.pageNumber)
-                        teletextInfo.status = teletextStatus_finished;
-
-					if(teletextInfo.status==teletextStatus_begin)
-					{
-						writingEnd = m_nPage;
-						teletextInfo.status=teletextStatus_processing;
-					}
-				}
-
-				memcpy(&teletextInfo.text[teletextInfo.pageNumber][0][0], page, (lineCount-1)*rowCount);
-
-				if((timeSec != page[0][39]) && (teletextInfo.status>=teletextStatus_demand) && (!teletextInfo.subtitleFlag))
-				{
-					timeSec = page[0][39];
-					interface_displayMenu(1);
-				}
-			}
-
-			row++;
-		}
-	}
+    int a = hammtab[p[0]];
+    int b = hammtab[p[1]];
+    *err += a;
+    *err += b;
+    return (a & 15) | (b & 15) * 16;
 }
 
-static int ProcessPesPacket(void)
+static char hamm24par[3][256] =
+{
+    { // parities of first byte
+	 0, 33, 34,  3, 35,  2,  1, 32, 36,  5,  6, 39,  7, 38, 37,  4,
+	37,  4,  7, 38,  6, 39, 36,  5,  1, 32, 35,  2, 34,  3,  0, 33,
+	38,  7,  4, 37,  5, 36, 39,  6,  2, 35, 32,  1, 33,  0,  3, 34,
+	 3, 34, 33,  0, 32,  1,  2, 35, 39,  6,  5, 36,  4, 37, 38,  7,
+	39,  6,  5, 36,  4, 37, 38,  7,  3, 34, 33,  0, 32,  1,  2, 35,
+	 2, 35, 32,  1, 33,  0,  3, 34, 38,  7,  4, 37,  5, 36, 39,  6,
+	 1, 32, 35,  2, 34,  3,  0, 33, 37,  4,  7, 38,  6, 39, 36,  5,
+	36,  5,  6, 39,  7, 38, 37,  4,  0, 33, 34,  3, 35,  2,  1, 32,
+	40,  9, 10, 43, 11, 42, 41,  8, 12, 45, 46, 15, 47, 14, 13, 44,
+	13, 44, 47, 14, 46, 15, 12, 45, 41,  8, 11, 42, 10, 43, 40,  9,
+	14, 47, 44, 13, 45, 12, 15, 46, 42, 11,  8, 41,  9, 40, 43, 10,
+	43, 10,  9, 40,  8, 41, 42, 11, 15, 46, 45, 12, 44, 13, 14, 47,
+	15, 46, 45, 12, 44, 13, 14, 47, 43, 10,  9, 40,  8, 41, 42, 11,
+	42, 11,  8, 41,  9, 40, 43, 10, 14, 47, 44, 13, 45, 12, 15, 46,
+	41,  8, 11, 42, 10, 43, 40,  9, 13, 44, 47, 14, 46, 15, 12, 45,
+	12, 45, 46, 15, 47, 14, 13, 44, 40,  9, 10, 43, 11, 42, 41,  8
+    }, { // parities of second byte
+	 0, 41, 42,  3, 43,  2,  1, 40, 44,  5,  6, 47,  7, 46, 45,  4,
+	45,  4,  7, 46,  6, 47, 44,  5,  1, 40, 43,  2, 42,  3,  0, 41,
+	46,  7,  4, 45,  5, 44, 47,  6,  2, 43, 40,  1, 41,  0,  3, 42,
+	 3, 42, 41,  0, 40,  1,  2, 43, 47,  6,  5, 44,  4, 45, 46,  7,
+	47,  6,  5, 44,  4, 45, 46,  7,  3, 42, 41,  0, 40,  1,  2, 43,
+	 2, 43, 40,  1, 41,  0,  3, 42, 46,  7,  4, 45,  5, 44, 47,  6,
+	 1, 40, 43,  2, 42,  3,  0, 41, 45,  4,  7, 46,  6, 47, 44,  5,
+	44,  5,  6, 47,  7, 46, 45,  4,  0, 41, 42,  3, 43,  2,  1, 40,
+	48, 25, 26, 51, 27, 50, 49, 24, 28, 53, 54, 31, 55, 30, 29, 52,
+	29, 52, 55, 30, 54, 31, 28, 53, 49, 24, 27, 50, 26, 51, 48, 25,
+	30, 55, 52, 29, 53, 28, 31, 54, 50, 27, 24, 49, 25, 48, 51, 26,
+	51, 26, 25, 48, 24, 49, 50, 27, 31, 54, 53, 28, 52, 29, 30, 55,
+	31, 54, 53, 28, 52, 29, 30, 55, 51, 26, 25, 48, 24, 49, 50, 27,
+	50, 27, 24, 49, 25, 48, 51, 26, 30, 55, 52, 29, 53, 28, 31, 54,
+	49, 24, 27, 50, 26, 51, 48, 25, 29, 52, 55, 30, 54, 31, 28, 53,
+	28, 53, 54, 31, 55, 30, 29, 52, 48, 25, 26, 51, 27, 50, 49, 24
+    }, { // parities of third byte
+	63, 14, 13, 60, 12, 61, 62, 15, 11, 58, 57,  8, 56,  9, 10, 59,
+	10, 59, 56,  9, 57,  8, 11, 58, 62, 15, 12, 61, 13, 60, 63, 14,
+	 9, 56, 59, 10, 58, 11,  8, 57, 61, 12, 15, 62, 14, 63, 60, 13,
+	60, 13, 14, 63, 15, 62, 61, 12,  8, 57, 58, 11, 59, 10,  9, 56,
+	 8, 57, 58, 11, 59, 10,  9, 56, 60, 13, 14, 63, 15, 62, 61, 12,
+	61, 12, 15, 62, 14, 63, 60, 13,  9, 56, 59, 10, 58, 11,  8, 57,
+	62, 15, 12, 61, 13, 60, 63, 14, 10, 59, 56,  9, 57,  8, 11, 58,
+	11, 58, 57,  8, 56,  9, 10, 59, 63, 14, 13, 60, 12, 61, 62, 15,
+	31, 46, 45, 28, 44, 29, 30, 47, 43, 26, 25, 40, 24, 41, 42, 27,
+	42, 27, 24, 41, 25, 40, 43, 26, 30, 47, 44, 29, 45, 28, 31, 46,
+	41, 24, 27, 42, 26, 43, 40, 25, 29, 44, 47, 30, 46, 31, 28, 45,
+	28, 45, 46, 31, 47, 30, 29, 44, 40, 25, 26, 43, 27, 42, 41, 24,
+	40, 25, 26, 43, 27, 42, 41, 24, 28, 45, 46, 31, 47, 30, 29, 44,
+	29, 44, 47, 30, 46, 31, 28, 45, 41, 24, 27, 42, 26, 43, 40, 25,
+	30, 47, 44, 29, 45, 28, 31, 46, 42, 27, 24, 41, 25, 40, 43, 26,
+	43, 26, 25, 40, 24, 41, 42, 27, 31, 46, 45, 28, 44, 29, 30, 47
+    }
+};
+
+// table to extract the lower 4 bit from hamm24/18 encoded bytes
+
+
+static char hamm24val[256] =
+{
+      0,  0,  0,  0,  1,  1,  1,  1,  0,  0,  0,  0,  1,  1,  1,  1,
+      2,  2,  2,  2,  3,  3,  3,  3,  2,  2,  2,  2,  3,  3,  3,  3,
+      4,  4,  4,  4,  5,  5,  5,  5,  4,  4,  4,  4,  5,  5,  5,  5,
+      6,  6,  6,  6,  7,  7,  7,  7,  6,  6,  6,  6,  7,  7,  7,  7,
+      8,  8,  8,  8,  9,  9,  9,  9,  8,  8,  8,  8,  9,  9,  9,  9,
+     10, 10, 10, 10, 11, 11, 11, 11, 10, 10, 10, 10, 11, 11, 11, 11,
+     12, 12, 12, 12, 13, 13, 13, 13, 12, 12, 12, 12, 13, 13, 13, 13,
+     14, 14, 14, 14, 15, 15, 15, 15, 14, 14, 14, 14, 15, 15, 15, 15,
+      0,  0,  0,  0,  1,  1,  1,  1,  0,  0,  0,  0,  1,  1,  1,  1,
+      2,  2,  2,  2,  3,  3,  3,  3,  2,  2,  2,  2,  3,  3,  3,  3,
+      4,  4,  4,  4,  5,  5,  5,  5,  4,  4,  4,  4,  5,  5,  5,  5,
+      6,  6,  6,  6,  7,  7,  7,  7,  6,  6,  6,  6,  7,  7,  7,  7,
+      8,  8,  8,  8,  9,  9,  9,  9,  8,  8,  8,  8,  9,  9,  9,  9,
+     10, 10, 10, 10, 11, 11, 11, 11, 10, 10, 10, 10, 11, 11, 11, 11,
+     12, 12, 12, 12, 13, 13, 13, 13, 12, 12, 12, 12, 13, 13, 13, 13,
+     14, 14, 14, 14, 15, 15, 15, 15, 14, 14, 14, 14, 15, 15, 15, 15
+};
+
+// mapping from parity checks made by table hamm24par to error
+// results return by hamm24.
+// (0 = no error, 0x0100 = single bit error, 0x1000 = double error)
+
+
+static short hamm24err[64] =
+{
+    0x0000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000,
+    0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000,
+    0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000,
+    0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000,
+    0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100,
+    0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100,
+    0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100,
+    0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000,
+};
+
+// mapping from parity checks made by table hamm24par to faulty bit
+// in the decoded 18 bit word.
+
+
+static int hamm24cor[64] =
+{
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00001, 0x00000, 0x00002, 0x00004, 0x00008,
+    0x00000, 0x00010, 0x00020, 0x00040, 0x00080, 0x00100, 0x00200, 0x00400,
+    0x00000, 0x00800, 0x01000, 0x02000, 0x04000, 0x08000, 0x10000, 0x20000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+};
+
+
+int chk_parity(u8 *p, int n)
+{
+    int err;
+    for (err = 0; n--; p++)
+	if (hamm24par[0][*p] & 32)
+	    *p &= 0x7f;
+	else
+	    *p = BAD_CHAR, err++;
+    return err;
+}
+
+
+int hamm8(u8 *p, int *err)
+{
+    int a = hammtab[p[0]];
+    *err += a;
+    return a & 15;
+}
+
+int hamm24(u8 *p, int *err)
+{
+    int e = hamm24par[0][p[0]] ^ hamm24par[1][p[1]] ^ hamm24par[2][p[2]];
+    int x = hamm24val[p[0]] + p[1] % 128 * 16 + p[2] % 128 * 2048;
+    *err += hamm24err[e];
+    return x ^ hamm24cor[e];
+}
+
+
+
+int SetLine_2(int line,
+			unsigned char* data,
+			int mag2,
+			int last_line,
+			struct vt_page *cvtp_t)
+{
+	u8 *p = data;
+	struct vt_page *cvtp;
+    int hdr, mag, mag8, pkt, i;
+    int err = 0;
+	char tmp[40] ;
+
+    hdr = hamm16(p, &err);
+    if (err & 0xf000)
+		return;
+    mag = hdr & 7;
+    mag8 = mag?: 8;
+    pkt = (hdr >> 3) & 0x1f;
+    p += 2;
+
+	cvtp = (cvtp_t + mag);
+	switch (pkt)
+    {
+		case 0:
+		{
+
+			if (teletextInfo.status != teletextStatus_finished)
+				teletextInfo.status = teletextStatus_finished;
+		
+
+	 	   int b1, b2, b3, b4;
+		    b1 = hamm16(p, &err); // page number
+		    b2 = hamm16(p+2, &err); // subpage number + flags
+		    b3 = hamm16(p+4, &err); // subpage number + flags
+		    b4 = hamm16(p+6, &err); // language code + more flags
+
+		    if (err & 0xf000)
+				return ;
+
+			cvtp->errors = (err >> 8) + chk_parity(p + 8, 32);
+			cvtp->pgno = mag8 * 256 + b1;
+			cvtp->pgno = (((cvtp->pgno & 0xF00) >> 8 ) * 100) + ((cvtp->pgno & 0xF0) >> 4) * 10 + (cvtp->pgno & 0xF);
+		    cvtp->subno = (b2 + b3 * 256) & 0x3f7f;
+		    cvtp->lang = "\0\4\2\6\1\5\3\7"[b4 >> 5] ;//+ (latin1==LATIN1 ? 0 : 8);
+		    cvtp->flags = b4 & 0x1f;
+		    cvtp->flags |= b3 & 0xc0;
+		    cvtp->flags |= (b2 & 0x80) >> 2;
+		    cvtp->lines = 1;
+		    cvtp->flof = 0;
+
+		    if (b1 == 0xff)
+				return 0;
+		
+		    cvtp->flags |= PG_ACTIVE;
+			
+			memset(&cvtp->data, '\0', 40 * 24);
+	
+			teletextInfo.cyrillic[cvtp->pgno] = (unham(data[8], data[9]) >> 5) & 0x07;
+
+			tmp[0]=' ';
+			tmp[1]=' ';
+			tmp[2]='P';
+			tmp[3]=' ';
+			tmp[4]=p[8];
+			tmp[5]=p[9];
+			tmp[6]=p[10];
+			tmp[7]=' ';
+
+			memcpy(&tmp[8], p+8, 32);
+
+			int i;
+			for (i = 9; i < 40; i++)
+			{
+				char ch = tmp[i] & 0x7f;
+;
+				if (ch >= ' ')
+					tmp[i] = vtx2iso8559_1_table[ch - 0x20];
+				else
+					tmp[i] = ch;
+			}
+
+			memcpy(&cvtp->data[pkt], tmp, 40);
+			return 0;
+		}
+
+		case 1 ... 24:
+		{
+		    if (~cvtp->flags & PG_ACTIVE)
+				return 1;
+
+		    cvtp->errors += err;
+		    cvtp->lines |= 1 << pkt;
+
+			int i;
+			for (i = 0; i < 40; i++)
+			{
+				char ch = p[i] & 0x7f;
+
+				if (ch >= ' ')
+					p[i] = vtx2iso8559_1_table[ch - 0x20];
+				else
+					p[i] = ch;
+			}
+		    memcpy(cvtp->data[pkt], p, 40);
+
+			if  (cvtp->lines == 0xFFFFFF || cvtp->pgno == 888)
+			{
+				interface_displayMenu(1);
+				memcpy(&teletextInfo.text[cvtp->pgno][0][0], cvtp->data, 40*24);
+			}
+			return 0;
+		}
+		case 26:
+		{
+		    int d, t[13];
+	    	if (~cvtp->flags & PG_ACTIVE)
+				return 0;
+
+		    d = hamm8(p, &err);
+		    if (err & 0xf000)
+				return 4;
+
+		    for (i = 0; i < 13; ++i)
+			t[i] = hamm24(p + 1 + 3*i, &err);
+		    if (err & 0xf000)
+				return 4;
+
+		    //add_enhance(rvtp->enh, d, t);
+		    return 0;
+		}
+		case 27:
+		{
+		    int b1,b2,b3,x;
+		    if (~cvtp->flags & PG_ACTIVE)
+				return 0; // -1 flushes all pages. We may never resync again
+	
+		    b1 = hamm8(p, &err);
+		    b2 = hamm8(p + 37, &err);
+		    if (err & 0xf000)
+				return 4;
+		    if (b1 != 0 || !(b2 & 8))
+				return 0;
+	
+		    for (i = 0; i < 6; ++i)
+		    {
+				err = 0;
+				b1 = hamm16(p+1+6*i, &err);
+				b2 = hamm16(p+3+6*i, &err);
+				b3 = hamm16(p+5+6*i, &err);
+				if (err & 0xf000)
+				    return 1;
+				x = (b2 >> 7) | ((b3 >> 5) & 0x06);
+				cvtp->link[i].pgno = ((mag ^ x) ?: 8) * 256 + b1;
+				cvtp->link[i].subno = (b2 + b3 * 256) & 0x3f7f;
+		    }
+		    cvtp->flof = 1;
+			return 0;
+		}
+		case 30:
+		{
+		    if (mag8 != 8)
+				return 0;
+		    p[0] = hamm8(p, &err); // designation code
+		    p[1] = hamm16(p+1, &err); // initial page
+		    p[3] = hamm16(p+3, &err); // initial subpage + mag
+		    p[5] = hamm16(p+5, &err); // initial subpage + mag
+
+			if (err & 0xf000)
+				return 4;
+	    	
+			err += chk_parity(p+20, 20);
+			return 0;
+		}
+		default:
+	    	return 0;
+    }
+    return 0;
+}
+
+static int ProcessPesPacket(struct vt_page *cvtp_t)
 {
 	int stream_id = PesPacketBuffer[3];
 
@@ -549,32 +827,45 @@ static int ProcessPesPacket(void)
 		int data_unit_id, data_len;
 
 		k = PesPacketBuffer[8] + 10;
+		debug_print("PesPacketBuffer[8]: 0x%08x \n", PesPacketBuffer[8]);
+		debug_print("PesPacketBuffer[8] + 10: 0x%08x \n", PesPacketBuffer[8] + 10);
 
 		while (k < PesPacketLength)
 		{
 			data_unit_id = PesPacketBuffer[k++];
+			debug_print("data_unit_id: 0x%08x \n", data_unit_id);
 			data_len = PesPacketBuffer[k++];
+			debug_print("data_len: 0x%08x \n", data_len);
 			(void)data_unit_id;
 
 			if (data_len != 0x2c)
 				data_len = 0x2c;
 
+			debug_print("k = 0x%08x \n",k);
 			for (j = k; j < k + data_len; j++)
 				PesPacketBuffer[j] = invtab[PesPacketBuffer[j]];
 
 			unsigned char mpag = unham(PesPacketBuffer[k + 2], PesPacketBuffer[k + 3]);
-			unsigned char mag = mpag & 7;
-			unsigned char line = (mpag >> 3) & 0x1f;
+			unsigned char mag = mpag & 7; // mag
+			unsigned char line = (mpag >> 3) & 0x1f; //packet
+			debug_print("PesPacketBuffer[k + 2]: 0x%08x \n", PesPacketBuffer[k + 2]);
+			debug_print("PesPacketBuffer[k + 3]: 0x%08x \n", PesPacketBuffer[k + 3]);
+			debug_print("mpag: 0x%08x \n", mpag);
+			debug_print("mag: 0x%08x \n", mag);
+			debug_print("line: 0x%08x \n", line);
 
 			// mag == 0 means page is 8nn
 			if (mag == 0)
 				mag = 8;
 
-			SetLine(
+			SetLine_2(line, &PesPacketBuffer[k + 2] , mag, 23 ,cvtp_t);
+
+	/*		SetLine(
 				line,
 				&PesPacketBuffer[k + 4],
 				mag,
 				23);	//TELETEXT_SYMBOL_LINE_COUNT-2
+*/
 			k += data_len;
 		}
 
@@ -587,8 +878,9 @@ static int ProcessPesPacket(void)
 	}
 }
 
-static void teletext_readPESPacket(unsigned char *buf, size_t size)
+static void teletext_readPESPacket(unsigned char *buf, size_t size, struct vt_page *cvtp_t)
 {
+	debug_print("NEW Packet size = %d\n",size);
 	unsigned char *ts_buf = buf;
 	static int tsPacketCounter = -1;
 	static int PesPacketDirty = 0;
@@ -631,7 +923,7 @@ static void teletext_readPESPacket(unsigned char *buf, size_t size)
 		// Check payload start indicator.
 		if(ts_buf[1] & 0x40) {
 			if(!PesPacketDirty ) { //&& CheckPesPacket())
-				if(!ProcessPesPacket()) {
+				if(!ProcessPesPacket(cvtp_t)) {
 					size -= 188;
 					ts_buf = ts_buf + 188;
 					continue;
@@ -709,7 +1001,10 @@ void teletext_displayPage(void)
 		}
 
 		if(teletextInfo.pageNumber && (teletextInfo.status < teletextStatus_demand)) {
-			gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
+		   if (teletextInfo.selectedPage == 888)
+				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x00, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
+			else
+				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
 			for(column = 0; column < 25; column++) {
 				if((teletextInfo.freshCounter) && (column >= 4) && (column <= 6)) {
 					if(column == 4) {
@@ -743,7 +1038,10 @@ void teletext_displayPage(void)
 		uint8_t (*curPageTextBuf)[40] = teletextInfo.text[teletextInfo.selectedPage];
 
 		if(!teletextInfo.subtitleFlag) {
-			gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
+		   if (teletextInfo.selectedPage == 888)
+				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x00, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
+			else
+				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
 			teletextInfo.nextPage[0] = teletext_nextPageNumber(teletextInfo.selectedPage);
 			teletextInfo.nextPage[1] = teletext_nextPageNumber(teletextInfo.nextPage[0]);
 			teletextInfo.nextPage[2] = teletext_nextPageNumber(teletextInfo.nextPage[1]);
@@ -809,8 +1107,19 @@ void teletext_displayPage(void)
 		}
 
 		memcpy(&curPageTextBuf[0][26], teletextInfo.time, 14);
+		if (teletextInfo.selectedPage == 888)
+		{
+			line=1;
+			lineCount = 23;
+		}
+		else
+		{
+			line=0;
+			lineCount = 25;
+		}
+		
+		for(line; line < lineCount; line++) {
 
-		for(line = 0; line < lineCount; line++) {
 			alpha = 1;
 			red = 255;
 			green = 255;
@@ -1059,18 +1368,24 @@ void teletext_displayPage(void)
 					str[0]=' ';
 				}
 
-				if(box)
-					gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-symbolHeight, symbolWidth, symbolHeight);
 
 				if(alpha)	//Text
 				{
 					if((teletextInfo.cyrillic)&&(Lang)&&(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190))))
 					{
+						if(box)
+							gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-symbolHeight, symbolWidth, symbolHeight);
+					
 						teletext_convToCyrillic(str[0],fu);
 						gfx_drawText(DRAWING_SURFACE, pgfx_font, red, green, blue, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-upText, (char*) fu, 0, 0);
 					}
 					else
+					{
+						if (str[0] != ' ' && box)
+							gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-symbolHeight, symbolWidth, symbolHeight);
+						
 						gfx_drawText(DRAWING_SURFACE, pgfx_font, red, green, blue, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-upText, (char*) str, 0, 0);
+					}
 				}
 				else		//Pseudographics
 				{
@@ -1469,6 +1784,8 @@ static void *teletext_funcThread(void *pArg)
 	uint8_t buff[TELETEXT_PACKET_BUFFER_SIZE];
 	int32_t len;
 
+	struct vt_page cvtp_t[8];
+	memset(cvtp_t, 0, sizeof(cvtp_t));
 	
 	struct pollfd pfd[1];
 
@@ -1491,7 +1808,7 @@ static void *teletext_funcThread(void *pArg)
 				}
 
 				dprintf("len=%d\n", len);
-				teletext_readPESPacket(buff, len);
+				teletext_readPESPacket(buff, len, cvtp_t);
 			}
 		}
 	}
