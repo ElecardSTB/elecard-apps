@@ -1966,11 +1966,12 @@ int32_t teletext_start(DvbParam_t *param)
 	tt_fd = -1;
 
 #if (defined STSDK)
-	hasTeletext = st_teletext_start();
-	tt_fd = open(TELETEXT_pipe_TS, O_RDONLY);
-	if(tt_fd < 0) {
-		eprintf("Error in opening file %s\n", TELETEXT_pipe_TS);
-		return -2;
+	if ( hasTeletext = st_teletext_start()){
+		tt_fd = open(TELETEXT_pipe_TS, O_RDONLY);
+		if(tt_fd < 0) {
+			eprintf("Error in opening file %s\n", TELETEXT_pipe_TS);
+			return -2;
+		}
 	}
 
 #else
@@ -2008,9 +2009,21 @@ int32_t teletext_stop(void)
 	teletext_enable(0);
 #if (defined STSDK)
 	close(tt_fd);
-#endif
 
-	return ret;
+	elcdRpcType_t type;
+	cJSON *result = NULL;
+	st_rpcSync(elcmd_ttxStop, NULL, &type, &result);
+
+	if(  result &&
+		(result->valuestring != NULL) &&
+		(strcmp(result->valuestring, "ok") == 0))
+	{
+		cJSON_Delete(result);
+		return 1;
+	}
+	cJSON_Delete(result);
+#endif
+	return 0;
 }
 
 #endif //ENABLE_TELETEXT
