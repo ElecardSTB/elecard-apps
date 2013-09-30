@@ -70,6 +70,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define URL_HTTP_MEDIA   "http://"
 #define URL_HTTPS_MEDIA  "https://"
 #define URL_RTMP_MEDIA   "rtmp" // rtmp/rtmpt/rtmpe
+#define URL_FUSION_MEDIA "fusion"
 
 #define BUFFER_SIZE      (1024)
 #define MAX_SIP_STRING   (78)

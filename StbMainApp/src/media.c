@@ -103,7 +103,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FORMAT_ICON (appControlInfo.mediaInfo.typeIndex < 0 ? thumbnail_file : media_formats[appControlInfo.mediaInfo.typeIndex].icon )
 
-#define IS_URL(x) ((strncasecmp((x), "http://", 7) == 0) || (strncasecmp((x), "rtmp://", 7) == 0) || (strncasecmp((x), "https://", 8) == 0) || (strncasecmp((x), "ftp://", 6) == 0))
+#define IS_URL(x) ((strncasecmp((x), "http://", 7) == 0) || (strncasecmp((x), "rtmp://", 7) == 0) || (strncasecmp((x), "https://", 8) == 0) || (strncasecmp((x), "ftp://", 6) == 0) || (strncasecmp((x), "fusion://", 7) == 0))
 
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *

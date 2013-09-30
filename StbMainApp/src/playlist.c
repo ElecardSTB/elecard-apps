@@ -205,7 +205,8 @@ static int playlist_stream_change(interfaceMenu_t *pMenu, void* pArg)
 		if (strncasecmp(URL, URL_FILE_MEDIA, sizeof(URL_FILE_MEDIA)-1) == 0 ||
 		    strncasecmp(URL, URL_HTTP_MEDIA, sizeof(URL_HTTP_MEDIA)-1) == 0 ||
 		    strncasecmp(URL, URL_HTTPS_MEDIA,sizeof(URL_HTTPS_MEDIA)-1) == 0 ||
-		    strncasecmp(URL, URL_RTMP_MEDIA, sizeof(URL_RTMP_MEDIA)-1) == 0)
+		    strncasecmp(URL, URL_RTMP_MEDIA, sizeof(URL_RTMP_MEDIA)-1) == 0 ||
+		    strncasecmp(URL, URL_FUSION_MEDIA, sizeof(URL_FUSION_MEDIA)-1) == 0)
 		{
 			appControlInfo.playbackInfo.playlistMode = playlistModeFavorites;
 			appControlInfo.playbackInfo.streamSource = streamSourceFavorites;
@@ -311,7 +312,8 @@ static int playlist_validateURL(char *value)
 #endif
 			strncasecmp(value, URL_HTTP_MEDIA,  sizeof(URL_HTTP_MEDIA) -1) != 0 &&
 			strncasecmp(value, URL_HTTPS_MEDIA, sizeof(URL_HTTPS_MEDIA)-1) != 0 &&
-			strncasecmp(value, URL_RTMP_MEDIA,  sizeof(URL_RTMP_MEDIA) -1) != 0)
+			strncasecmp(value, URL_RTMP_MEDIA,  sizeof(URL_RTMP_MEDIA) -1) != 0 &&
+			strncasecmp(value, URL_FUSION_MEDIA,sizeof(URL_FUSION_MEDIA) -1) != 0)
 		{
 			interface_showMessageBox(_T("ERR_INCORRECT_PROTO"), thumbnail_error, 0);
 			return -1;
@@ -492,7 +494,7 @@ static int playlist_fillMenu(char *value)
 		while ( m3u_readEntry(file) == 0 )
 		{
 #ifdef ENABLE_USB
-			if( strncasecmp(m3u_url, URL_FILE_MEDIA,  sizeof(URL_FILE_MEDIA)-1) == 0 )
+			if( strncasecmp(m3u_url, URL_FILE_MEDIA,  sizeof(URL_FILE_MEDIA)-1) == 0)
 			{
 #ifdef ENABLE_SAMBA
 				if( strncmp( &m3u_url[sizeof(URL_FILE_MEDIA)-1], sambaRoot, strlen(sambaRoot) ) == 0 )
@@ -524,7 +526,8 @@ static int playlist_fillMenu(char *value)
 #endif
 			if( strncasecmp(m3u_url, URL_HTTP_MEDIA,  sizeof(URL_HTTP_MEDIA)-1) == 0 ||
 			    strncasecmp(m3u_url, URL_HTTPS_MEDIA, sizeof(URL_HTTPS_MEDIA)-1) == 0 ||
-			    strncasecmp(m3u_url, URL_RTMP_MEDIA,  sizeof(URL_RTMP_MEDIA)-1) == 0 )
+			    strncasecmp(m3u_url, URL_RTMP_MEDIA,  sizeof(URL_RTMP_MEDIA)-1) == 0 ||
+			    strncasecmp(m3u_url, URL_FUSION_MEDIA,  sizeof(URL_FUSION_MEDIA)-1) == 0 )
 			{
 #ifdef ENABLE_YOUTUBE
 				if( strstr( m3u_url, "youtube.com/" ) != NULL )
