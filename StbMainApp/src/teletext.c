@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gfx.h"
 #include "interface.h"
 #include "debug.h"
+#include "StbMainApp.h"
 #include "stsdk.h"
 
 #include <stdio.h>
@@ -90,7 +91,7 @@ typedef struct {
 	uint32_t			exists;
 	teletextStatus_t	status;
 	int32_t				pageNumber;
-	uint8_t				text[1000][25][40];
+	char				text[1000][25][40];
 	uint8_t				subtitle[25][40];
 	uint8_t				cyrillic[1000];
 	uint32_t			fresh[3];
@@ -201,38 +202,38 @@ static const unsigned char unhamtab[256] =
 
 static unsigned short hammtab[256] =
 {
-    0x0101, 0x100f, 0x0001, 0x0101, 0x100f, 0x0100, 0x0101, 0x100f,
-    0x100f, 0x0102, 0x0101, 0x100f, 0x010a, 0x100f, 0x100f, 0x0107,
-    0x100f, 0x0100, 0x0101, 0x100f, 0x0100, 0x0000, 0x100f, 0x0100,
-    0x0106, 0x100f, 0x100f, 0x010b, 0x100f, 0x0100, 0x0103, 0x100f,
-    0x100f, 0x010c, 0x0101, 0x100f, 0x0104, 0x100f, 0x100f, 0x0107,
-    0x0106, 0x100f, 0x100f, 0x0107, 0x100f, 0x0107, 0x0107, 0x0007,
-    0x0106, 0x100f, 0x100f, 0x0105, 0x100f, 0x0100, 0x010d, 0x100f,
-    0x0006, 0x0106, 0x0106, 0x100f, 0x0106, 0x100f, 0x100f, 0x0107,
-    0x100f, 0x0102, 0x0101, 0x100f, 0x0104, 0x100f, 0x100f, 0x0109,
-    0x0102, 0x0002, 0x100f, 0x0102, 0x100f, 0x0102, 0x0103, 0x100f,
-    0x0108, 0x100f, 0x100f, 0x0105, 0x100f, 0x0100, 0x0103, 0x100f,
-    0x100f, 0x0102, 0x0103, 0x100f, 0x0103, 0x100f, 0x0003, 0x0103,
-    0x0104, 0x100f, 0x100f, 0x0105, 0x0004, 0x0104, 0x0104, 0x100f,
-    0x100f, 0x0102, 0x010f, 0x100f, 0x0104, 0x100f, 0x100f, 0x0107,
-    0x100f, 0x0105, 0x0105, 0x0005, 0x0104, 0x100f, 0x100f, 0x0105,
-    0x0106, 0x100f, 0x100f, 0x0105, 0x100f, 0x010e, 0x0103, 0x100f,
-    0x100f, 0x010c, 0x0101, 0x100f, 0x010a, 0x100f, 0x100f, 0x0109,
-    0x010a, 0x100f, 0x100f, 0x010b, 0x000a, 0x010a, 0x010a, 0x100f,
-    0x0108, 0x100f, 0x100f, 0x010b, 0x100f, 0x0100, 0x010d, 0x100f,
-    0x100f, 0x010b, 0x010b, 0x000b, 0x010a, 0x100f, 0x100f, 0x010b,
-    0x010c, 0x000c, 0x100f, 0x010c, 0x100f, 0x010c, 0x010d, 0x100f,
-    0x100f, 0x010c, 0x010f, 0x100f, 0x010a, 0x100f, 0x100f, 0x0107,
-    0x100f, 0x010c, 0x010d, 0x100f, 0x010d, 0x100f, 0x000d, 0x010d,
-    0x0106, 0x100f, 0x100f, 0x010b, 0x100f, 0x010e, 0x010d, 0x100f,
-    0x0108, 0x100f, 0x100f, 0x0109, 0x100f, 0x0109, 0x0109, 0x0009,
-    0x100f, 0x0102, 0x010f, 0x100f, 0x010a, 0x100f, 0x100f, 0x0109,
-    0x0008, 0x0108, 0x0108, 0x100f, 0x0108, 0x100f, 0x100f, 0x0109,
-    0x0108, 0x100f, 0x100f, 0x010b, 0x100f, 0x010e, 0x0103, 0x100f,
-    0x100f, 0x010c, 0x010f, 0x100f, 0x0104, 0x100f, 0x100f, 0x0109,
-    0x010f, 0x100f, 0x000f, 0x010f, 0x100f, 0x010e, 0x010f, 0x100f,
-    0x0108, 0x100f, 0x100f, 0x0105, 0x100f, 0x010e, 0x010d, 0x100f,
-    0x100f, 0x010e, 0x010f, 0x100f, 0x010e, 0x000e, 0x100f, 0x010e,
+	0x0101, 0x100f, 0x0001, 0x0101, 0x100f, 0x0100, 0x0101, 0x100f,
+	0x100f, 0x0102, 0x0101, 0x100f, 0x010a, 0x100f, 0x100f, 0x0107,
+	0x100f, 0x0100, 0x0101, 0x100f, 0x0100, 0x0000, 0x100f, 0x0100,
+	0x0106, 0x100f, 0x100f, 0x010b, 0x100f, 0x0100, 0x0103, 0x100f,
+	0x100f, 0x010c, 0x0101, 0x100f, 0x0104, 0x100f, 0x100f, 0x0107,
+	0x0106, 0x100f, 0x100f, 0x0107, 0x100f, 0x0107, 0x0107, 0x0007,
+	0x0106, 0x100f, 0x100f, 0x0105, 0x100f, 0x0100, 0x010d, 0x100f,
+	0x0006, 0x0106, 0x0106, 0x100f, 0x0106, 0x100f, 0x100f, 0x0107,
+	0x100f, 0x0102, 0x0101, 0x100f, 0x0104, 0x100f, 0x100f, 0x0109,
+	0x0102, 0x0002, 0x100f, 0x0102, 0x100f, 0x0102, 0x0103, 0x100f,
+	0x0108, 0x100f, 0x100f, 0x0105, 0x100f, 0x0100, 0x0103, 0x100f,
+	0x100f, 0x0102, 0x0103, 0x100f, 0x0103, 0x100f, 0x0003, 0x0103,
+	0x0104, 0x100f, 0x100f, 0x0105, 0x0004, 0x0104, 0x0104, 0x100f,
+	0x100f, 0x0102, 0x010f, 0x100f, 0x0104, 0x100f, 0x100f, 0x0107,
+	0x100f, 0x0105, 0x0105, 0x0005, 0x0104, 0x100f, 0x100f, 0x0105,
+	0x0106, 0x100f, 0x100f, 0x0105, 0x100f, 0x010e, 0x0103, 0x100f,
+	0x100f, 0x010c, 0x0101, 0x100f, 0x010a, 0x100f, 0x100f, 0x0109,
+	0x010a, 0x100f, 0x100f, 0x010b, 0x000a, 0x010a, 0x010a, 0x100f,
+	0x0108, 0x100f, 0x100f, 0x010b, 0x100f, 0x0100, 0x010d, 0x100f,
+	0x100f, 0x010b, 0x010b, 0x000b, 0x010a, 0x100f, 0x100f, 0x010b,
+	0x010c, 0x000c, 0x100f, 0x010c, 0x100f, 0x010c, 0x010d, 0x100f,
+	0x100f, 0x010c, 0x010f, 0x100f, 0x010a, 0x100f, 0x100f, 0x0107,
+	0x100f, 0x010c, 0x010d, 0x100f, 0x010d, 0x100f, 0x000d, 0x010d,
+	0x0106, 0x100f, 0x100f, 0x010b, 0x100f, 0x010e, 0x010d, 0x100f,
+	0x0108, 0x100f, 0x100f, 0x0109, 0x100f, 0x0109, 0x0109, 0x0009,
+	0x100f, 0x0102, 0x010f, 0x100f, 0x010a, 0x100f, 0x100f, 0x0109,
+	0x0008, 0x0108, 0x0108, 0x100f, 0x0108, 0x100f, 0x100f, 0x0109,
+	0x0108, 0x100f, 0x100f, 0x010b, 0x100f, 0x010e, 0x0103, 0x100f,
+	0x100f, 0x010c, 0x010f, 0x100f, 0x0104, 0x100f, 0x100f, 0x0109,
+	0x010f, 0x100f, 0x000f, 0x010f, 0x100f, 0x010e, 0x010f, 0x100f,
+	0x0108, 0x100f, 0x100f, 0x0105, 0x100f, 0x010e, 0x010d, 0x100f,
+	0x100f, 0x010e, 0x010f, 0x100f, 0x010e, 0x000e, 0x100f, 0x010e,
 };
 
 static const unsigned char invtab[256] =
@@ -327,19 +328,8 @@ void teletext_init(void)
 	teletextInfo.freshCounter = 0;
 
 	memset(teletextInfo.text, 0 ,sizeof(teletextInfo.text));
-	for( page=0; page<1000; page++ )
-	{
-		teletextInfo.text[page][0][0]=
-		teletextInfo.text[page][0][1]=
-		teletextInfo.text[page][0][2]=
-		teletextInfo.text[page][0][3]=32;
-
-		teletextInfo.text[page][0][4]=page/100+48;
-		teletextInfo.text[page][0][5]=page/10 -
-			(teletextInfo.text[page][0][4]-48)*10 + 48;
-		teletextInfo.text[page][0][6]=page-
-			(teletextInfo.text[page][0][4]-48)*100 -
-			(teletextInfo.text[page][0][5]-48)*10 + 48;
+	for(page = 0; page < 1000; page++) {
+		snprintf(teletextInfo.text[page][0], 8, "    %03d", page);
 	}
 }
 
@@ -373,70 +363,42 @@ static int32_t teletext_previousPageNumber(int32_t pageNumber)
 
 static void teletext_convToCyrillic(unsigned char c, char unsigned *str)
 {
-	if(c<'q')
-		str[0]=0xD0;		//Cyrillic P
-	else
-		str[0]=0xD1;		//Cyrillic C
+	uint32_t i;
+	struct {
+		char	symbol;
+		char	code[2];
+	} symbol_map[] = {
+		{'h',	{0xD1, 0x85}},
+		{'f',	{0xD1, 0x84}},
+		{'c',	{0xD1, 0x86}},
+		{'v',	{0xD0, 0xB6}},
+		{'w',	{0xD0, 0xB2}},
+		{'&',	{0xD1, 0x8B}},
+		{'z',	{0xD0, 0xB7}},
+		{189,	{0xD0, 0xAD}},
+		{96,	{0xD1, 0x8E}},
+		{188,	{0xD1, 0x88}},
+		{190,	{0xD1, 0x89}},
+	};
 
-	if(c=='h')
-	{
-		str[0]=0xD1;
-		str[1]=0x85;
+	str[2] = '\0';
+	for(i = 0; i < ARRAY_SIZE(symbol_map); i++) {
+		if(symbol_map[i].symbol == c) {
+			str[0] = symbol_map[i].code[0];
+			str[1] = symbol_map[i].code[1];
+			return;
+		}
 	}
-	else if(c=='f')
-	{
-		str[0]=0xD1;
-		str[1]=0x84;
-	}
-	else if(c=='c')
-	{
-		str[0]=0xD1;
-		str[1]=0x86;
-	}
-	else if(c=='v')
-	{
-		str[0]=0xD0;
-		str[1]=0xB6;
-	}
-	else if(c=='w')
-	{
-		str[0]=0xD0;
-		str[1]=0xB2;
-	}
-	else if(c=='&')
-	{
-		str[0]=0xD1;
-		str[1]=0x8B;
-	}
-	else if(c=='z')
-	{
-		str[0]=0xD0;
-		str[1]=0xB7;
-	}
-	else if(c==189)
-	{
-		str[0]=0xD0;
-		str[1]=0xAD;
-	}
-	else if(c==96)
-	{
-		str[0]=0xD1;
-		str[1]=0x8E;
-	}
-	else if(c==188)
-	{
-		str[0]=0xD1;
-		str[1]=0x88;
-	}
-	else if(c==190)
-	{
-		str[0]=0xD1;
-		str[1]=0x89;
-	}
-	else
-		str[1]=cyrillic_table[c];
 
-	str[2]='\0';
+	//not found
+	if(c < 'q') {
+		str[0] = 0xD0; //Cyrillic P
+	} else {
+		str[0] = 0xD1; //Cyrillic C
+	}
+	str[1] = cyrillic_table[c];
+
+	return;
 }
 
 //Is PES packet correct?
@@ -995,10 +957,11 @@ void teletext_displayPage(void)
 		}
 
 		if(teletextInfo.pageNumber && (teletextInfo.status < teletextStatus_demand)) {
-		   if (teletextInfo.selectedPage == 888)
+			if(teletextInfo.selectedPage == 888) {
 				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x00, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
-			else
+			} else {
 				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
+			}
 			for(column = 0; column < 25; column++) {
 				if((teletextInfo.freshCounter) && (column >= 4) && (column <= 6)) {
 					if(column == 4) {
@@ -1029,75 +992,29 @@ void teletext_displayPage(void)
 	}
 
 	if((teletextInfo.status >= teletextStatus_demand) || (teletextInfo.subtitleFlag)) {
-		uint8_t (*curPageTextBuf)[40] = teletextInfo.text[teletextInfo.selectedPage];
+		char (*curPageTextBuf)[40] = teletextInfo.text[teletextInfo.selectedPage];
 
 		if(!teletextInfo.subtitleFlag) {
-		   if (teletextInfo.selectedPage == 888)
+			if(teletextInfo.selectedPage == 888) {
 				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x00, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
-			else
+			} else {
 				gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0xFF, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
+			}
 			teletextInfo.nextPage[0] = teletext_nextPageNumber(teletextInfo.selectedPage);
 			teletextInfo.nextPage[1] = teletext_nextPageNumber(teletextInfo.nextPage[0]);
 			teletextInfo.nextPage[2] = teletext_nextPageNumber(teletextInfo.nextPage[1]);
 			teletextInfo.previousPage = teletext_previousPageNumber(teletextInfo.selectedPage);
 
 			memset(&curPageTextBuf[lineCount-1][0], ' ', rowCount);
-
-			curPageTextBuf[lineCount-1][3]= 0x01;	//red color
-			curPageTextBuf[lineCount-1][4]=
-				teletextInfo.nextPage[0]/100+48;
-			curPageTextBuf[lineCount-1][5]=
-				teletextInfo.nextPage[0]/10 -
-				(curPageTextBuf[lineCount-1][4]-48)*10 + 48;
-			curPageTextBuf[lineCount-1][6]=
-				teletextInfo.nextPage[0] -
-				(curPageTextBuf[lineCount-1][4]-48)*100 -
-				(curPageTextBuf[lineCount-1][5]-48)*10 + 48;
-
-			curPageTextBuf[lineCount-1][13]= 0x02;	//green color
-			curPageTextBuf[lineCount-1][14]=
-				teletextInfo.nextPage[1]/100+48;
-			curPageTextBuf[lineCount-1][15]=
-				teletextInfo.nextPage[1]/10 -
-				(curPageTextBuf[lineCount-1][14]-48)*10 + 48;
-			curPageTextBuf[lineCount-1][16]=
-				teletextInfo.nextPage[1] -
-				(curPageTextBuf[lineCount-1][14]-48)*100 -
-				(curPageTextBuf[lineCount-1][15]-48)*10 + 48;
-
-			curPageTextBuf[lineCount-1][23]= 0x03;	//yellow color
-			curPageTextBuf[lineCount-1][24]=
-				teletextInfo.nextPage[2]/100+48;
-			curPageTextBuf[lineCount-1][25]=
-				teletextInfo.nextPage[2]/10 -
-				(curPageTextBuf[lineCount-1][24]-48)*10 + 48;
-			curPageTextBuf[lineCount-1][26]=
-				teletextInfo.nextPage[2] -
-				(curPageTextBuf[lineCount-1][24]-48)*100 -
-				(curPageTextBuf[lineCount-1][25]-48)*10 + 48;
-
-			curPageTextBuf[lineCount-1][33]= 0x06;	//cyan color
-			curPageTextBuf[lineCount-1][34]=
-				teletextInfo.previousPage/100+48;
-			curPageTextBuf[lineCount-1][35]=
-				teletextInfo.previousPage/10 -
-				(curPageTextBuf[lineCount-1][34]-48)*10 + 48;
-			curPageTextBuf[lineCount-1][36]=
-				teletextInfo.previousPage -
-				(curPageTextBuf[lineCount-1][34]-48)*100 -
-				(curPageTextBuf[lineCount-1][35]-48)*10 + 48;
+															//red		green		yellow		cyan
+			snprintf(curPageTextBuf[lineCount-1] + 3, 35, "\x01%03d      \x02%03d      \x03%03d      \x06%03d",
+						teletextInfo.nextPage[0], teletextInfo.nextPage[1], teletextInfo.nextPage[2],
+						teletextInfo.previousPage);
 		}
 
 		if(!teletextInfo.freshCounter) {
-			curPageTextBuf[0][4]=
-				teletextInfo.selectedPage/100+48;
-			curPageTextBuf[0][5]=
-				teletextInfo.selectedPage/10 -
-				(curPageTextBuf[0][4]-48)*10 + 48;
-			curPageTextBuf[0][6]=
-				teletextInfo.selectedPage -
-				(curPageTextBuf[0][4]-48)*100 -
-				(curPageTextBuf[0][5]-48)*10 + 48;
+			snprintf(curPageTextBuf[0] + 4, 4, "%03d", teletextInfo.selectedPage);
+			curPageTextBuf[0][7] = ' ';
 		}
 
 		memcpy(&curPageTextBuf[0][26], teletextInfo.time, 14);
@@ -1122,6 +1039,7 @@ void teletext_displayPage(void)
 			box=0;
 
 			for(column=0; column < rowCount; column++) {
+
 				if(teletextInfo.selectedPage != teletextInfo.subtitlePage) {
 					if((teletextInfo.status == teletextStatus_demand) &&
 					   (line == 0) && (column >= 7) && (column <= 10))
@@ -1138,248 +1056,131 @@ void teletext_displayPage(void)
 					str[0]=teletextInfo.subtitle[line][column];
 				}
 
-				if(str[0]<0x20)			//Special simbols
-				{
-					switch (str[0])
-					{
-					// Alpha Colour (Set After)
-					case 0 :
-						alpha = 1;
-						red = 0;
-						green = 0;
-						blue = 0;
-						//dprintf("%s:alpha black\n", __FUNCTION__);
-						break;
-					case 1 :
-						alpha = 1;
-						red = 0xFF;
-						green = 0;
-						blue = 0;
-						//dprintf("%s:alpha red\n", __FUNCTION__);
-						break;
-					case 2 :
-						alpha = 1;
-						red = 0;
-						green = 0xFF;
-						blue = 0;
-						//dprintf("%s:alpha green\n", __FUNCTION__);
-						break;
-					case 3 :
-						alpha = 1;
-						red = 0xFF;
-						green = 0xFF;
-						blue = 0;
-						//dprintf("%s:alpha yellow\n", __FUNCTION__);
-						break;
-					case 4 :
-						alpha = 1;
-						red = 0;
-						green = 0;
-						blue = 0xFF;
-						//dprintf("%s:alpha blue\n", __FUNCTION__);
-						break;
-					case 5 :
-						alpha = 1;
-						red = 0xFF;
-						green = 0;
-						blue = 0xFF;
-						//dprintf("%s:alpha magenta\n", __FUNCTION__);
-						break;
-					case 6 :
-						alpha = 1;
-						red = 0;
-						green = 0xFF;
-						blue = 0xFF;
-						//dprintf("%s:alpha cyan\n", __FUNCTION__);
-					break;
-					case 7 :
-						alpha = 1;
-						red = 0xFF;
-						green = 0xFF;
-						blue = 0xFF;
-						//dprintf("%s:alpha white\n", __FUNCTION__);
-						break;
-					case 0x8 :
-						// Start Flash (Set After)
-						//dprintf("%s:start flash\n", __FUNCTION__);
-						break;
-					case 0x9 :
-						// Steady (Set At)
-						//dprintf("%s: <steady>\n", __FUNCTION__);
-						break;
-					case 0xa :
-						// End Box (Set After)
-						box--;
-						//dprintf("%s: <end box>\n", __FUNCTION__);
-						break;
-					case 0xb :
-						// Start Box (Set After)
-						box++;
-						//dprintf("%s: <start box>\n", __FUNCTION__);
-						break;
-					case 0xc :
-						// Normal Size (Set At)
-						flagDH=0;
-						flagDW=0;
-						flagDS=0;
-						//dprintf("%s: <normal size>\n", __FUNCTION__);
-						break;
-					case 0xd :
-						// Double height (Set After)
-						flagDH=1;
-						flagDW=0;
-						flagDS=0;
-						//dprintf("%s: <double height>\n", __FUNCTION__);
-						break;
-					case 0xe :
-						// Double width (Set After)
-						flagDH=0;
-						flagDW=1;
-						flagDS=0;
-						//dprintf("%s: <double width>\n", __FUNCTION__);
-						break;
-					case 0xf :
-						// Double size (Set After)
-						flagDH=0;
-						flagDW=0;
-						flagDS=1;
-						//dprintf("%s: <double size>\n", __FUNCTION__);
-						break;
-					// Mosaic colour(Set After)
-					case 0x10 :
-						alpha = 0;
-						red = 0;
-						green = 0;
-						blue = 0;
-						//dprintf("%s: <mosaic black>\n", __FUNCTION__);
-						break;
-					case 0x11 :
-						alpha = 0;
-						red = 0xFF;
-						green = 0;
-						blue = 0;
-						//dprintf("%s: <mosaic red>\n", __FUNCTION__);
-						break;
-					case 0x12 :
-						alpha = 0;
-						red = 0;
-						green = 0xFF;
-						blue = 0;
-						//dprintf("%s: <mosaic green>\n", __FUNCTION__);
-						break;
-					case 0x13 :
-						alpha = 0;
-						red = 0xFF;
-						green = 0xFF;
-						blue = 0;
-						//dprintf("%s: <mosaic yellow>\n", __FUNCTION__);
-						break;
-					case 0x14 :
-						alpha = 0;
-						red = 0;
-						green = 0;
-						blue = 0xFF;
-						//dprintf("%s: <mosaic blue>\n", __FUNCTION__);
-						break;
-					case 0x15 :
-						alpha = 0;
-						red = 0xFF;
-						green = 0;
-						blue = 0xFF;
-						//dprintf("%s: <mosaic magenta>\n", __FUNCTION__);
-						break;
-					case 0x16 :
-						alpha = 0;
-						red = 0;
-						green = 0xFF;
-						blue = 0xFF;
-						//dprintf("%s: <mosaic cyan>\n", __FUNCTION__);
-						break;
-					case 0x17 :
-						alpha = 0;
-						red = 0xFF;
-						green = 0xFF;
-						blue = 0xFF;
-						//dprintf("%s: <mosaic white>\n", __FUNCTION__);
-						break;
-					case 0x18 :
-						// Conceal (Set At)
-						//dprintf("%s: <conceal>\n", __FUNCTION__);
-						break;
-					case 0x19 :
-						// Contiguous Mosaic Graphics (Set At)
-						//dprintf("%s: <contiguous mosaic>\n", __FUNCTION__);
-						break;
-					case 0x1A :
-						// Seperated Mosaic Graphics (Set At)
-						//dprintf("%s: <seperated mosaic>\n", __FUNCTION__);
-						break;
-					case 0x1B :
-						// Escape (Set After)
-						if(Lang)
-							Lang = 0;
-						else
-							Lang = 1;
-						//dprintf("%s: <escape>\n", __FUNCTION__);
-						break;
-					case 0x1C :
-						// Black background (Set At)
-						gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF,
-										column*symbolWidth+horIndent,
-										line*symbolHeight+verIndent-symbolHeight,
-										interfaceInfo.screenWidth-2*horIndent - column*symbolWidth,
-										symbolHeight);
-						//dprintf("%s: <black background>\n", __FUNCTION__);
-						break;
-					case 0x1D :
-						// New background
-						// The foreground colour becomes the background colour
-						// any new characters until foreground would be invisible.
-						gfx_drawRectangle(DRAWING_SURFACE, red, green, blue, 0xFF,
-										column*symbolWidth+horIndent,
-										line*symbolHeight+verIndent-symbolHeight,
-										interfaceInfo.screenWidth-2*horIndent - column*symbolWidth,
-										symbolHeight);
-						//dprintf("%s: <new background>\n", __FUNCTION__);
-						break;
-					case 0x1E :
-						// Hold Mosaics (Set At)
-						//dprintf("%s: <hold mosaics>\n", __FUNCTION__);
-						break;
+				if(str[0] < 0x20) {//Special simbols
+					uint32_t found = 0;
+					uint32_t i;
+					struct {
+						uint8_t	symbol;
+						uint8_t	ARGB[4]; //alpha, red, green, blue
+					} symbolsColor[] = {
+						{0x00, {0x01, 0x00, 0x00, 0x00}}, //alpha black
+						{0x01, {0x01, 0xff, 0x00, 0x00}}, //alpha red
+						{0x02, {0x01, 0x00, 0xff, 0x00}}, //alpha green
+						{0x03, {0x01, 0xff, 0xff, 0x00}}, //alpha yellow
+						{0x04, {0x01, 0x00, 0x00, 0xff}}, //alpha blue
+						{0x05, {0x01, 0xff, 0x00, 0xff}}, //alpha magneta
+						{0x06, {0x01, 0x00, 0xff, 0xff}}, //alpha cyan
+						{0x07, {0x01, 0xff, 0xff, 0xff}}, //alpha white
+						
+						{0x10, {0x00, 0x00, 0x00, 0x00}}, //mosaic black
+						{0x11, {0x00, 0xff, 0x00, 0x00}}, //mosaic red
+						{0x12, {0x00, 0x00, 0xff, 0x00}}, //mosaic green
+						{0x13, {0x00, 0xff, 0xff, 0x00}}, //mosaic yellow
+						{0x14, {0x00, 0x00, 0x00, 0xff}}, //mosaic blue
+						{0x15, {0x00, 0xff, 0x00, 0xff}}, //mosaic magneta
+						{0x16, {0x00, 0x00, 0xff, 0xff}}, //mosaic cyan
+						{0x17, {0x00, 0xff, 0xff, 0xff}}, //mosaic white
+					};
+					struct {
+						uint8_t	symbol;
+						uint8_t	flagDH;
+						uint8_t	flagDW;
+						uint8_t	flagDS;
+					} symbolsSize[] = {
+						{0x0c, 0x00, 0x00, 0x00}, //normal size
+						{0x0d, 0x01, 0x00, 0x00}, //double height
+						{0x0e, 0x00, 0x01, 0x00}, //double width
+						{0x0f, 0x00, 0x00, 0x01}, //double size
+					};
 
-					case 0x1F :
-						// Release Mosaics (Set At)
-						//dprintf("%s: <release mosaics>\n", __FUNCTION__);
-					break;
-
-					default :
-						//dprintf("%s: <default>\n", __FUNCTION__);
-						break;
+					for(i = 0; i < ARRAY_SIZE(symbolsColor); i++) {
+						if(str[0] == symbolsColor[i].symbol) {
+							alpha	= symbolsColor[i].ARGB[0];
+							red		= symbolsColor[i].ARGB[1];
+							green	= symbolsColor[i].ARGB[2];
+							blue	= symbolsColor[i].ARGB[3];
+							found	= 1;
+							break;
+						}
+					}
+					if(!found) {
+						for(i = 0; i < ARRAY_SIZE(symbolsSize); i++) {
+							if(str[0] == symbolsSize[i].symbol) {
+								flagDH	= symbolsSize[i].flagDH;
+								flagDW	= symbolsSize[i].flagDW;
+								flagDS	= symbolsSize[i].flagDS;
+								found	= 1;
+								break;
+							}
+						}
+					}
+					
+					if(!found) {
+						switch(str[0]) {
+						case 0x8: // Start Flash (Set After)
+						case 0x9: // Steady (Set At)
+							break;
+						case 0xa: // End Box (Set After)
+							box--;
+							break;
+						case 0xb: // Start Box (Set After)
+							box++;
+							break;
+						case 0x18: // Conceal (Set At)
+						case 0x19: // Contiguous Mosaic Graphics (Set At)
+						case 0x1A: // Seperated Mosaic Graphics (Set At)
+							break;
+						case 0x1B: // Escape (Set After)
+							if(Lang) {
+								Lang = 0;
+							} else {
+								Lang = 1;
+							}
+							break;
+						case 0x1C: // Black background (Set At)
+							gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF,
+											column*symbolWidth+horIndent,
+											line*symbolHeight+verIndent-symbolHeight,
+											interfaceInfo.screenWidth-2*horIndent - column*symbolWidth,
+											symbolHeight);
+							//dprintf("%s: <black background>\n", __FUNCTION__);
+							break;
+						case 0x1D: // New background
+							// The foreground colour becomes the background colour
+							// any new characters until foreground would be invisible.
+							gfx_drawRectangle(DRAWING_SURFACE, red, green, blue, 0xFF,
+											column*symbolWidth+horIndent,
+											line*symbolHeight+verIndent-symbolHeight,
+											interfaceInfo.screenWidth-2*horIndent - column*symbolWidth,
+											symbolHeight);
+							//dprintf("%s: <new background>\n", __FUNCTION__);
+							break;
+						case 0x1E: // Hold Mosaics (Set At)
+						case 0x1F: // Release Mosaics (Set At)
+						default:
+							break;
+						}
 					}
 					str[0]=' ';
 				}
 
 
-				if(alpha)	//Text
-				{
-					if((teletextInfo.cyrillic)&&(Lang)&&(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190))))
-					{
-						if(box)
+				if(alpha) { //Text
+					if((teletextInfo.cyrillic)&&(Lang)&&(((str[0]>=64)&&(str[0]<=127))||(str[0]=='#')||(str[0]=='&')||(str[0]==247)||((str[0]>=188)&&(str[0]<=190)))) {
+						if(box) {
 							gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-symbolHeight, symbolWidth, symbolHeight);
-					
+						}
+
 						teletext_convToCyrillic(str[0],fu);
 						gfx_drawText(DRAWING_SURFACE, pgfx_font, red, green, blue, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-upText, (char*) fu, 0, 0);
-					}
-					else
-					{
-						if (str[0] != ' ' && box)
+					} else {
+						if(str[0] != ' ' && box) {
 							gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-symbolHeight, symbolWidth, symbolHeight);
-						
+						}
+
 						gfx_drawText(DRAWING_SURFACE, pgfx_font, red, green, blue, 0xFF, column*symbolWidth+horIndent, line*symbolHeight+verIndent-upText, (char*) str, 0, 0);
 					}
-				}
-				else		//Pseudographics
-				{
+				} else { //Pseudographics
 					switch (str[0])
 					{
 						case 33:
