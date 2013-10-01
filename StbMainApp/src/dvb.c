@@ -755,8 +755,9 @@ static int dvb_sectionRead (__u32 frequency, char * demux_devname, struct sectio
 	/* 	the section filter API guarantess that we get one full section
 	 * per read(), provided that the buffer is large enough (it is)
 	 */
-	if (((count = read (s->fd, s->buf, sizeof(s->buf))) < 0) && errno == EOVERFLOW)
+	if(((count = read (s->fd, s->buf, sizeof(s->buf))) < 0) && (errno == EOVERFLOW)) {
 		count = read (s->fd, s->buf, sizeof(s->buf));
+	}
 	if (count < 0 && errno != EAGAIN) {
 		dprintf("%s: Read error %d (errno %d) pid 0x%04x\n", __FUNCTION__, count, errno, s->pid);
 		return -1;
@@ -791,24 +792,26 @@ static void dvb_filtersRead (__u32 frequency, char* demux_devname)
 	if (n == -1)
 		PERROR("%s: filter poll failed", __FUNCTION__);
 
-	for (i = 0; i < n_running; i++) {
+	for(i = 0; i < n_running; i++) {
 		s = poll_section_bufs[i];
-		if (!s)
-		{
+		if(!s) {
 			fatal("%s: poll_section_bufs[%d] is NULL\n", __FUNCTION__, i);
 			continue;
 		}
-		if (poll_fds[i].revents)
-			done = dvb_sectionRead (frequency, demux_devname, s) == 1;
-		else
+
+		if(poll_fds[i].revents) {
+			done = dvb_sectionRead(frequency, demux_devname, s) == 1;
+		} else {
 			done = 0; /* timeout */
-		if (done || time(NULL) > s->start_time + s->timeout) {
-			if (!done)
-			{
+		}
+		if(  done ||
+			(time(NULL) > (s->start_time + s->timeout)) )
+		{
+			if(!done) {
 				SCAN_MESSAGE("DVB: filter timeout pid 0x%04x\n", s->pid);
 				debug("%s: filter timeout pid 0x%04x\n", __FUNCTION__, s->pid);
 			}
-			dvb_filterRemove (s);
+			dvb_filterRemove(s);
 		}
 	}
 
@@ -1443,7 +1446,7 @@ const char *dvb_getTypeName(tunerFormat tuner)
 	return fe_typeNames[appControlInfo.tunerInfo[tuner].type];
 }
 
-int dvb_setType(tunerFormat tuner, int type)
+static int dvb_setType(tunerFormat tuner, int type)
 {
 	if(dvb_isLinuxTuner(tuner)) {
 		int ret = dvb_setFrontendType(dvb_getAdapter(tuner), type);
@@ -1459,6 +1462,7 @@ int dvb_setType(tunerFormat tuner, int type)
 int dvb_setFrontendType(int adapter, int type)
 {
 #ifdef DTV_DELIVERY_SYSTEM
+	int fdf;
 	struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
 	struct dtv_properties cmdseq = {
 		.num = 1,
@@ -1478,10 +1482,12 @@ int dvb_setFrontendType(int adapter, int type)
 			eprintf("%s: unknown frontend type %d\n", __FUNCTION__, type);
 			return -1;
 	}
-	int fdf = dvb_openFrontend(adapter, O_RDWR);
-	if (fdf < 0)
+
+	fdf = dvb_openFrontend(adapter, O_RDWR);
+	if(fdf < 0) {
 		return -1;
-	if (ioctl(fdf, FE_SET_PROPERTY, &cmdseq) == -1) {
+	}
+	if(ioctl(fdf, FE_SET_PROPERTY, &cmdseq) == -1) {
 		eprintf("%s: set property failed: %s\n", __FUNCTION__, strerror(errno));
 		close(fdf);
 		return -1;
@@ -1498,8 +1504,9 @@ int dvb_setFrontendType(int adapter, int type)
 int dvb_toggleType(tunerFormat tuner)
 {
 	fe_type_t type = (dvb_getType(tuner)+1)%FE_TYPE_COUNT;
-	while (type != dvb_getType(tuner) && (appControlInfo.tunerInfo[tuner].caps & (1 << type)) == 0)
-		type = (type+1)%FE_TYPE_COUNT;
+	while((type != dvb_getType(tuner)) && ((appControlInfo.tunerInfo[tuner].caps & (1 << type)) == 0)) {
+		type = (type + 1) % FE_TYPE_COUNT;
+	}
 	return dvb_setType(tuner, type);
 }
 
@@ -1542,16 +1549,21 @@ int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, _
 }
 
 int dvb_openFrontend(int adapter, int flags)
-{	
+{
 	char frontend_devname[32];
+	int frontend_fd;
 	snprintf(frontend_devname, sizeof(frontend_devname), "/dev/dvb/adapter%d/frontend0", adapter);
-	int frontend_fd = open(frontend_devname, flags);
-	if (frontend_fd < 0)
-	{
+
+	frontend_fd = open(frontend_devname, flags);
+	if(frontend_fd < 0) {
 		snprintf(frontend_devname, sizeof(frontend_devname), "/dev/dvb%d.frontend0", adapter);
 		frontend_fd = open(frontend_devname, flags);
+		if(frontend_fd < 0) {
+			printf("%s[%d]: %m\n", __FILE__, __LINE__);
+			eprintf("%s: failed to open adapter %d\n", __FUNCTION__, adapter);
+		}
 	}
-	
+
 	return frontend_fd;
 }
 
@@ -2050,7 +2062,7 @@ frequency_scan_failed:
 */
 static void dvb_instanceReset(struct dvb_instance * dvb, int adapter)
 {
-	memset( dvb, 0, sizeof(struct dvb_instance));
+	memset(dvb, 0, sizeof(struct dvb_instance));
 
 	dvb->adapter = adapter;
 	dvb->fdf = -1;
@@ -2358,14 +2370,16 @@ static int dvb_instanceOpen (struct dvb_instance * dvb, char *pFilename)
 	return 0;
 }
 
-int32_t dvb_hasTeletext(int adapter, int32_t *dvr_fd)
+int32_t dvb_getTeletextFD(int adapter, int32_t *dvr_fd)
 {
 	struct dvb_instance *dvb = &(dvbInstances[adapter]);
-	*dvr_fd = dvb->fdin;
-	if(dvb->filtert.pid) {
-		return 1;
+
+	if(dvb->filtert.pid > 0) {
+		*dvr_fd = dvb->fdin;
+		return 0;
 	}
-	return 0;
+
+	return -1;
 }
 #undef open_or_abort
 
@@ -3302,7 +3316,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 				default:;
 			}
 		}
-		if (neededType != dvb->fe_type && dvb_setFrontendType(dvb->adapter, neededType) != 0) {
+		if((neededType != dvb->fe_type) && (dvb_setFrontendType(dvb->adapter, neededType) != 0)) {
 			eprintf("%s[%d]: Watch failed to get frequency for %d service\n", __FUNCTION__, pParam->adapter, pParam->param.liveParam.channelIndex);
 			return -1;
 		}
@@ -3312,7 +3326,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 
 #ifdef LINUX_DVB_API_DEMUX
 	dvb_demuxerInit(dvb, pParam->mode);
-	if (dvb_demuxerSetup(dvb, pParam) != 0) {
+	if(dvb_demuxerSetup(dvb, pParam) != 0) {
 		eprintf("%s[%d]: unknown mode %d!\n", __FUNCTION__, dvb->adapter, pParam->mode);
 		return -1;
 	}

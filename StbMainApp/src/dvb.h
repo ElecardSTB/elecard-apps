@@ -550,7 +550,7 @@ int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
  *   @param[out]  dvr_fd     DVR file descriptor
  *   @return 1 if has teletext
  */
-int32_t dvb_hasTeletext(int adapter, int32_t *dvr_fd);
+int32_t dvb_getTeletextFD(int adapter, int32_t *dvr_fd);
 
 /** @} */
 
