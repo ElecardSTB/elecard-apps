@@ -984,7 +984,7 @@ void appInfo_init(void)
 	appControlInfo.dvbInfo.tuner      = 0;
 	appControlInfo.dvbInfo.scrambled  = 0;
 	appControlInfo.dvbInfo.channel    = 0;
-	appControlInfo.dvbInfo.channelChange = 0;
+	appControlInfo.dvbInfo.previousChannel = 0;
 	appControlInfo.dvbInfo.showInfo   = 0;
 
 	appControlInfo.offairInfo.dvbShowScrambled    = 0;

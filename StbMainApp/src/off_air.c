@@ -1474,6 +1474,17 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 
 	switch (cmd->command)
 	{
+		case interfaceCommandUp:
+		case interfaceCommandDown:
+			interface_menuActionShowMenu(interfaceInfo.currentMenu, &DVBTOutputMenu);
+			interface_showMenu(1, 1);
+			return 0;
+		case interfaceCommand0:
+			if (interfaceChannelControl.length)
+				return 1;
+			if (appControlInfo.dvbInfo.previousChannel)
+				offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+			return 0;
 #ifdef ENABLE_PVR
 		case interfaceCommandRecord:
 			pvr_toogleRecordingDVB();
@@ -1886,6 +1897,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		offair_stopVideo(screenMain, 0);
 	}
 
+	int previousChannel = appControlInfo.dvbInfo.channel;
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
 	appControlInfo.mediaInfo.bHttp = 0;
@@ -1926,6 +1938,8 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	if ( appControlInfo.dvbInfo.active != 0 )
 	{
 		interface_showMenu(0, 1);
+		if (appControlInfo.dvbInfo.previousChannel != previousChannel)
+			appControlInfo.dvbInfo.previousChannel  = previousChannel;
 	}
 
 	//interface_menuActionShowMenu(pMenu, (void*)&DVBTMenu);
@@ -3473,6 +3487,7 @@ void offair_clearServiceList(int permanent)
 #endif
 	offair_stopVideo(screenMain, 1);
 	appControlInfo.dvbInfo.channel = 0;
+	appControlInfo.dvbInfo.previousChannel = 0;
 	dvb_clearServiceList(permanent);
 	offair_initServices();
 #if (defined ENABLE_PVR) && (defined STBPNX)

@@ -278,8 +278,8 @@ typedef struct
 	int                  active;
 	tunerFormat          tuner; // points to tunerInfo
 	int                  channel;
+	int                  previousChannel;
 	int                  scrambled;
-	int                  channelChange;
 	int                  showInfo;
 	int                  scanPSI;
 	stb810_signalStatus  lastSignalStatus;
