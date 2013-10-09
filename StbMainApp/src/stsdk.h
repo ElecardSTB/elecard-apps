@@ -105,17 +105,19 @@ int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg);
 void st_cancelAsync(int index, int execute);
 
 #ifdef ENABLE_DVB
-uint32_t st_frequency(tunerFormat tuner, uint32_t frequency)
+static inline uint32_t st_frequency(tunerFormat tuner, uint32_t frequency)
 {
-	return dvb_getType(tuner) == DVBS ? frequency : frequency/1000;
+	return (dvb_getType(tuner) == DVBS) ? frequency : (frequency / KHZ);
 }
-void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media);
-static inline int st_getTunerIndex(tunerFormat tuner)
+
+static inline int32_t st_getTunerIndex(tunerFormat tuner)
 {
 	return appControlInfo.tunerInfo[tuner].adapter >= ADAPTER_COUNT ?
 	       appControlInfo.tunerInfo[tuner].adapter  - ADAPTER_COUNT :
 	       appControlInfo.tunerInfo[tuner].adapter;
 }
+
+void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media);
 void st_sendDiseqc(tunerFormat tuner, const uint8_t *cmd, size_t len);
 #endif
 

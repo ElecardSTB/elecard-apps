@@ -106,21 +106,23 @@ static void* st_poolThread(void* pArg);
 *******************************************************************/
 
 #ifdef ENABLE_DVB
-static const struct { fe_modulation_t value; const char *name; } modulation_names[] =
-{
-	{QPSK,    "qpsk"},
-	{QAM_16,  "qam16"},
-	{QAM_32,  "qam32"},
-	{QAM_64,  "qam64"},
-	{QAM_128, "qam128"},
-	{QAM_256, "qam256"},
-	{VSB_8,   "vsb8"},
-	{VSB_16,  "vsb16"},
-	{PSK_8,   "psk8"},
-	{APSK_16, "apsk16"},
-	{APSK_32, "apsk32"},
-	{DQPSK,   "dqpsk"},
-	{0,NULL}
+static const struct {
+	fe_modulation_t value;
+	const char *name;
+} modulation_names[] = {
+	{QPSK,		"qpsk"},
+	{QAM_16,	"qam16"},
+	{QAM_32,	"qam32"},
+	{QAM_64,	"qam64"},
+	{QAM_128,	"qam128"},
+	{QAM_256,	"qam256"},
+	{VSB_8,		"vsb8"},
+	{VSB_16,	"vsb16"},
+	{PSK_8,		"psk8"},
+	{APSK_16,	"apsk16"},
+	{APSK_32,	"apsk32"},
+	{DQPSK,		"dqpsk"},
+	{0, NULL}
 };
 #endif
 static rpcPool_t pool;
@@ -505,6 +507,17 @@ type_known:
 	pthread_exit(NULL);
 }
 
+const char *getModulationName(fe_modulation_t modulation)
+{
+	int32_t i;
+	for(i = 0; modulation_names[i].name != NULL; i++) {
+		if(modulation_names[i].value == modulation) {
+			return modulation_names[i].name;
+		}
+	}
+	return NULL;
+}
+
 #ifdef ENABLE_DVB
 void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media)
 {
@@ -517,13 +530,13 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 			break;
 		case DVBC: {
 			fe_modulation_t modulation = media ? media->dvb_c.modulation : appControlInfo.dvbcInfo.modulation;
-			for (int i=0; modulation_names[i].name != NULL; i++)
-				if (modulation_names[i].value == modulation) {
-					cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modulation_names[i].name));
-					break;
-				}
-			cJSON_AddItemToObject(params, "symbolrate",
-				cJSON_CreateNumber( media ? media->dvb_c.symbol_rate/1000 : appControlInfo.dvbcInfo.symbolRate ));
+			uint32_t symbolRate = media ? media->dvb_c.symbol_rate / 1000 : appControlInfo.dvbcInfo.symbolRate;
+			const char *modName;
+			modName = getModulationName(modulation);
+			if(modName) {
+				cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modName));
+			}
+			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber(symbolRate));
 			break;
 		}
 		case DVBS: {
@@ -532,6 +545,15 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 				cJSON_CreateNumber( media ? media->dvb_s.symbol_rate/1000 : appControlInfo.dvbsInfo.symbolRate ));
 			if (vertical)
 				cJSON_AddItemToObject(params, "vertical", cJSON_CreateTrue());
+			break;
+		}
+		case ATSC: {
+			fe_modulation_t modulation = media ? media->atsc.modulation : appControlInfo.atscInfo.modulation;
+			const char *modName;
+			modName = getModulationName(modulation);
+			if(modName) {
+				cJSON_AddItemToObject(params, "modulation", cJSON_CreateString(modName));
+			}
 			break;
 		}
 		default:;

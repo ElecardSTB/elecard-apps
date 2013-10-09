@@ -2708,7 +2708,7 @@ static int output_toggleDvbType(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleDvbTuner(interfaceMenu_t *pMenu, void* pArg)
 {
 	offair_stopVideo(screenMain, 1);
-	appControlInfo.dvbInfo.tuner = 1-appControlInfo.dvbInfo.tuner;
+	appControlInfo.dvbInfo.tuner = 1 - appControlInfo.dvbInfo.tuner;
 	return output_saveAndRedraw(0, pMenu);
 }
 
@@ -2953,8 +2953,7 @@ set_range_failed:
 
 static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 {
-	switch (appControlInfo.dvbcInfo.modulation)
-	{
+	switch (appControlInfo.dvbcInfo.modulation) {
 		case QAM_16: appControlInfo.dvbcInfo.modulation = QAM_32; break;
 		case QAM_32: appControlInfo.dvbcInfo.modulation = QAM_64; break;
 		case QAM_64: appControlInfo.dvbcInfo.modulation = QAM_128; break;
@@ -2966,7 +2965,7 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
 {
-	fe_modulation_t atscModulations[] = {VSB_8, VSB_16, QAM_64, QAM_256};
+	fe_modulation_t atscModulations[] = {VSB_8, /*VSB_16, */QAM_64, QAM_256};
 	static uint32_t curAtscModulation = 0;
 
 	curAtscModulation++;
@@ -2974,6 +2973,11 @@ static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
 		curAtscModulation = 0;
 	}
 	appControlInfo.atscInfo.modulation = atscModulations[curAtscModulation];
+
+	if((atscModulations[curAtscModulation] == VSB_8) || (atscModulations[curAtscModulation] == QAM_64)) {
+		dvb_setType(appControlInfo.dvbInfo.tuner, ATSC, atscModulations[curAtscModulation]);
+	}
+
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 

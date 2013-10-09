@@ -544,6 +544,8 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 #define dvb_isLinuxTuner(tuner) 1
 #endif
 
+//TODO: remove modulation argument, this used for separate ATSC and ANNEX-B delivery systems
+int32_t dvb_setType(tunerFormat tuner, int type, fe_modulation_t modulation);
 int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
 /** Function return if there has teletext in playing program
