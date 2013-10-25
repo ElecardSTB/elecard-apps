@@ -1154,6 +1154,10 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		media = NULL;
 	}
 	if((type == DVBT) && (media == NULL || media->type == serviceMediaDVBT)) {
+		fe_bandwidth_t bandwidth = (media != NULL) ? media->dvb_t.bandwidth : appControlInfo.dvbtInfo.bandwidth;
+		uint32_t int_bandwidth = (dvb_getBandwidth_kHz(bandwidth) == 0) ? 3 : dvb_getBandwidth_kHz(bandwidth);
+		uint32_t inversion = appControlInfo.dvbtInfo.fe.inversion;
+
 #ifdef DTV_STREAM_ID
 		uint8_t plp_id = media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id;
 
@@ -1167,9 +1171,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		}
 		eprintf("   T: plp %u\n", plp_id);
 #endif
-		fe_bandwidth_t bandwidth = media != NULL ? media->dvb_t.bandwidth : appControlInfo.dvbtInfo.bandwidth;
-		uint32_t int_bandwidth = (dvb_getBandwidth_kHz(bandwidth) == 0) ? 3 : dvb_getBandwidth_kHz(bandwidth);
-		uint8_t inversion = appControlInfo.dvbtInfo.fe.inversion;
+
 		dtv[0].cmd = DTV_FREQUENCY; 		dtv[0].u.data = frequency;
 		dtv[1].cmd = DTV_INVERSION; 		dtv[1].u.data = inversion;
 		dtv[2].cmd = DTV_BANDWIDTH_HZ; 		dtv[2].u.data = int_bandwidth;
@@ -1185,28 +1187,29 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 
 		eprintf("   T: bandwidth %u, invertion %u\n", int_bandwidth, inversion);
 	} else if((type == DVBC) && (media == NULL || media->type == serviceMediaDVBC)) {
-		uint8_t modulation;
-		uint8_t symbol_rate;
+		uint32_t modulation;
+		uint32_t symbol_rate;
+		uint32_t inversion = appControlInfo.dvbcInfo.fe.inversion;
 		if(media != NULL) {
 			modulation  = media->dvb_c.modulation;
 			symbol_rate = media->dvb_c.symbol_rate;
 		} else {
 			modulation  = appControlInfo.dvbcInfo.modulation;
-			symbol_rate = appControlInfo.dvbcInfo.symbolRate*1000;
+			symbol_rate = appControlInfo.dvbcInfo.symbolRate * KHZ;
 		}
 
 		dtv[0].cmd = DTV_FREQUENCY; 		dtv[0].u.data = frequency;
 		dtv[1].cmd = DTV_MODULATION; 		dtv[1].u.data = modulation;
 		dtv[2].cmd = DTV_SYMBOL_RATE; 		dtv[2].u.data = symbol_rate;
-		dtv[3].cmd = DTV_INVERSION; 		dtv[3].u.data = appControlInfo.dvbcInfo.fe.inversion;
+		dtv[3].cmd = DTV_INVERSION; 		dtv[3].u.data = inversion;
 		dtv[4].cmd = DTV_INNER_FEC; 		dtv[4].u.data = FEC_NONE;
 		dtv[5].cmd = DTV_TUNE;
 
 		cmdseq.num = 6;
 		eprintf("   C: Symbol rate %u, modulation %u invertion %u\n",
-				symbol_rate, modulation, appControlInfo.dvbcInfo.fe.inversion);
+				symbol_rate, modulation, inversion);
 	} else if((type == DVBS) && (media == NULL || media->type == serviceMediaDVBS)) {
-		uint8_t symbol_rate = media != NULL ? media->dvb_s.symbol_rate : appControlInfo.dvbsInfo.symbolRate*1000;
+		uint32_t symbol_rate = (media != NULL) ? media->dvb_s.symbol_rate : appControlInfo.dvbsInfo.symbolRate * KHZ;
 
 		dtv[0].cmd = DTV_FREQUENCY; 		dtv[0].u.data = frequency;
 		dtv[1].cmd = DTV_SYMBOL_RATE; 		dtv[1].u.data = symbol_rate;
@@ -1218,7 +1221,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 
 		dvb_diseqcSetup(tuner, frontend_fd, frequency, media);
 	} else if((type == ATSC) /*&& (media == NULL || media->type == serviceMediaATSC)*/) {
-		uint8_t modulation = media ? media->atsc.modulation : appControlInfo.atscInfo.modulation;
+		uint32_t modulation = media ? media->atsc.modulation : appControlInfo.atscInfo.modulation;
 		if(modulation == 0) {
 			modulation = VSB_8;
 		}
