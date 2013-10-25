@@ -1824,7 +1824,7 @@ int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *me
 						int save_service_list, dvb_cancelFunctionDef* pCancelFunction)
 {
 	char demux_devname[32];
-	int frontend_fd = 0;
+	int frontend_fd = -1;
 	struct dvb_frontend_info fe_info;
 	int current_frequency_number = 1, max_frequency_number = 0;
 
