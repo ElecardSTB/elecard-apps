@@ -4091,8 +4091,12 @@ static int  offair_updateEPG(void* pArg)
 
 int  offair_tunerPresent(void)
 {
-	return (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
-	        appControlInfo.tunerInfo[1].status != tunerNotPresent);
+	if(st_getBoardId() == eSTB850) {
+		return 1; //we always have analog tuner for stb850.
+	} else {
+		return (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
+				appControlInfo.tunerInfo[1].status != tunerNotPresent);
+	}
 }
 
 void offair_buildDVBTMenu(interfaceMenu_t *pParent)
