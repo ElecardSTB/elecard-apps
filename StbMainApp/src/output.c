@@ -847,20 +847,26 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_checkInputs()
 {
-	elcdRpcType_t   type = elcdRpcInvalid;
-	cJSON           *list;
+	elcdRpcType_t	type = elcdRpcInvalid;
+	cJSON			*list;
+	static int32_t	inputsExist = -1;
 
-	st_rpcSync(elcmd_listvinput, NULL, &type, &list);
-	
-	if (type != elcdRpcResult) return 0;
-	if (!list) return 0;
-	if (list->type != cJSON_Array) return 0;
+	if(inputsExist == -1) { //check inputs once
+		st_rpcSync(elcmd_listvinput, NULL, &type, &list);
 
-	if (cJSON_GetArraySize(list) > 0) return 1;
-	return 0;
+		inputsExist = 0;
+		if((type == elcdRpcResult) &&
+			list && (list->type == cJSON_Array) &&
+			(cJSON_GetArraySize(list) > 0))
+		{
+			inputsExist = 1;
+		}
+	}
+
+	return inputsExist;
 }
 
-static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
+static void output_fillInputsMenu(interfaceMenu_t *pMenu, void *pArg)
 {
 	int32_t			selected = MENU_ITEM_BACK;
 	interfaceMenu_t	*inputsMenu = &(InputsSubMenu.baseMenu);
@@ -885,7 +891,7 @@ static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 			value = cJSON_GetObjectItem(inputItem, "name");
 			if (!value || value->type != cJSON_String) continue;
 			
-			sprintf (inputNames[g_inputCount], cJSON_GetObjectItem(inputItem, "name")->valuestring);
+			sprintf(inputNames[g_inputCount], cJSON_GetObjectItem(inputItem, "name")->valuestring);
 
 			interface_addMenuEntry(inputsMenu, inputNames[g_inputCount], output_setInput, inputNames[g_inputCount], icon);
 			g_inputCount++;
@@ -911,10 +917,12 @@ static void output_fillInputsMenu (interfaceMenu_t *pMenu, void *pArg)
 int output_toggleInputs(void)
 {
 	uint32_t next = 0;
-	
-	if (g_inputCount == 0){
-		if (output_checkInputs() == 0) return -1;
-		output_fillInputsMenu (NULL, NULL);
+
+	if(output_checkInputs() == 0) {
+		return -1;
+	}
+	if(g_inputCount == 0) {
+		output_fillInputsMenu(NULL, NULL);
 	}
 	
 	interfaceMenu_t *inputsMenu = &InputsSubMenu.baseMenu; 
@@ -4519,7 +4527,7 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 #ifdef STSDK
 int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused)
 {
-	output_fillInputsMenu (pMenu, NULL);
+	output_fillInputsMenu(pMenu, NULL);
 	return 0;
 };
 #endif
@@ -6183,7 +6191,7 @@ void output_fillOutputMenu(void)
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
 #if (defined STSDK)
-	if (output_checkInputs() > 0){
+	if(output_checkInputs() > 0) {
 		str = _T("INPUTS_CONFIG");
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
@@ -6275,7 +6283,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 #ifdef STSDK
-	if (output_checkInputs() > 0){
+	if(output_checkInputs() > 0) {
 		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterInputsMenu, NULL, NULL);
 	}
