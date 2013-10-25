@@ -107,7 +107,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define LAN_CONFIG_FILE             "/var/etc/ifcfg-lan"
 #define WLAN_CONFIG_FILE            "/var/etc/ifcfg-wlan0"
 #define XWORKS_INIT_SCRIPT          "/etc/init.d/S94xworks"
-#endif
+#endif //STSDK
 
 #define MOBILE_APN_FILE             SYSTEM_CONFIG_DIR "/ppp/chatscripts/apn"
 #define MOBILE_PHONE_FILE           SYSTEM_CONFIG_DIR "/ppp/chatscripts/phone"
@@ -132,6 +132,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DVB_MAX_FREQUENCY_K_BAND       18000
 #define DVB_MIN_FREQUENCY_STEP          1000
 #define DVB_MAX_FREQUENCY_STEP          8000
+
+//fake curentmeter functions:
+#define currentmeter_isExist()					0
+#define currentmeter_getCalibrateHighValue()	0
+#define currentmeter_getCalibrateLowValue()		0
+#define currentmeter_getValue(...)				0
+#define currentmeter_setCalibrateHighValue(...)
+#define currentmeter_setCalibrateLowValue(...)
 
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
@@ -288,7 +296,7 @@ static int output_confirmGatewayMode(interfaceMenu_t *pMenu, pinterfaceCommandEv
 static int output_toggleGatewayMode(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterGatewayMenu(interfaceMenu_t *pMenu, void* ignored);
 #endif
-#endif
+#endif //(defined ENABLE_LAN) || (defined ENABLE_WIFI)
 
 #ifdef ENABLE_WIFI
 static int output_readWirelessSettings(void);
@@ -387,6 +395,10 @@ static void output_fillBlankingMenu(void);
 #endif
 
 #ifdef STSDK
+
+static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg);
+static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg);
+
 static int output_enterInputsMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 
@@ -452,6 +464,8 @@ static interfaceListMenu_t InputsSubMenu;
 #ifdef ENABLE_ANALOGTV
 static interfaceListMenu_t AnalogTvSubMenu;
 #endif
+
+static interfaceListMenu_t CurrentmeterSubMenu;
 static interfaceListMenu_t VideoSubMenu;
 static interfaceListMenu_t TimeSubMenu;
 static interfaceListMenu_t NetworkSubMenu;
@@ -899,7 +913,7 @@ int output_toggleInputs(void)
 	uint32_t next = 0;
 	
 	if (g_inputCount == 0){
-		if (appControlInfo.countInputs == 0) return -1;
+		if (output_checkInputs() == 0) return -1;
 		output_fillInputsMenu (NULL, NULL);
 	}
 	
@@ -2416,6 +2430,51 @@ static int output_statusReport(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 
 	return 0;
 }
+
+#ifdef STSDK
+static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg)
+{
+	int32_t selected = MENU_ITEM_BACK;
+	interfaceMenu_t * calibrMenu = &CurrentmeterSubMenu.baseMenu;
+	char buf[MENU_ENTRY_INFO_LENGTH];
+
+	interface_clearMenuEntries(calibrMenu);
+
+	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_HIGH_VALUE"), currentmeter_getCalibrateHighValue(), _T("WATT"));
+	interface_addMenuEntry(calibrMenu, buf, output_calibrateCurrentMeter, SET_NUMBER(1), thumbnail_configure);
+
+	sprintf(buf, "%s: %u %s", _T("CURRENTMETER_CALIBRATE_LOW_VALUE"), currentmeter_getCalibrateLowValue(), _T("WATT"));
+	interface_addMenuEntry(calibrMenu, buf, output_calibrateCurrentMeter, SET_NUMBER(0), thumbnail_configure);
+
+	interface_setSelectedItem(calibrMenu, selected);
+
+	return 0;
+}
+
+static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
+{
+	int isHigh = GET_NUMBER(pArg);
+	uint32_t cur_val = 0;
+
+	if(currentmeter_getValue(&cur_val) == 0) {
+		char info[MENU_ENTRY_INFO_LENGTH];
+
+		if(isHigh == 1) {
+			currentmeter_setCalibrateHighValue(cur_val);
+		} else {
+			currentmeter_setCalibrateLowValue(cur_val);
+		}
+		snprintf(info, sizeof(info), _T("CURRENTMETER_CALIBRATE_SUCCESS"), cur_val);
+		interface_showMessageBox(info, thumbnail_yes, 0);
+	}
+	else {
+		interface_showMessageBox(_T("CURRENTMETER_CALIBRATE_ERROR"), thumbnail_error, 0);
+	}
+	output_redrawMenu(pMenu);
+
+	return 1;
+}
+#endif
 
 static int output_resetSettings(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -4407,6 +4466,22 @@ int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
 	return interface_getText(pMenu, buf, "\\d+", analogtv_setRange, analogtv_getRange, 0, (void *)1);
 }
 
+char *analogtv_delSysName[] = {
+	[TV_SYSTEM_PAL]		= "PAL",
+	[TV_SYSTEM_SECAM]	= "SECAM",
+	[TV_SYSTEM_NTSC]	= "NTSC",
+};
+
+static int analogtv_changeAnalogDelSys(interfaceMenu_t *pMenu, void* pArg)
+{
+	analogtv_delSys++;
+	if(analogtv_delSys > TV_SYSTEM_NTSC) {
+		analogtv_delSys = TV_SYSTEM_PAL;
+	}
+
+	return output_saveAndRedraw(0, pMenu);
+}
+
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	int32_t selected = MENU_ITEM_BACK;
@@ -4427,6 +4502,10 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 
 	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freqKHz);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freqKHz), thumbnail_configure); // SET_NUMBER(optionHighFreq)
+
+	sprintf(buf, "%s: %s", _T("ANALOGTV_DELSYS"), analogtv_delSysName[analogtv_delSys]);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogDelSys, NULL, thumbnail_configure); // SET_NUMBER(optionHighFreq
+	
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);
@@ -6104,8 +6183,7 @@ void output_fillOutputMenu(void)
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
 #if (defined STSDK)
-	appControlInfo.countInputs = output_checkInputs();
-	if (appControlInfo.countInputs > 0){
+	if (output_checkInputs() > 0){
 		str = _T("INPUTS_CONFIG");
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
@@ -6155,6 +6233,13 @@ void output_fillOutputMenu(void)
 #endif
 
 #ifdef STSDK
+	if(currentmeter_isExist()) {
+		str = _T("CURRENTMETER_CALIBRATE");
+		//interface_addMenuEntry(outputMenu, str, output_calibrateCurrentMeter, NULL, thumbnail_configure);
+		//interface_addMenuEntry(outputMenu, str, output_enterCalibrateMenu, &CurrentmeterSubMenu, thumbnail_configure);
+		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &CurrentmeterSubMenu, thumbnail_configure);
+	}
+
 	str = _T("UPDATES");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &UpdateMenu, settings_updates);
 #endif
@@ -6190,7 +6275,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
 #ifdef STSDK
-	if (appControlInfo.countInputs > 0){
+	if (output_checkInputs() > 0){
 		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterInputsMenu, NULL, NULL);
 	}
@@ -6203,6 +6288,12 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
 	}
 #endif
+
+	if (currentmeter_isExist()){
+		createListMenu(&CurrentmeterSubMenu, _T("CURRENTMETER_CALIBRATE"), settings_dvb, NULL, _M &OutputMenu,
+			interfaceListMenuIconThumbnail, output_enterCalibrateMenu, NULL, NULL);
+	}
+
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,

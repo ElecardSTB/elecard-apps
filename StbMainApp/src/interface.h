@@ -280,6 +280,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define INTERFACE_SOUND_CONTROL_BLUE            0x00
 #define INTERFACE_SOUND_CONTROL_ALPHA           0xFF
 
+#define MENU_ENTRY_LABEL_LENGTH 16
+
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
@@ -547,6 +549,7 @@ typedef struct
 {
 	interfaceMenuEntryType_t type;
 	char                     info[MENU_ENTRY_INFO_LENGTH];
+	char                     label[MENU_ENTRY_LABEL_LENGTH];
 	menuActionFunction       pAction;
 	menuActionFunction       pSelectedAction;
 	menuActionFunction       pDeselectedAction; /**< if type is interfaceMenuEntryEdit, used as reset action */
@@ -1227,6 +1230,14 @@ static inline int  interface_addMenuEntry(interfaceMenu_t *pMenu, const char *te
 	menuActionFunction pActivate, void *pArg, int thumbnail)
 {
 	return interface_addMenuEntry2(pMenu, text, 1, pActivate, pArg, thumbnail);
+}
+
+static inline int interface_setMenuEntryLabel(interfaceMenuEntry_t *menuEntry, const char *label)
+{
+	if (menuEntry && label) {
+		snprintf (menuEntry->label, MENU_ENTRY_LABEL_LENGTH, "%s", label);
+	}
+	return 0;
 }
 
 /**

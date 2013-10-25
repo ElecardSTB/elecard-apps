@@ -501,6 +501,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #ifndef ANALOGTV_CHANNEL_FILE
 	#define ANALOGTV_CHANNEL_FILE   CONFIG_DIR "/analog.conf"
+	#define ANALOGTV_CONFIG_JSON    CONFIG_DIR "/analog.json"
 #endif
 
 /***********************************************************

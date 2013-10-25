@@ -61,16 +61,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define URL_RTSP_MEDIA   "rtsp://"
-#define URL_RTP_MEDIA    "rtp://"
-#define URL_UDP_MEDIA    "udp://"
-#define URL_IGMP_MEDIA   "igmp://"
-#define URL_FILE_MEDIA   "file://"
-#define URL_DVB_MEDIA    "dvb://"
-#define URL_HTTP_MEDIA   "http://"
-#define URL_HTTPS_MEDIA  "https://"
-#define URL_RTMP_MEDIA   "rtmp" // rtmp/rtmpt/rtmpe
-#define URL_FUSION_MEDIA "fusion"
+#define URL_RTSP_MEDIA		"rtsp://"
+#define URL_RTP_MEDIA		"rtp://"
+#define URL_UDP_MEDIA		"udp://"
+#define URL_IGMP_MEDIA		"igmp://"
+#define URL_FILE_MEDIA		"file://"
+#define URL_DVB_MEDIA		"dvb://"
+#define URL_HTTP_MEDIA		"http://"
+#define URL_HTTPS_MEDIA		"https://"
+#define URL_RTMP_MEDIA		"rtmp" // rtmp/rtmpt/rtmpe
+#define URL_ANALOGTV_MEDIA	"tv://"
+#define URL_FUSION_MEDIA	"fusion"
 
 #define BUFFER_SIZE      (1024)
 #define MAX_SIP_STRING   (78)
@@ -143,6 +144,7 @@ typedef enum
 	streamSourceDLNA,
 	streamSourceYoutube,
 	streamSourceRutube,
+	streamSourceAnalogTV,
 	streamSources
 } stb810_streamSource;
 
@@ -156,6 +158,7 @@ typedef enum
 	"DLNA", \
 	"YouTube", \
 	"Rutube", \
+	"AnalogTV", \
 	}
 
 /* Trick Mode Speeds */
@@ -289,9 +292,9 @@ typedef struct
 
 typedef struct
 {
-	char channelConfigFile[256];
-	int active;
-	int channel;
+	char		channelConfigFile[256];
+	uint32_t	active;
+	uint32_t	id;
 } stb810_tvInfo;
 
 typedef struct __stb810_dvbCommonInfo
@@ -763,7 +766,6 @@ typedef struct __stb810_controlInfo
 #ifdef ENABLE_VIDIMAX
 	stb810_vidimaxInfo  vidimaxInfo;
 #endif
-	int		countInputs;
 } stb810_controlInfo;
 
 typedef struct _stbTimeZoneDesc_t

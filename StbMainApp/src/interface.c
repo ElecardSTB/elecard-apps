@@ -4498,6 +4498,13 @@ int interface_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i
 	return 0;
 }
 
+int interface_getTextLenInPx (char * text)
+{
+	int width = 0;
+	DFBCHECK (pgfx_font->GetStringWidth(pgfx_font, text, -1, &width));
+	return width;
+}
+
 static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i)
 {
 	int selected                   = pMenu->selectedItem == i;
@@ -4623,8 +4630,16 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x+pListMenu->baseMenu.thumbnailWidth+10, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
 	else
 #endif
+	{
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
 
+		if (selected && (strlen (pListMenu->baseMenu.menuEntry[i].label) > 0)){
+			x = interfaceInfo.clientX + interfaceInfo.clientWidth - 
+				interfaceInfo.paddingSize*4 - INTERFACE_SCROLLBAR_WIDTH - 
+				interface_getTextLenInPx(pListMenu->baseMenu.menuEntry[i].label);
+			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].label, 0, 1);
+		}
+	}
 	return 0;
 }
 
@@ -5177,6 +5192,7 @@ int interface_addMenuEntryCustom(interfaceMenu_t *pMenu,
 		pMenu->menuEntry[pMenu->menuEntryCount].info[dataSize] = 0;
 		pMenu->menuEntry[pMenu->menuEntryCount].pArg = pArg;
 		pMenu->menuEntry[pMenu->menuEntryCount].type = type;
+		memset(pMenu->menuEntry[pMenu->menuEntryCount].label, 0, MENU_ENTRY_LABEL_LENGTH);
 
 		pMenu->menuEntry[pMenu->menuEntryCount].isSelectable = isSelectable;
 
@@ -6031,6 +6047,9 @@ void interface_playControlSetup(playControlCallback pCallback, void *pArg, inter
 #ifdef ENABLE_DVB
 		|| appControlInfo.dvbInfo.active
 #endif
+#ifdef ENABLE_ANALOGTV
+		|| appControlInfo.tvInfo.active
+#endif
 	  )
 	{
 		interfacePlayControl.enabledButtons |= interfacePlayControlRecord;
@@ -6365,6 +6384,9 @@ void interface_playControlRefresh(int redraw)
 	if ( pvr_getActive()
 #ifdef ENABLE_DVB
 		|| appControlInfo.dvbInfo.active
+#endif
+#ifdef ENABLE_ANALOGTV
+		|| appControlInfo.tvInfo.active
 #endif
 	  )
 	{

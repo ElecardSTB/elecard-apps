@@ -961,6 +961,8 @@ void appInfo_init(void)
 #endif
 #ifdef ENABLE_ANALOGTV
 	strcpy(appControlInfo.tvInfo.channelConfigFile, ANALOGTV_CHANNEL_FILE);
+	appControlInfo.tvInfo.active	= 0;
+	appControlInfo.tvInfo.id		= 0;
 #endif
 	appControlInfo.dvbcInfo.fe.inversion          = 0;
 	appControlInfo.dvbcInfo.modulation            = QAM_64;

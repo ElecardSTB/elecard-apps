@@ -62,11 +62,20 @@ typedef struct {
 	uint32_t from_freqKHz;
 	uint32_t to_freqKHz;
 } analogtv_freq_range_t;
+
+typedef enum {
+	TV_SYSTEM_PAL = 0,
+	TV_SYSTEM_SECAM,
+	TV_SYSTEM_NTSC,
+} analogtv_deliverySystem;
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
 extern int analogtv_service_count;
 extern analogtv_freq_range_t analogtv_range;
+extern analogtv_deliverySystem analogtv_delSys;
+
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
@@ -104,10 +113,14 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
 
+int  analogtv_saveConfigFile(int32_t chanIndex, char* str);
+void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 void analogtv_addMenuEntry(interfaceMenu_t *pMenu);
 void analogtv_initMenu(interfaceMenu_t *pParent);
 void analogtv_fillMenu(void);
 uint32_t analogtv_getChannelCount(void);
+
+int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 
 #endif /* ENABLE_ANALOGTV */
 
