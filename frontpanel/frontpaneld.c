@@ -132,6 +132,7 @@ static int ArgHandler_Status(char *input, char *output);
 static int ArgHandler_Pulse(char *input, char *output);
 static int ArgHandler_Brightness(char *input, char *output);
 static int ArgHandler_OledBrightness(char *input, char *output);
+static int ArgHandler_Test(char *input, char *output);
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -183,6 +184,8 @@ struct argHandler_s handlers[] = {
 	{"b",		ArgHandler_Brightness},
 	{"obright",	ArgHandler_OledBrightness},
 	{"o",		ArgHandler_OledBrightness},
+	{"experience",	ArgHandler_Test},
+	{"e",		ArgHandler_Test},
 };
 
 /******************************************************************
@@ -636,6 +639,34 @@ void *PulseThread(void *arg)
 	return NULL;
 }
 
+void *FBTestThread(void *arg)
+{
+	FILE *OLED_fb;
+	unsigned char buffer[FRAMEBUFFER_SIZE];
+
+	OLED_fb = arg;
+
+	while(1) {
+		unsigned int i;
+		
+		for (i = 0; i < FRAMEBUFFER_SIZE; i++) buffer[i] = 0x00;
+		pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
+		fwrite(buffer, FRAMEBUFFER_SIZE, 1, OLED_fb);
+		SetBrightness(0);
+		pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
+		usleep(1000000);
+
+		for (i = 0; i < FRAMEBUFFER_SIZE; i++) buffer[i] = 0xFF;
+		pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
+		fwrite(buffer, FRAMEBUFFER_SIZE, 1, OLED_fb);
+		SetBrightness(8);
+		pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
+		usleep(1000000);
+	}
+	
+	return NULL;
+}
+
 static int ArgHandler_Time(char *input, char *output)
 {
 	(void)output;
@@ -752,6 +783,50 @@ static int ArgHandler_Pulse(char *input, char *output)
 			pthread_cancel(pulse_thread);
 			pthread_join(pulse_thread, NULL);
 			pulseStarted = 0;
+		}
+		SetBrightness(g_brightness);
+	}
+
+	return 0;
+}
+
+static int ArgHandler_Test(char *input, char *output)
+{
+	int					enable;
+	static int			testStarted = 0;
+	static pthread_t	test_thread;
+	static FILE			*fb_fd = NULL;
+
+	(void)output;
+	enable = strtol(input, NULL, 10);
+	if(enable) {
+		const char buffer[] = "ABCDEFGH";
+		FILE *f;
+
+		f = fopen(g_frontpanelText, "w");
+		if(f != 0) {
+				fwrite(buffer, 1, 8, f);  //Light all 8 LEDs
+				fclose(f);
+		}
+		
+		if(testStarted == 0) {
+			if(fb_fd == NULL) {
+				fb_fd = fopen(g_framebuffer_name, "w"); //Open OLED FB to write 
+			}
+			if(pthread_create(&test_thread, NULL, FBTestThread, fb_fd)) {
+				perror("server: FBTestThread");
+			} else {
+				testStarted = 1;
+			}
+		}
+	} else {
+		if(testStarted) {
+			pthread_cancel(test_thread);
+			pthread_join(test_thread, NULL);
+			testStarted = 0;
+			if(fb_fd) {
+				fclose(fb_fd);  //Close OLED FB to write 
+			}
 		}
 		SetBrightness(g_brightness);
 	}
