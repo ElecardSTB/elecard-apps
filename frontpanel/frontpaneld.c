@@ -798,39 +798,53 @@ static int ArgHandler_Test(char *input, char *output)
 	static FILE			*fb_fd = NULL;
 
 	(void)output;
-	enable = strtol(input, NULL, 10);
-	if(enable) {
-		const char buffer[] = "ABCDEFGH";
-		FILE *f;
 
-		f = fopen(g_frontpanelText, "w");
-		if(f != 0) {
-				fwrite(buffer, 1, 8, f);  //Light all 8 LEDs
-				fclose(f);
-		}
+	if(g_board == eSTB850) {
+
+		enable = strtol(input, NULL, 10);
+		if(enable) {		
+			if(testStarted == 0) {
+				 
+				const char buffer[8] = "ABCDEFGH";
+				FILE *f;
 		
-		if(testStarted == 0) {
-			if(fb_fd == NULL) {
-				fb_fd = fopen(g_framebuffer_name, "w"); //Open OLED FB to write 
+				f = fopen(g_frontpanelText, "w");
+				if(f != 0) {
+						fwrite(buffer, 1, 8, f);  //Light all 8 LEDs
+						fclose(f);
+				}
+	
+				if(fb_fd == NULL) {
+					fb_fd = fopen(g_framebuffer_name, "w"); //Open OLED FB to write 
+	
+				}
+				
+				if(pthread_create(&test_thread, NULL, FBTestThread, fb_fd)) {
+					perror("server: FBTestThread");
+				} else {
+					testStarted = 1;
+					g_timeEnabled = false;     //disable show time
+				}
+	
+	
 			}
-			if(pthread_create(&test_thread, NULL, FBTestThread, fb_fd)) {
-				perror("server: FBTestThread");
-			} else {
-				testStarted = 1;
+		} else {
+			if(testStarted) {
+				pthread_cancel(test_thread);
+				pthread_join(test_thread, NULL);
+				testStarted = 0;
+	
+				if(fb_fd) {
+					fclose(fb_fd);         //Close OLED FB to write 
+					fb_fd = NULL;
+				}
+	
+				g_timeEnabled = true;      //enable show time 
 			}
+			SetBrightness(g_brightness);
 		}
-	} else {
-		if(testStarted) {
-			pthread_cancel(test_thread);
-			pthread_join(test_thread, NULL);
-			testStarted = 0;
-			if(fb_fd) {
-				fclose(fb_fd);  //Close OLED FB to write 
-			}
-		}
-		SetBrightness(g_brightness);
-	}
 
+	}
 	return 0;
 }
 
