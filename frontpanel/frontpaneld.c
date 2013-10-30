@@ -184,8 +184,7 @@ struct argHandler_s handlers[] = {
 	{"b",		ArgHandler_Brightness},
 	{"obright",	ArgHandler_OledBrightness},
 	{"o",		ArgHandler_OledBrightness},
-	{"experience",	ArgHandler_Test},
-	{"e",		ArgHandler_Test},
+	{"test",	ArgHandler_Test},
 };
 
 /******************************************************************
