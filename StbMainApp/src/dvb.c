@@ -1244,7 +1244,8 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		currentFrequency[tuner] = frequency;
 		return 0;
 	}
-
+	int hasLock   = 0;
+/*
 	fe_status_t s;
 	int hasSignal = 0;
 	int hasLock   = 0;
@@ -1256,7 +1257,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 #endif
 	do {
 		ioctl_or_abort(tuner, frontend_fd, FE_READ_BER, &ber);
-		/* If ber is not -1, then wait a bit more */
+		// If ber is not -1, then wait a bit more 
 		if (ber == 0xffffffff) {
 			dprintf("%s[%d]: All clear...\n", __FUNCTION__, tuner);
 			BREAKABLE_SLEEP(100000);
@@ -1273,7 +1274,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 			else
 				break;
 			hasLock = 1;
-			/* locked, give adapter even more time... */
+			// locked, give adapter even more time... 
 			//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 		} else
 		if (s & FE_HAS_SIGNAL) {
@@ -1283,12 +1284,12 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 				hasSignal = 1;
 			}
 			dprintf("%s[%d]: S (%d)\n", __FUNCTION__, tuner, timeout);
-			/* found something above the noise level, increase timeout time */
+			// found something above the noise level, increase timeout time 
 			//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 		} else
 		{
 			dprintf("%s[%d]: N (%d)\n", __FUNCTION__, tuner, timeout);
-			/* there's no and never was any signal, reach timeout faster */
+			// there's no and never was any signal, reach timeout faster 
 			if (hasSignal == 0)
 			{
 				eprintf("%s[%d]: Skip\n", __FUNCTION__, tuner);
@@ -1297,6 +1298,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		}
 	} while (--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
 	dprintf("%s[%d]: %u timeout %d, ber %u\n", __FUNCTION__, tuner, frequency, timeout, ber);
+	*/
 	currentFrequency[tuner] = frequency;
 	eprintf("%s[%d]: Frequency set, lock: %d\n", __FUNCTION__, tuner, hasLock);
 	return hasLock;
