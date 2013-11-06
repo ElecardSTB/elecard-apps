@@ -47,28 +47,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define TELETEXT_PACKET_BUFFER_SIZE (5*TS_PACKET_SIZE)
 #define TELETEXT_pipe_TS "/tmp/ttx.ts"
-
-#define PG_ACTIVE	0x100
-#define BAD_CHAR 0xb8 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
 #ifdef ENABLE_TELETEXT
 
-struct vt_page
-{
-    int pgno, subno;	// the wanted page number
-    int lang;		// language code
-    int flags;		// misc flags (see PG_xxx below)
-    int errors;		// number of single bit errors in page
-    u32 lines;		// 1 bit for each line received
-    u8 data[25][40];	// page contents
-    int flof;		// page has FastText links
-    struct {
-    int pgno;
-    int subno;
-    } link[6]; // FastText links (FLOF)
-};
 void teletext_init(void);
 
 int32_t teletext_start(DvbParam_t *param);
@@ -79,7 +62,6 @@ int32_t teletext_processCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 /* Displays teletext */
 void teletext_displayPage(void);
 
-int32_t teletext_isTeletextReady(void);
 int32_t teletext_isTeletextShowing(void);
 uint32_t teletext_isEnable(void);
 uint32_t teletext_enable(uint32_t enable);
@@ -92,7 +74,6 @@ uint32_t teletext_enable(uint32_t enable);
 #define teletext_stop(...)
 #define teletext_processCommand(...)	-1
 #define teletext_displayPage(...)
-#define teletext_isTeletextReady()		0
 #define teletext_isTeletextShowing()	0
 #define teletext_isEnable()				0
 #define teletext_enable(...)

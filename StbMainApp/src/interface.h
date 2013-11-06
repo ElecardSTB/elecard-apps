@@ -397,12 +397,12 @@ typedef enum
 	interfaceCommandFavorites =                  DIKS_FAVORITES,
 	interfaceCommandTV =                         DIKS_TV,
 	interfaceCommandUsb =                        DIKS_TAPE,
-	interfaceCommandPhone =                      DIKS_PHONE,
+	interfaceCommandPhone =                      DIKS_TEXT, //DIKS_PHONE,
 	interfaceCommandWeb =                        DIKS_INTERNET,
 	interfaceCommandPageUp =                     DIKS_PAGE_UP,
 	interfaceCommandPageDown =                   DIKS_PAGE_DOWN,
 	interfaceCommandRefresh =                    DIKS_RESTART,
-	interfaceCommandTeletext =                   DIKS_TEXT,
+	interfaceCommandTeletext =                   DIKS_PHONE,//DIKS_TEXT,
 	interfaceCommandSubtitle =                   DIKS_SUBTITLE,
 	interfaceCommandSearch =                     DIKS_CUSTOM1,
 	interfaceCommandEpg =                        DIKS_EPG,
@@ -867,6 +867,7 @@ typedef struct
 	interfaceMenu_t *currentMenu; // MUST be not null
 
 	int showMenu;
+	int showTeletext;
 	int showLoadingAnimation;
 	int showSliderControl;
 	int showIncomingCall;

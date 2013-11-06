@@ -1935,7 +1935,7 @@ static void interface_animateMenu(int flipFB, int animate)
 
 	mysem_get(interface_semaphore);
 
-	if(teletext_isTeletextReady()) {
+	if(teletext_isEnable()) {
 		teletext_displayPage();
 		interface_flipSurface();
 		mysem_release(interface_semaphore);
@@ -6549,6 +6549,7 @@ void interface_init()
 	interface_resize();
 
 	interfaceInfo.showMenu = 0;
+	interfaceInfo.showTeletext = 0;
 
 	interfaceInfo.eventCount = 0;
 
