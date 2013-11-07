@@ -135,6 +135,7 @@ typedef struct {
 	uint32_t				freshCounter;
 	uint32_t				nextPage[3];	
 	uint32_t				previousPage;
+	uint8_t				showTeletext;
 	uint8_t				global_timestamp[16]; // global TS PCR value
 	background_t			background;			//white or black
 	pthread_mutex_t 		mutex;				//for functions display on screen
@@ -406,7 +407,7 @@ void teletext_init(void)
 	teletextInfo.background = black;
 	teletextInfo.freshCounter = 0;
 	teletextInfo.selectedPage = 100;
-	interfaceInfo.showTeletext = 1;
+	teletextInfo.showTeletext = 1;
 	teletextInfo.numberPage[0] = 0x20;
 	teletextInfo.numberPage[1] = 0x20;
 	teletextInfo.numberPage[2] = 0x20;
@@ -419,7 +420,7 @@ void teletext_init(void)
 
 void teletext_destroy(void)
 {
-	interfaceInfo.showTeletext = 0;
+	teletextInfo.showTeletext = 0;
 	teletext_enable(0);
 	pthread_mutex_destroy(&teletextInfo.mutex);
 	//fclose(file);
@@ -560,7 +561,7 @@ int setLine(unsigned char* data, struct vt_page *cvtp_t)
 	cvtp = (cvtp_t + mag);
 	switch (pkt)
     {
-		case 0:
+		case 0: {
 			int b1, b2, b3, b4;
 			b1 = hamm16(p, &err); // page number
 			b2 = hamm16(p+2, &err); // subpage number + flags
@@ -650,7 +651,8 @@ int setLine(unsigned char* data, struct vt_page *cvtp_t)
 			}
 			memcpy(teletextInfo.global_timestamp, &tmp[24], 16);
 			return 0;
-		case 1 ... 24:
+		}
+		case 1 ... 24: {
 		    if (~cvtp->flags & PG_ACTIVE)
 				return 1;
 
@@ -687,6 +689,7 @@ int setLine(unsigned char* data, struct vt_page *cvtp_t)
 				}
 			}
 			return 0;
+		}
 		case 26:
 		 /*   int d, t[13];
 	    	if (~cvtp->flags & PG_ACTIVE)
@@ -1324,7 +1327,7 @@ static void *teletext_funcThread(void *pArg)
 	pfd[0].events = POLLIN;
 
 	while(1) {
-		pthread_testcancel();
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		if(poll(pfd, 1, 100) > 0) {
 			if(pfd[0].revents & POLLIN) {
 				len = read(fd, ts_buffer, TELETEXT_PACKET_BUFFER_SIZE);
@@ -1390,6 +1393,8 @@ static void *teletext_funcThread(void *pArg)
 				}
 			}
 		}
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+		pthread_testcancel();
 	}
 	return 0;
 }
@@ -1406,7 +1411,7 @@ void updatePagekey (int page)
 
 int32_t teletext_processCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
-	if(interfaceInfo.showTeletext) {
+	if(teletextInfo.showTeletext) {
 		if(cmd->command == interfaceCommandTeletext) {
             if(teletext_isEnable() && teletextInfo.background == white) {
 				teletext_enable(0);
@@ -1477,7 +1482,7 @@ int32_t teletext_processCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 
 int32_t teletext_isTeletextShowing(void)
 {
-	if ( !interfaceInfo.showTeletext )
+	if ( !teletextInfo.showTeletext )
 		return 0;
 	if( teletext_isEnable() )
 			return 1;
@@ -1522,8 +1527,9 @@ int32_t teletext_start(DvbParam_t *param)
 	ttx_pipe = -1;
 
 #if (defined STSDK)
+	unlink(TELETEXT_pipe_TS);
 	if( mkfifo(TELETEXT_pipe_TS,0666) < 0 ){
-		printf("ttx: Unable to create a fifo buffer\n");
+		eprintf("ttx: Unable to create a fifo buffer\n");
 		return -1;
 	}
 	hasTeletext = st_teletext_start();

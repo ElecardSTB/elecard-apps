@@ -867,7 +867,6 @@ typedef struct
 	interfaceMenu_t *currentMenu; // MUST be not null
 
 	int showMenu;
-	int showTeletext;
 	int showLoadingAnimation;
 	int showSliderControl;
 	int showIncomingCall;

@@ -6549,7 +6549,6 @@ void interface_init()
 	interface_resize();
 
 	interfaceInfo.showMenu = 0;
-	interfaceInfo.showTeletext = 0;
 
 	interfaceInfo.eventCount = 0;
 
