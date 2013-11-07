@@ -1244,8 +1244,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		currentFrequency[tuner] = frequency;
 		return 0;
 	}
-	int hasLock   = 0;
-/*
+
 	fe_status_t s;
 	int hasSignal = 0;
 	int hasLock   = 0;
@@ -1298,7 +1297,7 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		}
 	} while (--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
 	dprintf("%s[%d]: %u timeout %d, ber %u\n", __FUNCTION__, tuner, frequency, timeout, ber);
-	*/
+
 	currentFrequency[tuner] = frequency;
 	eprintf("%s[%d]: Frequency set, lock: %d\n", __FUNCTION__, tuner, hasLock);
 	return hasLock;
@@ -3345,7 +3344,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 #ifdef ENABLE_DVB_PVR
 	    (signed)dvb->setFrequency > 0 &&
 #endif
-	    dvb_setFrequency(dvb->fe_type, dvb->setFrequency, dvb->fdf, dvb->adapter, 1, pParam->media, NULL) < 0)
+	    dvb_setFrequency(dvb->fe_type, dvb->setFrequency, dvb->fdf, dvb->adapter, 0, pParam->media, NULL) < 0)
 	{
 		eprintf("%s[%d]: Failed to set frequency %u\n", __FUNCTION__, dvb->adapter, dvb->setFrequency);
 		return -1;
