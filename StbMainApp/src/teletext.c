@@ -1499,20 +1499,19 @@ static int32_t st_teletext_start(void)
 
 	st_rpcSync(elcmd_ttxStart, params, &type, &result);
 
-	if(  result &&
-		(result->valuestring != NULL) &&
-		(strcmp(result->valuestring, "ok") == 0))
+	if(result &&
+			(result->valuestring != NULL) &&
+			(strcmp(result->valuestring, "ok") == 0))
 	{
 		cJSON_Delete(result);
 		cJSON_Delete(params);
 
-		return 1;
+		return 0;
 	}
 
 	cJSON_Delete(result);
 	cJSON_Delete(params);
-
-	return 0;
+	return -1;
 }
 #endif
 
@@ -1528,20 +1527,21 @@ int32_t teletext_start(DvbParam_t *param)
 
 #if (defined STSDK)
 	unlink(TELETEXT_pipe_TS);
-	if( mkfifo(TELETEXT_pipe_TS,0666) < 0 ){
+	if(mkfifo(TELETEXT_pipe_TS, 0666) < 0) {
 		eprintf("ttx: Unable to create a fifo buffer\n");
 		return -1;
 	}
-	hasTeletext = st_teletext_start();
-	if ( hasTeletext ){
-		ttx_pipe = open(TELETEXT_pipe_TS, O_RDONLY);
-		if(ttx_pipe < 0) {
-			eprintf("Error in opening file %s\n", TELETEXT_pipe_TS);
-			return -2;
-		}
-	} else
+	ttx_pipe = open(TELETEXT_pipe_TS, O_RDONLY | O_NONBLOCK);
+	if(ttx_pipe < 0) {
 		unlink(TELETEXT_pipe_TS);
-
+		eprintf("Error in opening file %s\n", TELETEXT_pipe_TS);
+		return -2;
+	}
+	hasTeletext = st_teletext_start();
+	if(hasTeletext < 0) {
+		close(ttx_pipe);
+		unlink(TELETEXT_pipe_TS);
+	}
 #else
 	if(param->mode != DvbMode_Multi) {
 		if(dvb_getTeletextFD(param->adapter, &ttx_pipe) == 0) {
@@ -1549,7 +1549,7 @@ int32_t teletext_start(DvbParam_t *param)
 		}
 	}
 #endif
-	if(hasTeletext && (ttx_pipe >= 0)) {
+	if(hasTeletext == 0 && (ttx_pipe >= 0)) {
 		int32_t st;
 		teletext_init();
 		st = pthread_create(&teletext_thread, NULL, teletext_funcThread, (void *)ttx_pipe);
@@ -1570,8 +1570,8 @@ int32_t teletext_stop(void)
 		teletext_thread = 0;
 	}
 	int i;
-	for (i = 0; i<1000; i++)	{
-		if (teletextInfo.pages[i] != 0){
+	for(i = 0; i < 1000; i++)	{
+		if(teletextInfo.pages[i] != 0) {
 			free(teletextInfo.pages[i]);
 			teletextInfo.pages[i] = NULL;
 		}
@@ -1579,14 +1579,14 @@ int32_t teletext_stop(void)
 #if (defined STSDK)
 	close(ttx_pipe);
 	unlink(TELETEXT_pipe_TS);
-	
+
 	elcdRpcType_t type;
 	cJSON *result = NULL;
 	st_rpcSync(elcmd_ttxStop, NULL, &type, &result);
 
-	if(  result &&
-		(result->valuestring != NULL) &&
-		(strcmp(result->valuestring, "ok") == 0))
+	if(result &&
+			(result->valuestring != NULL) &&
+			(strcmp(result->valuestring, "ok") == 0))
 	{
 		cJSON_Delete(result);
 		return 1;
