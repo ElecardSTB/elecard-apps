@@ -1517,7 +1517,6 @@ static int32_t st_teletext_start(void)
 
 int32_t teletext_start(DvbParam_t *param)
 {
-	int32_t ret = 0;
 	int32_t hasTeletext = 0;
 
 	if(teletext_thread != 0) {
@@ -1541,6 +1540,7 @@ int32_t teletext_start(DvbParam_t *param)
 	if(hasTeletext < 0) {
 		close(ttx_pipe);
 		unlink(TELETEXT_pipe_TS);
+		return -3;
 	}
 #else
 	if(param->mode != DvbMode_Multi) {
@@ -1555,10 +1555,10 @@ int32_t teletext_start(DvbParam_t *param)
 		st = pthread_create(&teletext_thread, NULL, teletext_funcThread, (void *)ttx_pipe);
 		if(st != 0) {
 			eprintf("%s: ERROR not create thread\n", __func__);
-			return 0;
+			return -4;
 		}
 	}
-	return ret;
+	return 0;
 }
 
 int32_t teletext_stop(void)
