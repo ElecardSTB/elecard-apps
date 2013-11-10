@@ -1913,67 +1913,18 @@ void interface_hideLoading()
 	interfaceInfo.showLoading = 0;
 }
 
-void interface_displayMenu(int flipFB)
+static void interface_updateClientArea(void)
 {
-	interface_animateMenu(flipFB, 0);
-}
-
-
-static void interface_animateMenu(int flipFB, int animate)
-{
-#ifdef SCREEN_TRACE
-	unsigned long long cur, start;
-#endif
-
-	if(appControlInfo.inStandby) return;
-	if(interfaceInfo.cleanUpState) return;
-	if(DRAWING_SURFACE == NULL) return;
-
-	//dprintf("%s: in\n", __FUNCTION__);
-
-#ifdef ENABLE_VIDIMAX
-	if(appControlInfo.vidimaxInfo.active) {
-		if(vidimax_refreshMenu() == 0) {
-			return;
-		}
-	}
-#endif
-
-	mysem_get(interface_semaphore);
-
-	if(teletext_isEnable()) {
-		if(teletext_displayPage() != 0) {
-			mysem_release(interface_semaphore);
-			return;
-		}
-		interface_flipSurface();
-		mysem_release(interface_semaphore);
-		return;
-	}
-
-#ifdef SCREEN_TRACE
-	start = getCurrentTime();
-#endif
-
 	DFBCHECK(DRAWING_SURFACE->GetSize(DRAWING_SURFACE, &interfaceInfo.screenWidth, &interfaceInfo.screenHeight));
 
-	interfaceInfo.clientX = interfaceInfo.marginSize;
-	interfaceInfo.clientY = interfaceInfo.marginSize;
-	interfaceInfo.clientWidth = interfaceInfo.screenWidth-interfaceInfo.marginSize*2;
-	interfaceInfo.clientHeight = interfaceInfo.screenHeight-interfaceInfo.marginSize*2;
+	interfaceInfo.clientX      = interfaceInfo.marginSize;
+	interfaceInfo.clientY      = interfaceInfo.marginSize;
+	interfaceInfo.clientWidth  = interfaceInfo.screenWidth  - interfaceInfo.marginSize*2;
+	interfaceInfo.clientHeight = interfaceInfo.screenHeight - interfaceInfo.marginSize*2;
+}
 
-	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
-
-	gfx_clearSurface(DRAWING_SURFACE, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
-
-	/*if (appControlInfo.inStandby != 0)
-	{
-	interface_flipSurface(DRAWING_SURFACE);
-	mysem_release(interface_semaphore);
-	return;
-	}*/
-	interface_displayBackground();
-
+static void interface_displayLogo(void)
+{
 #ifdef SHOW_LOGO_TEXT
 	/* Show logo text */
 	int lw = 330;
@@ -2094,31 +2045,86 @@ static void interface_animateMenu(int flipFB, int animate)
 	
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 #endif
+}
 
-	if(!interfaceInfo.showMenu) {
-		//dprintf("%s: display play control\n", __FUNCTION__);
+static void interface_displayAll(void)
+{
 #ifdef ENABLE_MESSAGES
-		interface_displayMessageNotify();
+	interface_displayMessageNotify();
+#endif
+	interface_displayLoading();
+	interface_displayNotify();
+	interface_displayCustomSliderInMenu();
+	if (interfacePlayControl.pDisplay)
+		interfacePlayControl.pDisplay();
+	interface_displaySoundControl();
+	interface_displaySliderControl();
+	interface_displayMessageBox();
+	interface_displayVirtualKeypad();
+	interface_displayCall();
+	if (teletext_isEnable())
+		teletext_displayPage();
+}
+
+static void interface_setClockRefreshEvent(void)
+{
+	time_t rawtime;
+	struct tm cur_time;
+
+	time(&rawtime);
+	if (localtime_r(&rawtime, &cur_time))
+		interface_addEvent(interface_refreshClock, NULL, (61 - cur_time.tm_sec)*1000, 1);
+}
+
+void interface_displayMenu(int flipFB)
+{
+	interface_animateMenu(flipFB, 0);
+}
+
+static void interface_animateMenu(int flipFB, int animate)
+{
+#ifdef SCREEN_TRACE
+	unsigned long long cur, start;
 #endif
 
-		interface_displayLoading();
-		interface_displayNotify();
-		interface_displayCustomSliderInMenu();
-		if(interfacePlayControl.pDisplay != NULL) {
-			interfacePlayControl.pDisplay();
-		}
-		interface_displaySoundControl();
-		interface_displaySliderControl();
-		interface_displayMessageBox();
-		interface_displayVirtualKeypad();
-		interface_displayCall();
+	if(appControlInfo.inStandby) return;
+	if(interfaceInfo.cleanUpState) return;
+	if(DRAWING_SURFACE == NULL) return;
+#ifdef ENABLE_VIDIMAX
+	if (appControlInfo.vidimaxInfo.active && vidimax_refreshMenu() == 0)
+		return;
+#endif
+	//dprintf("%s: in\n", __FUNCTION__);
 
-		if(teletext_isEnable()) {
-			teletext_displayPage();
+	mysem_get(interface_semaphore);
+
+	if(teletext_isEnable()) {
+		if(teletext_displayPage() != 0) {
+			mysem_release(interface_semaphore);
+			return;
 		}
+		interface_flipSurface();
+		mysem_release(interface_semaphore);
+		return;
+	}
+
+#ifdef SCREEN_TRACE
+	start = getCurrentTime();
+#endif
+	// FIXME: it should be unnecessary to call this on each frame update
+	// interface_updateClientArea();
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+	gfx_clearSurface(DRAWING_SURFACE, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
+
+	interface_displayBackground();
+	interface_displayLogo();
+
+	if (!interfaceInfo.showMenu) {
+		//dprintf("%s: display play control\n", __FUNCTION__);
+		interface_displayAll();
 
 		interface_flipSurface();
-
 #ifdef SCREEN_TRACE
 		cur = getCurrentTime();
 		eprintf("%s: screen updated in %lu sec\n", __FUNCTION__, (unsigned long)(cur-start));
@@ -2127,48 +2133,15 @@ static void interface_animateMenu(int flipFB, int animate)
 		return;
 	}
 
-	//DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-
-	//gfx_drawRectangle(DRAWING_SURFACE, INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA, interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.clientWidth, interfaceInfo.clientHeight);
-
-	/*if (interfaceInfo.currentMenu->menuType != interfaceMenuList || ((interfaceListMenu_t*)interfaceInfo.currentMenu)->listMenuType != interfaceListMenuBigThumbnail)
-	{
-	interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_BORDER_RED, INTERFACE_BORDER_GREEN, INTERFACE_BORDER_BLUE, INTERFACE_BORDER_ALPHA, interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.clientWidth, interfaceInfo.clientHeight, interfaceInfo.borderWidth, interfaceBorderSideAll);
-	}*/
-
-	//dprintf("%s: check parent\n", __FUNCTION__);
-
-	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
-
 	//dprintf("%s: display menu\n", __FUNCTION__);
-
-	if ( interfaceInfo.currentMenu != NULL && interfaceInfo.currentMenu->displayMenu != NULL )
-	{
+	if (interfaceInfo.currentMenu && interfaceInfo.currentMenu->displayMenu) {
 		tprintf(" >>> %s <<<\n", interfaceInfo.currentMenu->name != NULL ? interfaceInfo.currentMenu->name : "[N/A]");
 		interfaceInfo.currentMenu->displayMenu(interfaceInfo.currentMenu);
 	}
-
-#ifdef ENABLE_MESSAGES
-	interface_displayMessageNotify();
-#endif
-	interface_displayLoading();
-	interface_displayNotify();
-	interface_displayCustomSliderInMenu();
-	if (interfacePlayControl.pDisplay != NULL )
-		interfacePlayControl.pDisplay();
-	interface_displaySoundControl();
-	interface_displaySliderControl();
 	interface_displayStatusbar();
-	interface_displayMessageBox();
-	interface_displayVirtualKeypad();
-	interface_displayCall();
-
-	if(teletext_isEnable()) {
-		teletext_displayPage();
-	}
+	interface_displayAll();
 
 	//dprintf("%s: flip\n", __FUNCTION__);
-
 	if ( flipFB )
 	{
 #ifdef STB82
@@ -2182,24 +2155,13 @@ static void interface_animateMenu(int flipFB, int animate)
 		}
 	}
 	//dprintf("%s: done\n", __FUNCTION__);
-
 #ifdef SCREEN_TRACE
 	cur = getCurrentTime();
 	eprintf("%s: menu screen updated in %lu sec\n", __FUNCTION__, (unsigned long)(cur-start));
 #endif
-
 	mysem_release(interface_semaphore);
 
-	// Set clock refresh event
-	time_t rawtime;
-	struct tm *cur_time;
-
-	time( &rawtime );
-	cur_time = localtime(&rawtime);
-	if (cur_time != NULL)
-	{
-		interface_addEvent(interface_refreshClock, NULL, (61 - cur_time->tm_sec)*1000, 1);
-	}
+	interface_setClockRefreshEvent();
 }
 
 void interface_displayMenuHeader(void)
@@ -6788,20 +6750,12 @@ void interface_init()
 
 void interface_resize(void)
 {
-	DFBCHECK(DRAWING_SURFACE->GetSize(DRAWING_SURFACE, &interfaceInfo.screenWidth, &interfaceInfo.screenHeight));
-
 	interfaceInfo.borderWidth = INTERFACE_BORDER_WIDTH;
 	interfaceInfo.paddingSize = INTERFACE_PADDING;
 	interfaceInfo.marginSize = INTERFACE_MARGIN_SIZE;
 	interfaceInfo.thumbnailSize = INTERFACE_THUMBNAIL_SIZE;
 
-	/*interfaceInfo.screenWidth = 720;
-	interfaceInfo.screenHeight = 576;*/
-
-	interfaceInfo.clientX = interfaceInfo.marginSize;
-	interfaceInfo.clientY = interfaceInfo.marginSize;
-	interfaceInfo.clientWidth = interfaceInfo.screenWidth-interfaceInfo.marginSize*2;
-	interfaceInfo.clientHeight = interfaceInfo.screenHeight-interfaceInfo.marginSize*2;
+	interface_updateClientArea();
 
 	DFBCHECK(pgfx_font->GetStringWidth(pgfx_font, "44:44:44", -1, &interfacePlayControl.sliderTimeWidth));
 }
