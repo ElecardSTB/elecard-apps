@@ -454,6 +454,16 @@ void interface_drawOuterBorder(IDirectFBSurface *pSurface,
 	}
 }
 
+static inline void interface_drawSelectionRectangle0(int x, int y, int w, int h)
+{
+	gfx_drawRectangle(DRAWING_SURFACE,
+	                  interface_colors[interfaceInfo.highlightColor].R,
+	                  interface_colors[interfaceInfo.highlightColor].G,
+	                  interface_colors[interfaceInfo.highlightColor].B,
+	                  interface_colors[interfaceInfo.highlightColor].A,
+	                  x, y, w, h);
+}
+
 void interface_drawBookmark(IDirectFBSurface *pSurface, IDirectFBFont *pFont,
                             int x, int y, const char *pText, int selected, int *endx)
 {
@@ -511,17 +521,9 @@ void interface_drawBookmark(IDirectFBSurface *pSurface, IDirectFBFont *pFont,
 
 	//interface_drawInnerBorder(pSurface, INTERFACE_BORDER_RED, INTERFACE_BORDER_GREEN, INTERFACE_BORDER_BLUE, INTERFACE_BORDER_ALPHA, tx, ty, tw, th, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideRight|interfaceBorderSideLeft);
 
-	if ( selected == 1 )
-	{
-		//interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR INTERFACE_ARROW_IMAGE, tx+interfaceInfo.borderWidth+interfaceInfo.paddingSize, ty+th/2, INTERFACE_ARROW_SIZE, INTERFACE_ARROW_SIZE, 0, 0, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignMiddle);
-		gfx_drawRectangle(DRAWING_SURFACE,
-		                  interface_colors[interfaceInfo.highlightColor].R,
-		                  interface_colors[interfaceInfo.highlightColor].G,
-		                  interface_colors[interfaceInfo.highlightColor].B,
-		                  interface_colors[interfaceInfo.highlightColor].A,
-		                  tx+interfaceInfo.paddingSize, ty +interfaceInfo.paddingSize, 
-		                  tw - 2*interfaceInfo.paddingSize, th - interfaceInfo.paddingSize);
-	}
+	if (selected)
+		interface_drawSelectionRectangle0(tx +   interfaceInfo.paddingSize, ty + interfaceInfo.paddingSize,
+		                                  tw - 2*interfaceInfo.paddingSize, th - interfaceInfo.paddingSize);
 
 	if ( endx != NULL )
 	{
@@ -4572,6 +4574,13 @@ int interface_getTextLenInPx (char * text)
 	return width;
 }
 
+static int interface_drawSelectionRectangle(interfaceMenu_t* pMenu, DFBRectangle *rect, int i)
+{
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+	interface_drawSelectionRectangle0(rect->x, rect->y, rect->w, rect->h);
+	return 0;
+}
+
 static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i)
 {
 	int selected                   = pMenu->selectedItem == i;
@@ -4583,12 +4592,11 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	char *second_line;
 	if ( selected )
 	{
-		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-		// selection rectangle
-		gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, rect->x, rect->y, rect->w, rect->h);
+		interface_drawSelectionRectangle(pMenu, rect, i);
 #ifdef INTERFACE_DRAW_ARROW
 		if ( pArrow != NULL )
 		{
+			DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 			//dprintf("%s: draw arrow\n", __FUNCTION__);
 			if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail || pListMenu->listMenuType == interfaceListMenuNoThumbnail )
 			{
@@ -8197,11 +8205,7 @@ static int interface_editEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	rectangle.x = rectangle.x+rectangle.w;
 	rectangle.w = INTERFACE_VALUE_WIDTH;
 	if ( selected == i && pEditEntry->active == 0 )
-	{
-		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-		// selection rectangle
-		gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, rectangle.x, rectangle.y, rectangle.w, rectangle.h);
-	}
+		interface_drawSelectionRectangle(pMenu, &rectangle, i);
 
 	switch ( pEditEntry->type )
 	{
@@ -8262,7 +8266,7 @@ static int interface_editDateDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 			w += dot_w*2;
 		else if (pEditEntry->info.date.selected > 1)
 			w += dot_w;
-		gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, w, rect->y, dig_w, rect->h);
+		interface_drawSelectionRectangle0(w, rect->y, dig_w, rect->h);
 	}
 
 	entryText[0] = pEditEntry->info.date.value[i];
@@ -8345,7 +8349,7 @@ static int interface_editTimeDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 			w += dot_w*2;
 		else if (pEditEntry->info.time.selected > 1)
 			w += dot_w;
-		gfx_drawRectangle(DRAWING_SURFACE, interface_colors[interfaceInfo.highlightColor].R, interface_colors[interfaceInfo.highlightColor].G, interface_colors[interfaceInfo.highlightColor].B, interface_colors[interfaceInfo.highlightColor].A, w, rect->y, dig_w, rect->h);
+		interface_drawSelectionRectangle0(w, rect->y, dig_w, rect->h);
 	}
 
 	entryText[0] = pEditEntry->info.time.value[i];
