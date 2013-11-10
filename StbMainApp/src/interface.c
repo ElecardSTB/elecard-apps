@@ -2159,15 +2159,6 @@ static void interface_animateMenu(int flipFB, int animate)
 	interface_displaySoundControl();
 	interface_displaySliderControl();
 	interface_displayStatusbar();
-
-	if (interfaceInfo.currentMenu != NULL && interfaceInfo.currentMenu->menuType == interfaceMenuList)
-	{
-#ifdef ENABLE_VIDIMAX
-		if ( interfaceInfo.currentMenu->pParentMenu != NULL )
-#endif
-		interface_displayClock( 
-			((interfaceListMenu_t*)interfaceInfo.currentMenu)->listMenuType == interfaceListMenuBigThumbnail );
-	}
 	interface_displayMessageBox();
 	interface_displayVirtualKeypad();
 	interface_displayCall();
@@ -4492,6 +4483,11 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 			maxVisibleItems,
 			itemOffset);
 	}
+
+#ifdef ENABLE_VIDIMAX
+	if (pMenu->pParentMenu != NULL)
+#endif
+	interface_displayClock(pListMenu->listMenuType == interfaceListMenuBigThumbnail);
 }
 
 int interface_menuEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect, int i)
