@@ -4656,23 +4656,24 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 		info_second_line[length] = 0;
 		gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, x+fh, y+fh, info_second_line, 0, i == pListMenu->baseMenu.selectedItem);
 		*second_line = '\n';
-	}
-#ifdef ENABLE_REGPLAT
-	if (interfaceInfo.currentMenu == (interfaceMenu_t*)&regplatServicesMenu
-		&& strcmp(regplatMainMenu.baseMenu.menuEntry[regplatMainMenu.baseMenu.selectedItem].info, "Личный кабинет") != 0)
-		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x+pListMenu->baseMenu.thumbnailWidth+10, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
-	else
-#endif
+	} else
 	{
+#ifdef ENABLE_REGPLAT
+		if (interfaceInfo.currentMenu == (interfaceMenu_t*)&regplatServicesMenu
+			&& strcmp(regplatMainMenu.baseMenu.menuEntry[regplatMainMenu.baseMenu.selectedItem].info, "Личный кабинет") != 0)
+			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x+pListMenu->baseMenu.thumbnailWidth+10, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
+		else
+#endif
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
-
-		if (selected && (strlen (pListMenu->baseMenu.menuEntry[i].label) > 0)){
-			x = interfaceInfo.clientX + interfaceInfo.clientWidth - 
-				interfaceInfo.paddingSize*4 - INTERFACE_SCROLLBAR_WIDTH - 
-				interface_getTextLenInPx(pListMenu->baseMenu.menuEntry[i].label);
-			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].label, 0, 1);
-		}
 	}
+
+	if (selected && (strlen (pListMenu->baseMenu.menuEntry[i].label) > 0)){
+		x = interfaceInfo.clientX + interfaceInfo.clientWidth -
+			interfaceInfo.paddingSize*4 - INTERFACE_SCROLLBAR_WIDTH -
+			interface_getTextLenInPx(pListMenu->baseMenu.menuEntry[i].label);
+		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].label, 0, 1);
+	}
+
 	return 0;
 }
 
