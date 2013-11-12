@@ -79,9 +79,10 @@ typedef enum
 	elcmd_subtitle,
 	elcmd_reclist,
 	elcmd_getstream,
-	elcmd_sync = elcmd_getstream,
+
 	// All following commands are asynchronous
-	elcmd_closestream,
+	elcmd_async = 0x1000, //should be enough for synchronous commands
+	elcmd_closestream = elcmd_async,
 	elcmd_setstream,
 	elcmd_setpos,
 	elcmd_setspeed,
@@ -137,7 +138,9 @@ typedef enum
 	case elcmd_pause: \
 	case elcmd_stop: \
 	case elcmd_recstart: \
-	case elcmd_recstop \
+	case elcmd_recstop: \
+	case elcmd_ttxStart: \
+	case elcmd_ttxStop
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -148,7 +151,8 @@ extern "C" {
 #endif
 
 /** Return read-only static string */
-const char* rpc_cmd_name(elcdRpcCommand_t cmd);
+const char *rpc_getCmdName(elcdRpcCommand_t cmd);
+elcdRpcCommand_t rpc_getCmd(const char *name);
 
 /** All functions return malloc'ated string, which needs to be freed after usage
  */

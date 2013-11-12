@@ -275,7 +275,7 @@ int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, voi
 	}
 
 	unsigned int id = get_id();
-	char *msg = rpc_request( rpc_cmd_name(cmd), id, params );
+	char *msg = rpc_request( rpc_getCmdName(cmd), id, params );
 	if( !msg )
 	{
 		eprintf("%s: failed to create RPC message\n", __FUNCTION__);
@@ -303,7 +303,7 @@ int st_rpcAsync(elcdRpcCommand_t cmd, cJSON* params, rpcCallback_t callback, voi
 	}
 	else
 	{
-		eprintf("%s: failed to write %s\n", __FUNCTION__, rpc_cmd_name(cmd));
+		eprintf("%s: failed to write %s\n", __FUNCTION__, rpc_getCmdName(cmd));
 		st_poolFreeAt(i);
 	}
 #ifndef RPC_POOL_TRACE
@@ -369,7 +369,7 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 	if( s.type == elcdRpcInvalid )
 	{
 #ifndef RPC_POOL_TRACE
-		dprintf("%s: canceled rpc[%2u]: %6u %s\n", __FUNCTION__, i, pool.waiting[i].id, rpc_cmd_name(pool.waiting[i].cmd));
+		dprintf("%s: canceled rpc[%2u]: %6u %s\n", __FUNCTION__, i, pool.waiting[i].id, rpc_getCmdName(pool.waiting[i].cmd));
 #else
 		dprintf("%s: canceled rpc[%2u]: %s\n", __FUNCTION__, i, pool.waiting[i].msg);
 #endif
