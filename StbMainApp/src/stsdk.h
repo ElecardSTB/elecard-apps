@@ -141,6 +141,7 @@ int  st_applyZoom(zoomPreset_t preset);
 int st_needRestart(void);
 
 g_board_type_t st_getBoardId(void);
+int32_t st_getBoardVer(void);
 
 #else // STSDK
 

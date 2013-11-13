@@ -138,8 +138,8 @@ static inline unsigned int get_id()
 	return request_id+=2;
 }
 static int needRestart = 0;
-
-g_board_type_t g_board_id = eSTB830;
+static g_board_type_t g_board_id = eSTB830;
+static int32_t g_board_ver = 0;
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -782,19 +782,43 @@ int st_applyZoom(zoomPreset_t preset)
 	return ret;
 }
 
-g_board_type_t st_getBoardId(void)
+static int32_t st_initBoardId(void)
 {
-	static int init = 0;
+	static int32_t init = 0;
+
 	if(init == 0) {
-		FILE *board_id_fd = fopen("/proc/board/id", "r");
-		if(board_id_fd) {
-			fscanf(board_id_fd, "%d", (int *)&g_board_id);
-			fclose(board_id_fd);
+		FILE *fd;
+
+		//id
+		fd = fopen("/proc/board/id", "r");
+		if(fd) {
+			fscanf(fd, "%d", (int32_t *)&g_board_id);
+			fclose(fd);
 		}
+
+		//ver
+		fd = fopen("/proc/board/ver", "r");
+		if(fd) {
+			fscanf(fd, "%d", (int32_t *)&g_board_ver);
+			fclose(fd);
+		}
+
+		printf("Detected curent board %d.%d\n", g_board_id, g_board_ver);
 		init = 1;
 	}
+	return 0;
+}
 
+g_board_type_t st_getBoardId(void)
+{
+	st_initBoardId();
 	return g_board_id;
+}
+
+int32_t st_getBoardVer(void)
+{
+	st_initBoardId();
+	return g_board_ver;
 }
 
 #endif // STSDK
