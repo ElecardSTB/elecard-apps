@@ -4546,7 +4546,6 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	int fh;
 	int x,y;
 	int r,g,b,a;
-	char entryText[MENU_ENTRY_INFO_LENGTH];
 	char *second_line;
 	if ( selected )
 	{
@@ -4559,11 +4558,11 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 			if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail || pListMenu->listMenuType == interfaceListMenuNoThumbnail )
 			{
 				x = interfaceInfo.clientX+interfaceInfo.paddingSize;
-				y = interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*(itemDisplayIndex+1)-INTERFACE_ARROW_SIZE;
+				y = interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*(i+1)-INTERFACE_ARROW_SIZE;
 			} else
 			{
 				x = interfaceInfo.clientX+interfaceInfo.paddingSize;
-				y = interfaceInfo.clientY+(interfaceInfo.paddingSize+pListMenu->baseMenu.thumbnailHeight)*(itemDisplayIndex+1)-(pListMenu->baseMenu.thumbnailHeight+INTERFACE_ARROW_SIZE)/2;
+				y = interfaceInfo.clientY+(interfaceInfo.paddingSize+pListMenu->baseMenu.thumbnailHeight)*(i+1)-(pListMenu->baseMenu.thumbnailHeight+INTERFACE_ARROW_SIZE)/2;
 			}
 			interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR INTERFACE_ARROW_IMAGE, x, y, INTERFACE_ARROW_SIZE, INTERFACE_ARROW_SIZE, 0, 0, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
 		}
@@ -4638,8 +4637,8 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	tprintf("%c%c%s\t\t\t|%d\n", i == pListMenu->baseMenu.selectedItem ? '>' : ' ', pListMenu->baseMenu.menuEntry[i].isSelectable ? ' ' : '-', pListMenu->baseMenu.menuEntry[i].info, pListMenu->baseMenu.menuEntry[i].thumbnail);
 	if (second_line)
 	{
+		char entryText[MENU_ENTRY_INFO_LENGTH];
 		char *info_second_line = entryText + (second_line - pListMenu->baseMenu.menuEntry[i].info) + 1;
-		int length;
 
 		interface_getMenuEntryInfo(pMenu,i,entryText,MENU_ENTRY_INFO_LENGTH);
 
@@ -4652,9 +4651,13 @@ static int interface_listEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 #endif
 			gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, pListMenu->baseMenu.menuEntry[i].info, 0, i == pListMenu->baseMenu.selectedItem);
 
-		length = getMaxStringLengthForFont(pgfx_smallfont, info_second_line, pListMenu->baseMenu.maxEntryTextWidth-fh);
-		info_second_line[length] = 0;
-		gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, x+fh, y+fh, info_second_line, 0, i == pListMenu->baseMenu.selectedItem);
+		if (pListMenu->listMenuType == interfaceListMenuIconThumbnail) {
+			int length = getMaxStringLengthForFont(pgfx_smallfont, info_second_line, pListMenu->baseMenu.maxEntryTextWidth-fh);
+			info_second_line[length] = 0;
+			int sx = x + fh;
+			int sy = y + fh;
+			gfx_drawText(DRAWING_SURFACE, pgfx_smallfont, r, g, b, a, sx, sy, info_second_line, 0, i == pListMenu->baseMenu.selectedItem);
+		}
 		*second_line = '\n';
 	} else
 	{
@@ -7516,14 +7519,13 @@ int interface_getMenuEntryInfo(interfaceMenu_t *pMenu, int entryIndex, char* ent
 {
 	if (entryIndex < 0 || entryIndex >= pMenu->menuEntryCount)
 		return -1;
-	strncpy(entryInfo,pMenu->menuEntry[entryIndex].info,entryInfoLength);
-	if ( pMenu->menuEntry[entryIndex].infoReplacedChar != 0 )
-	{
-	    entryInfo[pMenu->menuEntry[entryIndex].infoReplacedCharPos] = pMenu->menuEntry[entryIndex].infoReplacedChar;
-	    strncpy(&entryInfo[pMenu->menuEntry[entryIndex].infoReplacedCharPos+1],
-		&pMenu->menuEntry[entryIndex].info[pMenu->menuEntry[entryIndex].infoReplacedCharPos+1],
-		entryInfoLength-pMenu->menuEntry[entryIndex].infoReplacedCharPos-1);
-	}
+	if (entryInfoLength > MENU_ENTRY_INFO_LENGTH)
+		entryInfoLength = MENU_ENTRY_INFO_LENGTH;
+	memcpy(entryInfo,pMenu->menuEntry[entryIndex].info,entryInfoLength);
+	if (pMenu->menuEntry[entryIndex].infoReplacedChar != 0 &&
+	    pMenu->menuEntry[entryIndex].infoReplacedCharPos < (int)entryInfoLength)
+		entryInfo[pMenu->menuEntry[entryIndex].infoReplacedCharPos] = pMenu->menuEntry[entryIndex].infoReplacedChar;
+	entryInfo[entryInfoLength-1] = 0;
 	dprintf("%s: %d %s\n", __FUNCTION__, entryIndex, entryInfo);
 	return 0;
 }
@@ -8190,11 +8192,12 @@ static int interface_editDateDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 	pgfx_font->GetHeight(pgfx_font, &fh);
 	if ( pListMenu->listMenuType == interfaceListMenuNoThumbnail )
 	{
-		y = rect->y;
+		y = rect->y + fh;
 	} else
 	{
 		y =rect->y + pListMenu->baseMenu.thumbnailHeight/2 + fh/4;
 	}
+
 	r = INTERFACE_BOOKMARK_RED;
 	g = INTERFACE_BOOKMARK_GREEN;
 	b = INTERFACE_BOOKMARK_BLUE;
@@ -8274,11 +8277,12 @@ static int interface_editTimeDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 	pgfx_font->GetHeight(pgfx_font, &fh);
 	if ( pListMenu->listMenuType == interfaceListMenuNoThumbnail )
 	{
-		y = rect->y;
+		y = rect->y + fh;
 	} else
 	{
 		y =rect->y + pListMenu->baseMenu.thumbnailHeight/2 + fh/4;
 	}
+
 	r = INTERFACE_BOOKMARK_RED;
 	g = INTERFACE_BOOKMARK_GREEN;
 	b = INTERFACE_BOOKMARK_BLUE;
