@@ -79,6 +79,8 @@ typedef enum
 	elcmd_subtitle,
 	elcmd_reclist,
 	elcmd_getstream,
+	elcmd_TSsectionStreamOn,
+	elcmd_TSsectionStreamOff,
 
 	// All following commands are asynchronous
 	elcmd_async = 0x1000, //should be enough for synchronous commands
@@ -127,7 +129,9 @@ typedef enum
 	case elcmd_tvscan: \
 	case elcmd_tvtune: \
 	case elcmd_subtitle: \
-	case elcmd_reclist
+	case elcmd_reclist: \
+	case elcmd_TSsectionStreamOn: \
+	case elcmd_TSsectionStreamOff
 
 #define case_all_async \
 	case elcmd_closestream: \

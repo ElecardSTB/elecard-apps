@@ -195,13 +195,6 @@ struct dvb_instance {
 	struct dmx_pes_filter_params filtert;
 };
 
-enum table_type {
-	PAT,
-	PMT,
-	SDT,
-	NIT
-};
-
 enum running_mode {
 	RM_NOT_RUNNING = 0x01,
 	RM_STARTS_SOON = 0x02,
@@ -285,7 +278,6 @@ static inline int isSubtitle( PID_info_t* stream)
 * STATIC DATA                                                     *
 *******************************************************************/
 
-#ifdef LINUX_DVB_API_DEMUX
 static LIST_HEAD(running_filters);
 static LIST_HEAD(waiting_filters);
 static int n_running;
@@ -294,10 +286,6 @@ static struct section_buf* poll_section_bufs[MAX_RUNNING];
 static int lock_filters = 1;
 static inline void dvb_filtersLock(void)   { lock_filters = 1; }
 static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
-#else
-#define dvb_filtersUnlock()
-#define dvb_filtersLock()
-#endif
 
 static struct dvb_instance dvbInstances[ADAPTER_COUNT];
 static __u32 currentFrequency[ADAPTER_COUNT];
@@ -320,7 +308,6 @@ static pmysem_t dvb_filter_semaphore;
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
 
-#ifdef LINUX_DVB_API_DEMUX
 static void dvb_update_poll_fds(void)
 {
 	struct list_head *p;
@@ -347,68 +334,183 @@ static void dvb_update_poll_fds(void)
 		fatal("%s: n_running is hosed\n", __FUNCTION__);
 }
 
-static int dvb_filterStart (struct section_buf* s)
+#if (defined LINUX_DVB_API_DEMUX)
+static int32_t dvb_filterStart_dvbApi(struct section_buf* s)
 {
 	struct dmx_sct_filter_params f;
 
-	if (n_running >= MAX_RUNNING)
-		goto err0;
-	if ((s->fd = open (s->dmx_devname, O_RDWR | O_NONBLOCK)) < 0)
-		goto err0;
-
-	debug("%s: start filter 0x%02x\n", __FUNCTION__, s->pid);
-
-	memset(&f, 0, sizeof(f));
-
-	f.pid = (__u16) s->pid;
-
-	if (s->table_id < 0x100 && s->table_id > 0) {
-		f.filter.filter[0] = (unsigned char) s->table_id;
-		f.filter.mask[0]   = 0xff;
+	s->fd = open(s->dmx_devname, O_RDWR | O_NONBLOCK);
+	if(s->fd < 0) {
+		return -1;
 	}
 
+	memset(&f, 0, sizeof(f));
+	f.pid = (__u16)s->pid;
+
+	if(s->table_id < 0x100 && s->table_id > 0) {
+		f.filter.filter[0]	= (unsigned char) s->table_id;
+		f.filter.mask[0]	= 0xff;
+	}
 	f.timeout = 0;
 	f.flags = DMX_IMMEDIATE_START | DMX_CHECK_CRC;
 
-	if (ioctl(s->fd, DMX_SET_FILTER, &f) == -1) {
+	if(ioctl(s->fd, DMX_SET_FILTER, &f) == -1) {
 		PERROR("%s: ioctl DMX_SET_FILTER failed", __FUNCTION__);
-		goto err1;
+		ioctl(s->fd, DMX_STOP);
+		close(s->fd);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int32_t dvb_filterStop_dvbApi(struct section_buf *s)
+{
+	ioctl(s->fd, DMX_STOP);
+	close(s->fd);
+	s->fd = -1;
+
+	return 0;
+}
+#elif (defined STSDK)
+
+static int32_t dvb_filterStart_st(struct section_buf* s)
+{
+	char pipeName[32];
+	elcdRpcType_t type;
+	cJSON *result = NULL;
+	cJSON *params;
+	int32_t ret = -1;
+
+	sprintf(pipeName, "/tmp/section_pipe_%02d", n_running);
+	s->dmx_devname = strdup(pipeName);
+	unlink(pipeName);
+	if(mkfifo(pipeName, 0640) < 0) {
+		eprintf("%s(): Unable to create a fifo file\n", __func__);
+		return -2;
+	}
+	s->fd = open(pipeName, O_RDONLY | O_NONBLOCK);
+	if(s->fd < 0) {
+		unlink(pipeName);
+		eprintf("%s(): Error in opening file %s\n", __func__, pipeName);
+		return -3;
+	}
+
+	params = cJSON_CreateObject();
+	if(params == NULL) {
+		eprintf("%s(): Error in creating params\n", __func__);
+		return -4;
+	}
+
+	cJSON_AddStringToObject(params, "pipe_url", pipeName);
+	cJSON_AddNumberToObject(params, "tuner", 0);//TODO: Use something more general
+	cJSON_AddNumberToObject(params, "pid", (uint16_t)s->pid);
+	if(s->table_id < 0x100 && s->table_id > 0) {
+		cJSON_AddNumberToObject(params, "table_id", (uint8_t)s->table_id);
+	}
+
+	st_rpcSync(elcmd_TSsectionStreamOn, params, &type, &result);
+	if(result && (result->valuestring != NULL) &&
+		(strcmp(result->valuestring, "ok") == 0)) {
+		ret = 0;
+	}
+
+	cJSON_Delete(result);
+	cJSON_Delete(params);
+	return ret;
+}
+
+static int32_t dvb_filterStop_st(struct section_buf *s)
+{
+	elcdRpcType_t type;
+	cJSON *result = NULL;
+	cJSON *params;
+	int32_t ret = -1;
+
+	params = cJSON_CreateObject();
+	if(params == NULL) {
+		eprintf("%s(): Error in creating params\n", __func__);
+		return -4;
+	}
+
+	cJSON_AddStringToObject(params, "pipe_url", s->dmx_devname);
+	st_rpcSync(elcmd_TSsectionStreamOff, params, &type, &result);
+	if(result && (result->valuestring != NULL) &&
+		(strcmp(result->valuestring, "ok") == 0)) {
+		ret = 0;
+	}
+
+	close(s->fd);
+	unlink(s->dmx_devname);
+
+	cJSON_Delete(result);
+	cJSON_Delete(params);
+
+	return ret;
+}
+#else
+#define dvb_filterStart(args...)
+#define dvb_filterStop(args...)
+
+#warning "dvb_filterStart() and dvb_filterStop() not defined!!!"
+#endif
+
+static int dvb_filterStart(struct section_buf* s)
+{
+	int32_t ret = 0;
+	if(n_running >= MAX_RUNNING) {
+		return -1;
+	}
+
+	debug("%s: start filter 0x%02x\n", __FUNCTION__, s->pid);
+#if (defined LINUX_DVB_API_DEMUX)
+	ret = dvb_filterStart_dvbApi(s);
+#elif (defined STSDK)
+	ret = dvb_filterStart_st(s);
+#else
+#warning "dvb_filterStart() not defined!!!"
+	ret = -1;
+#endif
+
+	if(ret != 0) {
+		return ret;
 	}
 
 	s->sectionfilter_done = 0;
 	time(&s->start_time);
 
-	if (s->running_counter != NULL)
-	{
+	if(s->running_counter != NULL) {
 		(*s->running_counter)++;
 	}
 
-	list_del_init (&s->list);  /* might be in waiting filter list */
-	list_add (&s->list, &running_filters);
+	list_del_init(&s->list);  /* might be in waiting filter list */
+	list_add(&s->list, &running_filters);
 
 	n_running++;
 	dvb_update_poll_fds();
 
 	return 0;
-
-err1:
-	ioctl (s->fd, DMX_STOP);
-	close (s->fd);
-err0:
-	return -1;
 }
 
 static void dvb_filterStop (struct section_buf *s)
 {
+	int32_t ret = 0;
 	debug("%s: stop filter %d\n", __FUNCTION__, s->pid);
-	ioctl (s->fd, DMX_STOP);
-	close (s->fd);
-	s->fd = -1;
+
+#if (defined LINUX_DVB_API_DEMUX)
+	ret = dvb_filterStop_dvbApi(s);
+#elif (defined STSDK)
+	ret = dvb_filterStop_st(s);
+#else
+#warning "dvb_filterStop() not defined!!!"
+	ret = -1;
+#endif
+	(void)ret;
+
 	list_del (&s->list);
 	s->running_time += time(NULL) - s->start_time;
 
-	if (s->running_counter != NULL)
-	{
+	if(s->running_counter != NULL) {
 		(*s->running_counter)--;
 	}
 
@@ -817,9 +919,6 @@ static void dvb_filtersRead (__u32 frequency, char* demux_devname)
 
 	mysem_release(dvb_filter_semaphore);
 }
-#else
-#define dvb_filtersFlush()
-#endif // LINUX_DVB_API_DEMUX
 
 /*
 static void dvb_filterServices(list_element_t **head)
@@ -901,28 +1000,20 @@ int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner)
 void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 {
 	int adapter = dvb_getAdapter(tuner);
-
-	if(!dvb_isLinuxAdapter(adapter)) {
-		eprintf("%s[%d]: unsupported\n", __FUNCTION__, tuner);
-		return;
-	}
-
-#ifdef LINUX_DVB_API_DEMUX
 	struct section_buf eit_filter;
 	char demux_devname[32];
 	int counter = 0;
 
 	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", adapter);
 
-	dvb_filterSetup (&eit_filter, demux_devname, 0x12, -1, 2, NULL, &dvb_services); /* EIT */
+	dvb_filterSetup(&eit_filter, demux_devname, 0x12, -1, 2, NULL, &dvb_services); /* EIT */
 	eit_filter.running_counter = &counter;
-	dvb_filterAdd (&eit_filter);
-	do
-	{
-		dvb_filtersRead (frequency, demux_devname);
+	dvb_filterAdd(&eit_filter);
+	do {
+		dvb_filtersRead(frequency, demux_devname);
 		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
-	} while (eit_filter.start_time == 0 || counter > 0);
+	} while((eit_filter.start_time == 0) || (counter > 0));
 
 	//dvb_filterServices(&dvb_services);
 
@@ -931,7 +1022,6 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 		/* Write the channel list to the root file system */
 		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 	}
-#endif // LINUX_DVB_API_DEMUX
 }
 
 void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out_list )
@@ -3352,8 +3442,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 
 #ifdef LINUX_DVB_API_DEMUX
 	dprintf("%s[%d]: start demuxer\n", __FUNCTION__, pParam->adapter);
-	if (dvb_demuxerStart(dvb, pParam->media) != 0)
-	{
+	if(dvb_demuxerStart(dvb, pParam->media) != 0) {
 		eprintf("%s[%d]: Failed to change service!\n", __FUNCTION__, pParam->adapter);
 		return 0;
 	}
