@@ -1602,9 +1602,7 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
 #endif
 
-	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
-		interface_addEvent(offair_updateEPG, SET_NUMBER(which), 1000, 1);
-	}
+	interface_addEvent(offair_updateEPG, SET_NUMBER(which), 1000 * 5, 1);
 #ifdef ENABLE_STATS
 	time(&statsInfo.endTime);
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
@@ -4037,30 +4035,25 @@ static int  offair_updatePSI(void* pArg)
 }
 #endif
 
-static int  offair_updateEPG(void* pArg)
+static int offair_updateEPG(void* pArg)
 {
 	char desc[BUFFER_SIZE];
 	int my_channel = appControlInfo.dvbInfo.channel;
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if( current_service() == NULL )
-	{
+	if(current_service() == NULL) {
 		dprintf("offair: Can't update EPG: service %d is null\n",appControlInfo.dvbInfo.channel);
 		return -1;
 	}
 
 	mysem_get(epg_semaphore);
-	/*
-	dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
+/*	dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
+	if(appControlInfo.dvbInfo.scanPSI) {
+		offair_updatePSI(pArg);
+	}*/
 
-	if (appControlInfo.dvbInfo.scanPSI)
-	{
-	offair_updatePSI(pArg);
-	}
-	*/
-	if( appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel ) // can be 0 if we switched from DVB when already updating
-	{
+	if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel) {// can be 0 if we switched from DVB when already updating
 		dprintf("%s: scan for epg\n", __FUNCTION__);
 
 		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
@@ -4069,12 +4062,10 @@ static int  offair_updateEPG(void* pArg)
 
 		dprintf("%s: if active\n", __FUNCTION__);
 
-		if( appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel ) // can be 0 if we switched from DVB when already updating
-		{
+		if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel ) {// can be 0 if we switched from DVB when already updating
 			dprintf("%s: refresh event\n", __FUNCTION__);
 
-			if (appControlInfo.dvbInfo.active)
-			{
+			if(appControlInfo.dvbInfo.active) {
 				offair_getServiceDescription(current_service(),desc,_T("DVB_CHANNELS"));
 				interface_playControlUpdateDescription(desc);
 				interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
@@ -4083,7 +4074,6 @@ static int  offair_updateEPG(void* pArg)
 	}
 
 	dprintf("%s: update epg out\n", __FUNCTION__);
-
 	mysem_release(epg_semaphore);
 
 	return 0;
