@@ -402,11 +402,11 @@ static int32_t dvb_filterStart_st(struct section_buf* s)
 		return -4;
 	}
 
-	cJSON_AddStringToObject(params, "pipe_url", pipeName);
+	cJSON_AddStringToObject(params, "uri", pipeName);
 	cJSON_AddNumberToObject(params, "tuner", 0);//TODO: Use something more general
 	cJSON_AddNumberToObject(params, "pid", (uint16_t)s->pid);
 	if(s->table_id < 0x100 && s->table_id > 0) {
-		cJSON_AddNumberToObject(params, "table_id", (uint8_t)s->table_id);
+		cJSON_AddNumberToObject(params, "tid", (uint8_t)s->table_id);
 	}
 
 	st_rpcSync(elcmd_TSsectionStreamOn, params, &type, &result);
@@ -433,7 +433,7 @@ static int32_t dvb_filterStop_st(struct section_buf *s)
 		return -4;
 	}
 
-	cJSON_AddStringToObject(params, "pipe_url", s->dmx_devname);
+	cJSON_AddStringToObject(params, "uri", s->dmx_devname);
 	st_rpcSync(elcmd_TSsectionStreamOff, params, &type, &result);
 	if(result && (result->valuestring != NULL) &&
 		(strcmp(result->valuestring, "ok") == 0)) {
@@ -473,6 +473,7 @@ static int dvb_filterStart(struct section_buf* s)
 #endif
 
 	if(ret != 0) {
+		eprintf("%s(): Cant start collecting section with pid=0x04x, table_id=0x%02x\n", __func__, (uint16_t)s->pid, (uint8_t)s->table_id);
 		return ret;
 	}
 
