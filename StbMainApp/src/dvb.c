@@ -479,7 +479,6 @@ static int dvb_filterStart(struct section_buf* s)
 
 	s->sectionfilter_done = 0;
 	time(&s->start_time);
-
 	if(s->running_counter != NULL) {
 		(*s->running_counter)++;
 	}
@@ -510,7 +509,6 @@ static void dvb_filterStop (struct section_buf *s)
 
 	list_del (&s->list);
 	s->running_time += time(NULL) - s->start_time;
-
 	if(s->running_counter != NULL) {
 		(*s->running_counter)--;
 	}
@@ -521,15 +519,12 @@ static void dvb_filterStop (struct section_buf *s)
 
 static void dvb_filterAdd (struct section_buf *s)
 {
-	if (!lock_filters)
-	{
-		if (dvb_filterStart (s))
-			list_add_tail (&s->list, &waiting_filters);
-	} else
-	{
+	if(!lock_filters) {
+		if (dvb_filterStart(s))
+			list_add_tail(&s->list, &waiting_filters);
+	} else {
 		debug("%s: filters are locked\n", __FUNCTION__);
-		if (s->is_dynamic)
-		{
+		if(s->is_dynamic) {
 			debug("%s: free dynamic filter\n", __FUNCTION__);
 			dfree(s);
 		}
@@ -538,20 +533,19 @@ static void dvb_filterAdd (struct section_buf *s)
 
 static void dvb_filterRemove (struct section_buf *s)
 {
-	dvb_filterStop (s);
-	if (s->is_dynamic)
-	{
+	dvb_filterStop(s);
+	if(s->is_dynamic) {
 		debug("%s: free dynamic filter\n", __FUNCTION__);
 		dfree(s);
 	}
-
 	debug("%s: start waiting filters\n", __FUNCTION__);
 
-	while (!list_empty(&waiting_filters)) {
+	while(!list_empty(&waiting_filters)) {
 		struct list_head *next = waiting_filters.next;
-		s = list_entry (next, struct section_buf, list);
-		if (dvb_filterStart (s))
+		s = list_entry(next, struct section_buf, list);
+		if(dvb_filterStart(s)) {
 			break;
+		}
 	};
 }
 
@@ -1005,6 +999,10 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 	char demux_devname[32];
 	int counter = 0;
 
+	if(!dvb_isLinuxAdapter(adapter)) {
+		dvb_filtersUnlock();
+	}
+
 	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", adapter);
 
 	dvb_filterSetup(&eit_filter, demux_devname, 0x12, -1, 2, NULL, &dvb_services); /* EIT */
@@ -1015,11 +1013,9 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((eit_filter.start_time == 0) || (counter > 0));
-
 	//dvb_filterServices(&dvb_services);
 
-	if (eit_filter.was_updated)
-	{
+	if(eit_filter.was_updated) {
 		/* Write the channel list to the root file system */
 		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 	}
@@ -1388,7 +1384,6 @@ static int dvb_setFrequency(fe_type_t  type, __u32 frequency, int frontend_fd, t
 		}
 	} while (--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
 	dprintf("%s[%d]: %u timeout %d, ber %u\n", __FUNCTION__, tuner, frequency, timeout, ber);
-
 	currentFrequency[tuner] = frequency;
 	eprintf("%s[%d]: Frequency set, lock: %d\n", __FUNCTION__, tuner, hasLock);
 	return hasLock;
