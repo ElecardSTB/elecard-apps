@@ -98,6 +98,7 @@ static uintLookup_t rpc_commands[] = {
 	{elcmd_ttxStop,				"ttxStop"},
 	{elcmd_TSsectionStreamOn,	"TSsectionStreamOn"},
 	{elcmd_TSsectionStreamOff,	"TSsectionStreamOff"},
+	{elcmd_setOutputWnd,		"setOutputWnd"},
 
 	// todo: make sure this array match elcdRpcCommand_t enum in rpc.h
 	{elcmd_cmd_count,			NULL},

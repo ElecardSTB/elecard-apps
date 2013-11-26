@@ -81,6 +81,7 @@ typedef enum
 	elcmd_getstream,
 	elcmd_TSsectionStreamOn,
 	elcmd_TSsectionStreamOff,
+	elcmd_setOutputWnd,
 
 	// All following commands are asynchronous
 	elcmd_async = 0x1000, //should be enough for synchronous commands
@@ -95,6 +96,7 @@ typedef enum
 	elcmd_recstop,
 	elcmd_ttxStart,
 	elcmd_ttxStop,
+
 // todo: put new commands before this line,
 // then add matching entry to rpc_cmd_names array in rpc.c
 	elcmd_cmd_count,
@@ -131,7 +133,8 @@ typedef enum
 	case elcmd_subtitle: \
 	case elcmd_reclist: \
 	case elcmd_TSsectionStreamOn: \
-	case elcmd_TSsectionStreamOff
+	case elcmd_TSsectionStreamOff: \
+	case elcmd_setOutputWnd
 
 #define case_all_async \
 	case elcmd_closestream: \
