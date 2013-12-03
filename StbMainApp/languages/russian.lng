@@ -20,6 +20,7 @@ ANALOGTV_HIGH_FREQ=Верхняя частота сканирования
 ANALOGTV_SCAN_ALL=Автоматический поиск
 ANALOGTV_SCAN_RANGE=Поиск каналов в диапазоне
 ANALOGTV_DELSYS=Система ТВ
+ANALOGTV_AUDIO_MODE=Система модуляции аудио
 ANSWER_CALL=Принять звонок
 ANSWERED_CALLS=Принятые звонки
 APP_RELEASE=Прошивка

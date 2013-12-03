@@ -4423,8 +4423,8 @@ static int offair_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* p
 	else 
 	if (DVBTMenu.baseMenu.selectedItem - 2 < offair_indexCount + (int32_t)analogtv_getChannelCount() + 1) {
 
-		uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - offair_indexCount - 2;
-		analogtv_saveConfigFile(selectedItem - 1, pStr);
+		uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - offair_indexCount - 3;
+		analogtv_updateName(selectedItem, pStr);
 	}
 
 	snprintf (DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, 

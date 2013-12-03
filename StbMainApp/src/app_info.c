@@ -960,7 +960,7 @@ void appInfo_init(void)
 	appControlInfo.dvbcInfo.fe.frequencyStep      =   8000;
 #endif
 #ifdef ENABLE_ANALOGTV
-	strcpy(appControlInfo.tvInfo.channelConfigFile, ANALOGTV_CHANNEL_FILE);
+//	strcpy(appControlInfo.tvInfo.channelConfigFile, ANALOGTV_CHANNEL_FILE);
 	appControlInfo.tvInfo.active	= 0;
 	appControlInfo.tvInfo.id		= 0;
 #endif

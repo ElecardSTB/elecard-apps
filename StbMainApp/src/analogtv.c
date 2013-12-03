@@ -76,9 +76,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define verbose(...)
 #define debug(...)
 
-#define PERROR(fmt, ...) eprintf(fmt " (%s)\n", ##__VA_ARGS__, strerror(errno))
+#define PERROR(fmt, ...)		eprintf(fmt " (%s)\n", ##__VA_ARGS__, strerror(errno))
 
-#define FILE_PERMS (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define FILE_PERMS				(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+
+#define ANALOGTV_CHANNEL_FILE	CONFIG_DIR "/analog.conf"
+#define ANALOGTV_CONFIG_JSON	CONFIG_DIR "/analog.json"
+
+#define ANALOGTV_UNDEF			"UNDEF"
+
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -86,8 +92,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef struct {
 	uint32_t frequency;
 	uint16_t customNumber;
-	char customCaption[256];
-	char sysEncode[5];
+	char customCaption[128];
+	char sysEncode[16];
+	char audio[16];
 } analog_service_t;
 
 /***********************************************
@@ -101,7 +108,8 @@ static uint32_t		analogtv_channelCount = 0;
 
 analogtv_freq_range_t analogtv_range = {MIN_FREQUENCY_HZ / 1000, MAX_FREQUENCY_HZ / 1000};
 
-analogtv_deliverySystem analogtv_delSys = TV_SYSTEM_PAL;
+analogtv_deliverySystem analogtv_delSys	= TV_SYSTEM_PAL;
+analogtv_audioDemodMode analogtv_audio	= TV_AUDIO_FM2;
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -139,54 +147,81 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 	return 0;
 }
 
+static int32_t analogtv_parseOldConfigFile(void)
+{
+	int i = 0;
+	FILE *fd = NULL;
+
+	fd = fopen(ANALOGTV_CHANNEL_FILE, "r");
+	if(fd == NULL) {
+		dprintf("Error opening %s\n", ANALOGTV_CHANNEL_FILE);
+		return -1;
+	}
+	while(!feof(fd)) {
+		uint32_t freq;
+		char buf[256];
+		const char *name;
+
+		fgets(buf, sizeof(buf), fd);
+		freq = strtoul(buf, NULL, 10);
+
+		name = strchr(buf, ';');
+		if(name) {
+			name++;
+		} else {
+			snprintf(buf, sizeof(buf), "TV Program %02d", i + 1);
+			name = buf;
+		}
+
+		analogtv_channelParam[i].frequency = freq;
+		strncpy(analogtv_channelParam[i].customCaption, name, sizeof(analogtv_channelParam[0].customCaption));
+		strncpy(analogtv_channelParam[i].sysEncode, ANALOGTV_UNDEF, sizeof(analogtv_channelParam[0].sysEncode));
+		i++;
+	}
+	analogtv_channelCount = i;
+	fclose(fd);
+	return 0;
+}
+
+/*static int32_t analogtv_saveOldConfigFile(void)
+{
+	int32_t i;
+	FILE *fd = NULL;
+
+	fd = fopen(ANALOGTV_CHANNEL_FILE, "w");
+	if(fd == NULL) {
+		dprintf("Error opening %s\n", ANALOGTV_CHANNEL_FILE);
+		return -1;
+	}
+
+	for(int i = 0; i < (int32_t)analogtv_channelCount; i++) {
+		fprintf(fd, "%u;%s\n", analogtv_channelParam[i].frequency, analogtv_channelParam[i].customCaption);
+	}
+
+	fclose(fd);
+	return 0;
+}*/
 
 static int32_t analogtv_parseConfigFile(void)
 {
 	FILE *fd = NULL;
+	cJSON *root;
+	cJSON *format;
+	char *data;
+	long len;
+
 	fd = fopen(ANALOGTV_CONFIG_JSON, "r");
 	if(fd == NULL) {
 		dprintf("Error opening %s\n", ANALOGTV_CONFIG_JSON);
-
-		int i = 1;
-		analogtv_channelCount = 0;
-		fd = fopen(ANALOGTV_CHANNEL_FILE, "r");
-		if(fd == NULL) {
-			dprintf("Error opening %s\n", ANALOGTV_CHANNEL_FILE);
-			return -1;
-		}
-		while(!feof(fd)) {
-			uint32_t freq;
-			char buf[256];
-			const char *name;
-
-			fgets(buf, sizeof(buf), fd);
-			freq = strtoul(buf, NULL, 10);
-
-			name = strchr(buf, ';');
-			if(name) {
-				name++;
-			} else {
-				snprintf(buf, sizeof(buf), "TV Program %02d", i);
-				name = buf;
-			}
-			i++;
-
-			analogtv_channelParam[analogtv_channelCount].frequency = freq;
-			strcpy(analogtv_channelParam[analogtv_channelCount].customCaption, name);
-			strcpy(analogtv_channelParam[analogtv_channelCount].sysEncode, "UNDEF");
-			analogtv_channelCount++;
-		}
-		fclose(fd);
-		return 0;
+		//Is this need still
+		return analogtv_parseOldConfigFile();
 	}
 	fseek(fd, 0, SEEK_END);
-	long len = ftell(fd);
+	len = ftell(fd);
 	fseek(fd, 0, SEEK_SET);
-	char *data = malloc(len + 1);
+	data = malloc(len + 1);
 	fread(data, 1, len, fd);
 	fclose(fd);
-
-	cJSON *root;
 
 	root = cJSON_Parse(data);
 	free(data);
@@ -195,28 +230,19 @@ static int32_t analogtv_parseConfigFile(void)
 		return -1;
 	}
 
-	if(cJSON_GetObjectItem(root, "Analog TV channels")) {
-		cJSON * format = cJSON_GetObjectItem(root, "Analog TV channels");
-		if (format) {
-			for (analogtv_channelCount = 0 ; (int32_t)analogtv_channelCount < cJSON_GetArraySize(format) ; analogtv_channelCount++)
-			{
-				cJSON * subitem = cJSON_GetArrayItem(format, analogtv_channelCount);
-				if(subitem) {
-					cJSON *obj;
-					obj = cJSON_GetObjectItem(subitem,"frequency");
-					if(obj) {
-						analogtv_channelParam[analogtv_channelCount].frequency = obj->valueint;
-					}
-					obj = cJSON_GetObjectItem(subitem,"name");
-					if(obj) {
-						strcpy(analogtv_channelParam[analogtv_channelCount].customCaption, obj->valuestring);
-					} else {
-						sprintf(analogtv_channelParam[analogtv_channelCount].customCaption, "TV Program %02d", analogtv_channelCount + 1);
-					}
-					obj = cJSON_GetObjectItem(subitem,"systems encode");
-					if(obj) {
-						strcpy(analogtv_channelParam[analogtv_channelCount].sysEncode, obj->valuestring);
-					}
+	format = cJSON_GetObjectItem(root, "Analog TV channels");
+	if(format) {
+		uint32_t i;
+		analogtv_channelCount = cJSON_GetArraySize(format);
+		for(i = 0 ; i < analogtv_channelCount; i++) {
+			cJSON *subitem = cJSON_GetArrayItem(format, i);
+			if(subitem) {
+				analogtv_channelParam[i].frequency = objGetInt(subitem, "frequency", 0);
+				strncpy(analogtv_channelParam[i].customCaption, objGetString(subitem, "name", ""), sizeof(analogtv_channelParam[0].customCaption));
+				strncpy(analogtv_channelParam[i].sysEncode, objGetString(subitem, "system encode", ANALOGTV_UNDEF), sizeof(analogtv_channelParam[0].sysEncode));
+				strncpy(analogtv_channelParam[i].audio, objGetString(subitem, "audio demod mode", ANALOGTV_UNDEF), sizeof(analogtv_channelParam[0].audio));
+				if(analogtv_channelParam[i].customCaption[0] == 0) {
+					sprintf(analogtv_channelParam[i].customCaption, "TV Program %02d", i + 1);
 				}
 			}
 		}
@@ -226,65 +252,76 @@ static int32_t analogtv_parseConfigFile(void)
 	return 0;
 }
 
-int analogtv_saveConfigFile(int32_t chanIndex, char* str)
+static int32_t analogtv_saveConfigFile(void)
 {
-	FILE *fd = NULL;
-	fd = fopen(ANALOGTV_CONFIG_JSON, "r");
-	if(fd == NULL) {
-		dprintf("Error opening %s\n", ANALOGTV_CONFIG_JSON);
+	cJSON* root;
+	cJSON* format;
+	char *rendered;
+	uint32_t i;
 
-		fd = fopen(ANALOGTV_CHANNEL_FILE, "w");
-		if(fd == NULL) {
-			dprintf("Error opening %s\n", ANALOGTV_CHANNEL_FILE);
-			return -1;
-		}
-
-		for (int index = 0; index < (int32_t)analogtv_channelCount; index++) {
-			fprintf(fd, "%u;%s\n", analogtv_channelParam[index].frequency, (chanIndex == index) ? str:analogtv_channelParam[index].customCaption);
-		}
-
-		fclose(fd);
-		return 0;
+	root = cJSON_CreateObject();
+	if(!root) {
+		dprintf("Memory error!\n");
+		return -1;
 	}
-	fseek(fd, 0, SEEK_END);
-	long len = ftell(fd);
-	fseek(fd, 0, SEEK_SET);
-	char *data = malloc(len + 1);
-	fread(data, 1, len, fd);
-	fclose(fd);
-
-	cJSON *root;
-	root = cJSON_Parse(data);
-	free(data);
-	if (!root)
-	{
-		printf("Error before: [%s]\n", cJSON_GetErrorPtr());
-		return 1;
+	format = cJSON_CreateArray();
+	if(!format) {
+		dprintf("Memory error!\n");
+		cJSON_Delete(root);
+		return -1;
 	}
+	cJSON_AddItemToObject(root, "Analog TV channels", format);
 
-	cJSON * format = cJSON_GetObjectItem(root, "Analog TV channels");
+	for(i = 0; i < analogtv_channelCount; i++) {
+		cJSON* fld;
 
-	if(format) {
-		cJSON * subitem = cJSON_GetArrayItem(format, chanIndex);
-		if(subitem)	{
-			cJSON *obj;
-			obj = cJSON_GetObjectItem(subitem,"name");
-			if(obj) {
-				strcpy(obj->valuestring, str);
-			} else {
-				cJSON_AddStringToObject(subitem, "name", str);
-			}
-			char * rendered = cJSON_Print(root);
-			fd = fopen(ANALOGTV_CONFIG_JSON, "w");
-			fwrite(rendered, strlen(rendered), 1, fd);
-			free(rendered);
-			fclose(fd);
+		fld = cJSON_CreateObject();
+		if(fld) {
+			cJSON_AddNumberToObject(fld, "id", i + 1);
+			cJSON_AddNumberToObject(fld, "frequency", analogtv_channelParam[i].frequency);
+			cJSON_AddStringToObject(fld, "name", analogtv_channelParam[i].customCaption);
+			cJSON_AddStringToObject(fld, "system encode", analogtv_channelParam[i].sysEncode);
+			cJSON_AddStringToObject(fld, "audio demod mode", analogtv_channelParam[i].audio);
+
+			cJSON_AddItemToArray(format, fld);
+		} else {
+			dprintf("Memory error!\n");
 		}
 	}
+
+	rendered = cJSON_Print(root);
 	cJSON_Delete(root);
 
+	if(rendered) {
+		FILE *fd = NULL;
+		fd = fopen(ANALOGTV_CONFIG_JSON, "w");
+		if(fd) {
+			fwrite(rendered, strlen(rendered), 1, fd);
+			fclose(fd);
+		} else {
+			dprintf("Error opening %s\n", ANALOGTV_CONFIG_JSON);
+//			return -1;
+		}
+		free(rendered);
+	}
 	return 0;
 }
+
+int32_t analogtv_updateName(uint32_t chanIndex, char* str)
+{
+	if(str) {
+		dprintf("%s(): Wrong name\n", __func__);
+		return -1;
+	}
+	if(chanIndex >= analogtv_channelCount) {
+		dprintf("%s(): Wrong index\n", __func__);
+		return -2;
+	}
+
+	strncpy(analogtv_channelParam[chanIndex].customCaption, str, sizeof(analogtv_channelParam[0].customCaption));
+	return analogtv_saveConfigFile();
+}
+
 
 // int analogtv_readServicesFromFile ()
 // {
@@ -305,7 +342,7 @@ int analogtv_saveConfigFile(int32_t chanIndex, char* str)
 int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {
 #ifdef STSDK
-	char buf [256];
+	char buf[256];
 	uint32_t from_freq, to_freq;
 
 	sprintf(buf, "%s", _T("SCANNING_ANALOG_CHANNELS"));
@@ -345,6 +382,14 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		[TV_SYSTEM_NTSC]	= "ntsc",
 	};
 	cJSON_AddItemToObject(params, "delsys", cJSON_CreateString(analogtv_delSysName[analogtv_delSys]));
+
+	char *analogtv_audioName[] = {
+		[TV_AUDIO_SIF]	= "sif",
+		[TV_AUDIO_AM]	= "am",
+		[TV_AUDIO_FM1]	= "fm1",
+		[TV_AUDIO_FM2]	= "fm2",
+	};
+	cJSON_AddItemToObject(params, "audio", cJSON_CreateString(analogtv_audioName[analogtv_audio]));
 
 	int res = st_rpcSyncTimeout(elcmd_tvscan, params, RPC_ANALOG_SCAN_TIMEOUT, &type, &result );
 	(void)res;
@@ -400,7 +445,7 @@ void analogtv_terminate(void)
 
 	analogtv_stop();
 
-	analogtv_channelCount = 0;
+//	analogtv_channelCount = 0;
 
 	mysem_destroy(analogtv_semaphore);
 }
@@ -484,7 +529,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	offair_fillDVBTOutputMenu(screenMain);
 //	saveAppSettings();
 
-	snprintf(cmd, sizeof(cmd), URL_ANALOGTV_MEDIA "%u@%s", freq, analogtv_channelParam[id].sysEncode);
+	snprintf(cmd, sizeof(cmd), URL_ANALOGTV_MEDIA "%u@%s:%s", freq, analogtv_channelParam[id].sysEncode, analogtv_channelParam[id].audio);
 
 	gfx_startVideoProvider(cmd, 0, 0, NULL);
 
@@ -560,7 +605,7 @@ void analogtv_fillMenu(void)
 		char channelEntry[32];
 
 		sprintf(channelEntry, "TV Program %02d", i + 1);
-		interface_addMenuEntry(channelMenu, channelEntry, analogtv_activateChannel, (void*)(analogtv_channelParam + i)->frequency, thumbnail_tvstandard);
+		interface_addMenuEntry(channelMenu, channelEntry, analogtv_activateChannel, (void*)(analogtv_channelParam[i].frequency), thumbnail_tvstandard);
 	}
 //	interface_setSelectedItem(channelMenu, selectedMenuItem);
 

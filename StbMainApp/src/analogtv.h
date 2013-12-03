@@ -69,12 +69,20 @@ typedef enum {
 	TV_SYSTEM_NTSC,
 } analogtv_deliverySystem;
 
+typedef enum {
+	TV_AUDIO_SIF = 0,
+	TV_AUDIO_AM,
+	TV_AUDIO_FM1,
+	TV_AUDIO_FM2,
+} analogtv_audioDemodMode;
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
 extern int analogtv_service_count;
 extern analogtv_freq_range_t analogtv_range;
 extern analogtv_deliverySystem analogtv_delSys;
+extern analogtv_audioDemodMode analogtv_audio;
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -113,7 +121,7 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
 
-int  analogtv_saveConfigFile(int32_t chanIndex, char* str);
+int32_t analogtv_updateName(uint32_t chanIndex, char* str);
 void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 void analogtv_addMenuEntry(interfaceMenu_t *pMenu);
 void analogtv_initMenu(interfaceMenu_t *pParent);

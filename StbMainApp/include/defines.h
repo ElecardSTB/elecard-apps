@@ -497,13 +497,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#define PROFILE_LOCATIONS_PATH   "/profile/operator/locations"
 #endif
 
-/** Default Analog TV channel file which contains available channel list
- */
-#ifndef ANALOGTV_CHANNEL_FILE
-	#define ANALOGTV_CHANNEL_FILE   CONFIG_DIR "/analog.conf"
-	#define ANALOGTV_CONFIG_JSON    CONFIG_DIR "/analog.json"
-#endif
-
 /***********************************************************
 * Misc
 ***********************************************************/

@@ -4490,6 +4490,23 @@ static int analogtv_changeAnalogDelSys(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(0, pMenu);
 }
 
+char *analogtv_audioName[] = {
+	[TV_AUDIO_SIF]	= "sif",
+	[TV_AUDIO_AM]	= "am",
+	[TV_AUDIO_FM1]	= "fm1",
+	[TV_AUDIO_FM2]	= "fm2",
+};
+
+static int analogtv_changeAnalogAudio(interfaceMenu_t *pMenu, void* pArg)
+{
+	analogtv_audio++;
+	if(analogtv_audio > TV_AUDIO_FM2) {
+		analogtv_audio = TV_AUDIO_SIF;
+	}
+
+	return output_saveAndRedraw(0, pMenu);
+}
+
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	int32_t selected = MENU_ITEM_BACK;
@@ -4498,7 +4515,7 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	char * str;
 	
 	interface_clearMenuEntries(tvMenu);
-	
+
 	str = _T("ANALOGTV_SCAN_ALL");
 	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
 
@@ -4513,7 +4530,9 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 
 	sprintf(buf, "%s: %s", _T("ANALOGTV_DELSYS"), analogtv_delSysName[analogtv_delSys]);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogDelSys, NULL, thumbnail_configure); // SET_NUMBER(optionHighFreq
-	
+
+	sprintf(buf, "%s: %s", _T("ANALOGTV_AUDIO_MODE"), analogtv_audioName[analogtv_audio]);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogAudio, NULL, thumbnail_configure);
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);

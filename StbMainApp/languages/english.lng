@@ -20,6 +20,7 @@ ANALOGTV_HIGH_FREQ=Higher frequency limit
 ANALOGTV_SCAN_ALL=Scan for channels
 ANALOGTV_SCAN_RANGE=Scan in frequency range
 ANALOGTV_DELSYS=Television system
+ANALOGTV_AUDIO_MODE=Audo modulation mode
 ANSWER_CALL=Answer Call
 ANSWERED_CALLS=Answered Calls
 APP_RELEASE=Firmware
