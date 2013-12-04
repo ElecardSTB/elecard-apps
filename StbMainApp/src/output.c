@@ -4509,7 +4509,6 @@ static int analogtv_changeAnalogAudio(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
-	int32_t selected = MENU_ITEM_BACK;
 	interfaceMenu_t * tvMenu = &AnalogTvSubMenu.baseMenu;
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	char * str;
@@ -4537,8 +4536,6 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);
 	
-	interface_setSelectedItem(tvMenu, selected);
-
 	return 0;
 }
 #endif //#ifdef ENABLE_ANALOGTV
