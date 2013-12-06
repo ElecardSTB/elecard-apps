@@ -1390,19 +1390,21 @@ void offair_displayPlayControl(void)
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+rect.w+DVBPC_STATUS_ICON_SIZE+interfaceInfo.paddingSize*2, rect.y+fa, buffer, 0, 0);
 		//interface_drawTextWW(pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+rect.w+interfaceInfo.paddingSize*3, rect.y+fh, w-rect.w-interfaceInfo.paddingSize*3, 10, buffer, ALIGN_LEFT);
 
-		rect.x = x;
-		rect.w = w;
-		rect.y += rect.h+interfaceInfo.paddingSize*2;
-		rect.h = h-rect.h-interfaceInfo.paddingSize*2;
+		if(appControlInfo.playbackInfo.streamSource == streamSourceDVB) {
+			rect.x = x;
+			rect.w = w;
+			rect.y += rect.h+interfaceInfo.paddingSize*2;
+			rect.h = h-rect.h-interfaceInfo.paddingSize*2;
 
-		/*interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideBottom|interfaceBorderSideRight);
-		interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_DK_RED, INTERFACE_SCROLLBAR_COLOR_DK_GREEN, INTERFACE_SCROLLBAR_COLOR_DK_BLUE, INTERFACE_SCROLLBAR_COLOR_DK_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideLeft);*/
+			/*interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideBottom|interfaceBorderSideRight);
+			interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_DK_RED, INTERFACE_SCROLLBAR_COLOR_DK_GREEN, INTERFACE_SCROLLBAR_COLOR_DK_BLUE, INTERFACE_SCROLLBAR_COLOR_DK_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideLeft);*/
 
-		interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideBottom);
+			interface_drawOuterBorder(DRAWING_SURFACE, INTERFACE_SCROLLBAR_COLOR_LT_RED, INTERFACE_SCROLLBAR_COLOR_LT_GREEN, INTERFACE_SCROLLBAR_COLOR_LT_BLUE, INTERFACE_SCROLLBAR_COLOR_LT_ALPHA, rect.x-2, rect.y-2, w+4, rect.h+4, interfaceInfo.borderWidth, interfaceBorderSideTop|interfaceBorderSideBottom);
 
-		offair_getServiceDescription(current_service(), buffer, NULL);
+			offair_getServiceDescription(current_service(), buffer, NULL);
 
-		interface_drawTextWW(pgfx_smallfont, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+interfaceInfo.paddingSize, rect.y, rect.w-interfaceInfo.paddingSize, rect.h, buffer, ALIGN_LEFT);
+			interface_drawTextWW(pgfx_smallfont, 0xFF, 0xFF, 0xFF, 0xFF, rect.x+interfaceInfo.paddingSize, rect.y, rect.w-interfaceInfo.paddingSize, rect.h, buffer, ALIGN_LEFT);
+		}
 
 		interface_addEvent((eventActionFunction)interface_displayMenu, (void*)1, 100, 1);
 	}
