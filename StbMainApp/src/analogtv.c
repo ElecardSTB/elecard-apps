@@ -472,17 +472,16 @@ extern void offair_displayPlayControl(void);
 //-----------------------------------------------------------------------
 int32_t analogtv_startNextChannel(int32_t direction, void* pArg)
 {
-	uint32_t i;
-	int32_t which = GET_NUMBER(pArg);
+	int32_t id = appControlInfo.tvInfo.id;
 
-	for(i = (appControlInfo.tvInfo.id + analogtv_channelCount + direction) % analogtv_channelCount;
-		i != appControlInfo.tvInfo.id;
-		i = (i + direction + analogtv_channelCount) % analogtv_channelCount)
-	{
-		;
+	id += direction ? -1 : 1;
+	if(id < 0) {
+		id = analogtv_channelCount - 1;
+	} else if(id >= (int32_t)analogtv_channelCount) {
+		id = 0;
 	}
-	//printf("%s: i = %d, ch = %d, total = %d\n", __FUNCTION__, i, appControlInfo.tvInfo.id, analogtv_channelCount);
-	analogtv_activateChannel(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, i));
+
+	analogtv_activateChannel(interfaceInfo.currentMenu, (void *)id);
 	return 0;
 }
 //-----------------------------------------------------------------------
@@ -523,7 +522,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 //	interface_playControlSetAudioCallback(offair_audioChanged);
 	interface_channelNumberShow(appControlInfo.playbackInfo.channel);
 
-
+//	offair_stopVideo(screenMain, 1);
 //	offair_startVideo(screenMain);
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
