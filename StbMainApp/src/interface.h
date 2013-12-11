@@ -906,6 +906,57 @@ typedef struct
 	interfaceInputFocus_t inputFocus;
 } interfaceInfo_t;
 
+#ifdef ENABLE_FUSION
+
+#define FUSION_STREAM_SIZE    (1024*1024)
+#define FUSION_URL_LEN        (512)
+
+#define FUSION_MAX_LOGOS             (4)
+#define FUSION_MAX_CREEPLEN           (1024)
+
+#define FUSION_SPACES        250
+#define FUSION_SYMBOLS_FITS  250
+
+#define FUSION_PLAYLIST_FILE  "/tmp/fusion.playlist"
+#define FUSION_DEFAULT_SERVER_PATH   "http://public.tv/api"
+
+#define FUSION_TOP_LEFT_STR          "top_left"
+#define FUSION_TOP_RIGHT_STR         "top_right"
+#define FUSION_BOTTOM_LEFT_STR       "bottom_left"
+#define FUSION_BOTTOM_RIGHT_STR      "bottom_right"
+
+#define FUSION_DEFAULT_CREEP_PAUSE    (10)
+#define FUSION_DEFAULT_CREEP_REPEATS  (1)
+
+#define FUSION_SECRET                "secretKey81"
+
+typedef enum {
+	FUSION_TOP_LEFT = 0,
+	FUSION_TOP_RIGHT,
+	FUSION_BOTTOM_LEFT,
+	FUSION_BOTTOM_RIGHT
+} fusion_position_t;
+
+typedef struct {
+	char url[PATH_MAX];
+	fusion_position_t position;
+} fusion_logo_t;
+
+typedef struct _interfaceFusionObject_t {
+	unsigned char secret[32];
+
+	unsigned char creepline[FUSION_MAX_CREEPLEN];
+	int pause;
+	int repeats;
+	pthread_mutex_t mutexCreep;
+
+	fusion_logo_t logos[FUSION_MAX_LOGOS];
+	int logoCount;
+	pthread_mutex_t mutexLogo;
+
+} interfaceFusionObject_t;
+#endif
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/

@@ -128,6 +128,10 @@ typedef struct
 * STATIC DATA                                                     *
 *******************************************************************/
 
+#ifdef ENABLE_FUSION
+extern interfaceFusionObject_t FusionObject;
+#endif
+
 static pthread_t interfaceEventThread;
 
 /* display semaphore */
@@ -2024,6 +2028,66 @@ static void interface_animateMenu(int flipFB, int animate)
 			gfx_fb1_clear(0x0, 0x0, 0x0, 0x0);
 		}
 	}
+#endif
+
+#ifdef ENABLE_FUSION
+
+// todo : detect image size
+#define FUSION_LOGO1_W 328
+#define FUSION_LOGO1_H 60
+
+#define FUSION_LOGO2_W 200
+#define FUSION_LOGO2_H 134
+
+	// top left
+	eprintf ("%s(%d): pthread_mutex_lock mutexLogo.. FusionObject.logoCount = %d\n", __FUNCTION__, __LINE__, FusionObject.logoCount);
+	pthread_mutex_lock(&FusionObject.mutexLogo);
+	for (int i=0; i<FusionObject.logoCount; i++){
+		char logoPath[PATH_MAX];
+		int left=0, top=0;
+		int w=0, h=0;
+		sprintf (logoPath, "/tmp/fusion_logo_%d.png", i);
+		switch (FusionObject.logos[i].position)
+		{
+			case FUSION_TOP_LEFT:
+				left = 100;
+				top = 100;
+				w = FUSION_LOGO1_W;
+				h = FUSION_LOGO1_H;
+				break;
+			case FUSION_TOP_RIGHT:
+				left = interfaceInfo.screenWidth - FUSION_LOGO2_W - 100;
+				top = 70;
+				w = FUSION_LOGO2_W;
+				h = FUSION_LOGO2_H;
+				break;
+			case FUSION_BOTTOM_LEFT:
+				left = 100;
+				top = interfaceInfo.screenHeight - 200;
+				break;
+			case FUSION_BOTTOM_RIGHT:
+				left = interfaceInfo.screenWidth - FUSION_LOGO2_W - 100;
+				top = interfaceInfo.screenHeight - 200;
+				break;
+		}
+		eprintf ("%s(%d): interface_drawImage %s at (%d, %d) of size (%d, %d)\n", __FUNCTION__, __LINE__, logoPath, left, top, w, h);
+		interface_drawImage(DRAWING_SURFACE, 
+			logoPath,
+			left, top,
+			w, h, 0, 0, DSBLIT_BLEND_ALPHACHANNEL,
+			interfaceAlignLeft | interfaceAlignTop, 0, 0);
+	}
+	pthread_mutex_unlock(&FusionObject.mutexLogo);
+
+	int fh;
+	pthread_mutex_lock(&FusionObject.mutexCreep);
+	pgfx_font->GetHeight(pgfx_font, &fh);
+	interface_drawTextWW(pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
+		50, interfaceInfo.screenHeight - 80, 
+		interfaceInfo.screenWidth + 100, fh + 10, 
+		FusionObject.creepline, ALIGN_LEFT);
+	
+	pthread_mutex_unlock(&FusionObject.mutexCreep);
 #endif
 
 	if(!interfaceInfo.showMenu) {

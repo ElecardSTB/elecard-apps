@@ -108,6 +108,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/un.h>
 #include <linux/input.h>
 
+#include "../../src/md5.h"
+
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
@@ -1839,6 +1841,69 @@ static void setupFramebuffers(void)
 
 #ifdef ENABLE_FUSION
 #define FUSION_STUB "fusion://stub"
+static int gStatus = 0;
+
+interfaceFusionObject_t FusionObject;
+
+void * fusion_threadCreepline(void * param)
+{
+	char tmpLine[1024];
+	int j=0, i=0, k=0;
+	int symbols = 0;
+	char initialCreep[FUSION_MAX_CREEPLEN];
+	char spaces[FUSION_SPACES];
+
+	memset(spaces, 0, FUSION_SPACES);
+	memset(initialCreep, 0, FUSION_MAX_CREEPLEN);
+
+	memset(spaces, ' ', FUSION_SPACES-1);
+	sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
+
+	while (j < FusionObject.repeats){
+		i = 0;
+		sprintf (FusionObject.creepline, initialCreep);
+
+		while (strlen(FusionObject.creepline) > 0){
+			pthread_mutex_lock(&FusionObject.mutexCreep);
+			if (FusionObject.creepline[0] == ' ' ||
+			    FusionObject.creepline[0] == ',' ||
+			    FusionObject.creepline[0] == '!' ||
+			    FusionObject.creepline[0] == '.' ||
+			    FusionObject.creepline[0] == '-'
+			)
+			{
+				i ++;
+			}
+			else {
+				i += 2;
+			}
+			sprintf (tmpLine, "%s", initialCreep + i);
+
+			for (k=0, symbols = 0; k<min(FUSION_SYMBOLS_FITS, strlen(tmpLine)); k++){
+				if (tmpLine[0] == ' ' ||
+					tmpLine[0] == ',' ||
+					tmpLine[0] == '!' ||
+					tmpLine[0] == '.' ||
+					tmpLine[0] == '-')
+				{
+					symbols++;
+				}
+				else symbols += 2;
+			}
+			tmpLine[symbols] = '\0';
+			sprintf (FusionObject.creepline, "%s", tmpLine);
+			pthread_mutex_unlock(&FusionObject.mutexCreep);
+
+			interface_displayMenu(1);
+			usleep(600);
+		}
+		sleep (FusionObject.pause);
+		j++;
+	}
+	pthread_exit((void *)&gStatus);
+	return (void*)NULL;
+}
+
 void fusion_startup()
 {
 	sprintf (appControlInfo.mediaInfo.filename, "%s", FUSION_STUB);
@@ -1854,7 +1919,193 @@ void fusion_startup()
 	else {
 		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
 	}
+
+	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
+	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
+	
+	fusion_getCreepAndLogo();
+	eprintf ("%s(%d): fusion_getCreepAndLogo OK.\n", __FUNCTION__, __LINE__);
+
+	pthread_t handle; 
+	eprintf ("%s(%d): pthread_create fusion_threadCreepline...\n", __FUNCTION__, __LINE__);
+	pthread_create(&handle, NULL, fusion_threadCreepline, (void*)NULL);
+	pthread_detach(handle);
+
+	interface_displayMenu(1);
+
 	return;
+}
+
+int fusion_getSecret ()
+{
+	char mac [16];
+	char input[64];
+	char output[64];
+	int i;
+	
+	mac[0] = 0;
+	input[0] = 0;
+	output[0] = 0;
+	memset (FusionObject.secret, 0, sizeof(FusionObject.secret));
+
+	FILE *f = popen ("cat /sys/class/net/eth0/address | tr -d ':'", "r");
+	if (!f) return -1;
+
+	fgets(mac, sizeof(mac), f);
+	pclose(f);
+	mac[strlen(mac) - 1] = '\0';
+
+	strcpy(input, FUSION_SECRET);
+	strcat(input, mac);
+
+	/* Get MD5 sum of input and convert it to hex string */
+	md5((unsigned char*)input, strlen(input), (unsigned char*)output);
+	for (i = 0; i < 16; i++)
+	{
+		sprintf(&FusionObject.secret[i*2], "%02hhx", output[i]);
+	}
+
+	return 0;
+}
+
+
+int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
+{
+	char playlistBuffer[FUSION_STREAM_SIZE];
+	char cmd[PATH_MAX];
+	char result[128];
+	FILE * f;
+	
+	if (!url || !strlen(url)) return -1;
+	memset(playlistBuffer, 0, FUSION_STREAM_SIZE);
+
+	sprintf (cmd, "wget \"%s\" -O "FUSION_PLAYLIST_FILE" 2>/dev/null", url);
+	eprintf ("%s(%d): rq: %s ...\n",   __FUNCTION__, __LINE__, url);
+	//eprintf ("%s(%d): cmd: %s ...\n", __FUNCTION__, __LINE__, cmd);
+	//fusion_getCommandOutput(cmd, result);
+	system(cmd);
+
+	f = fopen(FUSION_PLAYLIST_FILE, "rt");
+	if (!f) {
+		eprintf ("%s(%d): WARNING! Couldn't open playlist dump file %s.\n",   __FUNCTION__, __LINE__, FUSION_PLAYLIST_FILE);
+		return -1;
+	}
+
+	fread(playlistBuffer, FUSION_STREAM_SIZE, 1, f);
+	fclose(f);
+
+#ifdef FUSION_TEST
+	char cuttedStream[256];
+	snprintf (cuttedStream, 256, "%s", playlistBuffer);
+	eprintf ("ans: %s ...\n", cuttedStream);
+	//eprintf ("ans: %s\n", playlistBuffer);
+#endif
+	
+	if (strlen(playlistBuffer) == 0) {
+		eprintf (" %s: ERROR! empty response.\n",   __FUNCTION__);
+		return -1;
+	}
+	return fusion_checkResponse(playlistBuffer, ppRoot);
+}
+
+int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
+{
+	*ppRoot = cJSON_Parse(curlStream);
+	if (!(*ppRoot)) {
+		char cuttedStream[256];
+		snprintf (cuttedStream, 256, curlStream);
+		eprintf ("%s: ERROR! Not a JSON response. %s\n",   __FUNCTION__, cuttedStream);
+		return -1;
+	}
+	return 0;
+}
+
+int fusion_getCreepAndLogo ()
+{
+	cJSON * root;
+	char request[FUSION_URL_LEN];
+	unsigned int i;
+
+	fusion_getSecret();
+	sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FUSION_DEFAULT_SERVER_PATH, FusionObject.secret); // todo : FusionObject.server
+
+	if (fusion_downloadPlaylist(request, &root) != 0) {
+		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets FUSION_ERR_JUSTWAIT.\n",   __FILE__, __LINE__);
+		return -1;
+	}
+
+	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
+	if (jsonLogo){
+		FusionObject.logoCount = cJSON_GetArraySize(jsonLogo);
+		if (FusionObject.logoCount > FUSION_MAX_LOGOS){
+			FusionObject.logoCount = FUSION_MAX_LOGOS;
+		}
+		pthread_mutex_lock(&FusionObject.mutexLogo);
+		for (i=0; i<FusionObject.logoCount; i++){
+			cJSON * jsonItem = cJSON_GetArrayItem(jsonLogo, i);
+			if (!jsonItem || !jsonItem->string || !jsonItem->valuestring) continue;
+
+			if (!strcasecmp(jsonItem->string, FUSION_TOP_LEFT_STR)){
+				FusionObject.logos[i].position = FUSION_TOP_LEFT;
+			}
+			else if (!strcasecmp(jsonItem->string, FUSION_TOP_RIGHT_STR)){
+				FusionObject.logos[i].position = FUSION_TOP_RIGHT;
+			}
+			else if (!strcasecmp(jsonItem->string, FUSION_BOTTOM_LEFT_STR)){
+				FusionObject.logos[i].position = FUSION_BOTTOM_LEFT;
+			}
+			else if (!strcasecmp(jsonItem->string, FUSION_BOTTOM_RIGHT_STR)){
+				FusionObject.logos[i].position = FUSION_BOTTOM_RIGHT;
+			}
+			else continue;
+
+			sprintf (FusionObject.logos[i].url, "%s", jsonItem->valuestring);
+			eprintf ("%s(%d): logo[%d] = %s, position = %d\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].url, FusionObject.logos[i].position);
+
+			char logoPath[PATH_MAX];
+			char cmd[128];
+			sprintf (logoPath, "/tmp/fusion_logo_%d.png", i);
+
+			
+			eprintf ("%s(%d): \n", __FUNCTION__, __LINE__);
+			//sprintf (cmd, "wget \"%s\" -O %s 2>/dev/null", url, logoPath);
+			sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, logoPath);
+			system(cmd);
+		}
+		if (FusionObject.logoCount > 0) sleep(8);
+		pthread_mutex_unlock(&FusionObject.mutexLogo);
+	}
+
+	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
+	if (jsonCreep){
+		cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, 0);
+		if (jsonItem){
+			cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
+			if (jsonText) {
+				cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "pause");
+				if (!jsonPause) FusionObject.pause = FUSION_DEFAULT_CREEP_PAUSE;
+				else {
+					FusionObject.pause = atoi(jsonPause->valuestring);
+				}
+				cJSON * jsonRepeats = cJSON_GetObjectItem(jsonItem, "count");
+				if (!jsonRepeats) FusionObject.repeats = FUSION_DEFAULT_CREEP_REPEATS;
+				else {
+					FusionObject.repeats = atoi(jsonRepeats->valuestring);
+				}
+				sprintf (FusionObject.creepline, "%s", jsonText->valuestring);
+				eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+			}
+		}
+	}
+
+	cJSON_Delete(root);
+	return 0;
+}
+
+void fusion_cleanup()
+{
+	pthread_mutex_destroy(&FusionObject.mutexCreep);
+	pthread_mutex_destroy(&FusionObject.mutexLogo);
 }
 #endif
 
