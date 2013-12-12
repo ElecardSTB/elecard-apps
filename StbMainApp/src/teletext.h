@@ -60,7 +60,7 @@ int32_t teletext_stop(void);
 int32_t teletext_processCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 
 /* Displays teletext */
-void teletext_displayPage(void);
+int teletext_displayPage(void);
 
 int32_t teletext_isTeletextShowing(void);
 uint32_t teletext_isEnable(void);

@@ -41,7 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "stsdk.h"
 
 #include <stdio.h>
-#include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <poll.h>
@@ -139,7 +138,9 @@ typedef struct {
 	uint8_t				global_timestamp[16]; // global TS PCR value
 	background_t			background;			//white or black
 	pthread_mutex_t 		mutex;				//for functions display on screen
+	pthread_t 			thread;
 	bool_t				subtitle;   			// subtiles
+	int32_t 			hash;
 	my_page*				pages[1000];			// Fix: replace structure on the "vt_page"
 } teletextInfo_t;
 
@@ -161,7 +162,6 @@ static int32_t teletext_previousPageNumber(int32_t pageNumber);
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
-pthread_t teletext_thread = 0;
 teletextInfo_t teletextInfo;
 int32_t ttx_pipe = -1;
 
@@ -404,6 +404,8 @@ uint32_t teletext_enable(uint32_t enable)
 void teletext_init(void)
 {
 	pthread_mutex_init(&teletextInfo.mutex, NULL);
+	teletextInfo.thread = 0;
+	teletextInfo.hash = 0;
 	teletextInfo.background = black;
 	teletextInfo.freshCounter = 0;
 	teletextInfo.selectedPage = 100;
@@ -612,7 +614,9 @@ int setLine(unsigned char* data, struct vt_page *cvtp_t)
 					if (!teletextInfo.pages[cvtp->pgno])
 						allocate_memory(&teletextInfo.pages[cvtp->pgno]);
 
+					pthread_mutex_lock(&teletextInfo.mutex);
 					memset(&teletextInfo.pages[cvtp->pgno]->text[1], '\0', 40*24);
+					pthread_mutex_unlock(&teletextInfo.mutex);
 				}
 				cvtp->subtitle = NO;
 				if (	c6) cvtp->subtitle = YES;
@@ -673,7 +677,9 @@ int setLine(unsigned char* data, struct vt_page *cvtp_t)
 			if  (cvtp->lines == 0xFFFFFF || cvtp->subtitle == YES) {
 				if (!teletextInfo.pages[cvtp->pgno])
 					allocate_memory(&teletextInfo.pages[cvtp->pgno]);
+				pthread_mutex_lock(&teletextInfo.mutex);
 				memcpy(&teletextInfo.pages[cvtp->pgno]->text[0][0], cvtp->data, 40*24);
+				pthread_mutex_unlock(&teletextInfo.mutex);
 
 				if (cvtp->subtitle == YES) {
 					for (i = 1; i < 40; i++) {
@@ -825,7 +831,7 @@ void getLinks(char *buffer)
 	teletextInfo.nextPage[0], teletextInfo.nextPage[1], teletextInfo.nextPage[2],	teletextInfo.previousPage);
 }
 
-void teletext_displayPage(void)
+int teletext_displayPage(void)
 {
 	pthread_mutex_lock(&teletextInfo.mutex);
 
@@ -864,9 +870,6 @@ void teletext_displayPage(void)
 	horIndent		= (interfaceInfo.screenWidth - rowCount*symbolWidth)/2;
 	verIndent		= (interfaceInfo.screenHeight - lineCount*symbolHeight)/2 + symbolHeight;
 
-	//clear display
-	gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, teletextInfo.background, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
-
 	teletextInfo.subtitle = UNDEF;
 	if (teletextInfo.pages[teletextInfo.selectedPage]) {
 		curPageTextBuf = teletextInfo.pages[teletextInfo.selectedPage]->text;
@@ -884,11 +887,27 @@ void teletext_displayPage(void)
 			getClock((char *)curPageTextBuf[0]);
 			getLinks((char *)curPageTextBuf[TELETEXT_SYMBOL_LINE_COUNT]);			
 		}
+		int32_t hash_t = 0;
+		int i,j;
+		for(i = beginLine; i <= endLine; i++)
+			for(j = 0; j < rowCount; j++)
+				hash_t += curPageTextBuf[i][j] * ( (i+1)*j+j)+( (i+1)*j+j);
+		
+		if (teletextInfo.hash == hash_t) {
+			pthread_mutex_unlock(&teletextInfo.mutex);
+			return 1;
+		}
+		teletextInfo.hash = hash_t;
+			//clear display
+		gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, teletextInfo.background, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
 	} else {
+		teletextInfo.hash = 0;
+			//clear display
+		gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, teletextInfo.background, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenWidth);
 		//display the number in corner of the screen
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, 0xFF, 0xFF, 0xFF, 0xFF, 2*symbolWidth+horIndent, verIndent-upText, (char*) teletextInfo.numberPage, 0, 0);	
 		pthread_mutex_unlock(&teletextInfo.mutex);
-		return;
+		return 0;
 	}
 	
 	line = beginLine;
@@ -902,10 +921,9 @@ void teletext_displayPage(void)
 		flagDW=0;
 		flagDS=0;
 		box=0;
-
+		if (curPageTextBuf[line][0] == '\0')
+			continue;
 		for(column = 0; column < rowCount; column++) {
-			if (curPageTextBuf[line][column] == '\0')
-				continue;
 			str[0] = curPageTextBuf[line][column];
 
 			if(str[0] < 0x20) {//Special simbols
@@ -1306,6 +1324,7 @@ void teletext_displayPage(void)
 		}
 	}
 	pthread_mutex_unlock(&teletextInfo.mutex);
+	return 0;
 }
 
 static void *teletext_funcThread(void *pArg)
@@ -1519,7 +1538,7 @@ int32_t teletext_start(DvbParam_t *param)
 {
 	int32_t hasTeletext = 0;
 
-	if(teletext_thread != 0) {
+	if(teletextInfo.thread != 0) {
 		return -1;
 	}
 	ttx_pipe = -1;
@@ -1552,7 +1571,7 @@ int32_t teletext_start(DvbParam_t *param)
 	if(hasTeletext == 0 && (ttx_pipe >= 0)) {
 		int32_t st;
 		teletext_init();
-		st = pthread_create(&teletext_thread, NULL, teletext_funcThread, (void *)ttx_pipe);
+		st = pthread_create(&teletextInfo.thread, NULL, teletext_funcThread, (void *)ttx_pipe);
 		if(st != 0) {
 			eprintf("%s: ERROR not create thread\n", __func__);
 			return -4;
@@ -1564,10 +1583,10 @@ int32_t teletext_start(DvbParam_t *param)
 int32_t teletext_stop(void)
 {
 	teletext_destroy();
-	if(teletext_thread) {
-		pthread_cancel(teletext_thread);
-		pthread_join(teletext_thread, NULL);
-		teletext_thread = 0;
+	if(teletextInfo.thread) {
+		pthread_cancel(teletextInfo.thread);
+		pthread_join(teletextInfo.thread, NULL);
+		teletextInfo.thread = 0;
 	}
 	int i;
 	for(i = 0; i < 1000; i++)	{
