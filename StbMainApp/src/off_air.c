@@ -946,8 +946,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 			if(appControlInfo.dvbInfo.channel > 0) {
 				char desc[BUFFER_SIZE];
 				offair_getServiceDescription(current_service(),desc,_T("DVB_CHANNELS"));
-				interface_playControlUpdateDescriptionThumbnail(desc,
-					current_service()->service_descriptor.service_type == 2 ? thumbnail_radio : thumbnail_channels);
+				interface_playControlUpdateDescriptionThumbnail(desc, service_thumbnail(current_service()));
 			}
 		}
 #endif
@@ -1374,7 +1373,7 @@ void offair_displayPlayControl(void)
 			strcpy(buffer, dvb_getServiceName(current_service()));
 			break;
 		  case streamSourceAnalogTV:
-			snprintf(buffer, sizeof(buffer), "TV Program %02d", appControlInfo.tvInfo.id + 1);
+			snprintf(buffer, sizeof(buffer), "%s", analogtv_getServiceName(appControlInfo.tvInfo.id));
 			break;
 		  default:
 			snprintf(buffer, sizeof(buffer), "unknown");
@@ -1923,7 +1922,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_playControlSetInputFocus(inputFocusPlayControl);
 	interface_playControlSetup(offair_play_callback, NULL, buttons, desc,
-		offair_services[channelNumber].service->service_descriptor.service_type == 2 ? thumbnail_radio : thumbnail_channels);
+	                           service_thumbnail(offair_services[channelNumber].service));
 	interface_playControlSetDisplayFunction(offair_displayPlayControl);
 	interface_playControlSetProcessCommand(offair_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, offair_setChannel);
@@ -2066,7 +2065,7 @@ void offair_fillDVBTOutputMenu(int which)
 	{
 		service = offair_services[offair_indeces[i]].service;
 		scrambled = dvb_getScrambled( service );
-		radio = service->service_descriptor.service_type == 2;
+		radio = service_isRadio(service);
 		serviceName = dvb_getServiceName(service);
 
 		switch( appControlInfo.offairInfo.sorting )
@@ -3284,7 +3283,7 @@ void offair_fillDVBTMenu()
 			break;
 		  case streamSourceAnalogTV:
 			hasChannel = 1;
-			snprintf(buf, sizeof(buf), "%s: TV Program %02d", _T("SELECTED_CHANNEL"), appControlInfo.tvInfo.id + 1);
+			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), analogtv_getServiceName(appControlInfo.tvInfo.id));
 			interface_addMenuEntry(dvbtMenu, buf, analogtv_activateChannel, (void *)appControlInfo.tvInfo.id, thumbnail_selected);
 		  default:
 			break;
@@ -3332,7 +3331,7 @@ void offair_fillDVBTMenu()
 		offair_addDVBChannelsToMenu();
 	}
 	if(analogtv_getChannelCount() > 0) {
-		analogtv_addChannelsToMenu(dvbtMenu, dvb_getNumberOfServices());
+		analogtv_addChannelsToMenu(dvbtMenu, offair_serviceCount);
 	}
 
 	if ( offair_epgEnabled() )
@@ -4488,8 +4487,11 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			* */
 		case interfaceCommandInfo:
 		case interfaceCommandGreen:
-			dvb_getServiceDescription(offair_services[channelNumber].service, URL);
-			eprintf("offaie: Channel %d info:\n%s\n", channelNumber, URL);
+			if (menu_entryIsAnalogTv(pMenu, pMenu->selectedItem))
+				analogtv_getServiceDescription(channelNumber, URL, sizeof(URL));
+			else
+				dvb_getServiceDescription(offair_services[channelNumber].service, URL);
+			eprintf("offair: Channel %d info:\n%s\n", channelNumber, URL);
 			interface_showMessageBox(URL, thumbnail_info, 0);
 			return 0;
 		case interfaceCommandEpg:

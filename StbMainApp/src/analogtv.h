@@ -121,8 +121,12 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
 
+const char * analogtv_getServiceName(uint32_t index);
+int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size);
 int32_t analogtv_updateName(uint32_t chanIndex, char* str);
+
 void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
+int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
 void analogtv_addMenuEntry(interfaceMenu_t *pMenu);
 void analogtv_initMenu(interfaceMenu_t *pParent);
 void analogtv_fillMenu(void);

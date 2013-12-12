@@ -39,7 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_ANALOGTV
 
 #include "debug.h"
-#include "list.h"
 #include "app_info.h"
 #include "StbMainApp.h"
 #include "interface.h"
@@ -50,22 +49,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gfx.h"
 #include "off_air.h"
 
-#include <fcntl.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <errno.h>
+#include <cJSON.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <assert.h>
-#include <libgen.h>
-#include <signal.h>
-#include <pthread.h>
-
-#include <poll.h>
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -84,7 +69,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANALOGTV_CONFIG_JSON	CONFIG_DIR "/analog.json"
 
 #define ANALOGTV_UNDEF			"UNDEF"
-
+#define MAX_ANALOG_CHANNELS		128
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -92,7 +77,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef struct {
 	uint32_t frequency;
 	uint16_t customNumber;
-	char customCaption[128];
+	char customCaption[256];
 	char sysEncode[16];
 	char audio[16];
 } analog_service_t;
@@ -101,7 +86,7 @@ typedef struct {
 * EXPORTED DATA                                *
 ************************************************/
 
-analog_service_t 	analogtv_channelParam[128];
+analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
 
 static interfaceListMenu_t AnalogTVOutputMenu;
 static uint32_t		analogtv_channelCount = 0;
@@ -466,9 +451,6 @@ static int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void
 	return -1;
 }
 
-extern int offair_play_callback(interfacePlayControlButton_t button, void *pArg);
-extern void offair_displayPlayControl(void);
-
 //-----------------------------------------------------------------------
 int32_t analogtv_startNextChannel(int32_t direction, void* pArg)
 {
@@ -485,8 +467,6 @@ int32_t analogtv_startNextChannel(int32_t direction, void* pArg)
 	return 0;
 }
 //-----------------------------------------------------------------------
-
-extern int offair_setChannel(int channel, void* pArg);
 
 int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 {
@@ -522,7 +502,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 //	interface_playControlSetAudioCallback(offair_audioChanged);
 	interface_channelNumberShow(appControlInfo.playbackInfo.channel);
 
-//	offair_stopVideo(screenMain, 1);
+	offair_stopVideo(screenMain, 1);
 //	offair_startVideo(screenMain);
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
@@ -544,14 +524,12 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 void analogtv_addMenuEntry(interfaceMenu_t *pMenu)
 {
 	interface_addMenuEntry2(pMenu, _T("ANALOGTV_CHANNELS"), 1, interface_menuActionShowMenu, &AnalogTVOutputMenu, thumbnail_tvstandard);
-	return;
 }
 
 void analogtv_initMenu(interfaceMenu_t *pParent)
 {
 	createListMenu(&AnalogTVOutputMenu, _T("ANALOGTV_CHANNELS"), thumbnail_tvstandard, /*offair_icons*/NULL, pParent,
 		interfaceListMenuIconThumbnail, analogtv_activateMenu, NULL, NULL);
-	return;
 }
 
 uint32_t analogtv_getChannelCount(void)
@@ -585,8 +563,30 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
 		}
 	}
 //	interface_setSelectedItem(channelMenu, selectedMenuItem);
+}
 
-	return;
+int menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index)
+{
+	return pMenu->menuEntry[pMenu->selectedItem].pAction == analogtv_activateChannel;
+}
+
+int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size)
+{
+	if (index >= analogtv_channelCount) {
+		buf[0] = 0;
+		return -1;
+	}
+	snprintf(buf, size, "%s\n%u %s %s",
+		analogtv_channelParam[index].customCaption,
+		analogtv_channelParam[index].frequency/1000000, _T("MHZ"), analogtv_channelParam[index].sysEncode);
+	return 0;
+}
+
+const char * analogtv_getServiceName(uint32_t index)
+{
+	if (index >= analogtv_channelCount)
+		return "";
+	return analogtv_channelParam[index].customCaption;
 }
 
 void analogtv_fillMenu(void)
@@ -601,14 +601,13 @@ void analogtv_fillMenu(void)
 		interface_addMenuEntryDisabled(channelMenu, _T("NO_CHANNELS"), thumbnail_info);
 	}
 	for(i = 0; i < analogtv_channelCount; i++) {
-		char channelEntry[32];
-
-		sprintf(channelEntry, "TV Program %02d", i + 1);
-		interface_addMenuEntry(channelMenu, channelEntry, analogtv_activateChannel, (void*)(analogtv_channelParam[i].frequency), thumbnail_tvstandard);
+		interface_addMenuEntry(channelMenu,
+							   analogtv_channelParam[i].customCaption,
+							   analogtv_activateChannel,
+							   (void*)analogtv_channelParam[i].frequency,
+							   thumbnail_tvstandard);
 	}
 //	interface_setSelectedItem(channelMenu, selectedMenuItem);
-
-	return;
 }
 
 #endif /* ENABLE_ANALOGTV */

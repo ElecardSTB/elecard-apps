@@ -247,6 +247,15 @@ int  offair_getIndex(int index);
 
 int  offair_getServiceIndex(EIT_service_t *service);
 
+static inline int service_isRadio(const EIT_service_t *service) {
+	return service->service_descriptor.service_type == 2;
+}
+
+static inline int service_thumbnail(const EIT_service_t *service)
+{
+	return service_isRadio(service) ? thumbnail_radio : thumbnail_channels;
+}
+
 // Returns -1 if no tuner supporting service media type is found, tunerFormat otherwise
 int offair_findCapableTuner(EIT_service_t *service);
 
@@ -265,6 +274,14 @@ int  offair_epgEnabled(void);
 int  offair_frequencyMonitor(interfaceMenu_t *pMenu, void* pArg);
 
 int  offair_checkForUpdates(void);
+
+int  offair_setChannel(int channel, void* pArg);
+
+// DVB or Analog channel number suitable for offair_setChannel()
+int  offair_getCurrentChannel(void);
+
+int offair_play_callback(interfacePlayControlButton_t button, void *pArg);
+void offair_displayPlayControl(void);
 
 #endif /* ENABLE_DVB */
 

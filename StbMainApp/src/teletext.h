@@ -73,10 +73,12 @@ uint32_t teletext_enable(uint32_t enable);
 #define teletext_start(...)
 #define teletext_stop(...)
 #define teletext_processCommand(...)	-1
-#define teletext_displayPage(...)
+//#define teletext_displayPage(...)		do {} while(0)
 #define teletext_isTeletextShowing()	0
 #define teletext_isEnable()				0
 #define teletext_enable(...)
+
+int32_t teletext_displayPage(void) {return 0;}
 
 #endif //ENABLE_TELETEXT
 

@@ -1940,7 +1940,7 @@ static void interface_animateMenu(int flipFB, int animate)
 	mysem_get(interface_semaphore);
 
 	if(teletext_isEnable()) {
-		if ( teletext_displayPage() == 1 ){
+		if(teletext_displayPage() != 0) {
 			mysem_release(interface_semaphore);
 			return;
 		}
