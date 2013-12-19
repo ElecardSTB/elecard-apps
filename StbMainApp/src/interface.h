@@ -562,6 +562,7 @@ typedef struct
 	/** alternative thumbnail
 	 * NB: interface_ functions not allocates, nor frees the image. */
 	char                     *image;
+	int id;
 } interfaceMenuEntry_t;
 
 typedef struct
@@ -1778,6 +1779,20 @@ void interface_listMenuGetItemInfo(interfaceListMenu_t *pListMenu,
                                    int* itemHeight, int* maxVisibleItems);
 
 int  interface_symbolLookup( int num, int repeat, int *offset );
+
+//functions for changing
+int interface_setMenuEntryId(interfaceMenuEntry_t *pMenuEntry, int entryId);
+interfaceMenuEntry_t * interface_getMenuEntry(interfaceMenu_t *pMenu, int entryId);
+
+int  interface_changeMenuEntryInfo(interfaceMenuEntry_t *pMenuEntry, char *data, size_t dataSize);
+int  interface_changeMenuEntryType(interfaceMenuEntry_t *pMenuEntry, interfaceMenuEntryType_t type);
+int  interface_changeMenuEntryArgs(interfaceMenuEntry_t *pMenuEntry, void *pArg);
+int  interface_changeMenuEntryFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pFunc);
+int  interface_changeMenuEntrySelectedFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pSelectedFunc);
+int  interface_changeMenuEntryDeselectedFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pDeselectedFunc);
+int  interface_changeMenuEntryDisplay(interfaceMenuEntry_t *pMenuEntry, menuEntryDisplayFunction pDisplay);
+int  interface_changeMenuEntrySelectable(interfaceMenuEntry_t *pMenuEntry, int isSelectable);
+int  interface_changeMenuEntryThumbnail(interfaceMenuEntry_t *pMenuEntry, int thumbnail);
 
 /** Draw current time in bottom right corner
  * @param[in] detached If true, draw rounded corners on top, if false - draw solid rectangle (clock will be part of standard list menu) 

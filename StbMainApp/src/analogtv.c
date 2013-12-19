@@ -504,7 +504,8 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 
 	offair_stopVideo(screenMain, 1);
 //	offair_startVideo(screenMain);
-	offair_fillDVBTMenu();
+// 	offair_fillDVBTMenu();
+	offair_fillMenuEntry();
 	offair_fillDVBTOutputMenu(screenMain);
 //	saveAppSettings();
 

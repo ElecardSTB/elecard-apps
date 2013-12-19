@@ -99,6 +99,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define WIZARD_UPDATE_INTERVAL (100)
 #endif
 
+#define CHANNEL_STATUS_ID 1
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
@@ -762,7 +763,8 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 		if (ok) {
 			interface_refreshMenu(pMenu);
 			output_showDVBMenu(pMenu, NULL);
-			offair_fillDVBTMenu();
+// 			offair_fillDVBTMenu();
+			offair_fillMenuEntry();
 			offair_fillDVBTOutputMenu(which);
 #ifdef ENABLE_PVR
 			pvr_updateSettings();
@@ -1583,7 +1585,8 @@ void offair_startVideo(int which)
 		dvb_frequencyScan(appControlInfo.dvbInfo.tuner,
 			 current_service()->media.frequency,
 			&current_service()->media, NULL, NULL, 1, NULL);
-		offair_fillDVBTMenu();
+// 		offair_fillDVBTMenu();
+		offair_fillMenuEntry();
 		offair_fillDVBTOutputMenu(screenMain);
 		interface_hideMessageBox();
 	}
@@ -1931,7 +1934,8 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 
 	offair_startVideo(screenMain);
-	offair_fillDVBTMenu();
+// 	offair_fillDVBTMenu();
+	offair_fillMenuEntry();
 	saveAppSettings();
 
 	if ( appControlInfo.dvbInfo.active != 0 )
@@ -3248,6 +3252,68 @@ int offair_epgEnabled()
 	return 0;
 }
 
+void offair_fillMenuEntry()
+{
+	char  buf[MENU_ENTRY_INFO_LENGTH];
+
+	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
+
+	int hasChannel = 0;
+	interfaceMenuEntry_t *dvbtEntry = interface_getMenuEntry(dvbtMenu, CHANNEL_STATUS_ID);
+	if (dvbtEntry == NULL) {
+		offair_fillDVBTMenu();
+	}
+#ifdef ENABLE_PVR
+	if (pvr_isRecordingDVB())
+	{
+		char *str = dvb_getTempServiceName(appControlInfo.pvrInfo.dvb.channel);
+		if (str == NULL)
+			str = _T("NOT_AVAILABLE_SHORT");
+		snprintf(buf, sizeof(buf), "%s: %s", _T("RECORDING"), str);
+		interface_addMenuEntry(dvbtMenu, buf, offair_stopRecording, NULL, thumbnail_recording);
+		interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
+		interface_changeMenuEntryArgs(dvbtEntry, NULL);
+		interface_changeMenuEntryFunc(dvbtEntry, offair_stopRecording);
+		interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_recording);
+		interface_changeMenuEntrySelectable(dvbtEntry, 1);
+	} else
+#endif
+	{
+		switch(appControlInfo.playbackInfo.streamSource) {
+		  case streamSourceDVB:
+			hasChannel = 	(appControlInfo.dvbInfo.channel > 0) &&
+							(appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) &&
+							(appControlInfo.dvbInfo.channel <= offair_serviceCount) &&
+							(current_service() != NULL);
+			if(hasChannel) {
+				snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), dvb_getServiceName(current_service()));
+				interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
+				interface_changeMenuEntryArgs(dvbtEntry, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
+				interface_changeMenuEntryFunc(dvbtEntry, offair_channelChange);
+				interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
+				interface_changeMenuEntrySelectable(dvbtEntry, 1);
+			}
+			break;
+		  case streamSourceAnalogTV:
+			hasChannel = 1;
+			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), analogtv_getServiceName(appControlInfo.tvInfo.id));
+			interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
+			interface_changeMenuEntryArgs(dvbtEntry, (void *)appControlInfo.tvInfo.id);
+			interface_changeMenuEntryFunc(dvbtEntry, analogtv_activateChannel);
+			interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
+			interface_changeMenuEntrySelectable(dvbtEntry, 1);
+		  default:
+			break;
+		}
+		if(!hasChannel) {
+			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), _T("NONE"));
+			interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
+			interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_not_selected);
+			interface_changeMenuEntrySelectable(dvbtEntry, 0);
+		}
+	}
+}
+
 void offair_fillDVBTMenu()
 {
 	char  buf[MENU_ENTRY_INFO_LENGTH];
@@ -3293,7 +3359,7 @@ void offair_fillDVBTMenu()
 			interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_not_selected);
 		}
 	}
-
+	interface_setMenuEntryId(&dvbtMenu->menuEntry[dvbtMenu->menuEntryCount-1], CHANNEL_STATUS_ID);
 #ifndef HIDE_EXTRA_FUNCTIONS
 	switch ( dvb_getType(0) )  // Assumes same type FEs
 	{

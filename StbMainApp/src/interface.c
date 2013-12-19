@@ -5253,6 +5253,80 @@ int interface_addMenuEntryCustom(interfaceMenu_t *pMenu,
 	return -1;
 }
 
+int interface_setMenuEntryId(interfaceMenuEntry_t *pMenuEntry, int entryId)
+{
+	if (entryId < 0) {
+		return -1;
+	}
+	pMenuEntry->id = entryId;
+	return 0;
+}
+
+interfaceMenuEntry_t * interface_getMenuEntry(interfaceMenu_t *pMenu, int entryId)
+{
+	int i;
+	for (i = 0; i < pMenu->menuEntryCount; i++) {
+		if (pMenu->menuEntry[i].id == entryId) {
+			return &pMenu->menuEntry[i];
+		}
+	}
+	return NULL;
+}
+
+int  interface_changeMenuEntryInfo(interfaceMenuEntry_t *pMenuEntry, char *data, size_t dataSize)
+{
+	dataSize = dataSize > MENU_ENTRY_INFO_LENGTH-1 ? MENU_ENTRY_INFO_LENGTH-1 : dataSize;
+	strcpy(pMenuEntry->info, data);
+	/* enshure there's zero at the end of a string */
+	pMenuEntry->info[dataSize+1] = 0;
+	if (pMenuEntry->infoReplacedChar != 0 &&
+	    pMenuEntry->infoReplacedCharPos < (int)dataSize)
+		data[pMenuEntry->infoReplacedCharPos] = pMenuEntry->infoReplacedChar;
+	return 0;
+}
+
+int  interface_changeMenuEntryType(interfaceMenuEntry_t *pMenuEntry, interfaceMenuEntryType_t type)
+{
+	pMenuEntry->type = type;
+	return 0;
+}
+
+int  interface_changeMenuEntryArgs(interfaceMenuEntry_t *pMenuEntry, void *pArg)
+{
+	pMenuEntry->pArg = pArg;
+	return 0;
+}
+int  interface_changeMenuEntryFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pFunc)
+{
+	pMenuEntry->pAction = pFunc;
+	return 0;
+}
+int  interface_changeMenuEntrySelectedFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pSelectedFunc)
+{
+	pMenuEntry->pSelectedAction = pSelectedFunc;
+	return 0;
+}
+int  interface_changeMenuEntryDeselectedFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pDeselectedFunc)
+{
+	pMenuEntry->pDeselectedAction = pDeselectedFunc;
+	return 0;
+}
+int  interface_changeMenuEntryDisplay(interfaceMenuEntry_t *pMenuEntry, menuEntryDisplayFunction pDisplay)
+{
+	pMenuEntry->pDisplay = pDisplay ? pDisplay : interface_menuEntryDisplay;
+	return 0;
+}
+int  interface_changeMenuEntrySelectable(interfaceMenuEntry_t *pMenuEntry, int isSelectable)
+{
+	pMenuEntry->isSelectable = isSelectable;
+	return 0;
+}
+int  interface_changeMenuEntryThumbnail(interfaceMenuEntry_t *pMenuEntry, int thumbnail)
+{
+	pMenuEntry->thumbnail = thumbnail;
+	return 0;
+}
+
 void interface_clearMenuEntries(interfaceMenu_t *pMenu)
 {
 	pMenu->menuEntryCount = 0;

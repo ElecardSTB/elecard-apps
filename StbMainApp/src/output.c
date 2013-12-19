@@ -6226,7 +6226,8 @@ void output_fillOutputMenu(void)
 
 #ifdef ENABLE_DVB
 #ifdef HIDE_EXTRA_FUNCTIONS
-	if ( offair_tunerPresent() )
+	if (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
+				appControlInfo.tunerInfo[1].status != tunerNotPresent)
 #endif
 	{
 		str = _T("DVB_CONFIG");
