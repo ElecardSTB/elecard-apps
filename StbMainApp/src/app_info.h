@@ -145,7 +145,9 @@ typedef enum
 	streamSourceYoutube,
 	streamSourceRutube,
 	streamSourceAnalogTV,
-	streamSources
+	streamSourceInput,
+
+	streamSources, //count of sources
 } stb810_streamSource;
 
 #define STREAM_SOURCE_NAMES { \
@@ -159,6 +161,7 @@ typedef enum
 	"YouTube", \
 	"Rutube", \
 	"AnalogTV", \
+	"Input", \
 	}
 
 /* Trick Mode Speeds */
