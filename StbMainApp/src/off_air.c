@@ -3243,7 +3243,7 @@ static int  offair_stopRecording(interfaceMenu_t *pMenu, void *pArg)
 }
 #endif
 
-int offair_epgEnabled()
+int offair_epgEnabled(void)
 {
 	int i;
 	for( i = 0; i < offair_serviceCount; ++i )
@@ -3252,7 +3252,7 @@ int offair_epgEnabled()
 	return 0;
 }
 
-void offair_fillMenuEntry()
+void offair_fillMenuEntry(void)
 {
 	char  buf[MENU_ENTRY_INFO_LENGTH];
 

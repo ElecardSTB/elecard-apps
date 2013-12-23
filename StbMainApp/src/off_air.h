@@ -265,6 +265,8 @@ int  offair_getCurrentServiceIndex(int which);
 
 EIT_service_t* offair_getService(int index);
 
+void offair_fillMenuEntry(void);
+
 void offair_fillDVBTMenu(void);
 
 void offair_fillDVBTOutputMenu(int which);
