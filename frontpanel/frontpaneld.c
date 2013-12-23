@@ -201,6 +201,7 @@ int32_t FrameBufferInit(void)
 void FrameBufferClose(void)
 {
 	close(g_fbInfo.fd);
+	g_fbInfo.fd = 0;
 }
 
 void UpdateDisplay(void)
@@ -638,29 +639,24 @@ void *PulseThread(void *arg)
 	return NULL;
 }
 
-void *FBTestThread(void *arg)
+void *FBTestThread()
 {
-	FILE *OLED_fb;
-	unsigned char buffer[FRAMEBUFFER_SIZE];
-
-	OLED_fb = arg;
-
 	while(1) {
 		unsigned int i;
 		
-		for (i = 0; i < FRAMEBUFFER_SIZE; i++) buffer[i] = 0x00;
+		for (i = 0; i < FRAMEBUFFER_SIZE; i++) g_fbInfo.mask[i] = 0xFF;
 		pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
-		fwrite(buffer, FRAMEBUFFER_SIZE, 1, OLED_fb);
-		SetBrightness(0);
-		pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
-		usleep(1000000);
-
-		for (i = 0; i < FRAMEBUFFER_SIZE; i++) buffer[i] = 0xFF;
-		pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
-		fwrite(buffer, FRAMEBUFFER_SIZE, 1, OLED_fb);
+		UpdateDisplay();
 		SetBrightness(8);
 		pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
-		usleep(1000000);
+		usleep(2000000);
+
+		for (i = 0; i < FRAMEBUFFER_SIZE; i++) g_fbInfo.mask[i] = 0x00;
+		pthread_setcancelstate_my(PTHREAD_CANCEL_DISABLE);
+		UpdateDisplay();
+		SetBrightness(0);
+		pthread_setcancelstate_my(PTHREAD_CANCEL_ENABLE);
+		usleep(2000000);
 	}
 	
 	return NULL;
@@ -794,7 +790,6 @@ static int ArgHandler_Test(char *input, char *output)
 	int					enable;
 	static int			testStarted = 0;
 	static pthread_t	test_thread;
-	static FILE			*fb_fd = NULL;
 
 	(void)output;
 
@@ -812,17 +807,13 @@ static int ArgHandler_Test(char *input, char *output)
 						fwrite(buffer, 1, 8, f);  //Light all 8 LEDs
 						fclose(f);
 				}
-	
-				if(fb_fd == NULL) {
-					fb_fd = fopen(g_framebuffer_name, "w"); //Open OLED FB to write 
-	
-				}
 				
-				if(pthread_create(&test_thread, NULL, FBTestThread, fb_fd)) {
+				if(pthread_create(&test_thread, NULL, FBTestThread, NULL)) {
 					perror("server: FBTestThread");
 				} else {
 					testStarted = 1;
 					g_timeEnabled = false;     //disable show time
+					ShowTime();			       //apply enable/disable displaying time
 				}
 	
 	
@@ -832,13 +823,8 @@ static int ArgHandler_Test(char *input, char *output)
 				pthread_cancel(test_thread);
 				pthread_join(test_thread, NULL);
 				testStarted = 0;
-	
-				if(fb_fd) {
-					fclose(fb_fd);         //Close OLED FB to write 
-					fb_fd = NULL;
-				}
-	
 				g_timeEnabled = true;      //enable show time 
+				ShowTime();			       //apply enable/disable displaying time
 			}
 			SetBrightness(g_brightness);
 		}
