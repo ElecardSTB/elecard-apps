@@ -150,6 +150,7 @@ typedef struct _offair_multiviewInstance_t {
 
 #ifdef ENABLE_DVB
 
+static void offair_servicesRenumbering(void);
 static void offair_initIndeces(void);
 static void offair_exportServices(const char* filename);
 static void offair_setStateCheckTimer(int which, int bEnable);
@@ -763,8 +764,7 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 		if (ok) {
 			interface_refreshMenu(pMenu);
 			output_showDVBMenu(pMenu, NULL);
-// 			offair_fillDVBTMenu();
-			offair_fillMenuEntry();
+			offair_fillDVBTMenu();
 			offair_fillDVBTOutputMenu(which);
 #ifdef ENABLE_PVR
 			pvr_updateSettings();
@@ -1960,7 +1960,8 @@ static void offair_addDVBChannelsToMenu()
 	char lastChar = 0, curChar, *serviceName, *str;
 
 	interfaceMenu_t *channelMenu = _M &DVBTMenu;
-
+	offair_servicesRenumbering();
+	offair_fillMenuEntry();
 	int selectedMenuItem = MENU_ITEM_BACK;
 	for (int i = 0; i < offair_indexCount; ++i )
 	{
@@ -3622,6 +3623,29 @@ void offair_initIndeces()
 		{
 			offair_indeces[offair_indexCount++] = i;
 		}
+}
+
+void offair_servicesRenumbering()
+{
+	service_index_t service[MAX_MEMORIZED_SERVICES];
+	BOOL chk = 0;
+	int i, old_count = offair_serviceCount;
+	for(i = 0; i < old_count; ++i) {
+		service[i].service = NULL;
+	}
+	old_count = 1;
+	for(i = 0; i < offair_serviceCount; ++i) {
+		service[old_count] = offair_services[offair_indeces[i]];
+		if ((!chk) && (appControlInfo.dvbInfo.channel == offair_indeces[i])) {
+			appControlInfo.dvbInfo.channel = old_count;
+			chk = 1;
+		}
+		offair_indeces[i] = old_count;
+		old_count++;
+	}
+	for(i = 0; i < offair_serviceCount; ++i) {
+		offair_services[i] = service[i];
+	}
 }
 
 void offair_initServices()
