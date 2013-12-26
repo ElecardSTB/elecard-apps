@@ -1955,7 +1955,7 @@ static void offair_addDVBChannelsToMenu()
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 	EIT_service_t *service;
 	serviceMediaType_t lastDelSys = serviceMediaNone;
-	int radio, scrambled, type = -1;
+	int radio, scrambled;
 	__u32 lastFreqency = 0, serviceFrequency;
 	char lastChar = 0, curChar, *serviceName, *str;
 
@@ -1963,6 +1963,8 @@ static void offair_addDVBChannelsToMenu()
 	offair_servicesRenumbering();
 	offair_fillMenuEntry();
 	int selectedMenuItem = MENU_ITEM_BACK;
+
+	interface_addMenuEntryDisabled(channelMenu, "DVB", 0);
 	for (int i = 0; i < offair_indexCount; ++i )
 	{
 		service = offair_services[offair_indeces[i]].service;
@@ -1970,58 +1972,6 @@ static void offair_addDVBChannelsToMenu()
 		radio = service->service_descriptor.service_type == 2;
 		serviceName = dvb_getServiceName(service);
 
-		switch( appControlInfo.offairInfo.sorting )
-		{
-		case serviceSortAlpha:
-			if( serviceName == NULL )
-				break;
-			curChar = toupper( *serviceName );
-			if( curChar != lastChar )
-			{
-				channelEntry[0] = lastChar = curChar;
-				channelEntry[1] = 0;
-				interface_addMenuEntryDisabled(channelMenu, channelEntry, 0 );
-			}
-			break;
-		case serviceSortType:
-			if( type != radio )
-			{
-				type = radio;
-				str = _T( type ? "RADIO" : "TV" );
-				interface_addMenuEntryDisabled(channelMenu, str, 0 );
-			}
-			break;
-		case serviceSortFreq:
-			if(dvb_getServiceFrequency(service, &serviceFrequency) != 0) {
-				break;
-			}
-			
-			if( (lastFreqency != serviceFrequency) ||
-				(lastDelSys != service->media.type) )
-			{
-				uint32_t divider = MHZ;
-				char *deliverySystemName[] = {
-					[serviceMediaNone] = "none",
-					[serviceMediaDVBT] = "DVB-T",
-					[serviceMediaDVBC] = "DVB-C",
-					[serviceMediaDVBS] = "DVB-S",
-					[serviceMediaMulticast] = "multicast",
-					[serviceMediaATSC] = "ATSC",
-				};
-
-				lastFreqency = serviceFrequency;
-				lastDelSys = service->media.type;
-
-				if(lastDelSys == serviceMediaDVBS) {
-					divider = KHZ;
-				}
-				sprintf(channelEntry, "%s: %lu %s", deliverySystemName[lastDelSys], (long unsigned int)lastFreqency / divider, _T("MHZ"));
-				interface_addMenuEntryDisabled(channelMenu, channelEntry, 0 );
-			}
-			break;
-		default:
-			break;
-		}
 		if (appControlInfo.dvbInfo.channel == offair_indeces[i])
 			selectedMenuItem = interface_getMenuEntryCount(channelMenu);
 
@@ -2073,37 +2023,7 @@ void offair_fillDVBTOutputMenu(int which)
 		radio = service_isRadio(service);
 		serviceName = dvb_getServiceName(service);
 
-		switch( appControlInfo.offairInfo.sorting )
-		{
-		case serviceSortAlpha:
-			if( serviceName == NULL )
-				break;
-			curChar = toupper( *serviceName );
-			if( curChar != lastChar )
-			{
-				channelEntry[0] = lastChar = curChar;
-				channelEntry[1] = 0;
-				interface_addMenuEntryDisabled(channelMenu, channelEntry, 0 );
-			}
-			break;
-		case serviceSortType:
-			if( type != radio )
-			{
-				type = radio;
-				str = _T( type ? "RADIO" : "TV" );
-				interface_addMenuEntryDisabled(channelMenu, str, 0 );
-			}
-			break;
-		case serviceSortFreq:
-			if( dvb_getServiceFrequency( service, &serviceFrequency ) == 0 && serviceFrequency != lastFreqency)
-			{
-				lastFreqency = serviceFrequency;
-				sprintf( channelEntry, "%lu %s", (long unsigned int)lastFreqency / MHZ, _T("MHZ") );
-				interface_addMenuEntryDisabled(channelMenu, channelEntry, 0 );
-			}
-			break;
-		default: ;
-		}
+		interface_addMenuEntryDisabled(channelMenu, "DVB", 0 );
 		if (appControlInfo.dvbInfo.channel == offair_indeces[i])
 			selectedMenuItem = interface_getMenuEntryCount(channelMenu);
 
@@ -3260,9 +3180,11 @@ void offair_fillMenuEntry(void)
 	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
 
 	int hasChannel = 0;
+	int selectedMenuItem = MENU_ITEM_BACK; 
 	interfaceMenuEntry_t *dvbtEntry = interface_getMenuEntry(dvbtMenu, CHANNEL_STATUS_ID);
 	if (dvbtEntry == NULL) {
 		offair_fillDVBTMenu();
+		return;
 	}
 #ifdef ENABLE_PVR
 	if (pvr_isRecordingDVB())
@@ -3293,6 +3215,7 @@ void offair_fillMenuEntry(void)
 				interface_changeMenuEntryFunc(dvbtEntry, offair_channelChange);
 				interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
 				interface_changeMenuEntrySelectable(dvbtEntry, 1);
+				selectedMenuItem = appControlInfo.dvbInfo.channel + 1;//shift on 1 becouse there are 1 disabled entry (DVB)
 			}
 			break;
 		  case streamSourceAnalogTV:
@@ -3303,6 +3226,7 @@ void offair_fillMenuEntry(void)
 			interface_changeMenuEntryFunc(dvbtEntry, analogtv_activateChannel);
 			interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
 			interface_changeMenuEntrySelectable(dvbtEntry, 1);
+			selectedMenuItem = offair_indexCount + appControlInfo.tvInfo.id + 3; //shift on 3 becouse there are 3 disabled entry(DVB, ANALOGTV and start if f)
 		  default:
 			break;
 		}
@@ -3313,6 +3237,7 @@ void offair_fillMenuEntry(void)
 			interface_changeMenuEntrySelectable(dvbtEntry, 0);
 		}
 	}
+	interface_setSelectedItem(dvbtMenu, selectedMenuItem);
 }
 
 void offair_fillDVBTMenu()
@@ -3398,7 +3323,7 @@ void offair_fillDVBTMenu()
 		offair_addDVBChannelsToMenu();
 	}
 	if(analogtv_getChannelCount() > 0) {
-		analogtv_addChannelsToMenu(dvbtMenu, offair_serviceCount);
+		analogtv_addChannelsToMenu(dvbtMenu, offair_indexCount);
 	}
 
 	if ( offair_epgEnabled() )
@@ -3700,6 +3625,7 @@ void offair_clearServices()
 	memset( &offair_services, 0, sizeof(offair_services[0])*offair_serviceCount );
 	offair_services[0].service = NULL;
 	offair_services[0].common.media_id = (unsigned long)-1;
+	offair_fillDVBTMenu();
 }
 
 void offair_clearServiceList(int permanent)
@@ -3715,6 +3641,7 @@ void offair_clearServiceList(int permanent)
 #if (defined ENABLE_PVR) && (defined STBPNX)
 	pvr_purgeDVBRecords();
 #endif
+	offair_fillDVBTMenu();
 }
 
 static void offair_swapServices(int first, int second)

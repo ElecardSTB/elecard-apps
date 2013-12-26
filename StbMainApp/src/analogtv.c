@@ -553,7 +553,14 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
 	interface_addMenuEntryDisabled(pMenu, "AnalogTV", 0);
 	for(i = 0; i < analogtv_channelCount; i++) {
 		char channelEntry[32];
-		sprintf(channelEntry, "%02d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
+
+		if (analogtv_channelCount < 10)
+			sprintf(channelEntry, "%d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
+		else if (analogtv_channelCount < 100)
+			sprintf(channelEntry, "%02d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
+		else
+			sprintf(channelEntry, "%03d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
+
 		interface_addMenuEntry(pMenu, channelEntry, analogtv_activateChannel, (void *)i, thumbnail_tvstandard);
 		interface_setMenuEntryLabel(&pMenu->menuEntry[pMenu->menuEntryCount-1], "ANALOG");
 
