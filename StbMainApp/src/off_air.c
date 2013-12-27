@@ -2018,6 +2018,7 @@ void offair_fillDVBTOutputMenu(int which)
 
 	interfaceMenu_t *channelMenu = _M &DVBTOutputMenu;
 	interface_clearMenuEntries(channelMenu);
+	interface_addMenuEntryDisabled(channelMenu, "DVB", 0 );
 
 	//dprintf("%s: got %d channels for layer %d\n", __FUNCTION__, dvb_getNumberOfChannels(), which);
 
@@ -2029,7 +2030,6 @@ void offair_fillDVBTOutputMenu(int which)
 		radio = service_isRadio(service);
 		serviceName = dvb_getServiceName(service);
 
-		interface_addMenuEntryDisabled(channelMenu, "DVB", 0 );
 		if (appControlInfo.dvbInfo.channel == offair_indeces[i])
 			selectedMenuItem = interface_getMenuEntryCount(channelMenu);
 
