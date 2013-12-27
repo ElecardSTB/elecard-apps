@@ -937,8 +937,14 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	} else if ( button == interfacePlayControlPlay )
 	{
 		dprintf("%s: play\n", __FUNCTION__);
-		if (!appControlInfo.dvbInfo.active)
-			offair_startVideo(which);
+		if (!appControlInfo.dvbInfo.active) {
+			if (appControlInfo.playbackInfo.streamSource == streamSourceDVB) {
+				offair_startVideo(which);
+			} else if (appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV) {
+				interfaceMenu_t *channelMenu = _M &DVBTMenu;
+				analogtv_activateChannel(channelMenu, appControlInfo.tvInfo.id);
+			}
+		}
 	} else if ( button == interfacePlayControlStop )
 	{
 		dprintf("%s: stop\n", __FUNCTION__);
