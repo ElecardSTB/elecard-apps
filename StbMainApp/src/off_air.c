@@ -2022,6 +2022,8 @@ void offair_fillDVBTOutputMenu(int which)
 
 	//dprintf("%s: got %d channels for layer %d\n", __FUNCTION__, dvb_getNumberOfChannels(), which);
 
+	offair_initServices();
+
 	int selectedMenuItem = MENU_ITEM_BACK;
 	for (int i = 0; i < offair_indexCount; ++i )
 	{
