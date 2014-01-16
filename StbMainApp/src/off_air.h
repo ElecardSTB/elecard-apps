@@ -308,4 +308,6 @@ int  offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg);
 int  offair_startPvrVideo(int which);
 #endif
 
+void offair_activateChannelMenu(void);
+
 #endif /* __OFF_AIR_H      Do not add any thing below this line */

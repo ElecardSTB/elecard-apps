@@ -3346,6 +3346,11 @@ void offair_fillDVBTMenu()
 #endif
 }
 
+void offair_activateChannelMenu(void)
+{
+	interface_menuActionShowMenu((interfaceMenu_t *)&DVBTMenu, (interfaceMenu_t *)&DVBTMenu);
+}
+
 #define MAX_SEARCH_STACK 32
 
 typedef int (*list_comp_func)(list_element_t *, list_element_t *);

@@ -71,6 +71,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANALOGTV_UNDEF			"UNDEF"
 #define MAX_ANALOG_CHANNELS		128
 
+#define TV_STATION_FULL_LIST "/var/etc/tvstations.txt"
+#define TV_STATION_FOUND_LIST "/var/etc/tvstationsnew.txt"
+
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
@@ -82,6 +85,17 @@ typedef struct {
 	char audio[16];
 } analog_service_t;
 
+typedef struct _short_chinfo {
+	char name[50];
+	uint32_t id;
+} short_chinfo;
+
+typedef struct _full_chinfo {
+	char name[50];
+	uint32_t id;
+	uint32_t freq;
+} full_chinfo;
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
@@ -90,6 +104,12 @@ analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
 
 static interfaceListMenu_t AnalogTVOutputMenu;
 static uint32_t		analogtv_channelCount = 0;
+
+static interfaceListMenu_t AnalogTVChannelMenu;
+static short_chinfo full_service_list[2048];
+static full_chinfo found_service_list[2048];
+static uint32_t found_servise_count = 0;
+static uint32_t full_servise_count = 0;
 
 analogtv_freq_range_t analogtv_range = {MIN_FREQUENCY_HZ / 1000, MAX_FREQUENCY_HZ / 1000};
 
@@ -294,7 +314,7 @@ static int32_t analogtv_saveConfigFile(void)
 
 int32_t analogtv_updateName(uint32_t chanIndex, char* str)
 {
-	if(str) {
+	if(!str) {
 		dprintf("%s(): Wrong name\n", __func__);
 		return -1;
 	}
@@ -323,6 +343,121 @@ int32_t analogtv_updateName(uint32_t chanIndex, char* str)
 // }
 
 #define RPC_ANALOG_SCAN_TIMEOUT      (180)
+
+static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
+{
+	uint32_t i;
+	uint8_t in_list = 0;
+
+	//rename service and update menu list
+	analogtv_updateName(appControlInfo.tvInfo.id, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name);
+	offair_fillDVBTMenu();
+
+	//hide menu and activate menu of all channels
+	interface_showMenu(0, 1);
+	offair_activateChannelMenu();
+
+	//update list of renaming channels
+	for(i = 0; i < found_servise_count; i++) {
+		if(found_service_list[i].freq == analogtv_channelParam[appControlInfo.tvInfo.id].frequency) {
+			in_list = 1;
+			break;
+		}
+	}
+
+	if(in_list) {	//if this channel exist in list
+		found_service_list[i].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
+		strncpy(found_service_list[i].name, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name, sizeof(found_service_list[i].name));
+	} else {		//if this channel not exist in list, then add it to list
+		found_service_list[found_servise_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
+		strncpy(	found_service_list[found_servise_count].name, 
+			full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name,
+			sizeof(found_service_list[found_servise_count].name));
+		found_service_list[found_servise_count].freq = analogtv_channelParam[appControlInfo.tvInfo.id].frequency;
+		found_servise_count++;
+	}
+
+	//save renaming channel list to file
+	FILE *file = fopen(TV_STATION_FOUND_LIST, "w");
+	if (file!=NULL) {
+		for(i = 0; i < found_servise_count; i++) {
+			fprintf(file ,"%d %d %s\n", found_service_list[i].id, found_service_list[i].freq, found_service_list[i].name);
+		}
+		fclose(file);
+	}
+
+	return 0;
+}
+
+static int32_t analogtv_menuServicesInit()
+{
+	interfaceMenu_t *tvMenu = _M &AnalogTVChannelMenu;
+	FILE *file;
+	char buf[256], chname[50];
+	uint32_t chid;
+	interface_clearMenuEntries(tvMenu);
+
+	//read full channel list from file
+	file = fopen(TV_STATION_FULL_LIST, "r");
+	full_servise_count = 0;
+	if (file!=NULL) {
+		while(!feof(file)) {
+		      if(fscanf(file, "%d;", &chid) == 0) {
+			      fgets(chname, sizeof(chname), file);
+			      chname[strlen(chname)-2] = '\0';
+
+			      strncpy(full_service_list[full_servise_count].name, chname, sizeof(full_service_list[full_servise_count].name));
+			      full_service_list[full_servise_count].id = chid;
+
+			      snprintf(buf, sizeof(buf), "%d. %s", chid, chname);
+			      interface_addMenuEntry(tvMenu, buf, analogtv_renameFromList, NULL, thumbnail_channels);
+			      full_servise_count++;
+		      }
+		}
+		fclose(file);
+	}
+
+	//read already renaming channels from file
+	file = fopen(TV_STATION_FOUND_LIST, "r");
+	found_servise_count = 0;
+	if (file!=NULL) {
+		while(!feof(file)) {
+		      if(fscanf(file, "%d %d ", &found_service_list[found_servise_count].id, &found_service_list[found_servise_count].freq) == 0) {
+			      fgets(found_service_list[found_servise_count].name, sizeof(found_service_list[found_servise_count].name), file);
+			      found_service_list[found_servise_count].name[strlen(found_service_list[found_servise_count].name)-1] = '\0';
+			      found_servise_count++;
+		      }
+		}
+		fclose(file);
+	}
+
+	return 0;
+}
+
+static int32_t analogtv_checkServiceNames()
+{
+	for(uint32_t i = 0; i < analogtv_channelCount; i++) {
+		for(uint32_t j = 0; j < found_servise_count; j++) {
+			if(found_service_list[j].freq == analogtv_channelParam[i].frequency) {
+				analogtv_updateName(i, found_service_list[j].name);
+				break;
+			}
+		}
+	}
+	offair_fillDVBTMenu();
+
+	return 0;
+}
+
+static int32_t analogtv_menuServicesShow()
+{
+	interfaceMenu_t *tvMenu = _M &AnalogTVChannelMenu;
+
+	interface_menuActionShowMenu(tvMenu, tvMenu);
+	interface_showMenu(1, 1);
+
+	return 0;
+}
 
 int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -394,7 +529,9 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 
 	offair_fillDVBTMenu();
 	offair_fillDVBTOutputMenu(screenMain);
-
+	if(found_servise_count > 0) {
+		analogtv_checkServiceNames();
+	}
 	return 0;
 }
 
@@ -446,6 +583,11 @@ static int analogtv_activateMenu(interfaceMenu_t *pMenu, void *pArg)
 static int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	switch(cmd->command) {
+		case interfaceCommandYellow:
+			if(full_servise_count > 0) {
+				analogtv_menuServicesShow();
+				return 0;
+			}
 		default:;
 	}
 	return -1;
@@ -531,6 +673,11 @@ void analogtv_initMenu(interfaceMenu_t *pParent)
 {
 	createListMenu(&AnalogTVOutputMenu, _T("ANALOGTV_CHANNELS"), thumbnail_tvstandard, /*offair_icons*/NULL, pParent,
 		interfaceListMenuIconThumbnail, analogtv_activateMenu, NULL, NULL);
+	
+	createListMenu(&AnalogTVChannelMenu, "Services", thumbnail_tvstandard, /*offair_icons*/NULL, pParent,
+		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
+	
+	analogtv_menuServicesInit();
 }
 
 uint32_t analogtv_getChannelCount(void)
