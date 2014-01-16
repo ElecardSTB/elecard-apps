@@ -979,7 +979,7 @@ int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner)
 	  return 0;
 
 	int fdf = dvb_openFrontend(dvb_getAdapter(tuner), O_RDONLY);
-	if (fdf) {
+	if (fdf >= 0) {
 		struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
 		struct dtv_properties cmdseq = { .num = 1, .props = &p, };
 		if(ioctl(fdf, FE_GET_PROPERTY, &cmdseq) >= 0 && p.u.data == SYS_DVBT2) {
@@ -1653,7 +1653,7 @@ int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, _
 	return 0;
 }
 
-int dvb_openFrontend(int adapter, int flags)
+static int dvb_openFrontend(int adapter, int flags)
 {
 	char frontend_devname[32];
 	int frontend_fd;
@@ -1664,7 +1664,7 @@ int dvb_openFrontend(int adapter, int flags)
 		snprintf(frontend_devname, sizeof(frontend_devname), "/dev/dvb%d.frontend0", adapter);
 		frontend_fd = open(frontend_devname, flags);
 		if(frontend_fd < 0) {
-			printf("%s[%d]: %m\n", __FILE__, __LINE__);
+//			printf("%s[%d]: %m\n", __FILE__, __LINE__);
 			eprintf("%s: failed to open adapter %d\n", __FUNCTION__, adapter);
 		}
 	}
@@ -1707,7 +1707,7 @@ int dvb_getSignalInfo(tunerFormat tuner,
 	fe_status_t status = 0;
 	mysem_get(dvb_fe_semaphore);
 
-	if((frontend_fd = dvb_openFrontend(adapter, O_RDONLY | O_NONBLOCK)) > 0) {
+	if((frontend_fd = dvb_openFrontend(adapter, O_RDONLY | O_NONBLOCK)) >= 0) {
 		ioctl(frontend_fd, FE_READ_STATUS, &status);
 		ioctl(frontend_fd, FE_READ_SIGNAL_STRENGTH, signal);
 		ioctl(frontend_fd, FE_READ_SNR, snr);
