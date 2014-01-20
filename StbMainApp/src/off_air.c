@@ -3567,20 +3567,22 @@ void offair_servicesRenumbering()
 {
 	service_index_t service[MAX_MEMORIZED_SERVICES];
 	BOOL chk = 0;
-	int i, old_count = offair_serviceCount;
-	for(i = 0; i < old_count; ++i) {
+	int32_t i;
+
+	for(i = 0; i < offair_serviceCount; ++i) {
 		service[i].service = NULL;
 	}
-	old_count = 1;
+
 	for(i = 0; i < offair_serviceCount; ++i) {
-		service[old_count] = offair_services[offair_indeces[i]];
+		service[i] = offair_services[offair_indeces[i]];
+
 		if ((!chk) && (appControlInfo.dvbInfo.channel == offair_indeces[i])) {
-			appControlInfo.dvbInfo.channel = old_count;
+			appControlInfo.dvbInfo.channel = i + 1;
 			chk = 1;
 		}
-		offair_indeces[i] = old_count;
-		old_count++;
+		offair_indeces[i] = i;
 	}
+
 	for(i = 0; i < offair_serviceCount; ++i) {
 		offair_services[i] = service[i];
 	}
