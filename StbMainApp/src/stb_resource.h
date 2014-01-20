@@ -88,6 +88,7 @@ typedef enum
 	statusbar_f2_playmode,
 	statusbar_f2_settings,
 	statusbar_f2_timeline,
+	statusbar_f2_find,
 	statusbar_f3_abook,
 	statusbar_f3_add,
 	statusbar_f3_edit,

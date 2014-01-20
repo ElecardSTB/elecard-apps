@@ -71,8 +71,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANALOGTV_UNDEF			"UNDEF"
 #define MAX_ANALOG_CHANNELS		128
 
-#define TV_STATION_FULL_LIST "/var/etc/tvstations.txt"
-#define TV_STATION_FOUND_LIST "/var/etc/tvstationsnew.txt"
+#define TV_STATION_FULL_LIST	"/tmp/tvchannels.txt"
+#define TV_STATION_FOUND_LIST	"/var/etc/tvchannelsnew.txt"
+
+#define MAX_SERVICE_COUNT 2048
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -102,14 +104,14 @@ typedef struct _full_chinfo {
 
 analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
 
-static interfaceListMenu_t AnalogTVOutputMenu;
 static uint32_t		analogtv_channelCount = 0;
 
 static interfaceListMenu_t AnalogTVChannelMenu;
-static short_chinfo full_service_list[2048];
-static full_chinfo found_service_list[2048];
-static uint32_t found_servise_count = 0;
-static uint32_t full_servise_count = 0;
+static short_chinfo full_service_list[MAX_SERVICE_COUNT];
+static full_chinfo found_service_list[MAX_SERVICE_COUNT];
+static uint32_t found_service_count = 0;
+static uint32_t full_service_count = 0;
+static int8_t services_edit_able = 0;
 
 analogtv_freq_range_t analogtv_range = {MIN_FREQUENCY_HZ / 1000, MAX_FREQUENCY_HZ / 1000};
 
@@ -147,7 +149,6 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 	interface_displayMenu(1);
 
 	offair_fillDVBTMenu();
-	offair_fillDVBTOutputMenu(screenMain);
 
 	return 0;
 }
@@ -358,7 +359,7 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 	offair_activateChannelMenu();
 
 	//update list of renaming channels
-	for(i = 0; i < found_servise_count; i++) {
+	for(i = 0; i < found_service_count; i++) {
 		if(found_service_list[i].freq == analogtv_channelParam[appControlInfo.tvInfo.id].frequency) {
 			in_list = 1;
 			break;
@@ -369,18 +370,18 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 		found_service_list[i].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
 		strncpy(found_service_list[i].name, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name, sizeof(found_service_list[i].name));
 	} else {		//if this channel not exist in list, then add it to list
-		found_service_list[found_servise_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
-		strncpy(	found_service_list[found_servise_count].name, 
+		found_service_list[found_service_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
+		strncpy(	found_service_list[found_service_count].name, 
 			full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name,
-			sizeof(found_service_list[found_servise_count].name));
-		found_service_list[found_servise_count].freq = analogtv_channelParam[appControlInfo.tvInfo.id].frequency;
-		found_servise_count++;
+			sizeof(found_service_list[found_service_count].name));
+		found_service_list[found_service_count].freq = analogtv_channelParam[appControlInfo.tvInfo.id].frequency;
+		found_service_count++;
 	}
 
 	//save renaming channel list to file
 	FILE *file = fopen(TV_STATION_FOUND_LIST, "w");
 	if (file!=NULL) {
-		for(i = 0; i < found_servise_count; i++) {
+		for(i = 0; i < found_service_count; i++) {
 			fprintf(file ,"%d %d %s\n", found_service_list[i].id, found_service_list[i].freq, found_service_list[i].name);
 		}
 		fclose(file);
@@ -389,43 +390,29 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-static int32_t analogtv_menuServicesInit()
+static int32_t analogtv_fillFullServList()
 {
-	interfaceMenu_t *tvMenu = _M &AnalogTVChannelMenu;
 	FILE *file;
-	char buf[256], chname[50];
+	char chname[50];
 	uint32_t chid;
-	interface_clearMenuEntries(tvMenu);
 
 	//read full channel list from file
 	file = fopen(TV_STATION_FULL_LIST, "r");
-	full_servise_count = 0;
+	full_service_count = 0;
 	if (file!=NULL) {
 		while(!feof(file)) {
 		      if(fscanf(file, "%d;", &chid) == 0) {
 			      fgets(chname, sizeof(chname), file);
 			      chname[strlen(chname)-2] = '\0';
 
-			      strncpy(full_service_list[full_servise_count].name, chname, sizeof(full_service_list[full_servise_count].name));
-			      full_service_list[full_servise_count].id = chid;
+			      strncpy(full_service_list[full_service_count].name, chname, sizeof(full_service_list[full_service_count].name));
+			      full_service_list[full_service_count].id = chid;
 
-			      snprintf(buf, sizeof(buf), "%d. %s", chid, chname);
-			      interface_addMenuEntry(tvMenu, buf, analogtv_renameFromList, NULL, thumbnail_channels);
-			      full_servise_count++;
-		      }
-		}
-		fclose(file);
-	}
-
-	//read already renaming channels from file
-	file = fopen(TV_STATION_FOUND_LIST, "r");
-	found_servise_count = 0;
-	if (file!=NULL) {
-		while(!feof(file)) {
-		      if(fscanf(file, "%d %d ", &found_service_list[found_servise_count].id, &found_service_list[found_servise_count].freq) == 0) {
-			      fgets(found_service_list[found_servise_count].name, sizeof(found_service_list[found_servise_count].name), file);
-			      found_service_list[found_servise_count].name[strlen(found_service_list[found_servise_count].name)-1] = '\0';
-			      found_servise_count++;
+			      full_service_count++;
+			      if (full_service_count > MAX_SERVICE_COUNT) {
+				      full_service_count = MAX_SERVICE_COUNT;
+				      break;
+			      }
 		      }
 		}
 		fclose(file);
@@ -434,10 +421,61 @@ static int32_t analogtv_menuServicesInit()
 	return 0;
 }
 
+static int32_t analogtv_fillFoundServList()
+{
+	FILE *file;
+	//read already renaming channels from file
+	file = fopen(TV_STATION_FOUND_LIST, "r");
+	found_service_count = 0;
+	if (file!=NULL) {
+		while(!feof(file)) {
+		      if(fscanf(file, "%d %d ", &found_service_list[found_service_count].id, &found_service_list[found_service_count].freq) == 0) {
+			      fgets(found_service_list[found_service_count].name, sizeof(found_service_list[found_service_count].name), file);
+			      found_service_list[found_service_count].name[strlen(found_service_list[found_service_count].name)-1] = '\0';
+			      found_service_count++;
+			      if (found_service_count > MAX_SERVICE_COUNT) {
+				      found_service_count = MAX_SERVICE_COUNT;
+				      break;
+			      }
+		      }
+		}
+		fclose(file);
+	}
+
+	return 0;
+}
+
+static int32_t analogtv_fillServiceNamesMenu(short_chinfo *list, int32_t list_count)
+{
+	interfaceMenu_t *tvMenu = _M &AnalogTVChannelMenu;
+	char buf[256];
+
+	if((list == NULL) || (list_count < 0)) {
+		dprintf("Error filling menu\n");
+		return -1;
+	}
+
+	interface_clearMenuEntries(tvMenu);
+	for(int i = 0; i < list_count; i++) {
+		snprintf(buf, sizeof(buf), "%d. %s", list[i].id, list[i].name);
+		interface_addMenuEntry(tvMenu, buf, analogtv_renameFromList, NULL, thumbnail_channels);
+	}
+	AnalogTVChannelMenu.baseMenu.selectedItem = 0;
+
+	return 0;
+}
+
+static int32_t analogtv_confInit()
+{
+	services_edit_able = 0;
+
+	return 0;
+}
+
 static int32_t analogtv_checkServiceNames()
 {
 	for(uint32_t i = 0; i < analogtv_channelCount; i++) {
-		for(uint32_t j = 0; j < found_servise_count; j++) {
+		for(uint32_t j = 0; j < found_service_count; j++) {
 			if(found_service_list[j].freq == analogtv_channelParam[i].frequency) {
 				analogtv_updateName(i, found_service_list[j].name);
 				break;
@@ -452,11 +490,61 @@ static int32_t analogtv_checkServiceNames()
 static int32_t analogtv_menuServicesShow()
 {
 	interfaceMenu_t *tvMenu = _M &AnalogTVChannelMenu;
-
+	analogtv_fillServiceNamesMenu(full_service_list, full_service_count);
 	interface_menuActionShowMenu(tvMenu, tvMenu);
 	interface_showMenu(1, 1);
 
 	return 0;
+}
+
+static int32_t analogtv_findServicesInList(interfaceMenu_t *pMenu, char* pStr, void* pArg)
+{
+	int32_t new_service_count = 0;
+	uint32_t i;
+	(void)pArg;
+	if (pStr == NULL) {
+		return 0;
+	}
+
+	short_chinfo new_service_list[MAX_SERVICE_COUNT];
+
+	for(i = 0; i < full_service_count; i++) {
+		if(strncasecmp(full_service_list[i].name, pStr, strlen(pStr)) == 0) {
+			strncpy(new_service_list[new_service_count].name, full_service_list[i].name, sizeof(new_service_list[new_service_count].name));
+			new_service_list[new_service_count].id = full_service_list[i].id;
+			new_service_count++;
+		}
+	}
+	full_service_count = new_service_count;
+	for(i = 0; i < full_service_count; i++) {
+		full_service_list[i] = new_service_list[i];
+	}
+
+	analogtv_fillServiceNamesMenu(full_service_list, full_service_count);
+
+	return 0;
+}
+
+static int32_t analogtv_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
+{
+	switch( cmd->command )
+	{
+		case interfaceCommandBlue:
+			if(services_edit_able) {
+				analogtv_fillFullServList();
+				analogtv_fillServiceNamesMenu(full_service_list, full_service_count);
+				interface_showMenu(1, 1);
+				return 0;
+			}
+		case interfaceCommandGreen:
+			if(services_edit_able) {
+				interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", analogtv_findServicesInList, NULL, inputModeABC, pArg);
+				return 0;
+			}
+		default: ;
+	}
+
+	return 1;
 }
 
 int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
@@ -528,8 +616,7 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	interface_displayMenu(1);
 
 	offair_fillDVBTMenu();
-	offair_fillDVBTOutputMenu(screenMain);
-	if(found_servise_count > 0) {
+	if(found_service_count > 0) {
 		analogtv_checkServiceNames();
 	}
 	return 0;
@@ -572,22 +659,20 @@ void analogtv_terminate(void)
 	mysem_destroy(analogtv_semaphore);
 }
 
-static int analogtv_activateMenu(interfaceMenu_t *pMenu, void *pArg)
-{
-	analogtv_fillMenu();
-	return 0;
-}
-
-
-
 static int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	switch(cmd->command) {
-		case interfaceCommandYellow:
-			if(full_servise_count > 0) {
-				analogtv_menuServicesShow();
-				return 0;
+		case interfaceCommandGreen:
+			if(services_edit_able) {
+				analogtv_fillFullServList();
+				if(full_service_count > 0) {
+					analogtv_menuServicesShow();
+				}
 			}
+			return 0;
+		case interfaceCommandMainMenu://DIKS_HOME
+		case interfaceCommandYellow:
+			return 0;
 		default:;
 	}
 	return -1;
@@ -642,7 +727,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	interface_playControlSetProcessCommand(analogtv_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(analogtv_startNextChannel, offair_setChannel);
 //	interface_playControlSetAudioCallback(offair_audioChanged);
-	interface_channelNumberShow(appControlInfo.playbackInfo.channel);
+	interface_channelNumberShow(appControlInfo.playbackInfo.channel + 1);
 
 	offair_stopVideo(screenMain, 1);
 //	offair_startVideo(screenMain);
@@ -664,20 +749,23 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	return 0;
 }
 
-void analogtv_addMenuEntry(interfaceMenu_t *pMenu)
-{
-	interface_addMenuEntry2(pMenu, _T("ANALOGTV_CHANNELS"), 1, interface_menuActionShowMenu, &AnalogTVOutputMenu, thumbnail_tvstandard);
-}
-
 void analogtv_initMenu(interfaceMenu_t *pParent)
 {
-	createListMenu(&AnalogTVOutputMenu, _T("ANALOGTV_CHANNELS"), thumbnail_tvstandard, /*offair_icons*/NULL, pParent,
-		interfaceListMenuIconThumbnail, analogtv_activateMenu, NULL, NULL);
-	
-	createListMenu(&AnalogTVChannelMenu, "Services", thumbnail_tvstandard, /*offair_icons*/NULL, pParent,
+	int offair_icons[4] = { 
+		statusbar_f2_find, 
+		statusbar_f4_enterurl,
+		0,
+		0
+	};
+
+	analogtv_confInit();
+
+	createListMenu(&AnalogTVChannelMenu, _T("SELECT_CHANNEL"), thumbnail_tvstandard, offair_icons, pParent,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
-	
-	analogtv_menuServicesInit();
+
+	interface_setCustomKeysCallback(_M &AnalogTVChannelMenu, analogtv_keyCallback);
+
+	analogtv_fillFoundServList();
 }
 
 uint32_t analogtv_getChannelCount(void)
@@ -742,27 +830,6 @@ const char * analogtv_getServiceName(uint32_t index)
 	if (index >= analogtv_channelCount)
 		return "";
 	return analogtv_channelParam[index].customCaption;
-}
-
-void analogtv_fillMenu(void)
-{
-	interfaceMenu_t *channelMenu = _M &AnalogTVOutputMenu;
-	uint32_t i;
-
-	analogtv_parseConfigFile();
-	interface_clearMenuEntries(channelMenu);
-
-	if(analogtv_channelCount == 0) {
-		interface_addMenuEntryDisabled(channelMenu, _T("NO_CHANNELS"), thumbnail_info);
-	}
-	for(i = 0; i < analogtv_channelCount; i++) {
-		interface_addMenuEntry(channelMenu,
-							   analogtv_channelParam[i].customCaption,
-							   analogtv_activateChannel,
-							   (void*)analogtv_channelParam[i].frequency,
-							   thumbnail_tvstandard);
-	}
-//	interface_setSelectedItem(channelMenu, selectedMenuItem);
 }
 
 #endif /* ENABLE_ANALOGTV */
