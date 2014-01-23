@@ -1615,7 +1615,8 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 #else
 	if ( force || strcmp(videoSource, gfx_videoProvider.name) )
 	{
-		gfx_stopVideoProvider(videoLayer, 1, 1);
+		if (!(strncasecmp(videoSource, "tv://", 5) == 0) || !(strncasecmp(gfx_videoProvider.name, "tv://", 5) == 0))
+			gfx_stopVideoProvider(videoLayer, 1, 1);
 
 		gfx_videoProvider.name[0] = 0;
 #ifdef STSDK
