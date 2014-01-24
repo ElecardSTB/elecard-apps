@@ -1146,18 +1146,12 @@ void *testServerThread(void *pArg)
 							}
 							if (dvb_hasMedia(service))
 							{
-								if (item == channel)
-								{
-									while (offair_services[t].service != service && t < MAX_MEMORIZED_SERVICES)
-									{
-										t++;
-									}
-									if (t < MAX_MEMORIZED_SERVICES)
-									{
+								if(item == channel) {
+									t = offair_getServiceIndex(service);
+									if(t < MAX_MEMORIZED_SERVICES) {
 										offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, t));
 										sprintf(obuf, "DVB Channel set to %s - %s\r\n", ptr, dvb_getServiceName(service));
-									} else
-									{
+									} else {
 										sprintf(obuf, "ERROR: DVB Channel cannot be set to %s\r\n", ptr);
 									}
 									break;
@@ -1260,17 +1254,13 @@ void *testServerThread(void *pArg)
 					{
 						int index = 0, item = 0;
 
-						while (item < dvb_getNumberOfServices())
-						{
+						while(item < dvb_getNumberOfServices()) {
 							EIT_service_t* service = dvb_getService(index);
-							if (service == NULL)
-							{
+							if(service == NULL) {
 								break;
 							}
-							if (dvb_hasMedia(service))
-							{
-								if (service == offair_services[appControlInfo.dvbInfo.channel].service)
-								{
+							if(dvb_hasMedia(service)) {
+								if(service == offair_getService(appControlInfo.dvbInfo.channel)) {
 									sprintf(obuf, "%d: %s%s\r\n", item, dvb_getServiceName(service), dvb_getScrambled(service) ? " (scrambled)" : "");
 									break;
 								}

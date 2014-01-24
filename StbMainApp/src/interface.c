@@ -6399,7 +6399,6 @@ static int interface_channelNumberHide(void *pArg)
 void interface_channelNumberShow(int channelNumber)
 {
 	snprintf(interfaceChannelControl.number, sizeof(interfaceChannelControl.number), "%03d", channelNumber);
-	interfaceChannelControl.number[sizeof(interfaceChannelControl.number)-1] = 0;
 	interfaceChannelControl.showingLength = strlen(interfaceChannelControl.number);
 	interface_addEvent(interface_channelNumberHide, NULL, 1000*interfacePlayControl.showTimeout, 1);
 }

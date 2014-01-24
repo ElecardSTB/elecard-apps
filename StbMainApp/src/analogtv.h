@@ -127,9 +127,8 @@ int32_t analogtv_updateName(uint32_t chanIndex, char* str);
 
 void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
-void analogtv_addMenuEntry(interfaceMenu_t *pMenu);
+
 void analogtv_initMenu(interfaceMenu_t *pParent);
-void analogtv_fillMenu(void);
 uint32_t analogtv_getChannelCount(void);
 
 int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);

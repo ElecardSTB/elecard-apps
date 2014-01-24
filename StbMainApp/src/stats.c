@@ -234,22 +234,20 @@ int stats_load()
 						{
 							dprintf("%s: wrong channel index %d (%s)\n", __FUNCTION__, index, buf);
 							state = parserError;
-						} else
-						{
-							for( i = 1; i < offair_serviceCount; ++i )
-							{
-								if( memcmp(&header, &offair_services[i].common, sizeof(EIT_common_t)) == 0 )
-								{
-									channelMap[index] = i;
-									break;
+						} else {
+							int32_t serviceCount = dvbChannel_getCount();
+							i = dvbChannel_getServiceId(&header);
+							if(i >= 0) {
+								channelMap[index] = i;
+							} else if(serviceCount < MAX_MEMORIZED_SERVICES) {
+								EIT_service_t *service = offair_getService(serviceCount - 1);
+
+								if(service) {
+									service->service = NULL;
+									service->common = header;
+									channelMap[index] = serviceCount;
+									serviceCount++;
 								}
-							}
-							if( i >= offair_serviceCount && i < MAX_MEMORIZED_SERVICES )
-							{
-								offair_serviceCount++;
-								memcpy(&offair_services[offair_serviceCount].common, &header, sizeof(EIT_common_t));
-								offair_services[offair_serviceCount].service = NULL;
-								channelMap[index] = offair_serviceCount;
 							}
 						}
 						break;
@@ -297,29 +295,30 @@ int stats_save()
 	FILE *f;
 	char  buf[32];
 	int i;
+	int32_t serviceCount;
 
 	f = fopen(STATS_TMP_FILE, "w");
-	if( f == NULL )
-	{
+	if(f == NULL) {
 		eprintf("Stats: Can't open temp file\n");
 		return 1;
 	}
+	serviceCount = dvbChannel_getCount();
 	strftime(buf,32,"DATE=%F\n", gmtime(&statsInfo.today));
 	fputs(buf, f);
 	fprintf(f,"TIMEZONE=%ld\n", timezone);
-	fprintf(f,"CHANNELCOUNT=%d\n", offair_serviceCount);
-	for( i = 1; i < offair_serviceCount; ++i )
-	{
-		fprintf(f,"CHANNEL%03d=%lu;%hu;%hu\n", i,
-		        offair_services[i].common.media_id,
-		        offair_services[i].common.service_id,
-		        offair_services[i].common.transport_stream_id);
+	fprintf(f,"CHANNELCOUNT=%d\n", serviceCount);
+	for(i = 1; i < serviceCount; ++i) {
+		EIT_service_t *service = offair_getService(i);
+		if(service) {
+			fprintf(f,"CHANNEL%03d=%lu;%hu;%hu\n", i,
+					service->common.media_id,
+					service->common.service_id,
+					service->common.transport_stream_id);
+		}
 	}
 	fputs("STATS=", f);
-	for( i = 0; i < STATS_SAMPLE_COUNT; ++i )
-	{
-		if( i % 30 == 0 )
-		{
+	for(i = 0; i < STATS_SAMPLE_COUNT; ++i) {
+		if(i % 30 == 0) {
 			fputc('\n', f);
 		}
 		fprintf(f, "%d ", statsInfo.watched[i]);

@@ -118,16 +118,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 typedef struct
 {
-	EIT_common_t common;
-	EIT_service_t *service;
-	uint16_t audio_track;
-	/* First EPG event which fit to current timeline.
-	Updated on each call to offair_initEPGRecordMenu. */
-	list_element_t *first_event;
-} service_index_t;
-
-typedef struct
-{
 	interfaceMenu_t baseMenu;
 
 	int currentService;
@@ -152,11 +142,7 @@ typedef struct
 
 #ifdef ENABLE_DVB
 /* Service index in offair_service used as channel number */
-extern service_index_t offair_services[MAX_MEMORIZED_SERVICES];
-extern int  offair_serviceCount;
-
 extern interfaceListMenu_t DVBTMenu;
-extern interfaceListMenu_t DVBTOutputMenu;
 #endif
 
 extern interfaceEpgMenu_t  EPGRecordMenu;
@@ -167,7 +153,16 @@ extern interfaceColor_t    genre_colors[];
 *********************************/
 
 #ifdef ENABLE_DVB
-int  offair_tunerPresent(void);
+EIT_service_t *dvbChannel_getService(uint32_t id);
+int32_t dvbChannel_getServiceId(EIT_common_t *header);
+int32_t dvbChannel_getIndex(EIT_service_t *service);
+int32_t dvbChannel_getCount(void);
+int32_t dvbChannel_clearServices(void);
+int32_t dvbChannel_hasAnyEPG(void);
+
+char *offair_getChannelNumberPrefix(uint32_t id);
+
+int offair_tunerPresent(void);
 
 /**
 *   @brief Function used to build the DVB T menu data structures
@@ -234,10 +229,6 @@ TELETXT_PID::= ushort
 void offair_playURL(char* URL, int which);
 #endif
 
-void offair_initServices(void);
-
-void offair_clearServices(void);
-
 void offair_cleanupMenu(void);
 
 int  offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg);
@@ -245,7 +236,10 @@ int  offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg);
 /* Get offair service index (LCN) by dvb channel index */
 int  offair_getIndex(int index);
 
-int  offair_getServiceIndex(EIT_service_t *service);
+static inline int offair_getServiceIndex(EIT_service_t *service)
+{
+	return dvbChannel_getIndex(service);
+}
 
 static inline int service_isRadio(const EIT_service_t *service) {
 	return service->service_descriptor.service_type == 2;
@@ -259,28 +253,27 @@ static inline int service_thumbnail(const EIT_service_t *service)
 // Returns -1 if no tuner supporting service media type is found, tunerFormat otherwise
 int offair_findCapableTuner(EIT_service_t *service);
 
-int  offair_getServiceCount(void);
-
 int  offair_getCurrentServiceIndex(int which);
 
-EIT_service_t* offair_getService(int index);
+static inline EIT_service_t* offair_getService(int index)
+{
+	return dvbChannel_getService(index);
+}
 
-void offair_fillMenuEntry(void);
+static inline const char *offair_getServiceName(int index)
+{
+	return dvb_getServiceName(offair_getService(index));
+}
+
+int32_t offair_updateChannelStatus(void);
 
 void offair_fillDVBTMenu(void);
-
-void offair_fillDVBTOutputMenu(int which);
-
-int  offair_epgEnabled(void);
 
 int  offair_frequencyMonitor(interfaceMenu_t *pMenu, void* pArg);
 
 int  offair_checkForUpdates(void);
 
 int  offair_setChannel(int channel, void* pArg);
-
-// DVB or Analog channel number suitable for offair_setChannel()
-int  offair_getCurrentChannel(void);
 
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg);
 void offair_displayPlayControl(void);

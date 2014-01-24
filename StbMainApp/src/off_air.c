@@ -81,6 +81,36 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //extern char scan_messages[64*1024];
 
+
+/*********************************************************(((((((**********
+* EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
+***************************************************************************/
+
+interfaceEpgMenu_t EPGRecordMenu;
+interfaceColor_t genre_colors[0x10] = {
+	{ 151, 200, 142, 0x88 }, // other
+	{ 255,  94,  81, 0x88 }, // movie
+	{ 175, 175, 175, 0x88 }, // news
+	{ 251, 147,  46, 0x88 }, // show
+	{  89, 143, 198, 0x88 }, // sports
+	{ 245, 231,  47, 0x88 }, // children's
+	{ 255, 215, 182, 0x88 }, // music
+	{ 165,  81,  13, 0x88 }, // art
+	{ 236, 235, 235, 0x88 }, // politics
+	{ 160, 151, 198, 0x88 }, // education
+	{ 162, 160,   5, 0x88 }, // leisure
+	{ 151, 200, 142, 0x88 }, // special
+	{ 151, 200, 142, 0x88 }, // 0xC
+	{ 151, 200, 142, 0x88 }, // 0xD
+	{ 151, 200, 142, 0x88 }, // 0xE
+	{ 151, 200, 142, 0x88 }  // 0xF
+};
+
+#ifdef ENABLE_DVB
+interfaceListMenu_t DVBTMenu;
+#endif // ENABLE_DVB
+
+
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
@@ -100,13 +130,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #define CHANNEL_STATUS_ID 1
+
+
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
 
 #ifdef ENABLE_DVB
-typedef enum _wizardState_t
-{
+typedef enum {
 	wizardStateDisabled = 0,
 	wizardStateConfirmLocation,
 	wizardStateSelectLocation,
@@ -123,8 +154,7 @@ typedef enum _wizardState_t
 	wizardStateCount
 } wizardState_t;
 
-typedef struct _wizardSettings_t
-{
+typedef struct {
 	wizardState_t state;
 	int allowExit;
 	int locationCount;
@@ -136,37 +166,119 @@ typedef struct _wizardSettings_t
 } wizardSettings_t;
 
 #ifdef ENABLE_MULTI_VIEW
-typedef struct _offair_multiviewInstance_t {
+typedef struct {
 	int stop;
 	int exit;
 	pthread_t thread;
 } offair_multiviewInstance_t;
 #endif
+
+typedef struct {
+	EIT_common_t	common;
+	EIT_service_t	*service;
+	uint16_t		audio_track;
+	/* First EPG event which fit to current timeline.
+	Updated on each call to offair_initEPGRecordMenu. */
+	list_element_t	*first_event;
+
+	//lists
+	struct list_head	orderNone;
+	struct list_head	orderSort;
+} service_index_t;
+
+
+typedef struct {
+	struct list_head	orderNoneHead;
+	struct list_head	orderSortHead;
+
+	uint32_t		count;
+	serviceSort_t	sortOrderType;
+	
+//	uint32_t		initialized;
+} dvb_channels_t;
+
 #endif /* ENABLE_DVB */
+
+/******************************************************************
+* STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
+*******************************************************************/
+
+#ifdef ENABLE_DVB
+static interfaceListMenu_t EPGMenu;
+
+static struct {
+	struct {
+		__u32 frequency;
+		struct {
+			__u32 index;
+			__u32 count;
+		} nit;
+	} scan;
+} dvb;
+
+static int  offair_scheduleIndex;   // service number
+//static char offair_lcn_buf[4];
+
+static struct {
+	int index;
+	list_element_t *stream;
+	int visible;
+} subtitle = {
+	.index   = 0,
+	.stream  = NULL,
+	.visible = 0,
+};
+
+static pmysem_t epg_semaphore = 0;
+static pmysem_t offair_semaphore = 0;
+
+static interfaceListMenu_t wizardHelperMenu;
+static wizardSettings_t   *wizardSettings = NULL;
+
+
+static dvb_channels_t g_dvb_channels = {
+	.orderNoneHead	= LIST_HEAD_INIT(g_dvb_channels.orderNoneHead),
+	.orderSortHead	= LIST_HEAD_INIT(g_dvb_channels.orderSortHead),
+
+	.count			= 0,
+	.sortOrderType	= serviceSortNone,
+//	.initialized	= 0,
+};
+
+#endif // ENABLE_DVB
+
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
-
 #ifdef ENABLE_DVB
+static service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
+static service_index_t *dvbChannel_getServiceIndex(uint32_t id);
+static service_index_t *dvbChannel_add(void);
+static int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);
+static int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track);
+static int32_t dvbChannel_addService(EIT_service_t *service);
+static int32_t dvbChannel_remove(service_index_t *srvIdx);
+static int32_t dvbChannel_readOrderConfig(void);
+static int32_t dvbChannel_writeOrderConfig(void);
+static int32_t dvbChannel_update(void);
+static int32_t dvbChannel_sort(serviceSort_t sortType);
+static int32_t dvbChannel_initServices(void);
 
-static void offair_servicesRenumbering(void);
-static void offair_initIndeces(void);
-static void offair_exportServices(const char* filename);
+static void offair_sortSchedule(void);
 static void offair_setStateCheckTimer(int which, int bEnable);
 static int  offair_startNextChannel(int direction, void* pArg);
 int  offair_setChannel(int channel, void* pArg);
 static int  offair_infoTimerEvent(void *pArg);
 static int  offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type);
-static void offair_initDVBTOutputMenu(interfaceMenu_t *pParent, int which);
 static int  offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg);
 static void offair_sortEvents(list_element_t **event_list);
-static void offair_swapServices(int first, int second);
+//static void offair_swapServices(int first, int second);
 static int  offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pArg);
-static int  offair_getUserLCN(interfaceMenu_t *pMenu, char *value, void* pArg);
-static int  offair_changeLCN(interfaceMenu_t *pMenu, void* pArg);
-static int  offair_scheduleCheck( int channelNumber );
+//static int  offair_getUserLCN(interfaceMenu_t *pMenu, char *value, void* pArg);
+//static int  offair_changeLCN(interfaceMenu_t *pMenu, void* pArg);
+static int32_t dvbChannel_hasSchedule( uint32_t channelNumber );
 static int  offair_showSchedule(interfaceMenu_t *pMenu, int channel);
 static int  offair_showScheduleMenu(interfaceMenu_t *pMenu, void* pArg);
 static int  offair_updateEPG(void* pArg);
@@ -208,95 +320,22 @@ static int offair_subtitleShow(uint16_t subtitle_pid);
 
 static inline EIT_service_t *current_service(void)
 {
-	return offair_services[appControlInfo.dvbInfo.channel].service;
+	return dvbChannel_getService(appControlInfo.dvbInfo.channel);
 }
 
 static inline int has_video(int channel)
 {
-	return dvb_hasMediaType(offair_services[channel].service, mediaTypeVideo);
+	return dvb_hasMediaType(dvbChannel_getService(channel), mediaTypeVideo);
 }
 
 static inline int can_play(int channel)
 {
-	return  offair_services[channel].service != NULL &&
-	       (appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY ||
-	        dvb_getScrambled(offair_services[channel].service) == 0);
+	EIT_service_t *service = dvbChannel_getService(channel);
+	return (service != NULL) &&
+			((appControlInfo.offairInfo.dvbShowScrambled == SCRAMBLED_PLAY) || (dvb_getScrambled(service) == 0));
 }
 
 #endif /* ENABLE_DVB */
-
-/******************************************************************
-* STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
-*******************************************************************/
-
-#ifdef ENABLE_DVB
-static interfaceListMenu_t EPGMenu;
-
-static struct {
-	struct {
-		__u32 frequency;
-		struct {
-			__u32 index;
-			__u32 count;
-		} nit;
-	} scan;
-} dvb;
-
-/* offair_indeces used to display sorted list of channels */
-static int  offair_indeces[MAX_MEMORIZED_SERVICES];
-static int  offair_indexCount = 0;
-static int  offair_scheduleIndex;   // service number
-static char offair_lcn_buf[4];
-
-static struct {
-	int index;
-	list_element_t *stream;
-	int visible;
-} subtitle = {
-	.index   = 0,
-	.stream  = NULL,
-	.visible = 0,
-};
-
-static pmysem_t epg_semaphore = 0;
-static pmysem_t offair_semaphore = 0;
-
-static interfaceListMenu_t wizardHelperMenu;
-static wizardSettings_t   *wizardSettings = NULL;
-#endif // ENABLE_DVB
-
-/*********************************************************(((((((**********
-* EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
-***************************************************************************/
-
-interfaceEpgMenu_t EPGRecordMenu;
-interfaceColor_t genre_colors[0x10] = {
-	{ 151, 200, 142, 0x88 }, // other
-	{ 255,  94,  81, 0x88 }, // movie
-	{ 175, 175, 175, 0x88 }, // news
-	{ 251, 147,  46, 0x88 }, // show
-	{  89, 143, 198, 0x88 }, // sports
-	{ 245, 231,  47, 0x88 }, // children's
-	{ 255, 215, 182, 0x88 }, // music
-	{ 165,  81,  13, 0x88 }, // art
-	{ 236, 235, 235, 0x88 }, // politics
-	{ 160, 151, 198, 0x88 }, // education
-	{ 162, 160,   5, 0x88 }, // leisure
-	{ 151, 200, 142, 0x88 }, // special
-	{ 151, 200, 142, 0x88 }, // 0xC
-	{ 151, 200, 142, 0x88 }, // 0xD
-	{ 151, 200, 142, 0x88 }, // 0xE
-	{ 151, 200, 142, 0x88 }  // 0xF
-};
-
-#ifdef ENABLE_DVB
-/* Service index in offair_service used as channel number */
-service_index_t offair_services[MAX_MEMORIZED_SERVICES];
-int             offair_serviceCount = 0;
-
-interfaceListMenu_t DVBTMenu;
-interfaceListMenu_t DVBTOutputMenu;
-#endif // ENABLE_DVB
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -304,6 +343,410 @@ interfaceListMenu_t DVBTOutputMenu;
 ********************************************************************************/
 
 #ifdef ENABLE_DVB
+static service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount)
+{
+	struct list_head *pos;
+	uint32_t i = 0;
+
+	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
+		if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) {
+			return srv;
+		}
+		i++;
+		if(i >= searchCount) {
+			break;
+		}
+	}
+	return NULL;
+}
+
+int32_t dvbChannel_getServiceId(EIT_common_t *header)
+{
+	struct list_head *pos;
+	int32_t i = 0;
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) {
+			return i;
+		}
+		i++;
+	}
+	return -1;
+}
+
+static service_index_t *dvbChannel_getServiceIndex(uint32_t id)
+{
+	struct list_head *pos;
+	uint32_t i = 0;
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		if(i == id) {
+			return list_entry(pos, service_index_t, orderSort);
+		}
+		i++;
+	}
+	return NULL;
+}
+
+EIT_service_t *dvbChannel_getService(uint32_t id)
+{
+	service_index_t *srv = dvbChannel_getServiceIndex(id);
+	return srv ? srv->service : NULL;
+}
+
+int32_t dvbChannel_getIndex(EIT_service_t *service)
+{
+	struct list_head *pos;
+	int32_t i = 0;
+
+	if(service == NULL) {
+		return -2;
+	}
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		if(srv && (srv->service == service)) {
+			return i;
+		}
+		i++;
+	}
+
+	return -1;
+}
+
+static int32_t dvbChannel_hasSchedule(uint32_t serviceNumber)
+{
+	EIT_service_t *service = dvbChannel_getService(serviceNumber);
+	if(service == NULL) {
+		return 0;
+	}
+	return ((service->schedule != NULL) && dvb_hasMedia(service));
+}
+
+int32_t dvbChannel_hasAnyEPG(void)
+{
+	struct list_head *pos;
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
+		if((srvIdx == NULL) || (srvIdx->service == NULL)) {
+			continue;
+		}
+		if((srvIdx->service->schedule != NULL) && dvb_hasMedia(srvIdx->service)) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+//dvb_getNumberOfServices
+int32_t dvbChannel_getCount(void)
+{
+	return g_dvb_channels.count;
+}
+
+static service_index_t *dvbChannel_add(void)
+{
+	service_index_t *new = malloc(sizeof(service_index_t));
+	if(new == NULL) {
+		eprintf("%s()[%d]: Error allocating memory!\n", __func__, __LINE__);
+		return NULL;
+	}
+	memset(new, 0, sizeof(service_index_t));
+	list_add_tail(&new->orderNone, &g_dvb_channels.orderNoneHead);
+	list_add_tail(&new->orderSort, &g_dvb_channels.orderSortHead);
+	g_dvb_channels.count++;
+
+	return new;
+}
+
+static int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
+{
+	service_index_t *new = dvbChannel_add();
+	if(new) {
+		new->common = *common;
+		new->audio_track = audio_track;
+	} else {
+		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int32_t dvbChannel_addService(EIT_service_t *service)
+{
+  
+	service_index_t *new = dvbChannel_add();
+	if(new) {
+		new->service = service;
+		new->common = service->common;
+	} else {
+		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int32_t dvbChannel_remove(service_index_t *srvIdx)
+{
+	list_del(&srvIdx->orderNone);
+	list_del(&srvIdx->orderSort);
+	free(srvIdx);
+	g_dvb_channels.count--;
+
+	return 0;
+}
+
+static int32_t dvbChannel_readOrderConfig(void)
+{
+	char buf[BUFFER_SIZE];
+	FILE* fd;
+
+	fd = fopen(OFFAIR_SERVICES_FILENAME, "r");
+	if(fd == NULL) {
+		dprintf("%s: Failed to open '%s'\n", __FUNCTION__, OFFAIR_SERVICES_FILENAME);
+		return -1;
+	}
+	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
+		uint32_t media_id = 0;
+		uint16_t service_id = 0;
+		uint16_t transport_stream_id = 0;
+		uint16_t audio_track = 0;
+		int i;
+
+		if ( sscanf(buf, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu\n",
+			&i, &media_id, &service_id, &transport_stream_id, &audio_track) >= 4)
+		{
+			EIT_common_t common;
+
+			if(i < 0) {
+				continue;
+			}
+
+			common.media_id = media_id;
+			common.service_id = service_id;
+			common.transport_stream_id = transport_stream_id;
+
+			dvbChannel_addCommon(&common, audio_track);
+		}
+	}
+	fclose(fd);
+	dprintf("%s: imported %d services\n", __FUNCTION__, dvbChannel_getCount());
+
+	return 0;
+}
+
+
+static int32_t dvbChannel_writeOrderConfig(void)
+{
+	struct list_head *pos;
+	FILE *f;
+	uint32_t i = 0;
+#warning "Maybe need to keep empty list?"
+	if(list_empty(&g_dvb_channels.orderSortHead)) {
+		return -1;
+	}
+
+	f = fopen(OFFAIR_SERVICES_FILENAME, "w");
+
+	if(f == NULL) {
+		eprintf("%s: Failed to open '%s': %m\n", __FUNCTION__, OFFAIR_SERVICES_FILENAME);
+		return -1;
+	}
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
+		if(srvIdx->common.media_id || srvIdx->common.service_id || srvIdx->common.transport_stream_id) {
+			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu\n", i,
+				srvIdx->common.media_id,
+				srvIdx->common.service_id,
+				srvIdx->common.transport_stream_id,
+				srvIdx->audio_track);
+			i++;
+		}
+	}
+
+	fclose(f);
+
+	return 0;
+}
+
+int32_t dvbChannel_clearServices(void)
+{
+	struct list_head *pos;
+	//invalidate service pointers
+	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+		srvIdx->service = NULL;
+	}
+	return 0;
+}
+
+
+static int32_t dvbChannel_update(void)
+{
+	uint32_t old_count;
+	list_element_t	*service_element;
+	struct list_head		*pos;
+	struct list_head		*n;
+
+	if(list_empty(&g_dvb_channels.orderNoneHead)) {
+		dvbChannel_readOrderConfig();
+	} else {
+		dvbChannel_clearServices();
+	}
+
+	old_count = dvbChannel_getCount();
+	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+		service_index_t *p_srvIdx;
+		EIT_service_t *curService = (EIT_service_t *)service_element->data;
+
+		if(curService == NULL) {
+			continue;
+		}
+		p_srvIdx = dvbChannel_findServiceLimit(&curService->common, old_count);
+		if(p_srvIdx) {
+			p_srvIdx->service = curService;
+		} else {
+/*			if( dvb_hasMedia(curService) &&
+				(appControlInfo.offairInfo.dvbShowScrambled || (dvb_getScrambled(curService) == 0))
+			)*/
+
+			if(dvb_hasMedia(curService)) {
+				dvbChannel_addService(curService);
+			}
+		}
+	}
+
+	//clear from elements with no service pointer
+	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+		if(srvIdx->service == NULL) {
+			dvbChannel_remove(srvIdx);
+		}
+	}
+
+	dvbChannel_writeOrderConfig();
+
+	return 0;
+}
+
+
+static int32_t serviceIdx_cmp(const void *e1, const void *e2, void *arg)
+{
+	serviceSort_t sortOrderType = *((serviceSort_t *)arg);
+	service_index_t *srvIndx1 = *(service_index_t **)e1;
+	service_index_t *srvIndx2 = *(service_index_t **)e2;
+	EIT_service_t *s1;
+	EIT_service_t *s2;
+	int32_t result = 0;
+
+	if(!srvIndx1 || !srvIndx2) {
+		eprintf("%s:%s()[%d]: ERROR!!!\n", __FILE__, __func__, __LINE__);
+		return 0;
+	}
+	s1 = srvIndx1->service;
+	s2 = srvIndx2->service;
+	if(!s1 || !s2) {
+		eprintf("%s:%s()[%d]: ERROR!!!\n", __FILE__, __func__, __LINE__);
+		return 0;
+	}
+	if(sortOrderType == serviceSortType) {
+		result = dvb_hasMediaType(s2, mediaTypeVideo) - dvb_hasMediaType(s1, mediaTypeVideo);
+	} else if(sortOrderType == serviceSortFreq) {
+		__u32 f1,f2;
+		dvb_getServiceFrequency(s1, &f1);
+		dvb_getServiceFrequency(s2, &f2);
+		if(f1 > f2) {
+			result = 1;
+		} else if(f2 > f1) {
+			result = -1;
+		}
+	}
+
+	if(result == 0) {
+		char *n1 = dvb_getServiceName(s1);
+		char *n2 = dvb_getServiceName(s2);
+		return strcasecmp(n1, n2);
+	}
+	return result;
+}
+
+static int32_t dvbChannel_sort(serviceSort_t sortType)
+{
+#define MAX_DVB_CHANNELS_SORT	512
+
+	if(sortType == g_dvb_channels.sortOrderType) {
+		return 0;
+	}
+
+	g_dvb_channels.sortOrderType = sortType;
+	if(sortType == serviceSortNone) {
+		struct list_head *pos;
+
+		INIT_LIST_HEAD(&g_dvb_channels.orderSortHead);
+		list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+			service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+			list_add_tail(&(srvIdx->orderSort), &g_dvb_channels.orderSortHead);
+		}
+	} else {
+		service_index_t *sortingBuf[MAX_DVB_CHANNELS_SORT];
+		struct list_head *pos;
+		struct list_head *n;
+		uint32_t i = 0;
+		uint32_t count = dvbChannel_getCount();
+
+		if(count > MAX_DVB_CHANNELS_SORT) {
+			count = MAX_DVB_CHANNELS_SORT;
+			eprintf("%s()[%d]: Too much channels, sort only first %d!\n", __func__, __LINE__, count);
+		}
+		list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+			if(i >= count) {
+				break;
+			}
+			sortingBuf[i] = list_entry(pos, service_index_t, orderNone);
+			i++;
+		}
+
+		if(count > i) {
+			count = i;
+		}
+		//empty orderSort list
+		list_for_each_safe(pos, n, &g_dvb_channels.orderSortHead) {
+			list_del_init(pos);
+		}
+		if(!list_empty(&g_dvb_channels.orderSortHead)) {
+			eprintf("%s()[%d]: Something wrong!!!!!!\n", __func__, __LINE__);
+		}
+
+		qsort_r(sortingBuf, count, sizeof(sortingBuf[0]), serviceIdx_cmp, &g_dvb_channels.sortOrderType);
+
+		for(i = 0; i < count; i++) {
+			list_add_tail(&(sortingBuf[i]->orderSort), &g_dvb_channels.orderSortHead);
+		}
+	}
+
+	return 0;
+}
+
+static int32_t dvbChannel_initServices(void)
+{
+	dvbChannel_update();
+	offair_sortSchedule();
+
+	//return dvbChannel_getCount();
+#ifdef ENABLE_STATS
+	stats_load();
+#endif
+
+	return 0;
+}
+
 
 tunerFormat offair_getTuner(void)
 {
@@ -603,10 +1046,9 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 				interface_refreshMenu(pMenu);
 				output_showDVBMenu(pMenu, NULL);
 				offair_fillDVBTMenu();
-				offair_fillDVBTOutputMenu(which);
-	#ifdef ENABLE_PVR
+#ifdef ENABLE_PVR
 				pvr_updateSettings();
-	#endif
+#endif
 			}
 			dvb_clearNIT(&nit);
 
@@ -644,7 +1086,6 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	interface_refreshMenu(pMenu);
 	output_showDVBMenu(pMenu, NULL);
 	offair_fillDVBTMenu();
-	offair_fillDVBTOutputMenu(screenMain);
 #ifdef ENABLE_PVR
 	pvr_updateSettings();
 #endif*/
@@ -765,7 +1206,6 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 			interface_refreshMenu(pMenu);
 			output_showDVBMenu(pMenu, NULL);
 			offair_fillDVBTMenu();
-			offair_fillDVBTOutputMenu(which);
 #ifdef ENABLE_PVR
 			pvr_updateSettings();
 #endif
@@ -792,8 +1232,7 @@ void offair_stopVideo(int which, int reset)
 {
 	mysem_get(offair_semaphore);
 
-	if (appControlInfo.dvbInfo.active)
-	{
+	if(appControlInfo.dvbInfo.active) {
 		interface_playControlSelect(interfacePlayControlStop);
 
 #ifdef ENABLE_DVB_DIAG
@@ -809,27 +1248,27 @@ void offair_stopVideo(int which, int reset)
 		offair_multiviewInstance_t multiviewStopInstance;
 		int thread_create = -1;
 		/* Force stop provider in multiview mode */
-		if(appControlInfo.multiviewInfo.count>0 && appControlInfo.multiviewInfo.source == streamSourceDVB)
-		{
-			multiviewStopInstance.stop 	= 	0;
-			multiviewStopInstance.exit	=	0;
+		if((appControlInfo.multiviewInfo.count > 0) && (appControlInfo.multiviewInfo.source == streamSourceDVB)) {
+			multiviewStopInstance.stop = 0;
+			multiviewStopInstance.exit = 0;
 			thread_create = pthread_create(&multiviewStopInstance.thread, NULL,  offair_multiviewStopThread,  &multiviewStopInstance);
 		}
 		/* Force stop provider in multiview mode */
 		gfx_stopVideoProvider(which, reset || (appControlInfo.multiviewInfo.count > 0), 1);
-		if(!thread_create)
-		{
+		if(!thread_create) {
 			appControlInfo.multiviewInfo.count = 0;
 			multiviewStopInstance.stop = 1;
-			while(!multiviewStopInstance.exit)
+			while(!multiviewStopInstance.exit) {
 				usleep(100000);
+			}
 		}
 #else
 		gfx_stopVideoProvider(which, reset, 1);
 #endif
 #ifdef ENABLE_PVR
-		if (pvr_isRecordingDVB())
+		if(pvr_isRecordingDVB()) {
 			pvr_stopPlayback(screenMain);
+		}
 #endif
 
 		dprintf("%s: Stop video \n", __FUNCTION__);
@@ -847,6 +1286,7 @@ void offair_stopVideo(int which, int reset)
 	mysem_release(offair_semaphore);
 }
 
+#warning "TODO: Remove offair_services[] in offair_audioChange()! This not include for STSDK compile."
 #ifndef STSDK
 static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
@@ -866,20 +1306,19 @@ static int offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
 		case interfaceCommandGreen:
-			if (offair_services[appControlInfo.dvbInfo.channel].audio_track != selected)
-			{
+			if(offair_services[appControlInfo.dvbInfo.channel].audio_track != selected) {
 				if (dvb_getAudioType(current_service(), selected) !=
 				    dvb_getAudioType(current_service(), offair_services[appControlInfo.dvbInfo.channel].audio_track))
 				{
 					offair_stopVideo(which, 0);
 					offair_services[appControlInfo.dvbInfo.channel].audio_track = selected;
 					offair_startVideo(which);
-				} else
-				{
+				} else {
 					dvb_changeAudioPid(appControlInfo.dvbInfo.tuner, dvb_getAudioPid(current_service(), selected));
 					offair_services[appControlInfo.dvbInfo.channel].audio_track = selected;
 				}
-				offair_exportServices(OFFAIR_SERVICES_FILENAME);
+
+				dvbChannel_writeOrderConfig();
 			}
 			return 0;
 		case interfaceCommandDown:
@@ -928,28 +1367,24 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 
 	dprintf("%s: in %d\n", __FUNCTION__, button);
 
-	if ( button == interfacePlayControlPrevious )
-	{
+	if(button == interfacePlayControlPrevious) {
 		offair_startNextChannel(1, pArg);
-	} else if ( button == interfacePlayControlNext )
-	{
+	} else if(button == interfacePlayControlNext) {
 		offair_startNextChannel(0, pArg);
-	} else if ( button == interfacePlayControlPlay )
-	{
+	} else if(button == interfacePlayControlPlay) {
 		dprintf("%s: play\n", __FUNCTION__);
-		if (!appControlInfo.dvbInfo.active) {
-			if (appControlInfo.playbackInfo.streamSource == streamSourceDVB) {
+		if(!appControlInfo.dvbInfo.active) {
+			if(appControlInfo.playbackInfo.streamSource == streamSourceDVB) {
 				offair_startVideo(which);
-			} else if (appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV) {
+			} else if(appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV) {
 				interfaceMenu_t *channelMenu = _M &DVBTMenu;
-				analogtv_activateChannel(channelMenu, appControlInfo.tvInfo.id);
+				analogtv_activateChannel(channelMenu, (void *)appControlInfo.tvInfo.id);
 			}
 		}
-	} else if ( button == interfacePlayControlStop )
-	{
+	} else if(button == interfacePlayControlStop) {
 		dprintf("%s: stop\n", __FUNCTION__);
 #ifdef ENABLE_PVR
-		if (pvr_isPlayingDVB(which)) {
+		if(pvr_isPlayingDVB(which)) {
 			pvr_stopRecordingDVB(which);
 			if(appControlInfo.dvbInfo.channel > 0) {
 				char desc[BUFFER_SIZE];
@@ -959,8 +1394,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		}
 #endif
 		offair_stopVideo(which, 1);
-	} else if (button == interfacePlayControlInfo)
-	{
+	} else if(button == interfacePlayControlInfo) {
 #ifdef ENABLE_DVB_DIAG
 		/* Make diagnostics... */
 		//if (appControlInfo.offairInfo.diagnosticsMode == DIAG_ON)
@@ -977,10 +1411,9 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		return 0;
 	} else
 #ifndef STSDK
-	if (button == interfacePlayControlAudioTracks) {
+	if(button == interfacePlayControlAudioTracks) {
 		//dprintf("%S: request change tracks\n", __FUNCTION__);
-		if (dvb_getAudioCount(current_service()) > 0)
-		{
+		if(dvb_getAudioCount(current_service()) > 0) {
 			//dprintf("%s: display change tracks\n", __FUNCTION__);
 			offair_audioChange(interfaceInfo.currentMenu, NULL, CHANNEL_INFO_SET(which, 0));
 		}
@@ -998,7 +1431,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	} else
 #endif // DVB_FAVORITES
 #ifdef ENABLE_PVR
-	if (button == interfacePlayControlRecord) {
+	if(button == interfacePlayControlRecord) {
 		pvr_toogleRecordingDVB();
 	} else
 #endif
@@ -1014,6 +1447,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 	return 0;
 }
 
+#warning "TODO: Remove offair_services[] in offair_multiviewPlay()!"
 #ifdef ENABLE_MULTI_VIEW
 static void *offair_multiviewStopThread(void* pArg)
 {
@@ -1072,7 +1506,7 @@ static int offair_multiviewPlay( interfaceMenu_t *pMenu, void *pArg)
 	mvCount = 1;
 	for (i = channelNumber+1;
 	     mvCount < 4 && i != channelNumber;
-	     i = (i+1) % offair_indexCount)
+	     i = (i+1) % dvbChannel_getCount())
 	{
 		if (can_play(i) &&
 		    offair_services[i].service->media.type == offair_services[channelNumber].service->media.type &&
@@ -1122,7 +1556,7 @@ static int offair_multiviewNext(int direction, void* pArg)
 	{
 		do
 		{
-			newIndex = (newIndex + offair_serviceCount + indexdiff) % offair_serviceCount;
+			newIndex = (newIndex + dvbChannel_getCount() + indexdiff) % dvbChannel_getCount();
 		} while (newIndex != channelIndex && (!can_play(newIndex) || !has_video(newIndex)));
 		if( newIndex == channelIndex )
 		{
@@ -1495,7 +1929,7 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 	{
 		case interfaceCommandUp:
 		case interfaceCommandDown:
-			interface_menuActionShowMenu(interfaceInfo.currentMenu, &DVBTOutputMenu);
+			interface_menuActionShowMenu(interfaceInfo.currentMenu, (void*)&DVBTMenu);
 			interface_showMenu(1, 1);
 			return 0;
 		case interfaceCommand0:
@@ -1555,58 +1989,66 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 static int offair_audioChanged(void* pArg)
 {
 	int selected = GET_NUMBER(pArg);
-	if (appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
-		offair_services[appControlInfo.dvbInfo.channel].audio_track = selected;
-		offair_exportServices(OFFAIR_SERVICES_FILENAME);
+	if(appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
+		service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+		if(srvIdx == NULL) {
+			return -1;
+		}
+		srvIdx->audio_track = selected;
+
+		dvbChannel_writeOrderConfig();
 	}
 	return 0;
 }
 
 void offair_startVideo(int which)
 {
-	if (current_service() == NULL) {
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+	EIT_service_t *service;
+	if((srvIdx == NULL) || (srvIdx->service == NULL)) {
 		eprintf("%s: Failed to start channel %d: offair service is NULL\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
 		return;
 	}
-	appControlInfo.dvbInfo.tuner = offair_findCapableTuner(current_service());
+	service = srvIdx->service;
+	appControlInfo.dvbInfo.tuner = offair_findCapableTuner(service);
 
 	DvbParam_t param;
 	param.frequency = 0;
 	param.mode = DvbMode_Watch;
 	param.adapter = dvb_getAdapter(appControlInfo.dvbInfo.tuner);
-	param.media = &current_service()->media;
-	param.param.liveParam.channelIndex = dvb_getServiceIndex(current_service());
-	param.param.liveParam.audioIndex = offair_services[appControlInfo.dvbInfo.channel].audio_track;
+	param.media = &service->media;
+	param.param.liveParam.channelIndex = dvb_getServiceIndex(service);
+	param.param.liveParam.audioIndex = srvIdx->audio_track;
 	param.directory = NULL;
 
-	if (current_service()->program_map.map.streams == NULL ||
-	   (current_service()->flags & serviceFlagHasPMT) == 0)
+	if (service->program_map.map.streams == NULL ||
+	   (service->flags & serviceFlagHasPMT) == 0)
 	{
 		offair_stopVideo(which, 1);
 		interface_showMessageBox(_T("DVB_SCANNING_SERVICE"), thumbnail_loading, 0);
 		eprintf("offair: Channel '%s' has no PMT info, force rescan on %lu Hz, type %d\n",
-			dvb_getServiceName(current_service()),
-			current_service()->media.frequency,
-			current_service()->media.type);
+			dvb_getServiceName(service),
+			service->media.frequency,
+			service->media.type);
 		dvb_frequencyScan(appControlInfo.dvbInfo.tuner,
-			 current_service()->media.frequency,
-			&current_service()->media, NULL, NULL, 1, NULL);
+			 service->media.frequency,
+			&service->media, NULL, NULL, 1, NULL);
 // 		offair_fillDVBTMenu();
-		offair_fillMenuEntry();
-		offair_fillDVBTOutputMenu(screenMain);
+		offair_updateChannelStatus();
+
 		interface_hideMessageBox();
 	}
 
-	if (current_service()->program_map.map.streams == NULL ||
-	   (current_service()->flags & serviceFlagHasPMT) == 0)
+	if (service->program_map.map.streams == NULL ||
+	   (service->flags & serviceFlagHasPMT) == 0)
 	{
-		eprintf("offair: Channel '%s' has no PIDs!\n", dvb_getServiceName(current_service()));
+		eprintf("offair: Channel '%s' has no PIDs!\n", dvb_getServiceName(service));
 		interface_showMessageBox(_T("ERR_NO_STREAMS_IN_CHANNEL"), thumbnail_error, 0);
 		return;
 	}
 
-	int audio_type = dvb_getAudioType(current_service(), offair_services[appControlInfo.dvbInfo.channel].audio_track);
-	int video_type = dvb_getVideoType(current_service());
+	int audio_type = dvb_getAudioType(service, srvIdx->audio_track);
+	int video_type = dvb_getVideoType(service);
 
 #ifdef ENABLE_DVB_DIAG
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
@@ -1618,7 +2060,7 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
 #endif
 
-	offair_startDvbVideo(which,&param,audio_type, video_type);
+	offair_startDvbVideo(which, &param,audio_type, video_type);
 }
 
 static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type)
@@ -1700,9 +2142,10 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 		return;
 	}
 #ifdef STSDK
-	if (offair_services[appControlInfo.dvbInfo.channel].audio_track) {
-		eprintf("%s: set audio %u\n", __func__, offair_services[appControlInfo.dvbInfo.channel].audio_track);
-		gfx_setVideoProviderAudioStream(which, offair_services[appControlInfo.dvbInfo.channel].audio_track);
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+	if(srvIdx && srvIdx->audio_track) {
+		eprintf("%s: set audio %u\n", __func__, srvIdx->audio_track);
+		gfx_setVideoProviderAudioStream(which, srvIdx->audio_track);
 	}
 #endif
 
@@ -1877,29 +2320,28 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	int channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	char desc[BUFFER_SIZE];
 	int buttons;
+	EIT_service_t *service = dvbChannel_getService(channelNumber);
 
 	dprintf("%s: channelNumber = %d\n", __FUNCTION__, channelNumber);
 
-	if (dvb_getServiceID(offair_services[channelNumber].service) == -1 ) {
+	if((service == NULL) || (dvb_getServiceID(service) == -1)) {
 		eprintf("%s: Unknown service for channel %d\n", __FUNCTION__, channelNumber);
 		return -1;
 	}
 
-	if (!dvb_hasMedia(offair_services[channelNumber].service))
-	{
+	if(!dvb_hasMedia(service)) {
 		eprintf("%s: Scrambled or media-less service ignored %d\n", __FUNCTION__, channelNumber);
 		return -1;
 	}
 
-	if (offair_findCapableTuner(offair_services[channelNumber].service) < 0) {
-		eprintf("%s: no tuner found to handle media type %d\n", __FUNCTION__, offair_services[channelNumber].service->media.type);
+	if(offair_findCapableTuner(service) < 0) {
+		eprintf("%s: no tuner found to handle media type %d\n", __FUNCTION__, service->media.type);
 		interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 3000);
 		return -1;
 	}
 
 #if (defined ENABLE_PVR) && (defined STBPNX)
-	if (pvr_isRecordingDVB())
-	{
+	if(pvr_isRecordingDVB()) {
 		if (offair_getIndex(appControlInfo.pvrInfo.dvb.channel) == channelNumber)
 			pvr_startPlaybackDVB(screenMain);
 		else
@@ -1907,8 +2349,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		return 0;
 	}
 #endif
-	if ( appControlInfo.dvbInfo.active != 0 )
-	{
+	if(appControlInfo.dvbInfo.active != 0) {
 		//interface_playControlSelect(interfacePlayControlStop);
 		// force showState to NOT be triggered
 		interfacePlayControl.activeButton = interfacePlayControlStop;
@@ -1920,28 +2361,27 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
 	appControlInfo.mediaInfo.bHttp = 0;
 	appControlInfo.dvbInfo.channel = channelNumber;
-	appControlInfo.dvbInfo.scrambled = dvb_getScrambled(offair_services[channelNumber].service);
+	appControlInfo.dvbInfo.scrambled = dvb_getScrambled(service);
 
 	buttons  = interfacePlayControlStop|interfacePlayControlPlay|interfacePlayControlPrevious|interfacePlayControlNext;
 	buttons |= appControlInfo.playbackInfo.playlistMode != playlistModeFavorites ?
 	           interfacePlayControlAddToPlaylist : interfacePlayControlMode;
 
-	offair_getServiceDescription(offair_services[channelNumber].service,desc,_T("DVB_CHANNELS"));
+	offair_getServiceDescription(service, desc, _T("DVB_CHANNELS"));
 	appControlInfo.playbackInfo.channel = channelNumber;
 
 	interface_playControlSetInputFocus(inputFocusPlayControl);
-	interface_playControlSetup(offair_play_callback, NULL, buttons, desc,
-	                           service_thumbnail(offair_services[channelNumber].service));
+	interface_playControlSetup(offair_play_callback, NULL, buttons, desc, service_thumbnail(service));
 	interface_playControlSetDisplayFunction(offair_displayPlayControl);
 	interface_playControlSetProcessCommand(offair_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, offair_setChannel);
 	interface_playControlSetAudioCallback(offair_audioChanged);
-	interface_channelNumberShow(appControlInfo.playbackInfo.channel);
+	interface_channelNumberShow(channelNumber + 1);
 
 
 	offair_startVideo(screenMain);
 // 	offair_fillDVBTMenu();
-	offair_fillMenuEntry();
+//	offair_updateChannelStatus();
 	saveAppSettings();
 
 	if ( appControlInfo.dvbInfo.active != 0 )
@@ -1956,137 +2396,93 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
+char *offair_getChannelNumberPrefix(uint32_t id)
+{
+	int32_t serviceCount;
+	static char numberStr[8];
+	const char *format;
+	const char *formats[] = {
+		"%d",
+		"%02d",
+		"%03d",
+	};
+
+	serviceCount = dvbChannel_getCount() + analogtv_getChannelCount();
+	if(serviceCount < 10) {
+		format = formats[0];
+	} else if(serviceCount < 100) {
+		format = formats[1];
+	} else {
+		format = formats[2];
+	}
+	snprintf(numberStr, sizeof(numberStr), format, id + 1);
+
+	return numberStr;
+}
+
 static void offair_addDVBChannelsToMenu()
 {
-	char channelEntry[MENU_ENTRY_INFO_LENGTH];
-	EIT_service_t *service;
-	serviceMediaType_t lastDelSys = serviceMediaNone;
-	int radio, scrambled;
-	__u32 lastFreqency = 0, serviceFrequency;
-	char lastChar = 0, curChar, *serviceName, *str;
-
 	interfaceMenu_t *channelMenu = _M &DVBTMenu;
-	offair_servicesRenumbering();
-	offair_fillMenuEntry();
-	int selectedMenuItem = MENU_ITEM_BACK;
+	struct list_head *pos;
+	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+	int32_t i = 0;
+
+	offair_updateChannelStatus();
 
 	interface_addMenuEntryDisabled(channelMenu, "DVB", 0);
-	for (int i = 0; i < offair_indexCount; ++i )
-	{
-		service = offair_services[offair_indeces[i]].service;
-		scrambled = dvb_getScrambled( service );
+
+// 	for(int i = 0; i < dvbChannel_getCount(); ++i) {
+// 		EIT_service_t *service = dvbChannel_getService(i);
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		EIT_service_t *service = srv->service;
+		interfaceMenuEntry_t *entry;
+		char *serviceName;
+		int32_t radio;
+		int32_t scrambled;
+
+		scrambled = dvb_getScrambled(service);
+		if((appControlInfo.offairInfo.dvbShowScrambled == 0) && scrambled) {
+			continue;
+		}
 		radio = service->service_descriptor.service_type == 2;
 		serviceName = dvb_getServiceName(service);
 
-		if (appControlInfo.dvbInfo.channel == offair_indeces[i])
-			selectedMenuItem = interface_getMenuEntryCount(channelMenu);
+		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
+		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, i),
+								scrambled ? thumbnail_billed : ( radio ? thumbnail_radio : thumbnail_channels));
 
-		if (offair_serviceCount < 10)
-			sprintf(channelEntry, "%d",   offair_indeces[i]);
-		else if (offair_serviceCount < 100)
-			sprintf(channelEntry, "%02d", offair_indeces[i]);
-		else
-			sprintf(channelEntry, "%03d", offair_indeces[i]);
-
-		snprintf(&channelEntry[strlen(channelEntry)], MENU_ENTRY_INFO_LENGTH - 3, ". %s", serviceName);
-		channelEntry[MENU_ENTRY_INFO_LENGTH-1] = 0;
-		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, offair_indeces[i]),
-			scrambled ? thumbnail_billed : ( radio ? thumbnail_radio : thumbnail_channels));
-
-		interface_setMenuEntryLabel (&channelMenu->menuEntry[channelMenu->menuEntryCount-1], "DVB");
-		
-		if( (appControlInfo.playbackInfo.streamSource == streamSourceDVB) &&
-			(appControlInfo.dvbInfo.channel == offair_indeces[i]) )
-		{
-			interface_setSelectedItem(channelMenu, channelMenu->menuEntryCount - 1);
+		entry = menu_getLastEntry(channelMenu);
+		if(entry) {
+			interface_setMenuEntryLabel(entry, "DVB");
 		}
+
+		if(appControlInfo.dvbInfo.channel == i) {
+			interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
+		}
+		i++;
 	}
-	if (offair_indexCount == 0) {
+	if(dvbChannel_getCount() == 0) {
 		strcpy(channelEntry, _T("NO_CHANNELS"));
 		interface_addMenuEntryDisabled(channelMenu, channelEntry, thumbnail_info);
 	}
-	interface_setSelectedItem(channelMenu, selectedMenuItem);
-}
-
-void offair_fillDVBTOutputMenu(int which)
-{
-	char channelEntry[MENU_ENTRY_INFO_LENGTH];
-	EIT_service_t *service;
-	int radio, scrambled, type = -1;
-	__u32 lastFreqency = 0, serviceFrequency;
-	char lastChar = 0, curChar, *serviceName, *str;
-
-	interfaceMenu_t *channelMenu = _M &DVBTOutputMenu;
-	interface_clearMenuEntries(channelMenu);
-	interface_addMenuEntryDisabled(channelMenu, "DVB", 0 );
-
-	//dprintf("%s: got %d channels for layer %d\n", __FUNCTION__, dvb_getNumberOfChannels(), which);
-
-	offair_initServices();
-
-	int selectedMenuItem = MENU_ITEM_BACK;
-	for (int i = 0; i < offair_indexCount; ++i )
-	{
-		service = offair_services[offair_indeces[i]].service;
-		scrambled = dvb_getScrambled( service );
-		radio = service_isRadio(service);
-		serviceName = dvb_getServiceName(service);
-
-		if (appControlInfo.dvbInfo.channel == offair_indeces[i])
-			selectedMenuItem = interface_getMenuEntryCount(channelMenu);
-
-		if (offair_serviceCount < 10)
-			sprintf(channelEntry, "%d",   offair_indeces[i]);
-		else if (offair_serviceCount < 100)
-			sprintf(channelEntry, "%02d", offair_indeces[i]);
-		else
-			sprintf(channelEntry, "%03d", offair_indeces[i]);
-
-		snprintf(&channelEntry[strlen(channelEntry)], MENU_ENTRY_INFO_LENGTH - 3, ". %s", serviceName);
-		channelEntry[MENU_ENTRY_INFO_LENGTH-1] = 0;
-		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(which, offair_indeces[i]),
-			scrambled ? thumbnail_billed : ( radio ? thumbnail_radio : thumbnail_channels));
-	}
-	if (offair_indexCount == 0) {
-		strcpy(channelEntry, _T("NO_CHANNELS"));
-		interface_addMenuEntryDisabled(channelMenu, channelEntry, thumbnail_info);
-	}
-	interface_setSelectedItem(channelMenu, selectedMenuItem);
-}
-
-static void offair_initDVBTOutputMenu(interfaceMenu_t *pParent, int which)
-{
-	int offair_icons[4] = { 
-		statusbar_f1_sorting, 
-		statusbar_f2_info,
-#ifdef ENABLE_FAVORITES
-		statusbar_f3_add,
-#else
-		0,
-#endif
-		statusbar_f4_number };
-	//int position = 0;
-	createListMenu(&DVBTOutputMenu, which == screenMain ? _T("MAIN_LAYER") : _T("PIP_LAYER"), thumbnail_dvb, offair_icons, pParent,
-		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
-	interface_setCustomKeysCallback(_M &DVBTOutputMenu, offair_keyCallback);
-
-	offair_fillDVBTOutputMenu(which);
 }
 
 int offair_setChannel(int channel, void* pArg)
 {
 	int which = GET_NUMBER(pArg);
-	if (channel < 0) return 1;
+	if(channel < 0) {
+		return 1;
+	}
 
-	if ((channel < offair_serviceCount) && (offair_services[channel].service != NULL))
-	{
+	if((channel < dvbChannel_getCount()) && (dvbChannel_getService(channel) != NULL)) {
 		printf("%s: offair_channelChange...\n", __FUNCTION__);
 		offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, channel));
 		return 0;
 	}
 
-	if (channel >= offair_serviceCount){
-		channel = channel - offair_serviceCount;
+	if(channel >= dvbChannel_getCount()) {
+		channel = channel - dvbChannel_getCount();
 		analogtv_activateChannel(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, channel));
 		return 0;
 	}
@@ -2105,11 +2501,11 @@ int offair_startNextChannel(int direction, void* pArg)
 	dprintf("%s: %d, screen%s\n", __FUNCTION__, direction, which == screenMain ? "Main" : "Pip" );
 	direction = direction == 0 ? 1 : -1;
 	for(
-		i = (appControlInfo.dvbInfo.channel + offair_serviceCount + direction ) % offair_serviceCount;
-		i != appControlInfo.dvbInfo.channel && (!can_play(i) || !dvb_hasMedia(offair_services[i].service));
-		i = (i + direction + offair_serviceCount) % offair_serviceCount );
+		i = (appControlInfo.dvbInfo.channel + dvbChannel_getCount() + direction ) % dvbChannel_getCount();
+		i != appControlInfo.dvbInfo.channel && (!can_play(i) || !dvb_hasMedia(dvbChannel_getService(i)));
+		i = (i + direction + dvbChannel_getCount()) % dvbChannel_getCount() );
 
-	dprintf("%s: i = %d, ch = %d, total = %d\n", __FUNCTION__, i, appControlInfo.dvbInfo.channel, offair_serviceCount);
+	dprintf("%s: i = %d, ch = %d, total = %d\n", __FUNCTION__, i, appControlInfo.dvbInfo.channel, dvbChannel_getCount());
 
 	if (i != appControlInfo.dvbInfo.channel)
 		offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, i));
@@ -2133,23 +2529,21 @@ static int offair_confirmAutoScan(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 
 int offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg)
 {
-	if( dvb_getNumberOfServices() == 0 && analogtv_getChannelCount() == 0)
-	{
+	if((dvbChannel_getCount() == 0) && (analogtv_getChannelCount() == 0)) {
 		output_showDVBMenu(pMenu, NULL);
 		interface_showConfirmationBox( _T("DVB_NO_CHANNELS"), thumbnail_dvb, offair_confirmAutoScan, NULL);
 		return 1;
 	}
 
 	/* Auto play */
-	if (appControlInfo.playbackInfo.bAutoPlay &&
-	    gfx_videoProviderIsActive( screenMain ) == 0 &&
-	    appControlInfo.slideshowInfo.state == slideshowDisabled &&
-	    offair_indexCount > 0)
+	if(  appControlInfo.playbackInfo.bAutoPlay &&
+		(gfx_videoProviderIsActive( screenMain ) == 0) &&
+		(appControlInfo.slideshowInfo.state == slideshowDisabled) &&
+		(dvbChannel_getCount() > 0))
 	{
 		dprintf("%s: Auto play dvb channel = %d\n", __FUNCTION__,appControlInfo.dvbInfo.channel);
-		if( appControlInfo.dvbInfo.channel <= 0 || appControlInfo.dvbInfo.channel >= dvb_getNumberOfServices() )
-		{
-			appControlInfo.dvbInfo.channel = offair_indeces[0];
+		if((appControlInfo.dvbInfo.channel < 0) || (appControlInfo.dvbInfo.channel > dvbChannel_getCount())) {
+			appControlInfo.dvbInfo.channel = 0;
 		}
 		offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
 	}
@@ -2161,93 +2555,93 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 {
 	interfaceEpgMenu_t *pEpg = (interfaceEpgMenu_t *)pMenu;
 	list_element_t *event_element;
+
+	service_index_t *srvIdx;
 	EIT_event_t *event;
 	time_t event_start, event_end;
 	int i, events_found;
 
-	if( GET_NUMBER(pArg) < 0 ) // double call fix
-	{
+	if(GET_NUMBER(pArg) < 0) {// double call fix
 		return 0;
 	}
 
 	pEpg->currentService = GET_NUMBER(pArg);
 	pEpg->serviceOffset = 0;
-	if( offair_services[pEpg->serviceOffset].service == NULL || offair_services[pEpg->serviceOffset].service->schedule == NULL || dvb_hasMedia(offair_services[pEpg->serviceOffset].service) == 0)
-	{
-		for( pEpg->serviceOffset = 0; pEpg->serviceOffset < offair_serviceCount; pEpg->serviceOffset++ )
-		{
-			if( offair_services[pEpg->serviceOffset].service != NULL && offair_services[pEpg->serviceOffset].service->schedule != NULL && dvb_hasMedia(offair_services[pEpg->serviceOffset].service) != 0 )
-			{
+
+	if(!dvbChannel_hasSchedule(pEpg->serviceOffset)) {
+		for(pEpg->serviceOffset = 0; pEpg->serviceOffset < dvbChannel_getCount(); pEpg->serviceOffset++) {
+			if(dvbChannel_hasSchedule(pEpg->serviceOffset)) {
 				break;
 			}
 		}
-		if( pEpg->serviceOffset == offair_serviceCount || offair_services[pEpg->serviceOffset].service == NULL || offair_services[pEpg->serviceOffset].service->schedule == NULL || dvb_hasMedia(offair_services[pEpg->serviceOffset].service) == 0)
-		{
+		if((pEpg->serviceOffset == dvbChannel_getCount()) || !dvbChannel_hasSchedule(pEpg->serviceOffset)) {
 			interface_showMessageBox(_T("EPG_UNAVAILABLE"), thumbnail_error, 3000);
 			return 1;
 		}
 	}
-	if(offair_services[pEpg->currentService].service == NULL || offair_services[pEpg->currentService].service->schedule == NULL || dvb_hasMedia(offair_services[pEpg->currentService].service) == 0)
-	{
+	if(!dvbChannel_hasSchedule(pEpg->currentService)) {
 		pEpg->currentService = pEpg->serviceOffset;
-		for( pEpg->serviceOffset++; pEpg->serviceOffset < offair_serviceCount; pEpg->serviceOffset++ )
-		{
-			if( offair_services[pEpg->serviceOffset].service != NULL && offair_services[pEpg->serviceOffset].service->schedule != NULL && dvb_hasMedia(offair_services[pEpg->serviceOffset].service) != 0)
-			{
+		for(pEpg->serviceOffset++; pEpg->serviceOffset < dvbChannel_getCount(); pEpg->serviceOffset++) {
+			if(dvbChannel_hasSchedule(pEpg->serviceOffset)) {
 				break;
 			}
 		}
 	}
-	dprintf("%s: Found valid service #%d %s\n", __FUNCTION__, pEpg->currentService, dvb_getServiceName(offair_services[pEpg->currentService].service));
+
+	dprintf("%s: Found valid service #%d %s\n", __FUNCTION__, pEpg->currentService, dvb_getServiceName(dvbChannel_getService(pEpg->currentService)));
 
 	time( &pEpg->curOffset );
 	pEpg->minOffset = pEpg->maxOffset = pEpg->curOffset = 3600 * (pEpg->curOffset / 3600); // round to hours
 	events_found = 0;
-	for( i = 0; i < offair_serviceCount; i++)
-	{
-		offair_services[i].first_event = NULL;
-		if( offair_services[i].service != NULL && offair_services[i].service->schedule != NULL && dvb_hasMedia(offair_services[i].service) != 0 )
-		{
-			for( event_element = offair_services[i].service->schedule; event_element != NULL; event_element = event_element->next)
-			{
+	for(i = 0; i < dvbChannel_getCount(); i++) {
+		srvIdx = dvbChannel_getServiceIndex(i);
+		if(srvIdx == NULL) {
+			continue;
+		}
+		srvIdx->first_event = NULL;
+		if(srvIdx->service != NULL && srvIdx->service->schedule != NULL && dvb_hasMedia(srvIdx->service) != 0) {
+			for(event_element = srvIdx->service->schedule; event_element != NULL; event_element = event_element->next) {
 				event = (EIT_event_t *)event_element->data;
-				if(offair_getLocalEventTime(event, NULL, &event_start) == 0 )
-				{
+				if(offair_getLocalEventTime(event, NULL, &event_start) == 0) {
 					event_end = event_start + offair_getEventDuration(event);
-					if( offair_services[i].first_event == NULL && event_end > pEpg->minOffset )
-					{
-						offair_services[i].first_event = event_element;
+					if(srvIdx->first_event == NULL && event_end > pEpg->minOffset) {
+						srvIdx->first_event = event_element;
 						events_found = 1;
 					}
 					/* Skip older events
-					if( event_start < pEpg->minOffset )
-					{
-					pEpg->minOffset = 3600 * (event_start / 3600);
+					if(event_start < pEpg->minOffset) {
+						pEpg->minOffset = 3600 * (event_start / 3600);
 					}*/
 					event_end -= 3600 * pEpg->displayingHours;
-					if( event_end > pEpg->maxOffset)
-					{
+					if(event_end > pEpg->maxOffset) {
 						pEpg->maxOffset = 3600 * (event_end / 3600 + 1);
 					}
 				}
 			}
 		}
 	}
-	if( events_found == 0 )
-	{
+	if(events_found == 0) {
 		interface_showMessageBox(_T("EPG_UNAVAILABLE"), thumbnail_error, 3000);
 		return -1;
 	}
-	if( pEpg->maxOffset - pEpg->minOffset < ERM_DISPLAYING_HOURS * 3600 )
-	{
+	if(pEpg->maxOffset - pEpg->minOffset < ERM_DISPLAYING_HOURS * 3600) {
 		pEpg->maxOffset = pEpg->minOffset + ERM_DISPLAYING_HOURS * 3600;
 	}
-	pEpg->highlightedEvent = offair_services[pEpg->currentService].first_event;
-	if( pEpg->highlightedEvent == NULL )
-	{
-		for( pEpg->currentService = 0; offair_services[pEpg->currentService].first_event == NULL; pEpg->currentService++ );
-		pEpg->highlightedEvent = offair_services[pEpg->currentService].first_event;
+	srvIdx = dvbChannel_getServiceIndex(pEpg->currentService);
+	if(srvIdx->first_event) {
+		pEpg->highlightedEvent = srvIdx->first_event;
+	} else {
+		struct list_head *pos;
+
+		list_for_each(pos, &g_dvb_channels.orderSortHead) {
+			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderSort);
+			if(srvIdx2 && srvIdx2->first_event) {
+				pEpg->highlightedEvent = srvIdx2->first_event;
+				break;
+			}
+		}
 	}
+
 	pEpg->highlightedService = pEpg->currentService;
 
 	pEpg->baseMenu.selectedItem = MENU_ITEM_EVENT;
@@ -2283,7 +2677,11 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	pvrJob_t *job;
 	int job_channel;
 #endif
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(pEpg->currentService);
 
+	if(srvIdx == NULL) {
+		return;
+	}
 	interface_displayMenuHeader();
 
 	//dprintf("%s: menu.sel=%d ri.cur=%d ri.hi=%d ri.he=%p\n", __FUNCTION__, pEpg->baseMenu.selectedItem, pEpg->currentService, pEpg->highlightedService, pEpg->highlightedEvent);
@@ -2299,8 +2697,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "black_circle.png", interfaceInfo.clientX, interfaceInfo.clientY+interfaceInfo.clientHeight-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS, 1, 0, DSBLIT_BLEND_COLORALPHA, interfaceAlignLeft|interfaceAlignTop);
 
 	/* Show menu logo if needed */
-	if (interfaceInfo.currentMenu->logo > 0 && interfaceInfo.currentMenu->logoX > 0)
-	{
+	if(interfaceInfo.currentMenu->logo > 0 && interfaceInfo.currentMenu->logoX > 0) {
 		interface_drawImage(DRAWING_SURFACE, resource_thumbnails[interfaceInfo.currentMenu->logo],
 			interfaceInfo.currentMenu->logoX, interfaceInfo.currentMenu->logoY, interfaceInfo.currentMenu->logoWidth, interfaceInfo.currentMenu->logoHeight, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0);
 	}
@@ -2309,9 +2706,8 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 
 	pgfx_font->GetHeight(pgfx_font, &fh);
 
-	if(offair_services[pEpg->currentService].service == NULL || offair_services[pEpg->currentService].first_event == NULL)
-	{
-		eprintf("%s: Can't display '%': service %d event %d\n", __FUNCTION__, pEpg->baseMenu.name, offair_services[pEpg->currentService].service != NULL, offair_services[pEpg->currentService].first_event != NULL);
+	if(srvIdx->service == NULL || srvIdx->first_event == NULL) {
+		eprintf("%s: Can't display '%': service %d event %d\n", __FUNCTION__, pEpg->baseMenu.name, srvIdx->service != NULL, srvIdx->first_event != NULL);
 		return;
 	}
 	/* Timeline */
@@ -2320,8 +2716,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	y = interfaceInfo.clientY + interfaceInfo.paddingSize;
 	end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
 	timelineEnd =  pEpg->timelineX + pEpg->timelineWidth - interfaceInfo.paddingSize;
-	if( pEpg->baseMenu.selectedItem == MENU_ITEM_TIMELINE)
-	{
+	if(pEpg->baseMenu.selectedItem == MENU_ITEM_TIMELINE) {
 		r = ERM_HIGHLIGHTED_CELL_RED;//interface_colors[interfaceInfo.highlightColor].R;
 		g = ERM_HIGHLIGHTED_CELL_GREEN;//interface_colors[interfaceInfo.highlightColor].G;
 		b = ERM_HIGHLIGHTED_CELL_BLUE;//interface_colors[interfaceInfo.highlightColor].B;
@@ -2338,8 +2733,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	event_tt = pEpg->curOffset;
 	strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
 	gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, interfaceInfo.clientX + interfaceInfo.paddingSize, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
-	for( i = 0; i < pEpg->displayingHours; i++)
-	{
+	for(i = 0; i < pEpg->displayingHours; i++) {
 		strftime( buf, 10, "%H:%M", localtime(&event_tt));
 		gfx_drawRectangle(DRAWING_SURFACE, ERM_TIMESTAMP_RED, ERM_TIMESTAMP_GREEN, ERM_TIMESTAMP_BLUE, ERM_TIMESTAMP_ALPHA, x, y, ERM_TIMESTAMP_WIDTH, (1+ERM_VISIBLE_CHANNELS)*interfaceInfo.paddingSize + (2+ERM_VISIBLE_CHANNELS)*fh);
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x+ERM_TIMESTAMP_WIDTH, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
@@ -2353,7 +2747,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	gfx_drawRectangle(DRAWING_SURFACE, ERM_TIMESTAMP_RED, ERM_TIMESTAMP_GREEN, ERM_TIMESTAMP_BLUE, ERM_TIMESTAMP_ALPHA, interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize -  ERM_TIMESTAMP_WIDTH, y, ERM_TIMESTAMP_WIDTH, (1+ERM_VISIBLE_CHANNELS)*interfaceInfo.paddingSize + (2+ERM_VISIBLE_CHANNELS)*fh);
 
 	/* Current service (no vertical scroll) */
-	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(offair_services[pEpg->currentService].service));
+	snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(srvIdx->service));
 	buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
 	l = getMaxStringLength(buf, ERM_CHANNEL_NAME_LENGTH);
 	buf[l] = 0;
@@ -2363,14 +2757,12 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	y += fh + interfaceInfo.paddingSize;
 
 	gfx_drawRectangle(DRAWING_SURFACE, ERM_CURRENT_TITLE_RED, ERM_CURRENT_TITLE_GREEN, ERM_CURRENT_TITLE_BLUE, ERM_CURRENT_TITLE_ALPHA, x, y, ERM_CHANNEL_NAME_LENGTH, fh);
-	if( pEpg->baseMenu.selectedItem == MENU_ITEM_EVENT && pEpg->highlightedService == pEpg->currentService )
-	{
+	if(pEpg->baseMenu.selectedItem == MENU_ITEM_EVENT && pEpg->highlightedService == pEpg->currentService) {
 		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 		g = 3;
 		b = x + ERM_CHANNEL_NAME_LENGTH - g;
 		a = ERM_HIGHLIGHTED_CELL_ALPHA;
-		for( r = 0; r < 8; r++ )
-		{
+		for(r = 0; r < 8; r++) {
 			gfx_drawRectangle(DRAWING_SURFACE, ERM_HIGHLIGHTED_CELL_RED, ERM_HIGHLIGHTED_CELL_GREEN, ERM_HIGHLIGHTED_CELL_BLUE, a, b, y, g, fh);
 			a -= 0x10;
 			b -= g;
@@ -2383,25 +2775,20 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, buf, 0, 0);
 	/* Current service events */
 	x += interfaceInfo.paddingSize + ERM_CHANNEL_NAME_LENGTH;
-	event_element = offair_services[pEpg->currentService].first_event;
-	while( event_element != NULL )
-	{
+	event_element = srvIdx->first_event;
+	while(event_element != NULL) {
 		event = (EIT_event_t*)event_element->data;
 
-		if(offair_getLocalEventTime(event, &event_tm, &event_tt) == 0)
-		{
+		if(offair_getLocalEventTime(event, &event_tm, &event_tt) == 0) {
 			event_len = offair_getEventDuration(event);
-			if( event_tt + event_len > pEpg->curOffset && event_tt < end_tt )
-			{
-				if( event_tt >= pEpg->curOffset)
-				{
+			if(event_tt + event_len > pEpg->curOffset && event_tt < end_tt) {
+				if(event_tt >= pEpg->curOffset) {
 					x = pEpg->timelineX + (int)(pEpg->pps * (event_tt - pEpg->curOffset));
 				}
 				w = event_tt >= pEpg->curOffset
 					? (int)(pEpg->pps * offair_getEventDuration(event)) - ERM_TIMESTAMP_WIDTH
 					: (int)(pEpg->pps * (event_tt + event_len - pEpg->curOffset)) - ERM_TIMESTAMP_WIDTH;
-				if (x + w > timelineEnd )
-				{
+				if(x + w > timelineEnd) {
 					w = timelineEnd - x;
 				}
 				DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
@@ -2423,11 +2810,14 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 
 	/* Other services (vertically scrollable) */
 	displayedChannels = 0;
-	for( i = pEpg->serviceOffset; displayedChannels < ERM_VISIBLE_CHANNELS && i < offair_serviceCount; i++)
-	{
-		if( i != pEpg->currentService && offair_services[i].first_event != NULL && dvb_hasMedia(offair_services[i].service) )
-		{
-			snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(offair_services[i].service));
+	for(i = pEpg->serviceOffset; displayedChannels < ERM_VISIBLE_CHANNELS && i < dvbChannel_getCount(); i++) {
+		srvIdx = dvbChannel_getServiceIndex(i);
+		if(srvIdx == NULL) {
+			continue;
+		}
+
+		if(i != pEpg->currentService && srvIdx->first_event != NULL && dvb_hasMedia(srvIdx->service)) {
+			snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(srvIdx->service));
 			buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
 			l = getMaxStringLength(buf, ERM_CHANNEL_NAME_LENGTH);
 			buf[l] = 0;
@@ -2436,14 +2826,12 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			x = interfaceInfo.clientX + interfaceInfo.paddingSize;
 			y += rect.h + interfaceInfo.paddingSize;
 			gfx_drawRectangle(DRAWING_SURFACE, ERM_TITLE_RED, ERM_TITLE_GREEN, ERM_TITLE_BLUE, ERM_TITLE_ALPHA, x, y, ERM_CHANNEL_NAME_LENGTH, rect.h);
-			if( pEpg->baseMenu.selectedItem == MENU_ITEM_EVENT && pEpg->highlightedService == i )
-			{
+			if(pEpg->baseMenu.selectedItem == MENU_ITEM_EVENT && pEpg->highlightedService == i) {
 				DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 				g = 3;
 				b = x + ERM_CHANNEL_NAME_LENGTH - g;
 				a = ERM_HIGHLIGHTED_CELL_ALPHA;
-				for( r = 0; r < 8; r++ )
-				{
+				for(r = 0; r < 8; r++) {
 					gfx_drawRectangle(DRAWING_SURFACE, ERM_HIGHLIGHTED_CELL_RED, ERM_HIGHLIGHTED_CELL_GREEN, ERM_HIGHLIGHTED_CELL_BLUE, a, b, y, g, fh);
 					a -= 0x10;
 					b -= g;
@@ -2455,7 +2843,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			displayedChannels++;
 
 			x += interfaceInfo.paddingSize + ERM_CHANNEL_NAME_LENGTH;
-			event_element = offair_services[i].first_event;
+			event_element = srvIdx->first_event;
 			while( event_element != NULL )
 			{
 				event = (EIT_event_t*)event_element->data;
@@ -2495,25 +2883,22 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 		}
 	} // end of services loop
 	/* Arrows */
-	if( displayedChannels == ERM_VISIBLE_CHANNELS )
-	{
+	if(displayedChannels == ERM_VISIBLE_CHANNELS) {
 		x = interfaceInfo.clientX - interfaceInfo.paddingSize - ERM_ICON_SIZE;
-		for( j = i; j < offair_serviceCount; j++ )
-		{
-			if( j != pEpg->currentService && offair_services[j].first_event != NULL )
-			{
+		for(j = i; j < dvbChannel_getCount(); j++) {
+			srvIdx = dvbChannel_getServiceIndex(j);
+
+			if(j != pEpg->currentService && srvIdx && srvIdx->first_event != NULL) {
 				interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "icon_up.png", x, interfaceInfo.clientY + interfaceInfo.paddingSize + 2*(interfaceInfo.paddingSize + fh), ERM_ICON_SIZE, ERM_ICON_SIZE, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignLeft|interfaceAlignTop, NULL, NULL);
 				interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "icon_down.png", x, interfaceInfo.clientY + (2+displayedChannels)*(interfaceInfo.paddingSize + fh), ERM_ICON_SIZE, ERM_ICON_SIZE, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignLeft|interfaceAlignBottom, NULL, NULL);
 				x = -1;
 				break;
 			}
 		}
-		if( x > 0 )
-		{
-			for( j = 0; j < pEpg->serviceOffset; j++ )
-			{
-				if( j != pEpg->currentService && offair_services[j].first_event != NULL )
-				{
+		if(x > 0) {
+			for(j = 0; j < pEpg->serviceOffset; j++) {
+				srvIdx = dvbChannel_getServiceIndex(j);
+				if(j != pEpg->currentService && srvIdx && srvIdx->first_event != NULL) {
 					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "icon_up.png", x, interfaceInfo.clientY + interfaceInfo.paddingSize + 2*(interfaceInfo.paddingSize + fh), ERM_ICON_SIZE, ERM_ICON_SIZE, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignLeft|interfaceAlignTop, NULL, NULL);
 					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "icon_down.png", x, interfaceInfo.clientY + (2+displayedChannels)*(interfaceInfo.paddingSize + fh), ERM_ICON_SIZE, ERM_ICON_SIZE, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignLeft|interfaceAlignBottom, NULL, NULL);
 					break;
@@ -2523,19 +2908,16 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	}
 	x = interfaceInfo.clientX + interfaceInfo.paddingSize;
 	/* Fillers */
-	for( ; displayedChannels < ERM_VISIBLE_CHANNELS; displayedChannels++ )
-	{
+	for(; displayedChannels < ERM_VISIBLE_CHANNELS; displayedChannels++) {
 		y += fh + interfaceInfo.paddingSize;
 		gfx_drawRectangle(DRAWING_SURFACE, ERM_TITLE_RED, ERM_TITLE_GREEN, ERM_TITLE_BLUE, ERM_TITLE_ALPHA, x, y, interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize, fh);
 	}
 #ifdef ENABLE_PVR
 #ifdef STBPNX
 	/* Record jobs */
-	for( event_element = pvr_jobs; event_element != NULL; event_element = event_element->next )
-	{
+	for(event_element = pvr_jobs; event_element != NULL; event_element = event_element->next) {
 		job = (pvrJob_t*)event_element->data;
-		if( job->end_time > pEpg->curOffset && job->start_time < end_tt )
-		{
+		if(job->end_time > pEpg->curOffset && job->start_time < end_tt) {
 			y = interfaceInfo.clientY + interfaceInfo.paddingSize + fh;
 			x = job->start_time >= pEpg->curOffset
 				? pEpg->timelineX + (int)(pEpg->pps * (job->start_time - pEpg->curOffset))
@@ -2543,24 +2925,19 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			w = job->start_time >= pEpg->curOffset
 				? (int)(pEpg->pps * (job->end_time - job->start_time))
 				: (int)(pEpg->pps * (job->end_time - pEpg->curOffset));
-			if (x + w > timelineEnd )
-			{
+			if(x + w > timelineEnd) {
 				w = timelineEnd - x;
 			}
 			gfx_drawRectangle(DRAWING_SURFACE, ERM_RECORD_RED, ERM_RECORD_GREEN, ERM_RECORD_BLUE, ERM_RECORD_ALPHA, x+ERM_TIMESTAMP_WIDTH, y, w, interfaceInfo.paddingSize);
-			if( job->type == pvrJobTypeDVB )
-			{
+			if(job->type == pvrJobTypeDVB) {
 				job_channel = offair_getIndex(job->info.dvb.channel);
-				if((job_channel == pEpg->currentService || ( pEpg->serviceOffset <= job_channel && job_channel < i ) ))
-				{
+				if((job_channel == pEpg->currentService || ( pEpg->serviceOffset <= job_channel && job_channel < i ) )) {
 					y += interfaceInfo.paddingSize + fh;
-					if( job_channel != pEpg->currentService )
-					{
+					if(job_channel != pEpg->currentService) {
 						displayedChannels = 1;
-						for( j = pEpg->serviceOffset; j < job_channel; j++ )
-						{
-							if( j != pEpg->currentService && offair_services[j].first_event != NULL )
-							{
+						for(j = pEpg->serviceOffset; j < job_channel; j++) {
+							srvIdx = dvbChannel_getServiceIndex(j);
+							if(j != pEpg->currentService && srvIdx && srvIdx->first_event != NULL) {
 								displayedChannels++;
 							}
 						}
@@ -2613,7 +2990,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 				gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
 			}
 			/* // channel name
-			snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(offair_services[pEpg->highlightedService].service));
+			snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(dvbChannel_getService(pEpg->highlightedService)));
 			buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
 			l = getMaxStringLength(buf, interfaceInfo.clientX + interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - x);
 			buf[l] = 0;
@@ -2631,13 +3008,13 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			buf[MAX_TEXT-1] = 0;
 			interface_drawTextWW(pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y, interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize, interfaceInfo.clientY + interfaceInfo.clientHeight - y - interfaceInfo.paddingSize, str, ALIGN_LEFT);
 			//gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
-		}
-		else if( pEpg->highlightedService >=0 && pEpg->highlightedService < offair_serviceCount && offair_services[pEpg->highlightedService].service != NULL )
-		{
-			snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(offair_services[pEpg->highlightedService].service) );
-			buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
-			str = buf;
-			gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
+		} else if(pEpg->highlightedService >=0 && pEpg->highlightedService < dvbChannel_getCount()) {
+			EIT_service_t *service = dvbChannel_getService(pEpg->highlightedService);
+			if(service) {
+				snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(service));
+				str = buf;
+				gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
+			}
 		}
 	}
 }
@@ -2651,6 +3028,7 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 	int i, service_index, service_count;
 	time_t eventOffset = 0, eventEnd = 0, end_tt;
 	struct tm t;
+	service_index_t *srvIdx;
 
 	switch(cmd->command)
 	{
@@ -2661,67 +3039,59 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		case MENU_ITEM_MAIN:
 			pMenu->selectedItem = MENU_ITEM_EVENT;
 			service_index = pEpg->currentService;
-			for( i = offair_serviceCount - 1; i >= 0; i-- )
-			{
-				if( i != pEpg->currentService && offair_services[i].first_event != NULL )
-				{
+			for(i = dvbChannel_getCount() - 1; i >= 0; i--) {
+				srvIdx = dvbChannel_getServiceIndex(i);
+				if(i != pEpg->currentService && srvIdx && srvIdx->first_event != NULL) {
 					service_index = i;
 					break;
 				}
 			}
-			if(service_index != pEpg->highlightedService || pEpg->highlightedEvent == NULL )
-			{
+			if(service_index != pEpg->highlightedService || pEpg->highlightedEvent == NULL ) {
 				pEpg->highlightedService = service_index;
 				end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-				for( pEpg->highlightedEvent = offair_services[pEpg->highlightedService].first_event;
-					pEpg->highlightedEvent->next != NULL;
+
+				srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
+				for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
+					pEpg->highlightedEvent && pEpg->highlightedEvent->next;
 					pEpg->highlightedEvent = pEpg->highlightedEvent->next )
 				{
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
 					offair_getLocalEventTime(event,&t,&eventOffset);
 					eventEnd = eventOffset + offair_getEventDuration(event);
-					if( eventEnd > pEpg->curOffset && eventOffset < end_tt )
-					{
+					if(eventEnd > pEpg->curOffset && eventOffset < end_tt ) {
 						break;
 					}
 				}
-				if( eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL )
-				{
+				if(eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL) {
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
 					offair_getLocalEventTime(event,&t,&eventOffset);
 					eventEnd = eventOffset + offair_getEventDuration(event);
 				}
-				if( eventEnd <= pEpg->curOffset || eventOffset >= end_tt )
-				{
+				if(eventEnd <= pEpg->curOffset || eventOffset >= end_tt) {
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
 					offair_getLocalEventTime(event,&t,&pEpg->curOffset);
 					pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
 						3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
 				}
 				// counting displaying services
-				if( pEpg->highlightedService != pEpg->currentService)
-				{
+				if(pEpg->highlightedService != pEpg->currentService) {
 					service_count = 0;
-					for( i = pEpg->highlightedService; i >= 0; i-- )
-					{
-						if( i != pEpg->currentService && offair_services[i].first_event )
-						{
+					for(i = pEpg->highlightedService; i >= 0; i--) {
+						srvIdx = dvbChannel_getServiceIndex(i);
+						if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 							service_count++;
 							pEpg->serviceOffset = i;
-							if( service_count == ERM_VISIBLE_CHANNELS)
-							{
+							if(service_count == ERM_VISIBLE_CHANNELS) {
 								break;
 							}
 						}
 					}
 				}
-			} else
-			{
+			} else {
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
 				eventEnd = eventOffset + offair_getEventDuration(event);
-				if( eventEnd <= pEpg->curOffset || eventOffset > pEpg->curOffset + 3600 * pEpg->displayingHours )
-				{
+				if(eventEnd <= pEpg->curOffset || eventOffset > pEpg->curOffset + 3600 * pEpg->displayingHours) {
 					pEpg->curOffset = (pEpg->minOffset < eventOffset) ?
 						3600 * (eventOffset / 3600) : pEpg->minOffset;
 				}
@@ -2731,33 +3101,29 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			pMenu->selectedItem = MENU_ITEM_BACK;
 			break;
 		default: // MENU_ITEM_EVENT
-			if( pEpg->highlightedService == pEpg->currentService)
-			{
+			if(pEpg->highlightedService == pEpg->currentService) {
 				pMenu->selectedItem = MENU_ITEM_TIMELINE;
 			} else {
 				/* Get our current position and guess new position */
 				service_index = -1;
-				for( i = 0; i < pEpg->highlightedService; i++)
-				{
-					if( i != pEpg->currentService && offair_services[i].first_event != NULL)
-					{
+				for(i = 0; i < pEpg->highlightedService; i++) {
+					srvIdx = dvbChannel_getServiceIndex(i);
+					if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 						service_index = i;
 					}
 				}
-				if( service_index < 0 )
-				{
+				if(service_index < 0) {
 					pEpg->highlightedService = pEpg->currentService;
-				} else
-				{
+				} else {
 					pEpg->highlightedService = service_index;
-					if ( pEpg->highlightedService <  pEpg->serviceOffset)
-					{
+					if(pEpg->highlightedService <  pEpg->serviceOffset) {
 						pEpg->serviceOffset = pEpg->highlightedService;
 					}
 				}
 				end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-				for( pEpg->highlightedEvent = offair_services[pEpg->highlightedService].first_event;
-					pEpg->highlightedEvent->next != NULL;
+				srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
+				for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
+					pEpg->highlightedEvent && pEpg->highlightedEvent->next;
 					pEpg->highlightedEvent = pEpg->highlightedEvent->next )
 				{
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
@@ -2793,12 +3159,12 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			break;
 		case MENU_ITEM_TIMELINE:
 			pMenu->selectedItem = MENU_ITEM_EVENT;
-			if(pEpg->currentService != pEpg->highlightedService || pEpg->highlightedEvent == NULL)
-			{
+			if(pEpg->currentService != pEpg->highlightedService || pEpg->highlightedEvent == NULL) {
 				pEpg->highlightedService = pEpg->currentService;
 				end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-				for( pEpg->highlightedEvent = offair_services[pEpg->highlightedService].first_event;
-					pEpg->highlightedEvent->next != NULL;
+				srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
+				for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
+					pEpg->highlightedEvent && pEpg->highlightedEvent->next;
 					pEpg->highlightedEvent = pEpg->highlightedEvent->next )
 				{
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
@@ -2809,43 +3175,36 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 						break;
 					}
 				}
-				if( eventEnd <= pEpg->curOffset )
-				{
+				if(eventEnd <= pEpg->curOffset) {
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
 					offair_getLocalEventTime(event,&t,&eventOffset);
 					eventEnd = eventOffset + offair_getEventDuration(event);
 				}
-				if( eventEnd <= pEpg->curOffset || eventOffset >= end_tt )
-				{
+				if(eventEnd <= pEpg->curOffset || eventOffset >= end_tt) {
 					event = (EIT_event_t*)pEpg->highlightedEvent->data;
 					offair_getLocalEventTime(event,&t,&pEpg->curOffset);
 					pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
 						3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
 				}
 				// counting displaying services
-				if( pEpg->highlightedService != pEpg->currentService)
-				{
+				if(pEpg->highlightedService != pEpg->currentService) {
 					service_count = 1; // highlighted
-					for( i = pEpg->highlightedService - 1; i >= 0; i-- )
-					{
-						if( i != pEpg->currentService && offair_services[i].first_event != NULL)
-						{
+					for(i = pEpg->highlightedService - 1; i >= 0; i-- ) {
+						srvIdx = dvbChannel_getServiceIndex(i);
+						if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 							service_count++;
 							pEpg->serviceOffset = i;
-							if( service_count == ERM_VISIBLE_CHANNELS)
-							{
+							if(service_count == ERM_VISIBLE_CHANNELS) {
 								break;
 							}
 						}
 					}
 				}
-			} else
-			{
+			} else {
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
 				eventEnd = eventOffset + offair_getEventDuration(event);
-				if( eventEnd <= pEpg->curOffset || eventOffset > pEpg->curOffset + 3600 * pEpg->displayingHours )
-				{
+				if(eventEnd <= pEpg->curOffset || eventOffset > pEpg->curOffset + 3600 * pEpg->displayingHours) {
 					pEpg->curOffset = (pEpg->minOffset < eventOffset) ?
 						3600 * (eventOffset / 3600) : pEpg->minOffset;
 				}
@@ -2854,62 +3213,55 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		default: // MENU_ITEM_EVENT
 			service_index = -1;
 			for( i = pEpg->highlightedService == pEpg->currentService ? 0 : pEpg->highlightedService+1;
-				i < offair_serviceCount; i++ )
+				i < dvbChannel_getCount(); i++ )
 			{
-				if( i != pEpg->currentService && offair_services[i].first_event != NULL )
-				{
+				srvIdx = dvbChannel_getServiceIndex(i);
+				if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 					service_index = i;
 					break;
 				}
 			}
-			if( service_index < 0 )
-			{
+			if(service_index < 0) {
 				pMenu->selectedItem = MENU_ITEM_BACK;
 				break;
 			}
 			pEpg->highlightedService = service_index;
 			end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-			for( pEpg->highlightedEvent = offair_services[pEpg->highlightedService].first_event;
-				pEpg->highlightedEvent->next != NULL;
+			srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
+			for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
+				pEpg->highlightedEvent && pEpg->highlightedEvent->next;
 				pEpg->highlightedEvent = pEpg->highlightedEvent->next )
 			{
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
 				eventEnd = eventOffset + offair_getEventDuration(event);
-				if( eventEnd > pEpg->curOffset && eventOffset < end_tt )
-				{
+				if(eventEnd > pEpg->curOffset && eventOffset < end_tt) {
 					break;
 				}
 			}
-			if( eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL )
-			{
+			if(eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL) {
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
 				eventEnd = eventOffset + offair_getEventDuration(event);
 			}
-			if( eventEnd <= pEpg->curOffset || eventOffset >= end_tt )
-			{
+			if(eventEnd <= pEpg->curOffset || eventOffset >= end_tt) {
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&pEpg->curOffset);
 				pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
 					3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
 			}
-			if(service_index < pEpg->serviceOffset)
-			{
+			if(service_index < pEpg->serviceOffset) {
 				pEpg->serviceOffset = service_index;
-			} else
-			{
+			} else {
 				service_count = 1;
-				for( i = service_index - 1 ; service_count < ERM_VISIBLE_CHANNELS && i >= 0; i-- )
-				{
-					if( offair_services[i].service != NULL && offair_services[i].first_event != NULL )
-					{
+				for(i = service_index - 1 ; service_count < ERM_VISIBLE_CHANNELS && i >= 0; i--) {
+					srvIdx = dvbChannel_getServiceIndex(i);
+					if(srvIdx && srvIdx->service && srvIdx->first_event) {
 						service_count++;
 						service_index = i;
 					}
 				}
-				if( service_count == ERM_VISIBLE_CHANNELS && service_index > pEpg->serviceOffset )
-				{
+				if(service_count == ERM_VISIBLE_CHANNELS && service_index > pEpg->serviceOffset) {
 					pEpg->serviceOffset = service_index;
 				}
 			}
@@ -2929,21 +3281,22 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			}
 			break;
 		default: // MENU_ITEM_EVENT
-			if( pEpg->highlightedService < 0 || pEpg->highlightedService >= offair_serviceCount || offair_services[pEpg->highlightedService].first_event == NULL || pEpg->highlightedEvent == offair_services[pEpg->highlightedService].first_event )
+			srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
+			if( pEpg->highlightedService < 0 ||
+				pEpg->highlightedService >= dvbChannel_getCount() ||
+				!srvIdx || !srvIdx->first_event ||
+				pEpg->highlightedEvent == srvIdx->first_event)
 			{
 				break;
 			}
-			for(
-				event_element = offair_services[pEpg->highlightedService].first_event;
+			for(event_element = srvIdx->first_event;
 				event_element->next != NULL && event_element->next != pEpg->highlightedEvent;
-			event_element = event_element->next );
-			if( event_element->next == pEpg->highlightedEvent)
-			{
+				event_element = event_element->next);
+			if(event_element->next == pEpg->highlightedEvent) {
 				pEpg->highlightedEvent = event_element;
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
-				if( eventOffset < pEpg->curOffset )
-				{
+				if(eventOffset < pEpg->curOffset) {
 					pEpg->curOffset = (pEpg->minOffset < eventOffset) ?
 						3600 * (eventOffset / 3600) : pEpg->minOffset;
 				}
@@ -2980,46 +3333,42 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		break;
 	case interfaceCommandPageUp:
 		service_index = -1;
-		for( i = pEpg->serviceOffset - 1; i >= 0; i--)
-		{
-			if( i != pEpg->currentService && offair_services[i].first_event != NULL )
-			{
+		for(i = pEpg->serviceOffset - 1; i >= 0; i--) {
+			srvIdx = dvbChannel_getServiceIndex(i);
+			if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 				service_index = i;
 				break;
 			}
 		}
-		if( service_index < 0)
-		{
+		if(service_index < 0) {
 			return 0;
 		}
 		pEpg->serviceOffset = service_index;
 		break;
 	case interfaceCommandPageDown:
 		service_index = -1;
-		for( i = pEpg->serviceOffset + 1; i < offair_serviceCount; i++)
-		{
-			if( i != pEpg->currentService && offair_services[i].first_event != NULL )
-			{
+		for(i = pEpg->serviceOffset + 1; i < dvbChannel_getCount(); i++) {
+			srvIdx = dvbChannel_getServiceIndex(i);
+			if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 				service_index = i;
 				break;
 			}
 		}
-		if( service_index < 0)
-		{
+		if(service_index < 0) {
 			return 0;
 		}
 		service_count = 1;
-		for( i = service_index + 1; service_count < ERM_VISIBLE_CHANNELS && i < offair_serviceCount; i++)
-		{
-			if( i != pEpg->currentService && offair_services[i].first_event != NULL )
-			{
+		for(i = service_index + 1; service_count < ERM_VISIBLE_CHANNELS && i < dvbChannel_getCount(); i++) {
+			srvIdx = dvbChannel_getServiceIndex(i);
+			if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 				service_count++;
 			}
 		}
-		if( service_count == ERM_VISIBLE_CHANNELS)
-		{
+		if(service_count == ERM_VISIBLE_CHANNELS) {
 			pEpg->serviceOffset = service_index;
-		} else return 0;
+		} else {
+			return 0;
+		}
 		break;
 #ifdef ENABLE_PVR
 #ifdef STBPNX
@@ -3030,13 +3379,15 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			{
 				list_element_t *job_element = NULL;
 				pvrJob_t job;
+				EIT_service_t *service = dvbChannel_getService(pEpg->highlightedService);
+
 				event = (EIT_event_t*)pEpg->highlightedEvent->data;
 				offair_getLocalEventTime(event,&t,&eventOffset);
 				job.type         = pvrJobTypeDVB;
 				job.start_time   = eventOffset;
 				job.end_time     = eventOffset + offair_getEventDuration(event);
-				job.info.dvb.channel  = dvb_getServiceIndex( offair_services[pEpg->highlightedService].service );
-				job.info.dvb.service  = offair_services[pEpg->highlightedService].service;
+				job.info.dvb.channel  = service ? dvb_getServiceIndex(service) : -1;
+				job.info.dvb.service  = service;
 				job.info.dvb.event_id = event->event_id;
 				switch( pvr_findOrInsertJob( &job, &job_element) )
 				{
@@ -3172,27 +3523,18 @@ static int  offair_stopRecording(interfaceMenu_t *pMenu, void *pArg)
 }
 #endif
 
-int offair_epgEnabled(void)
-{
-	int i;
-	for( i = 0; i < offair_serviceCount; ++i )
-		if(offair_scheduleCheck( i ) == 0)
-			return 1;
-	return 0;
-}
-
-void offair_fillMenuEntry(void)
+int32_t offair_updateChannelStatus(void)
 {
 	char  buf[MENU_ENTRY_INFO_LENGTH];
 
 	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
 
 	int hasChannel = 0;
-	int selectedMenuItem = MENU_ITEM_BACK; 
+//	int selectedMenuItem = MENU_ITEM_BACK; 
 	interfaceMenuEntry_t *dvbtEntry = interface_getMenuEntry(dvbtMenu, CHANNEL_STATUS_ID);
 	if (dvbtEntry == NULL) {
 		offair_fillDVBTMenu();
-		return;
+		return -1;
 	}
 #ifdef ENABLE_PVR
 	if (pvr_isRecordingDVB())
@@ -3212,88 +3554,68 @@ void offair_fillMenuEntry(void)
 	{
 		switch(appControlInfo.playbackInfo.streamSource) {
 		  case streamSourceDVB:
-			hasChannel = 	(appControlInfo.dvbInfo.channel > 0) &&
+			hasChannel = 	(appControlInfo.dvbInfo.channel >= 0) &&
 							(appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) &&
-							(appControlInfo.dvbInfo.channel <= offair_serviceCount) &&
+							(appControlInfo.dvbInfo.channel < dvbChannel_getCount()) &&
 							(current_service() != NULL);
+
 			if(hasChannel) {
 				snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), dvb_getServiceName(current_service()));
+
 				interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
 				interface_changeMenuEntryArgs(dvbtEntry, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
 				interface_changeMenuEntryFunc(dvbtEntry, offair_channelChange);
 				interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
 				interface_changeMenuEntrySelectable(dvbtEntry, 1);
-				selectedMenuItem = appControlInfo.dvbInfo.channel + 1;//shift on 1 becouse there are 1 disabled entry (DVB)
+//				selectedMenuItem = appControlInfo.dvbInfo.channel + 1;//shift on 1 becouse there are 1 disabled entry (DVB)
 			}
 			break;
 		  case streamSourceAnalogTV:
 			hasChannel = 1;
+
 			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), analogtv_getServiceName(appControlInfo.tvInfo.id));
+
 			interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
 			interface_changeMenuEntryArgs(dvbtEntry, (void *)appControlInfo.tvInfo.id);
 			interface_changeMenuEntryFunc(dvbtEntry, analogtv_activateChannel);
 			interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
 			interface_changeMenuEntrySelectable(dvbtEntry, 1);
-			selectedMenuItem = offair_indexCount + appControlInfo.tvInfo.id + 3; //shift on 3 becouse there are 3 disabled entry(DVB, ANALOGTV and start if f)
+//			selectedMenuItem = dvbChannel_getCount() + appControlInfo.tvInfo.id + 3; //shift on 3 becouse there are 3 disabled entry(DVB, ANALOGTV and start if f)
 		  default:
 			break;
 		}
 		if(!hasChannel) {
+
 			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), _T("NONE"));
+
 			interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
 			interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_not_selected);
 			interface_changeMenuEntrySelectable(dvbtEntry, 0);
 		}
 	}
-	interface_setSelectedItem(dvbtMenu, selectedMenuItem);
+//	interface_setSelectedItem(dvbtMenu, selectedMenuItem);
+	return 0;
 }
 
 void offair_fillDVBTMenu()
 {
-	char  buf[MENU_ENTRY_INFO_LENGTH];
-
+	char buf[MENU_ENTRY_INFO_LENGTH];
 	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
+
 	interface_clearMenuEntries(dvbtMenu);
+	dvbChannel_initServices();
 
-	offair_initServices();
+	snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), _T("NONE"));
+	interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_not_selected);
 
-#ifdef ENABLE_PVR
-	if (pvr_isRecordingDVB())
-	{
-		char *str = dvb_getTempServiceName(appControlInfo.pvrInfo.dvb.channel);
-		if (str == NULL)
-			str = _T("NOT_AVAILABLE_SHORT");
-		snprintf(buf, sizeof(buf), "%s: %s", _T("RECORDING"), str);
-		interface_addMenuEntry(dvbtMenu, buf, offair_stopRecording, NULL, thumbnail_recording);
-	} else
-#endif
-	{
-		int hasChannel = 0;
-
-		switch(appControlInfo.playbackInfo.streamSource) {
-		  case streamSourceDVB:
-			hasChannel = 	(appControlInfo.dvbInfo.channel > 0) &&
-							(appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) &&
-							(appControlInfo.dvbInfo.channel <= offair_serviceCount) &&
-							(current_service() != NULL);
-			if(hasChannel) {
-				snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), dvb_getServiceName(current_service()));
-				interface_addMenuEntry(dvbtMenu, buf, offair_channelChange, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel), thumbnail_selected);
-			}
-			break;
-		  case streamSourceAnalogTV:
-			hasChannel = 1;
-			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), analogtv_getServiceName(appControlInfo.tvInfo.id));
-			interface_addMenuEntry(dvbtMenu, buf, analogtv_activateChannel, (void *)appControlInfo.tvInfo.id, thumbnail_selected);
-		  default:
-			break;
-		}
-		if(!hasChannel) {
-			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), _T("NONE"));
-			interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_not_selected);
-		}
+	interfaceMenuEntry_t *entry = menu_getLastEntry(dvbtMenu);
+	if(entry) {
+		interface_setMenuEntryId(entry, CHANNEL_STATUS_ID);
+		offair_updateChannelStatus();
+	} else {
+		eprintf("%s()[%d]: ERROR: Cant get Channel status menu item!\n", __func__, __LINE__);
 	}
-	interface_setMenuEntryId(&dvbtMenu->menuEntry[dvbtMenu->menuEntryCount-1], CHANNEL_STATUS_ID);
+
 #ifndef HIDE_EXTRA_FUNCTIONS
 	switch ( dvb_getType(0) )  // Assumes same type FEs
 	{
@@ -3316,28 +3638,18 @@ void offair_fillDVBTMenu()
 	interface_addMenuEntryDisabled(dvbtMenu, buf, thumbnail_channels);
 #endif
 
-/*	if (offair_indexCount > 0)
-		sprintf(buf, "%s (%d)", _T("MAIN_LAYER"), offair_indexCount);
-	else
-		sprintf(buf,"%s", _T("MAIN_LAYER"));
-	interface_addMenuEntry2(dvbtMenu, buf, dvb_getNumberOfServices() > 0, interface_menuActionShowMenu, &DVBTOutputMenu, thumbnail_channels);
-
-#ifdef ENABLE_ANALOGTV
-	analogtv_addMenuEntry(dvbtMenu);
-	//interface_addMenuEntry2(pMenu, _T("ANALOGTV_CHANNELS"), 1, interface_menuActionShowMenu, &AnalogTVOutputMenu, thumbnail_channels);
-#endif
-*/
-	if(dvb_getNumberOfServices() > 0) {
+	if(dvbChannel_getCount() > 0) {
 		offair_addDVBChannelsToMenu();
 	}
 	if(analogtv_getChannelCount() > 0) {
-		analogtv_addChannelsToMenu(dvbtMenu, offair_indexCount);
+		analogtv_addChannelsToMenu(dvbtMenu, dvbChannel_getCount());
 	}
 
-	if ( offair_epgEnabled() )
+	if(dvbChannel_hasAnyEPG()) {
 		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_services != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
-	//else
-	//	interface_addMenuEntryDisabled(dvbtMenu, _T("EPG_UNAVAILABLE"), thumbnail_not_selected);
+	} /*else {
+		interface_addMenuEntryDisabled(dvbtMenu, _T("EPG_UNAVAILABLE"), thumbnail_not_selected);
+	}*/
 #ifdef ENABLE_PVR
 	interface_addMenuEntry(dvbtMenu, _T("RECORDING"), pvr_initPvrMenu, SET_NUMBER(pvrJobTypeDVB), thumbnail_recording);
 #endif
@@ -3364,18 +3676,15 @@ static int event_time_cmp(list_element_t *elem1, list_element_t *elem2)
 	event1 = (EIT_event_t *)elem1->data;
 	event2 = (EIT_event_t *)elem2->data;
 	result = event1->start_year - event2->start_year;
-	if(result != 0)
-	{
+	if(result != 0) {
 		return result;
 	}
 	result = event1->start_month - event2->start_month;
-	if(result != 0)
-	{
+	if(result != 0) {
 		return result;
 	}
 	result = event1->start_day - event2->start_day;
-	if(result != 0)
-	{
+	if(result != 0) {
 		return result;
 	}
 	return event1->start_time - event2->start_time;
@@ -3463,184 +3772,10 @@ void offair_sortEvents(list_element_t **event_list)
 
 static void offair_sortSchedule(void)
 {
-	for (list_element_t *s = dvb_services; s != NULL; s = s->next ) {
+	for(list_element_t *s = dvb_services; s != NULL; s = s->next ) {
 		EIT_service_t * service = s->data;
 		offair_sortEvents(&service->schedule);
 	}
-}
-
-static void offair_exportServices(const char* filename)
-{
-	FILE* f = fopen( filename, "w" );
-	if (f == NULL) {
-		eprintf("%s: Failed to open '%s': %s\n", __FUNCTION__, filename, strerror(errno));
-		return;
-	}
-	for( int i = 0; i < offair_serviceCount; ++i ) {
-		if( (offair_services[i].common.media_id | offair_services[i].common.service_id | offair_services[i].common.transport_stream_id) != 0 )
-		{
-			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu\n", i,
-				offair_services[i].common.media_id,
-				offair_services[i].common.service_id,
-				offair_services[i].common.transport_stream_id,
-				offair_services[i].audio_track);
-		}
-	}
-	fclose(f);
-}
-
-static void offair_importServices(const char* filename)
-{
-	char buf[BUFFER_SIZE];
-	int i;
-	unsigned long media_id;
-	unsigned short service_id, transport_stream_id, audio_track;
-
-	FILE* fd = fopen( filename, "r" );
-	if( fd == NULL )
-	{
-		dprintf("%s: Failed to open '%s'\n", __FUNCTION__, filename);
-		return;
-	}
-	while (fgets(buf, BUFFER_SIZE, fd) != NULL)
-	{
-		media_id = i = service_id = transport_stream_id = audio_track = 0;
-		if ( sscanf(buf, "service %d media_id %lu service_id %hu transport_stream_id %hu audio_track %hu\n",
-			&i, &media_id, &service_id, &transport_stream_id, &audio_track) >= 4)
-		{
-			if (i >= MAX_MEMORIZED_SERVICES || i < 0)
-				continue;
-			if (i >= offair_serviceCount)
-				offair_serviceCount = i+1;
-			offair_services[i].common.media_id = media_id;
-			offair_services[i].common.service_id = service_id;
-			offair_services[i].common.transport_stream_id = transport_stream_id;
-			offair_services[i].audio_track = audio_track;
-		}
-	}
-	fclose(fd);
-	dprintf("%s: imported %d services\n", __FUNCTION__,offair_serviceCount);
-}
-
-static int service_cmp(const void *e1, const void *e2)
-{
-	int result = 0, i1=*(int*)e1, i2 = *(int*)e2;
-	EIT_service_t *s1 = offair_services[i1].service ,
-		*s2 = offair_services[i2].service;
-	if( appControlInfo.offairInfo.sorting == serviceSortType )
-	{
-		result = dvb_hasMediaType(s2, mediaTypeVideo) - dvb_hasMediaType(s1, mediaTypeVideo);
-		if( result != 0 )
-			return result;
-	}
-	if( appControlInfo.offairInfo.sorting == serviceSortFreq )
-	{
-		__u32 f1,f2;
-		dvb_getServiceFrequency(s1,&f1);
-		dvb_getServiceFrequency(s2,&f2);
-		if( f1 > f2 )
-			result = 1;
-		else if( f2 > f1 )
-			result = -1;
-		if( result != 0 )
-			return result;
-	}
-	char *n1 = dvb_getServiceName(s1);
-	char *n2 = dvb_getServiceName(s2);
-	return strcasecmp(n1, n2);
-}
-
-void offair_initIndeces()
-{
-	offair_indexCount = 0;
-	for(int i = 0; i < offair_serviceCount; i++)
-		if (offair_services[i].service != NULL &&
-		    dvb_hasMedia(offair_services[i].service) &&
-		   (appControlInfo.offairInfo.dvbShowScrambled ||
-		    dvb_getScrambled(offair_services[i].service) == 0))
-		{
-			offair_indeces[offair_indexCount++] = i;
-		}
-}
-
-void offair_servicesRenumbering()
-{
-	service_index_t service[MAX_MEMORIZED_SERVICES];
-	BOOL chk = 0;
-	int32_t i;
-
-	for(i = 0; i < offair_serviceCount; ++i) {
-		service[i].service = NULL;
-	}
-
-	for(i = 0; i < offair_serviceCount; ++i) {
-		service[i] = offair_services[offair_indeces[i]];
-
-		if ((!chk) && (appControlInfo.dvbInfo.channel == offair_indeces[i])) {
-			appControlInfo.dvbInfo.channel = i + 1;
-			chk = 1;
-		}
-		offair_indeces[i] = i;
-	}
-
-	for(i = 0; i < offair_serviceCount; ++i) {
-		offair_services[i] = service[i];
-	}
-}
-
-void offair_initServices()
-{
-	int i, old_count = offair_serviceCount;
-	list_element_t *service_element;
-	for( i = 0; i < old_count; ++i )
-	{
-		offair_services[i].service = NULL;
-	}
-	for( service_element = dvb_services; service_element != NULL; service_element = service_element->next )
-	{
-		for( i = 0; i < old_count; ++i )
-		{
-			if( memcmp(service_element->data, &offair_services[i].common, sizeof(EIT_common_t)) == 0 )
-			{
-				offair_services[i].service = (EIT_service_t *)service_element->data;
-				break;
-			}
-		}
-		if( i < old_count)
-		{
-			continue;
-		}
-		if(offair_serviceCount == MAX_MEMORIZED_SERVICES)
-		{
-			break;
-		}
-		i = offair_serviceCount++;
-		offair_services[i].service = (EIT_service_t *)service_element->data;
-		offair_services[i].common = offair_services[i].service->common;
-	}
-	offair_sortSchedule();
-
-	offair_initIndeces();
-	if (appControlInfo.offairInfo.sorting != serviceSortNone )
-		qsort( offair_indeces, offair_indexCount, sizeof(offair_indeces[0]), service_cmp );
-
-	dprintf("%s: Services re-inited. old=%d current=%d dvb=%d indeces=%d\n", __FUNCTION__ ,old_count,offair_serviceCount,dvb_getNumberOfServices(),offair_indexCount);
-
-	offair_exportServices(OFFAIR_SERVICES_FILENAME);
-	//return offair_serviceCount;
-#ifdef ENABLE_STATS
-	stats_load();
-#endif
-}
-
-void offair_clearServices()
-{
-	/* We don't want user to see #0 channel (bug 9548) */
-	offair_serviceCount = 1;
-	memset( &offair_services, 0, sizeof(offair_services[0])*offair_serviceCount );
-	offair_services[0].service = NULL;
-	offair_services[0].common.media_id = (unsigned long)-1;
-	offair_fillDVBTMenu();
 }
 
 void offair_clearServiceList(int permanent)
@@ -3652,18 +3787,18 @@ void offair_clearServiceList(int permanent)
 	appControlInfo.dvbInfo.channel = 0;
 	appControlInfo.dvbInfo.previousChannel = 0;
 	dvb_clearServiceList(permanent);
-	offair_initServices();
 #if (defined ENABLE_PVR) && (defined STBPNX)
 	pvr_purgeDVBRecords();
 #endif
 	offair_fillDVBTMenu();
 }
 
-static void offair_swapServices(int first, int second)
+#warning "TODO: Remove offair_indeces() and offair_services[] in offair_swapServices()!"
+/*static void offair_swapServices(int first, int second)
 {
 	service_index_t t;
 	int i, first_i = -1, second_i = -1;
-	for( i = 0; i < offair_serviceCount; i++ )
+	for( i = 0; i < dvbChannel_getCount(); i++ )
 	{
 		if( offair_indeces[i] == first )
 			first_i = i;
@@ -3681,21 +3816,13 @@ static void offair_swapServices(int first, int second)
 	t = offair_services[first];
 	offair_services[first] = offair_services[second];
 	offair_services[second] = t;
-}
-
-static int offair_scheduleCheck( int serviceNumber )
-{
-	if( offair_services[serviceNumber].service == NULL )
-	{
-		return -1;
-	}
-	return (offair_services[serviceNumber].service->schedule == NULL || dvb_hasMedia(offair_services[serviceNumber].service) == 0) ? 1 : 0;
-}
+}*/
 
 static int offair_showSchedule(interfaceMenu_t *pMenu, int channel)
 {
-	if ( offair_scheduleCheck(channel) == 0 )
+	if(dvbChannel_hasSchedule(channel)) {
 		return offair_showScheduleMenu(pMenu, SET_NUMBER(channel));
+	}
 
 	interface_showMessageBox( _T("EPG_UNAVAILABLE"), thumbnail_epg ,3000);
 	return 1;
@@ -3710,18 +3837,18 @@ static int offair_showScheduleMenu(interfaceMenu_t *pMenu, void* pArg)
 	int old_mday = -1;
 	struct tm event_tm;
 	time_t event_start;
+	EIT_service_t *service;
 
 	offair_scheduleIndex = GET_NUMBER(pArg);
 
-	if( offair_services[offair_scheduleIndex].service == NULL )
-	{
+	service = dvbChannel_getService(offair_scheduleIndex);
+	if(service == NULL) {
 		return -1;
 	}
 
 	buffer[0] = 0;
 	str = buffer;
-	for( event_element = offair_services[offair_scheduleIndex].service->schedule; event_element != NULL; event_element = event_element->next )
-	{
+	for(event_element = service->schedule; event_element != NULL; event_element = event_element->next) {
 		event = (EIT_event_t *)event_element->data;
 		event_length = strlen( (char*)event->description.event_name );
 		/* 11 = strlen(timestamp + ". " + "\n"); */
@@ -3766,8 +3893,7 @@ static int offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&EPGMenu);
 
-	if( dvb_services == NULL )
-	{
+	if(dvb_services == NULL) {
 		str = _T("NONE");
 		interface_addMenuEntryDisabled((interfaceMenu_t*)&EPGMenu, str, thumbnail_not_selected);
 		return 0;
@@ -3778,26 +3904,15 @@ static int offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg)
 	interface_addMenuEntry((interfaceMenu_t*)&EPGMenu, str, interface_menuActionShowMenu, (void*)&EPGRecordMenu, thumbnail_epg);
 #endif
 
-	for( i = 0; i < offair_serviceCount; ++i )
-	{
-		if( offair_scheduleCheck(i) == 0 )
-		{
-			if( offair_serviceCount < 10 )
-			{
-				sprintf(buf, "%d. %s", i, offair_services[i].service->service_descriptor.service_name);
-			} else // if ( offair_serviceCount < 100 )
-			{
-				sprintf(buf, "%02d. %s", i, offair_services[i].service->service_descriptor.service_name);
-			}
-			buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
+	for(i = 0; i < dvbChannel_getCount(); ++i) {
+		EIT_service_t *service = dvbChannel_getService(i);
+		if(dvbChannel_hasSchedule(i)) {
+			snprintf(buf, sizeof(buf), "%s. %s", offair_getChannelNumberPrefix(i), service->service_descriptor.service_name);
 			interface_addMenuEntry((interfaceMenu_t*)&EPGMenu, buf, offair_showScheduleMenu, SET_NUMBER(i), thumbnail_channels);
-		} else
-		{
-			if( offair_services[i].service != NULL )
-			{
-				dprintf("%s: Service %s has no EPG\n", __FUNCTION__, dvb_getServiceName(offair_services[i].service));
-			} else
-			{
+		} else {
+			if(service) {
+				dprintf("%s: Service %s has no EPG\n", __FUNCTION__, dvb_getServiceName(service));
+			} else {
 				dprintf("%s: Service %d is not available\n", __FUNCTION__, i);
 			}
 		}
@@ -3811,41 +3926,53 @@ static int offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg)
 #ifdef ENABLE_DVB_DIAG
 static int offair_diagnisticsInfoCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
-	{
-		appControlInfo.dvbInfo.reportedSignalStatus = 0;
-		return 0;
-	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
-		dprintf("%s: start info wizard\n", __FUNCTION__);
-		interfaceInfo.showMessageBox = 0;
-		offair_wizardStart((interfaceMenu_t *)&DVBTOutputMenu, pArg);
-		appControlInfo.dvbInfo.reportedSignalStatus = 0;
-		return 0;
+	int32_t ret = 1;
+	switch(cmd->command) {
+		case interfaceCommandRed:
+		case interfaceCommandExit:
+		case interfaceCommandLeft:
+			appControlInfo.dvbInfo.reportedSignalStatus = 0;
+			ret = 0;
+			break;
+		case interfaceCommandGreen:
+		case interfaceCommandEnter:
+		case interfaceCommandOk:
+			dprintf("%s: start info wizard\n", __FUNCTION__);
+			interfaceInfo.showMessageBox = 0;
+			offair_wizardStart((interfaceMenu_t *)&DVBTMenu, pArg);
+			appControlInfo.dvbInfo.reportedSignalStatus = 0;
+			ret = 0;
+			break;
+		default:
 	}
 
-	return 1;
+	return ret;
 }
 
 static int offair_diagnisticsCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
-	{
-
-		if (appControlInfo.offairInfo.diagnosticsMode == DIAG_ON)
-		{
-			interface_showMessageBox(_T("DIAGNOSTICS_DISABLED"), thumbnail_info, 5000);
-			appControlInfo.offairInfo.diagnosticsMode = DIAG_OFF;
-			return 1;
-		}
-		return 0;
-	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
-		dprintf("%s: start diag wizard\n", __FUNCTION__);
-		interfaceInfo.showMessageBox = 0;
-		offair_wizardStart((interfaceMenu_t *)&DVBTOutputMenu, pArg);
-		appControlInfo.dvbInfo.reportedSignalStatus = 0;
-		return 0;
+	switch(cmd->command) {
+		case interfaceCommandRed:
+		case interfaceCommandExit:
+		case interfaceCommandLeft:
+			if(appControlInfo.offairInfo.diagnosticsMode == DIAG_ON) {
+				interface_showMessageBox(_T("DIAGNOSTICS_DISABLED"), thumbnail_info, 5000);
+				appControlInfo.offairInfo.diagnosticsMode = DIAG_OFF;
+				ret = 1;
+			} else {
+				ret = 0;
+			}
+			break;
+		case interfaceCommandGreen:
+		case interfaceCommandEnter:
+		case interfaceCommandOk:
+			dprintf("%s: start diag wizard\n", __FUNCTION__);
+			interfaceInfo.showMessageBox = 0;
+			offair_wizardStart((interfaceMenu_t *)&DVBTMenu, pArg);
+			appControlInfo.dvbInfo.reportedSignalStatus = 0;
+			ret = 0;
+			break;
+		default:
 	}
 
 	return 1;
@@ -3861,8 +3988,7 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 	int ccerrors;
 	stb810_signalStatus lastSignalStatus = signalStatusNoStatus;
 
-	if (pPSI != NULL)
-	{
+	if(pPSI != NULL) {
 		running_program_map = *pPSI;
 	}
 
@@ -3874,28 +4000,22 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 
 	dprintf("%s: Status: %d, ccerrors: %d\n", __FUNCTION__, status, ccerrors);
 
-	if (status == 0)
-	{
+	if(status == 0) {
 		lastSignalStatus = signalStatusNoSignal;
-	} else if (signal < BAD_SIGNAL && (uncorrected_blocks > BAD_UNC || ber > BAD_BER))
-	{
+	} else if(signal < BAD_SIGNAL && (uncorrected_blocks > BAD_UNC || ber > BAD_BER)) {
 		lastSignalStatus = signalStatusBadSignal;
-	} else if (running_program_map != NULL)
-	{
+	} else if(running_program_map != NULL) {
 		int has_new_channels = 0;
 		int missing_old_channels = 0;
 		list_element_t *element, *found;
 
 		/* find new */
 		element = running_program_map;
-		while (element != NULL)
-		{
+		while(element != NULL) {
 			EIT_service_t *service = (EIT_service_t *)element->data;
-			if (service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT))
-			{
+			if(service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT)) {
 				found = find_element_by_header(dvb_services, (unsigned char*)&service->common, sizeof(EIT_common_t), NULL);
-				if (found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT))
-				{
+				if(found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT)) {
 					dprintf("%s: Found new channel!\n", __FUNCTION__);
 					has_new_channels = 1;
 					break;
@@ -3906,11 +4026,9 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 
 		/* find missing */
 		element = dvb_services;
-		while (element != NULL)
-		{
+		while(element != NULL) {
 			EIT_service_t *service = (EIT_service_t *)element->data;
-			if (service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT))
-			{
+			if(service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT)) {
 				found = find_element_by_header(running_program_map, (unsigned char*)&service->common, sizeof(EIT_common_t), NULL);
 				if (found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT))
 				{
@@ -4124,13 +4242,12 @@ int  offair_tunerPresent(void)
 
 void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 {
-	int offair_icons[4] = { statusbar_f4_rename, 0, 0, 0};
-	offair_clearServices();
+	int offair_icons[4] = { 0, 0, 0, statusbar_f4_rename};
+	interfaceMenu_t *scheduleMenu;
+	interfaceMenu_t *scheduleParentMenu;
 
 	mysem_create(&epg_semaphore);
 	mysem_create(&offair_semaphore);
-
-	offair_importServices(OFFAIR_SERVICES_FILENAME);
 
 	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, offair_icons, pParent,
 		interfaceListMenuIconThumbnail, offair_enterDVBTMenu, NULL, NULL);
@@ -4139,29 +4256,22 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 
 #ifdef ENABLE_PVR
 	offair_icons[0] = statusbar_f1_record;
-#endif
-	createBasicMenu(&EPGRecordMenu.baseMenu, interfaceMenuEPG, _T("SCHEDULE"), thumbnail_epg, offair_icons,
-#ifdef ENABLE_PVR
-		_M &PvrMenu,
+	scheduleMenu = _M &PvrMenu;
+	scheduleParentMenu = (interfaceMenu_t *)&DVBTMenu;
 #else
-		_M &EPGMenu,
+	scheduleMenu = _M &EPGMenu;
+	scheduleParentMenu = pParent;
 #endif
-		offair_EPGRecordMenuProcessCommand, offair_EPGRecordMenuDisplay, NULL, offair_initEPGRecordMenu, NULL, NULL);
+	createBasicMenu(&EPGRecordMenu.baseMenu, interfaceMenuEPG, _T("SCHEDULE"), thumbnail_epg, offair_icons, scheduleMenu,
+					offair_EPGRecordMenuProcessCommand, offair_EPGRecordMenuDisplay, NULL, offair_initEPGRecordMenu, NULL, NULL);
 
-	createListMenu(&EPGMenu, _T("EPG_MENU"), thumbnail_epg, NULL,
-#ifdef ENABLE_PVR
-		(interfaceMenu_t*)&DVBTMenu,
-#else
-		pParent,
-#endif	
-		interfaceListMenuIconThumbnail,
-		offair_fillEPGMenu, NULL, NULL);
+	createListMenu(&EPGMenu, _T("EPG_MENU"), thumbnail_epg, NULL, scheduleParentMenu,
+					interfaceListMenuIconThumbnail, offair_fillEPGMenu, NULL, NULL);
 	interface_setCustomKeysCallback((interfaceMenu_t*)&EPGMenu, offair_EPGMenuKeyCallback);
 
 	offair_fillDVBTMenu();
-	offair_initDVBTOutputMenu((interfaceMenu_t*)&DVBTMenu, screenMain);
 #ifdef ENABLE_ANALOGTV
-	analogtv_initMenu((interfaceMenu_t*)&DVBTMenu);
+	analogtv_initMenu((interfaceMenu_t *)&DVBTMenu);
 #endif
 
 	wizard_init();
@@ -4172,11 +4282,11 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 
 void offair_cleanupMenu()
 {
-	if (epg_semaphore!=0) {
+	if(epg_semaphore != 0) {
 		mysem_destroy(epg_semaphore);
 		epg_semaphore = 0;
 	}
-	if (offair_semaphore!=0) {
+	if(offair_semaphore != 0) {
 		mysem_destroy(offair_semaphore);
 		offair_semaphore = 0;
 	}
@@ -4394,6 +4504,7 @@ parsing_done:
 }
 #endif // DVB_FAVORITES
 
+#if 0
 static char* offair_getLCNText(int field, void *pArg)
 {
 	return field == 0 ? offair_lcn_buf : NULL;
@@ -4417,15 +4528,17 @@ static int offair_getUserLCN(interfaceMenu_t *pMenu, char *value, void* pArg)
 	}
 
 	lcn = strtol(value,NULL,10);
-	if( serviceNumber == lcn || lcn < 0 || lcn >= offair_serviceCount)
+	if( serviceNumber == lcn || lcn < 0 || lcn >= dvbChannel_getCount())
 	{
 		return 0;
 	}
 	offair_swapServices(lcn, serviceNumber);
-	offair_exportServices(OFFAIR_SERVICES_FILENAME);
-	offair_fillDVBTOutputMenu(screen);
+	dvbChannel_writeOrderConfig();
+
+	offair_fillDVBTMenu();
 	return 0;
 }
+#endif
 
 static char* offair_getChannelCaption(int dummy, void* pArg)
 {
@@ -4440,75 +4553,70 @@ static char* offair_getChannelCaption(int dummy, void* pArg)
 
 static int offair_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* pArg)
 {
-	(void)pArg;
-	if (pStr == NULL) return 0;
-		
-	if (DVBTMenu.baseMenu.selectedItem - 2 < offair_indexCount)
-	{
-		// rename dvb service name
-		int dvbIndex = DVBTMenu.baseMenu.selectedItem - 2;
-		EIT_service_t *service = offair_services[offair_indeces[dvbIndex]].service;
-		
-		snprintf ((char*)&service->service_descriptor.service_name[0], MENU_ENTRY_INFO_LENGTH, (char*) pStr);
-		
-		// todo : save new caption to config file
+	if(pStr == NULL) {
+		return -1;
 	}
-	else 
-	if (DVBTMenu.baseMenu.selectedItem - 2 < offair_indexCount + (int32_t)analogtv_getChannelCount() + 1) {
 
-		uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - offair_indexCount - 3;
+	if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {
+		EIT_service_t *service;
+		int channelNumber;
+
+		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
+		service = dvbChannel_getService(channelNumber);
+		if(service == NULL) {
+			return -1;
+		}
+
+		snprintf((char *)service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", pStr);
+
+		// todo : save new caption to config file
+	} else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount() + 3)) {
+		uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - dvbChannel_getCount() - 3;
 		analogtv_updateName(selectedItem, pStr);
 	}
 
-	snprintf (DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, 
-		MENU_ENTRY_INFO_LENGTH, 
-		"%02d. %s", 
-		DVBTMenu.baseMenu.selectedItem - 2, pStr);
+#warning "Wrong printing number for analog TV!"
+	snprintf(DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, 
+			  MENU_ENTRY_INFO_LENGTH, "%02d. %s", DVBTMenu.baseMenu.selectedItem - 2, pStr);
 
 	return 0;
 }
 
 static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
+	EIT_service_t *service;
 	int channelNumber;
 	char URL[MAX_URL];
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if( cmd->command == interfaceCommandRed )
-	{
+	if(cmd->command == interfaceCommandRed) {
 		appControlInfo.offairInfo.sorting = (appControlInfo.offairInfo.sorting + 1) % serviceSortCount;
 		saveAppSettings();
+		dvbChannel_sort(appControlInfo.offairInfo.sorting);
 
-		if (appControlInfo.offairInfo.sorting != serviceSortNone )
-			qsort( offair_indeces, offair_indexCount, sizeof(offair_indeces[0]), service_cmp );
-		else
-			offair_initIndeces();
-
-//		offair_fillDVBTOutputMenu(screenMain);
 		offair_fillDVBTMenu();
 		interface_displayMenu(1);
 		return 0;
 	}
 
-	if(pMenu->selectedItem < 0 || GET_NUMBER(pArg) < 0)
-	{
+	if((pMenu->selectedItem < 0) || (GET_NUMBER(pArg) < 0)) {
 		return 1;
 	}
 
 	channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
+	service = dvbChannel_getService(channelNumber);
 
-	switch( cmd->command )
-	{
+	switch(cmd->command) {
 #ifdef DVB_FAVORITES
 		case interfaceCommandYellow:
-			dvb_getServiceURL(offair_services[channelNumber].service, URL);
+			dvb_getServiceURL(service, URL);
 			eprintf("offair: Add to Playlist '%s'\n",URL);
-			playlist_addUrl(URL, dvb_getServiceName(offair_services[channelNumber].service));
+			playlist_addUrl(URL, dvb_getServiceName(service));
 			return 0;
 #endif // DVB_FAVORITES
 		case interfaceCommandBlue:
-			if (DVBTMenu.baseMenu.selectedItem >= 1){
+			if(DVBTMenu.baseMenu.selectedItem >= 1){
 				interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", offair_saveChannelCaption, offair_getChannelCaption, inputModeABC, pArg);
 			}
 			return 0;
@@ -4519,10 +4627,11 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			* */
 		case interfaceCommandInfo:
 		case interfaceCommandGreen:
-			if (menu_entryIsAnalogTv(pMenu, pMenu->selectedItem))
+			if(menu_entryIsAnalogTv(pMenu, pMenu->selectedItem)) {
 				analogtv_getServiceDescription(channelNumber, URL, sizeof(URL));
-			else
-				dvb_getServiceDescription(offair_services[channelNumber].service, URL);
+			} else {
+				dvb_getServiceDescription(service, URL);
+			}
 			eprintf("offair: Channel %d info:\n%s\n", channelNumber, URL);
 			interface_showMessageBox(URL, thumbnail_info, 0);
 			return 0;
@@ -4546,58 +4655,22 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 	return 1;
 }
 
-int offair_getServiceCount()
-{
-	return offair_serviceCount;
-}
-
 int offair_getIndex(int index)
 {
 	EIT_service_t* service = dvb_getService(index);
-	return offair_getServiceIndex(service);
-}
-
-int offair_getServiceIndex(EIT_service_t *service)
-{
-	int index;
-	if( service == NULL )
-	{
-		return -2;
-	}
-	for( index = 0; index < offair_serviceCount; index++)
-	{
-		if( offair_services[index].service == service )
-		{
-			return index;
-		}
-	}
-	return -1;
-}
-
-EIT_service_t* offair_getService(int index)
-{
-	return offair_services[index].service;
+	return dvbChannel_getIndex(service);
 }
 
 int offair_getCurrentServiceIndex(int which)
 {
-	if( appControlInfo.dvbInfo.active == 0)
-	{
+	if(appControlInfo.dvbInfo.active == 0) {
 		return -1;
 	}
 	return dvb_getServiceIndex(current_service());
 }
 
-#ifdef ENABLE_STATS
-int offair_findService(EIT_common_t *header)
-{
-	int i;
-	for(i = 1; i < offair_serviceCount; i++)
-		if (memcmp(&offair_services[i].common, header, sizeof(EIT_common_t)) == 0)
-			return i;
-	return -1;
-}
 
+#ifdef ENABLE_STATS
 static int offair_updateStats(int which)
 {
 	time_t now = time(NULL) - statsInfo.today;
@@ -4976,7 +5049,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 
 							tmp = appControlInfo.playbackInfo.bAutoPlay;
 							appControlInfo.playbackInfo.bAutoPlay = 0;
-							interface_menuActionShowMenu(pMenu, (void*)&DVBTOutputMenu);
+							interface_menuActionShowMenu(pMenu, (void*)&DVBTMenu);
 							appControlInfo.playbackInfo.bAutoPlay = tmp;
 
 							if (foundAll == 0)
@@ -5404,27 +5477,21 @@ static void wizard_cleanup(int finished)
 	interfaceInfo.lockMenu = 0;
 	interfaceInfo.enableClock = 1;
 
-	if (finished == 1)
-	{
+	if(finished == 1) {
 		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 		appControlInfo.offairInfo.wizardFinished = 1;
 		saveAppSettings();
-	} else if (finished == 0)
-	{
+	} else if(finished == 0) {
 		offair_clearServiceList(0);
 		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 	}
 
-	if (finished != -1)
-	{
+	if(finished != -1) {
 		offair_fillDVBTMenu();
-		offair_fillDVBTOutputMenu(screenMain);
 	}
 
-	if (wizardSettings->locationFiles != NULL)
-	{
-		for (i=0; i<wizardSettings->locationCount; i++)
-		{
+	if(wizardSettings->locationFiles != NULL) {
+		for(i=0; i<wizardSettings->locationCount; i++) {
 			//dprintf("%s: free %s\n", __FUNCTION__, wizardSettings->locationFiles[i]->d_name);
 			free(wizardSettings->locationFiles[i]);
 		}

@@ -2745,18 +2745,25 @@ static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 
 static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
-	{
-		return 0;
-	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
-		offair_clearServices();
-		offair_initServices();
-		offair_fillDVBTOutputMenu(screenMain);
-		return 0;
+	int32_t ret = 1;
+	switch(cmd->command) {
+		case interfaceCommandRed:
+		case interfaceCommandExit:
+		case interfaceCommandLeft:
+			ret = 0;
+			break;
+		case interfaceCommandGreen:
+		case interfaceCommandEnter:
+		case interfaceCommandOk:
+			dvbChannel_clearServices();
+			offair_fillDVBTMenu();
+			ret = 0;
+			break;
+		default:
+			break;
 	}
 
-	return 1;
+	return ret;
 }
 
 #ifdef ENABLE_DVB_DIAG
@@ -2782,9 +2789,7 @@ static int output_toggleDvbTuner(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.dvbShowScrambled = (appControlInfo.offairInfo.dvbShowScrambled + 1) % 3;
-	offair_initServices();
 	offair_fillDVBTMenu();
-	offair_fillDVBTOutputMenu(screenMain);
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 

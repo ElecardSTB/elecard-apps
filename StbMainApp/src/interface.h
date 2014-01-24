@@ -1292,6 +1292,13 @@ static inline int interface_setMenuEntryLabel(interfaceMenuEntry_t *menuEntry, c
 	return 0;
 }
 
+static inline interfaceMenuEntry_t * menu_getLastEntry(interfaceMenu_t *pMenu)
+{
+	if (pMenu->menuEntryCount <= 0)
+		return NULL;
+	return &pMenu->menuEntry[pMenu->menuEntryCount-1];
+}
+
 /**
  *  @brief Adds new disabled text entry to specified menu
  *

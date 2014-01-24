@@ -1053,7 +1053,7 @@ static int pvr_enterPvrMenu(interfaceMenu_t *pvrMenu, void *pArg)
 #ifdef STBPVR
 #ifdef ENABLE_DVB
 	if (pvrEditInfo.job.type == pvrJobTypeDVB) {
-		if (offair_epgEnabled())
+		if (dvbChannel_hasAnyEPG())
 			interface_addMenuEntry(pvrMenu, _T("EPG_RECORD"), interface_menuActionShowMenu, &EPGRecordMenu, thumbnail_recorded_epg);
 		else
 			interface_addMenuEntryDisabled(pvrMenu, _T("EPG_UNAVAILABLE"), thumbnail_recorded_epg);

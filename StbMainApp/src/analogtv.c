@@ -712,7 +712,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceAnalogTV;
-	appControlInfo.playbackInfo.channel = id + offair_serviceCount;
+	appControlInfo.playbackInfo.channel = id + dvbChannel_getCount();
 	appControlInfo.mediaInfo.bHttp = 0;
 	appControlInfo.tvInfo.active = 1;
 	appControlInfo.tvInfo.id = id;
@@ -732,8 +732,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	offair_stopVideo(screenMain, 1);
 //	offair_startVideo(screenMain);
 // 	offair_fillDVBTMenu();
-	offair_fillMenuEntry();
-	offair_fillDVBTOutputMenu(screenMain);
+	offair_updateChannelStatus();
 //	saveAppSettings();
 
 	snprintf(cmd, sizeof(cmd), URL_ANALOGTV_MEDIA "%u@%s:%s", freq, analogtv_channelParam[id].sysEncode, analogtv_channelParam[id].audio);
@@ -789,13 +788,7 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
 	for(i = 0; i < analogtv_channelCount; i++) {
 		char channelEntry[32];
 
-		if (analogtv_channelCount < 10)
-			sprintf(channelEntry, "%d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
-		else if (analogtv_channelCount < 100)
-			sprintf(channelEntry, "%02d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
-		else
-			sprintf(channelEntry, "%03d. %s", startIndex + i + 1, analogtv_channelParam[i].customCaption);
-
+		sprintf(channelEntry, "%s. %s", offair_getChannelNumberPrefix(startIndex + i), analogtv_channelParam[i].customCaption);
 		interface_addMenuEntry(pMenu, channelEntry, analogtv_activateChannel, (void *)i, thumbnail_tvstandard);
 		interface_setMenuEntryLabel(&pMenu->menuEntry[pMenu->menuEntryCount-1], "ANALOG");
 
