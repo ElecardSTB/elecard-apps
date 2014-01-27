@@ -447,6 +447,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * Interface options (interface.h)
  *************************************/
 
+//#define MENU_HAS_NO_BACK_BUTTON
+
 /* With default font height(=18) only 144 dots can fit on one line */
 #define MENU_ENTRY_INFO_LENGTH   (256)
 

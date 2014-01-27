@@ -176,7 +176,7 @@ static int menu_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 
 void menu_buildMainMenu()
 {
-	char *str;
+	char *str = NULL;
 	int  main_icons[4] = { 0, 0, 0,
 #ifdef ENABLE_FAVORITES
 #ifdef ENABLE_VIDIMAX
@@ -188,9 +188,8 @@ void menu_buildMainMenu()
 	0
 #endif
 	};
-	
 
-	createListMenu(&interfaceMainMenu, NULL, thumbnail_logo, main_icons, NULL,
+	createListMenu(&interfaceMainMenu, str, thumbnail_logo, main_icons, NULL,
 				   /* interfaceInfo.clientX, interfaceInfo.clientY,
 				   interfaceInfo.clientWidth, interfaceInfo.clientHeight,*/ interfaceListMenuBigThumbnail,//interfaceListMenuIconThumbnail,
 				   NULL, NULL, NULL);

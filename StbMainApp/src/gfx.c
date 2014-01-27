@@ -3265,6 +3265,7 @@ void gfx_drawText(IDirectFBSurface *pSurface, IDirectFBFont *pgfx_Font,
 		DFBCHECKLABEL (pSurface->SetDrawingFlags(pSurface, DSDRAW_NOFX), finish_drawText );
 	}
 
+	DFBSurfaceTextFlags flags = DSTF_LEFT;
 	if (shadow)
 	{
 		/* Set up colour and alpha - draw the drop shadow */
@@ -3277,7 +3278,7 @@ void gfx_drawText(IDirectFBSurface *pSurface, IDirectFBFont *pgfx_Font,
 	/* Set up colour and alpha - draw the text */
 	DFBCHECKLABEL (pSurface->SetDrawingFlags(pSurface, DSDRAW_BLEND), finish_drawText );
 	DFBCHECKLABEL (pSurface->SetColor(pSurface, r, g, b, a), finish_drawText );
-	DFBCHECKLABEL (pSurface->DrawString(pSurface, pText, strlen(pText), x, y, DSTF_LEFT), finish_drawText );
+	DFBCHECKLABEL (pSurface->DrawString(pSurface, pText, strlen(pText), x, y, flags), finish_drawText );
 
 	DFBCHECKLABEL (pSurface->SetDrawingFlags(pSurface, DSDRAW_NOFX), finish_drawText );
 	finish_drawText:;

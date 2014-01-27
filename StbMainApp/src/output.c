@@ -366,7 +366,7 @@ static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-#endif
+#endif // ENABLE_DVB
 
 #ifdef ENABLE_3D
 static interfaceListMenu_t Video3DSubMenu;
@@ -3082,7 +3082,7 @@ int output_showDVBMenu(interfaceMenu_t *pMenu, void* notused)
 int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
-	char *str;
+	const char *str;
 	tunerFormat tuner = appControlInfo.dvbInfo.tuner;
 	stb810_dvbfeInfo *fe = getDvbRange(tuner);
 	int tunerType = dvb_getType(tuner);
@@ -6220,7 +6220,9 @@ void output_fillOutputMenu(void)
 
 
 #ifdef ENABLE_ANALOGTV
+#ifdef STSDK
 	if (st_getBoardId()==eSTB850)
+#endif
 	{
 		/// TODO : check whether analog tuner presents
 		str = _T("ANALOGTV_CONFIG");
@@ -6272,7 +6274,7 @@ void output_fillOutputMenu(void)
 
 	str = _T("UPDATES");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &UpdateMenu, settings_updates);
-#endif
+#endif /* STSDK */
 
 	str = _T("STATUS_REPORT");
 	interface_addMenuEntry(outputMenu, str, (void*)output_statusReport, NULL, thumbnail_configure);
@@ -6311,19 +6313,21 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	}
 #endif
 #ifdef ENABLE_ANALOGTV
+#ifdef STSDK
 	if (st_getBoardId()==eSTB850)
+#endif
 	{
 		/// TODO : check whether analog tuner presents
 		createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M 		&OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
 	}
 #endif
-
+#ifdef STSDK
 	if (currentmeter_isExist()){
 		createListMenu(&CurrentmeterSubMenu, _T("CURRENTMETER_CALIBRATE"), settings_dvb, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterCalibrateMenu, NULL, NULL);
 	}
-
+#endif
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,
@@ -6337,7 +6341,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
 	createListMenu(&DiSEqCMenu, "DiSEqC", settings_dvb, NULL, _M &DVBSubMenu,
 		interfaceListMenuIconThumbnail, output_enterDiseqcMenu, NULL, NULL);
-#endif
+#endif // ENABLE_DVB
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterNetworkMenu, output_leaveNetworkMenu, NULL);
 

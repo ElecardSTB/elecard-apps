@@ -659,7 +659,7 @@ void analogtv_terminate(void)
 	mysem_destroy(analogtv_semaphore);
 }
 
-static int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
+int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	switch(cmd->command) {
 		case interfaceCommandGreen:
@@ -675,7 +675,7 @@ static int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void
 			return 0;
 		default:;
 	}
-	return -1;
+	return 1;
 }
 
 //-----------------------------------------------------------------------
@@ -798,7 +798,6 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
 			interface_setSelectedItem(pMenu, pMenu->menuEntryCount - 1);
 		}
 	}
-//	interface_setSelectedItem(channelMenu, selectedMenuItem);
 }
 
 int menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index)

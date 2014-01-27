@@ -1,5 +1,3 @@
-#ifdef STSDK
-
 /*
  stsdk.c
 
@@ -35,6 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #include "stsdk.h"
+
+#ifdef STSDK
 
 #include "debug.h"
 #include "client.h"
@@ -819,6 +819,56 @@ int32_t st_getBoardVer(void)
 {
 	st_initBoardId();
 	return g_board_ver;
+}
+
+int st_command0(elcdRpcCommand_t cmd, cJSON* param, int timeout)
+{
+	elcdRpcType_t type;
+	cJSON *res  = NULL;
+	st_rpcSyncTimeout(cmd, param, timeout, &type, &res );
+	int ret = !st_isOk(type, res, rpc_getCmdName(cmd));
+	cJSON_Delete(param);
+	cJSON_Delete(res);
+	return ret;
+}
+
+static inline cJSON * px(int x)
+{
+	char buf[16];
+	snprintf(buf, sizeof(buf), "%dpx", x);
+	return cJSON_CreateString(buf);
+}
+
+int st_setOutputWnd(int x, int y, int w, int h)
+{
+	cJSON *param = cJSON_CreateObject();
+	cJSON_AddItemToObject(param, "x_pos",  px(x));
+	cJSON_AddItemToObject(param, "y_pos",  px(y));
+	cJSON_AddItemToObject(param, "width",  px(w));
+	cJSON_AddItemToObject(param, "height", px(h));
+	return st_command(elcmd_setOutputWnd, param);
+}
+
+static inline cJSON * fl(float x)
+{
+	char buf[16];
+	snprintf(buf, sizeof(buf), "%.4f", x);
+	return cJSON_CreateString(buf);
+}
+
+int st_setOutputWnd2(float x, float y, float w, float h)
+{
+	cJSON *param = cJSON_CreateObject();
+	cJSON_AddItemToObject(param, "x_pos",  fl(x));
+	cJSON_AddItemToObject(param, "y_pos",  fl(y));
+	cJSON_AddItemToObject(param, "width",  fl(w));
+	cJSON_AddItemToObject(param, "height", fl(h));
+	return st_command(elcmd_setOutputWnd, param);
+}
+
+int st_resetOutputWnd(void)
+{
+	return st_setOutputWnd2(0.0, 0.0, 1.0, 1.0);
 }
 
 #endif // STSDK

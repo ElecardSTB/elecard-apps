@@ -111,6 +111,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MENU_DEFAULT_CAPACITY (0)
 #define MENU_CAPACITY_INCREMENT (4)
 
+#define EDIT_ENTRY_TEXT_SHADOW  (0)
+
 //#define INTERFACE_DRAW_ARROW
 
 /***********************************************
@@ -159,6 +161,10 @@ static button_t controlButtons[] = {
 	{ "Exit", INTERFACE_SCROLLBAR_COLOR_RED, INTERFACE_SCROLLBAR_COLOR_GREEN,
 	          INTERFACE_SCROLLBAR_COLOR_BLUE, 0xFF, interfaceCommandExit }
 };
+
+#ifdef INTERFACE_DRAW_ARROW
+static IDirectFBSurface *pArrow = 0;
+#endif
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -3675,8 +3681,12 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		};
 
 // 		dprintf("%s: n=%d\n", __FUNCTION__, n);
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		if ((pMenu->pParentMenu != NULL && n < MENU_ITEM_MAIN) ||
 		    (pMenu->pParentMenu == NULL && n < 0))
+#else
+		if (n < 0)
+#endif
 		{
 			//dprintf("%s: loop\n", __FUNCTION__);
 			n = pMenu->menuEntryCount-1;
@@ -3686,7 +3696,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 				n--;
 			};
 		}
-
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		if ( pMenu->pParentMenu != NULL )
 		{
 			//pMenu->selectedItem = pMenu->selectedItem > MENU_ITEM_MAIN ? n : pMenu->selectedItem;
@@ -3696,16 +3706,19 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 				pMenu->selectedItem = MENU_ITEM_MAIN;
 			}
 		} else
+#endif
 		{
 			pMenu->selectedItem = n >= 0 ? n : pMenu->selectedItem;
 		}
 	} else if ( cmd->command == interfaceCommandDown )
 	{
 // 		dprintf("%s: down\n", __FUNCTION__);
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		if ( pMenu->selectedItem == MENU_ITEM_MAIN && pMenu->pParentMenu != NULL && pMenu->pParentMenu->pParentMenu != NULL )
 		{
 			n = MENU_ITEM_BACK;
 		} else
+#endif
 		{
 			if (pMenu->selectedItem < 0)
 			{
@@ -3725,11 +3738,13 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 
 		if (n >= pMenu->menuEntryCount)
 		{
+#ifndef MENU_HAS_NO_BACK_BUTTON
 			//dprintf("%s: loop\n", __FUNCTION__);
 			if ( pMenu->pParentMenu != NULL )
 			{
 				n = MENU_ITEM_MAIN;
 			} else
+#endif
 			{
 				//dprintf("%s: zero\n", __FUNCTION__);
 				n = 0;
@@ -3763,6 +3778,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		}*/
 	} else if ( cmd->command == interfaceCommandLeft )
 	{
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		//dprintf("%s: left\n", __FUNCTION__);
 		if ( pMenu->selectedItem == MENU_ITEM_BACK && pMenu->pParentMenu != NULL )
 		{
@@ -3770,7 +3786,9 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		} else if ( pMenu->selectedItem == MENU_ITEM_MAIN && pMenu->pParentMenu->pParentMenu != NULL )
 		{
 			pMenu->selectedItem = MENU_ITEM_BACK;
-		} else if ( pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail )
+		} else
+#endif
+		if ( pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail )
 		{
 			if (pMenu->selectedItem == 0 && pMenu->pParentMenu != NULL)
 			{
@@ -3815,7 +3833,9 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 					pMenu->selectedItem = n >= 0 ? n : pMenu->selectedItem;
 				}
 			}
-		} else if (pMenu->selectedItem >= 0 && pMenu->pParentMenu != NULL)
+		} else
+#ifndef MENU_HAS_NO_BACK_BUTTON
+		if (pMenu->selectedItem >= 0 && pMenu->pParentMenu != NULL)
 		{
 			if (pMenu->pParentMenu->pParentMenu != NULL)
 			{
@@ -3824,7 +3844,10 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 			{
 				pMenu->selectedItem = MENU_ITEM_MAIN;
 			}
-		} else if (pMenu->pParentMenu == NULL)
+
+		} else
+#endif
+		if (pMenu->pParentMenu == NULL)
 		{
 			interface_showMenu(!interfaceInfo.showMenu, 1);
 		}
@@ -3872,10 +3895,14 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 			//dprintf("%s: new n = %d of %d\n", __FUNCTION__, n, pMenu->menuEntryCount);
 			//dprintf("%s: n = %d of %d\n", __FUNCTION__, n, pMenu->menuEntryCount);
 			pMenu->selectedItem = n;
-		} else if ( pMenu->selectedItem < 0 && pMenu->pParentMenu != NULL && pMenu->pParentMenu->pParentMenu != NULL )
+		}
+#ifndef MENU_HAS_NO_BACK_BUTTON
+		// Switch between back and mainmenu button
+		else if ( pMenu->selectedItem < 0 && pMenu->pParentMenu != NULL && pMenu->pParentMenu->pParentMenu != NULL )
 		{
 			pMenu->selectedItem = 1-(pMenu->selectedItem+2)-2;
 		}
+#endif
 	} else if ( cmd->command == interfaceCommandBack )
 	{
 		if ( pMenu->pParentMenu != NULL )
@@ -4067,13 +4094,15 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		//dprintf("%s: up\n", __FUNCTION__);
 
 		interface_listMenuGetItemInfo(pListMenu,&itemHeight,&maxVisibleItems);
-
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		if (pListMenu->baseMenu.selectedItem == MENU_ITEM_BACK && 
 		    pListMenu->baseMenu.pParentMenu != NULL &&
 		    pListMenu->baseMenu.pParentMenu->pParentMenu != NULL )
 		{
 			n = MENU_ITEM_MAIN;
-		} else if ( pListMenu->baseMenu.menuEntryCount <= maxVisibleItems )
+		} else
+#endif
+		if ( pListMenu->baseMenu.menuEntryCount <= maxVisibleItems )
 		{
 			n = 0;
 		}else
@@ -4100,7 +4129,7 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 				n--;
 			};
 		}
-
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		if ( pListMenu->baseMenu.pParentMenu != NULL )
 		{
 			//pListMenu->baseMenu.selectedItem = pListMenu->baseMenu.selectedItem > MENU_ITEM_MAIN ? n : pListMenu->baseMenu.selectedItem;
@@ -4111,6 +4140,7 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 				pListMenu->baseMenu.selectedItem = MENU_ITEM_MAIN;
 			}
 		} else
+#endif
 		{
 			pListMenu->baseMenu.selectedItem = n >= 0 ? n : pListMenu->baseMenu.selectedItem;
 		}
@@ -4119,13 +4149,14 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 	{
 		interface_listMenuGetItemInfo(pListMenu,&itemHeight,&maxVisibleItems);
 		//dprintf("%s: down\n", __FUNCTION__);
-
+#ifndef MENU_HAS_NO_BACK_BUTTON
 		if ( pListMenu->baseMenu.selectedItem == MENU_ITEM_MAIN && 
 		     pListMenu->baseMenu.pParentMenu != NULL && 
 		     pListMenu->baseMenu.pParentMenu->pParentMenu != NULL )
 		{
 			n = MENU_ITEM_BACK;
 		} else
+#endif
 		{
 
 			if ( pListMenu->baseMenu.menuEntryCount <= maxVisibleItems )
@@ -4239,30 +4270,17 @@ void interface_listMenuGetItemInfo(interfaceListMenu_t *pListMenu, int* itemHeig
 	//dprintf("%s: maxVisibleItems: %d\n", __FUNCTION__, maxVisibleItems);
 }
 
-void interface_listMenuDisplay(interfaceMenu_t *pMenu)
+static void listMenu_drawBackground(interfaceListMenu_t *pListMenu)
 {
-	interfaceListMenu_t *pListMenu = (interfaceListMenu_t*)pMenu;
-	int i, x, y;
-	int fh;
-	int itemHeight, maxVisibleItems, itemOffset, itemDisplayIndex;
-	int r, g, b, a;
-	char *str;
-	DFBRectangle rect;
-
-	//dprintf("%s: displaying\n", __FUNCTION__);
-
-	if (pMenu->pParentMenu && pListMenu->listMenuType != interfaceListMenuBigThumbnail)
-		interface_displayMenuHeader();
-
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 	DFBCHECK( DRAWING_SURFACE->SetColor(DRAWING_SURFACE, 
 		INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA) );
 
 	if ( pListMenu->listMenuType != interfaceListMenuBigThumbnail)
 	{
-		gfx_drawRectangle(DRAWING_SURFACE, 
+		gfx_drawRectangle(DRAWING_SURFACE,
 		                  INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN,
-		                  INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA, 
+		                  INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
 		                  interfaceInfo.clientX, interfaceInfo.clientY+INTERFACE_ROUND_CORNER_RADIUS,
 		                  interfaceInfo.clientWidth, interfaceInfo.clientHeight-2*INTERFACE_ROUND_CORNER_RADIUS);
 		// top left corner
@@ -4272,14 +4290,14 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 			interfaceInfo.clientWidth-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS);
 		interface_drawRoundedCorner(interfaceInfo.clientX, interfaceInfo.clientY, 0, 0);
 		// bottom left corner
-		gfx_drawRectangle(DRAWING_SURFACE, 
+		gfx_drawRectangle(DRAWING_SURFACE,
 			INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
 			interfaceInfo.clientX+INTERFACE_ROUND_CORNER_RADIUS, interfaceInfo.clientY+interfaceInfo.clientHeight-INTERFACE_ROUND_CORNER_RADIUS,
 			interfaceInfo.clientWidth-INTERFACE_ROUND_CORNER_RADIUS, INTERFACE_ROUND_CORNER_RADIUS);
 		interface_drawRoundedCorner(interfaceInfo.clientX, interfaceInfo.clientY+interfaceInfo.clientHeight-INTERFACE_ROUND_CORNER_RADIUS, 1, 0);
 	} else {
 #ifndef ENABLE_VIDIMAX
-		gfx_drawRectangle(DRAWING_SURFACE, 
+		gfx_drawRectangle(DRAWING_SURFACE,
 			INTERFACE_BACKGROUND_RED, INTERFACE_BACKGROUND_GREEN, INTERFACE_BACKGROUND_BLUE, INTERFACE_BACKGROUND_ALPHA,
 			0, 0, interfaceInfo.screenWidth, interfaceInfo.marginSize);
 #endif
@@ -4294,11 +4312,12 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 		interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "background.png", interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 0, &clip, DSBLIT_BLEND_COLORALPHA, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
 		//interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "background.png", interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 0, &clip, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
 	}*/
+}
 
-
+static void listMenu_drawLogo(interfaceListMenu_t *pListMenu)
+{
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 
-	/* Show menu logo if needed */
 	if (interfaceInfo.currentMenu->logo > 0 && interfaceInfo.currentMenu->logoX > 0)
 	{
 		interface_drawImage(DRAWING_SURFACE, resource_thumbnails[interfaceInfo.currentMenu->logo],
@@ -4306,146 +4325,170 @@ void interface_listMenuDisplay(interfaceMenu_t *pMenu)
 			interfaceInfo.currentMenu->logoWidth, interfaceInfo.currentMenu->logoHeight,
 			0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignCenter|interfaceAlignMiddle, 0, 0);
 	}
+}
 
-	/*
-	if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail )
-	{
-		gfx_drawRectangle(DRAWING_SURFACE, INTERFACE_THUMBNAIL_BACKGROUND_RED, INTERFACE_THUMBNAIL_BACKGROUND_GREEN, INTERFACE_THUMBNAIL_BACKGROUND_BLUE, INTERFACE_THUMBNAIL_BACKGROUND_ALPHA, pListMenu->infoAreaX, pListMenu->infoAreaY, pListMenu->infoAreaWidth, pListMenu->infoAreaHeight);
-	}*/
-
-	pgfx_font->GetHeight(pgfx_font, &fh);
-
-#ifdef INTERFACE_DRAW_ARROW
-	IDirectFBSurface *pArrow;
-	pArrow = gfx_decodeImage(IMAGE_DIR INTERFACE_ARROW_IMAGE, INTERFACE_ARROW_SIZE, INTERFACE_ARROW_SIZE, 0);
-#endif
-
-	//dprintf("%s: go through entries\n", __FUNCTION__);
-
-	if ( pListMenu->listMenuType == interfaceListMenuBigThumbnail )
-	{
-		int last_row_index, last_row_col_count;
-		interfaceMenuEntry_t *selectedEntry = NULL;
-		char *second_line = NULL;
-
-		r = INTERFACE_BOOKMARK_RED;
-		g = INTERFACE_BOOKMARK_GREEN;
-		b = INTERFACE_BOOKMARK_BLUE;
-		a = INTERFACE_BOOKMARK_ALPHA;
-		switch (pListMenu->baseMenu.selectedItem)
-		{
-			case MENU_ITEM_MAIN: str = _T("MAIN_MENU"); break;
-			case MENU_ITEM_BACK: str = _T("BACK"); break;
-			default:
-				selectedEntry = &pListMenu->baseMenu.menuEntry[pListMenu->baseMenu.selectedItem];
-				str = selectedEntry->info;
-				if (selectedEntry->infoReplacedChar != 0 )
-					selectedEntry->info[selectedEntry->infoReplacedCharPos] = selectedEntry->infoReplacedChar;
-				second_line = strchr(str, '\n');
-				if ( second_line )
-					*second_line = 0;
-		}
-		DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, str, -1, &rect, NULL) );
-		x = (interfaceInfo.screenWidth - rect.w)/2;
-		y = interfaceInfo.marginSize - rect.h/2 - interfaceInfo.paddingSize;
-		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, str, 0, 1);
-		if (selectedEntry != NULL && selectedEntry->infoReplacedChar != 0)
-			selectedEntry->info[selectedEntry->infoReplacedCharPos] = 0;
-		if ( second_line )
-			*second_line = '\n';
-
-		switch (pListMenu->baseMenu.menuEntryCount)
-		{
-			case 0:case 1: pListMenu->infoAreaWidth = 1; break;
-			case 2:case 4: pListMenu->infoAreaWidth = 2; break;
-			case 3:case 5:
-			case 6:case 9: pListMenu->infoAreaWidth = 3; break;
-			default: pListMenu->infoAreaWidth = 4;
-		}
-		maxVisibleItems = pListMenu->infoAreaWidth * 3;
-		pListMenu->infoAreaHeight = (pListMenu->baseMenu.menuEntryCount + pListMenu->infoAreaWidth-1) / pListMenu->infoAreaWidth;
-		last_row_col_count = pListMenu->baseMenu.menuEntryCount - (pListMenu->infoAreaWidth*(pListMenu->infoAreaHeight-1));
-		last_row_index = last_row_col_count == pListMenu->infoAreaWidth ?
-		                 pListMenu->baseMenu.menuEntryCount :
-		                 pListMenu->infoAreaWidth * (pListMenu->infoAreaHeight - 1);
-		//dprintf("%s: count=%d col=%d row=%d last_count=%d last_index=%d\n", __FUNCTION__,pListMenu->baseMenu.menuEntryCount,pListMenu->infoAreaWidth,pListMenu->infoAreaHeight,last_row_col_count,last_row_index);
-		
-		pListMenu->infoAreaX = (interfaceInfo.screenWidth  - INTERFACE_BIG_THUMBNAIL_SIZE*pListMenu->infoAreaWidth)/2;
-		pListMenu->infoAreaY = (interfaceInfo.screenHeight - INTERFACE_BIG_THUMBNAIL_SIZE*
-			(pListMenu->baseMenu.menuEntryCount <= maxVisibleItems ? pListMenu->infoAreaHeight : 3 ))/2;
-		int last_row_start = last_row_col_count == 0 ? 
-		                     pListMenu->infoAreaX :
-		                     (interfaceInfo.screenWidth - last_row_col_count*INTERFACE_BIG_THUMBNAIL_SIZE)/2;
-
-		if ( pListMenu->baseMenu.menuEntryCount > maxVisibleItems && pListMenu->baseMenu.selectedItem >= pListMenu->infoAreaWidth*2 )
-		{
-			itemOffset = (pListMenu->baseMenu.selectedItem / pListMenu->infoAreaWidth - 1) * pListMenu->infoAreaWidth;
-			itemOffset = itemOffset > (pListMenu->baseMenu.menuEntryCount - last_row_col_count - pListMenu->infoAreaWidth*2) ?
-			             pListMenu->baseMenu.menuEntryCount - last_row_col_count - pListMenu->infoAreaWidth*2 :
-			             itemOffset;
-		} else
-		{
-			itemOffset = 0;
-		}
-
-		rect.w = INTERFACE_BIG_THUMBNAIL_SIZE;
-		rect.h = INTERFACE_BIG_THUMBNAIL_SIZE;
-		for ( i = itemOffset; i < pListMenu->baseMenu.menuEntryCount && i < itemOffset + maxVisibleItems; i++ )
-		{
-			rect.x = i < last_row_index
-				? pListMenu->infoAreaX + INTERFACE_BIG_THUMBNAIL_SIZE * (i % pListMenu->infoAreaWidth)              // complete row
-				: last_row_start       + INTERFACE_BIG_THUMBNAIL_SIZE *((i - last_row_index) % last_row_col_count); // incomplete row
-			rect.y = pListMenu->infoAreaY + INTERFACE_BIG_THUMBNAIL_SIZE * ((i-itemOffset) / pListMenu->infoAreaWidth);
-
-			pListMenu->baseMenu.menuEntry[i].pDisplay( pMenu, &rect, i );
-		}
-	} else
-	{
-		//pListMenu->listMenuType != interfaceListMenuBigThumbnail
-		interface_listMenuGetItemInfo(pListMenu,&itemHeight,&maxVisibleItems);
-
-		if ( pListMenu->baseMenu.selectedItem > maxVisibleItems/2 )
-		{
-			itemOffset = pListMenu->baseMenu.selectedItem - maxVisibleItems/2;
-			itemOffset = itemOffset > (pListMenu->baseMenu.menuEntryCount-maxVisibleItems) ? 
-			             pListMenu->baseMenu.menuEntryCount-maxVisibleItems :
-			             itemOffset;
-		} else
-		{
-			itemOffset = 0;
-		}
-
-		rect.w = interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize;
-		if (maxVisibleItems < pListMenu->baseMenu.menuEntryCount)
-			rect.w -= INTERFACE_SCROLLBAR_WIDTH + interfaceInfo.paddingSize;
-		rect.h = pListMenu->listMenuType == interfaceListMenuNoThumbnail ?
-		         fh + interfaceInfo.paddingSize :
-		         pListMenu->baseMenu.thumbnailHeight;
-		for ( i=itemOffset; i<itemOffset+maxVisibleItems; i++ )
-		{
-			itemDisplayIndex = i-itemOffset;
-			rect.x = interfaceInfo.clientX+interfaceInfo.paddingSize;
-			rect.y = pListMenu->listMenuType == interfaceListMenuNoThumbnail
-				? interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*itemDisplayIndex + interfaceInfo.paddingSize
-				: interfaceInfo.clientY+(interfaceInfo.paddingSize+pListMenu->baseMenu.thumbnailHeight)*itemDisplayIndex + interfaceInfo.paddingSize;
-
-			pListMenu->baseMenu.menuEntry[i].pDisplay( pMenu, &rect, i );
-		}
-	}
-
+static int32_t listMenu_drawScrollBar(interfaceListMenu_t *pListMenu, int32_t visibleItems, int32_t itemOffset)
+{
 	/* draw scroll bar if needed */
-	if ( maxVisibleItems < pListMenu->baseMenu.menuEntryCount )
-	{
+	if(visibleItems < pListMenu->baseMenu.menuEntryCount) {
 		interface_drawScrollingBar( DRAWING_SURFACE,
 			interfaceInfo.clientX + interfaceInfo.clientWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
 			interfaceInfo.clientY + interfaceInfo.paddingSize,
 			INTERFACE_SCROLLBAR_WIDTH,
-			interfaceInfo.clientHeight - interfaceInfo.paddingSize*2,
+			interfaceInfo.clientHeight - interfaceInfo.paddingSize * 2,
 			pListMenu->listMenuType == interfaceListMenuBigThumbnail ? pListMenu->infoAreaWidth * pListMenu->infoAreaHeight : pListMenu->baseMenu.menuEntryCount,
-			maxVisibleItems,
+			visibleItems,
 			itemOffset);
 	}
+	return 0;
+}
 
+static void listMenu_drawBigThumbnails(interfaceListMenu_t *pListMenu)
+{
+	int i, x, y;
+	int r, g, b, a;
+	char *str;
+	DFBRectangle rect;
+	int maxVisibleItems, itemOffset;
+	int last_row_index, last_row_col_count;
+	interfaceMenuEntry_t *selectedEntry = NULL;
+	char *second_line = NULL;
+
+	r = INTERFACE_BOOKMARK_RED;
+	g = INTERFACE_BOOKMARK_GREEN;
+	b = INTERFACE_BOOKMARK_BLUE;
+	a = INTERFACE_BOOKMARK_ALPHA;
+	switch (pListMenu->baseMenu.selectedItem)
+	{
+		case MENU_ITEM_MAIN: str = _T("MAIN_MENU"); break;
+		case MENU_ITEM_BACK: str = _T("BACK"); break;
+		default:
+			selectedEntry = &pListMenu->baseMenu.menuEntry[pListMenu->baseMenu.selectedItem];
+			str = selectedEntry->info;
+			if (selectedEntry->infoReplacedChar != 0 )
+				selectedEntry->info[selectedEntry->infoReplacedCharPos] = selectedEntry->infoReplacedChar;
+			second_line = strchr(str, '\n');
+			if ( second_line )
+				*second_line = 0;
+	}
+	DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, str, -1, &rect, NULL) );
+	x = (interfaceInfo.screenWidth - rect.w)/2;
+	y = interfaceInfo.marginSize - rect.h/2 - interfaceInfo.paddingSize;
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, str, 0, 1);
+	if (selectedEntry != NULL && selectedEntry->infoReplacedChar != 0)
+		selectedEntry->info[selectedEntry->infoReplacedCharPos] = 0;
+	if ( second_line )
+		*second_line = '\n';
+
+	switch (pListMenu->baseMenu.menuEntryCount)
+	{
+		case 0:case 1: pListMenu->infoAreaWidth = 1; break;
+		case 2:case 4: pListMenu->infoAreaWidth = 2; break;
+		case 3:case 5:
+		case 6:case 9: pListMenu->infoAreaWidth = 3; break;
+		default: pListMenu->infoAreaWidth = 4;
+	}
+	maxVisibleItems = pListMenu->infoAreaWidth * 3;
+	pListMenu->infoAreaHeight = (pListMenu->baseMenu.menuEntryCount + pListMenu->infoAreaWidth-1) / pListMenu->infoAreaWidth;
+	last_row_col_count = pListMenu->baseMenu.menuEntryCount - (pListMenu->infoAreaWidth*(pListMenu->infoAreaHeight-1));
+	last_row_index = last_row_col_count == pListMenu->infoAreaWidth ?
+						pListMenu->baseMenu.menuEntryCount :
+						pListMenu->infoAreaWidth * (pListMenu->infoAreaHeight - 1);
+	//dprintf("%s: count=%d col=%d row=%d last_count=%d last_index=%d\n", __FUNCTION__,pListMenu->baseMenu.menuEntryCount,pListMenu->infoAreaWidth,pListMenu->infoAreaHeight,last_row_col_count,last_row_index);
+
+	pListMenu->infoAreaX = (interfaceInfo.screenWidth  - INTERFACE_BIG_THUMBNAIL_SIZE*pListMenu->infoAreaWidth)/2;
+	pListMenu->infoAreaY = (interfaceInfo.screenHeight - INTERFACE_BIG_THUMBNAIL_SIZE*
+		(pListMenu->baseMenu.menuEntryCount <= maxVisibleItems ? pListMenu->infoAreaHeight : 3 ))/2;
+	int last_row_start = last_row_col_count == 0 ?
+							pListMenu->infoAreaX :
+							(interfaceInfo.screenWidth - last_row_col_count*INTERFACE_BIG_THUMBNAIL_SIZE)/2;
+
+	if ( pListMenu->baseMenu.menuEntryCount > maxVisibleItems && pListMenu->baseMenu.selectedItem >= pListMenu->infoAreaWidth*2 )
+	{
+		itemOffset = (pListMenu->baseMenu.selectedItem / pListMenu->infoAreaWidth - 1) * pListMenu->infoAreaWidth;
+		itemOffset = itemOffset > (pListMenu->baseMenu.menuEntryCount - last_row_col_count - pListMenu->infoAreaWidth*2) ?
+						pListMenu->baseMenu.menuEntryCount - last_row_col_count - pListMenu->infoAreaWidth*2 :
+						itemOffset;
+	} else
+	{
+		itemOffset = 0;
+	}
+
+	rect.w = INTERFACE_BIG_THUMBNAIL_SIZE;
+	rect.h = INTERFACE_BIG_THUMBNAIL_SIZE;
+	for ( i = itemOffset; i < pListMenu->baseMenu.menuEntryCount && i < itemOffset + maxVisibleItems; i++ )
+	{
+		rect.x = i < last_row_index
+			? pListMenu->infoAreaX + INTERFACE_BIG_THUMBNAIL_SIZE * (i % pListMenu->infoAreaWidth)              // complete row
+			: last_row_start       + INTERFACE_BIG_THUMBNAIL_SIZE *((i - last_row_index) % last_row_col_count); // incomplete row
+		rect.y = pListMenu->infoAreaY + INTERFACE_BIG_THUMBNAIL_SIZE * ((i-itemOffset) / pListMenu->infoAreaWidth);
+
+		pListMenu->baseMenu.menuEntry[i].pDisplay( &pListMenu->baseMenu, &rect, i );
+	}
+
+	listMenu_drawScrollBar(pListMenu, maxVisibleItems, itemOffset);
+}
+
+static void listMenu_drawList(interfaceListMenu_t *pListMenu)
+{
+	int i;
+	int fh;
+	int itemHeight, maxVisibleItems, itemOffset, itemDisplayIndex;
+	DFBRectangle rect;
+
+	pgfx_font->GetHeight(pgfx_font, &fh);
+	interface_listMenuGetItemInfo(pListMenu,&itemHeight,&maxVisibleItems);
+
+	if ( pListMenu->baseMenu.selectedItem > maxVisibleItems/2 )
+	{
+		itemOffset = pListMenu->baseMenu.selectedItem - maxVisibleItems/2;
+		itemOffset = itemOffset > (pListMenu->baseMenu.menuEntryCount-maxVisibleItems) ?
+						pListMenu->baseMenu.menuEntryCount-maxVisibleItems :
+						itemOffset;
+	} else
+	{
+		itemOffset = 0;
+	}
+
+	rect.x = interfaceInfo.clientX+interfaceInfo.paddingSize;
+	rect.w = interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize;
+	if (maxVisibleItems < pListMenu->baseMenu.menuEntryCount)
+		rect.w -= INTERFACE_SCROLLBAR_WIDTH + interfaceInfo.paddingSize;
+	rect.h = pListMenu->listMenuType == interfaceListMenuNoThumbnail ?
+				fh + interfaceInfo.paddingSize :
+				pListMenu->baseMenu.thumbnailHeight;
+	for ( i=itemOffset; i<itemOffset+maxVisibleItems; i++ )
+	{
+		itemDisplayIndex = i-itemOffset;
+		rect.y = pListMenu->listMenuType == interfaceListMenuNoThumbnail
+			? interfaceInfo.clientY+(interfaceInfo.paddingSize+fh)*itemDisplayIndex + interfaceInfo.paddingSize
+			: interfaceInfo.clientY+(interfaceInfo.paddingSize+pListMenu->baseMenu.thumbnailHeight)*itemDisplayIndex + interfaceInfo.paddingSize;
+
+		pListMenu->baseMenu.menuEntry[i].pDisplay( &pListMenu->baseMenu, &rect, i );
+	}
+	listMenu_drawScrollBar(pListMenu, maxVisibleItems, itemOffset);
+}
+
+void interface_listMenuDisplay(interfaceMenu_t *pMenu)
+{
+	interfaceListMenu_t *pListMenu = (interfaceListMenu_t*)pMenu;
+
+	//dprintf("%s: displaying\n", __FUNCTION__);
+	listMenu_drawBackground(pListMenu);
+	if (pMenu->pParentMenu && pListMenu->listMenuType != interfaceListMenuBigThumbnail)
+		interface_displayMenuHeader();
+	listMenu_drawLogo(pListMenu);
+
+/*	if(pListMenu->listMenuType == interfaceListMenuBigThumbnail) {
+		gfx_drawRectangle(DRAWING_SURFACE, INTERFACE_THUMBNAIL_BACKGROUND_RED, INTERFACE_THUMBNAIL_BACKGROUND_GREEN, INTERFACE_THUMBNAIL_BACKGROUND_BLUE, INTERFACE_THUMBNAIL_BACKGROUND_ALPHA, pListMenu->infoAreaX, pListMenu->infoAreaY, pListMenu->infoAreaWidth, pListMenu->infoAreaHeight);
+	}*/
+
+	//dprintf("%s: go through entries\n", __FUNCTION__);
+	if(pListMenu->listMenuType == interfaceListMenuBigThumbnail) {
+		listMenu_drawBigThumbnails(pListMenu);
+	} else {
+		listMenu_drawList(pListMenu);
+	}
 #ifdef ENABLE_VIDIMAX
 	if (pMenu->pParentMenu != NULL)
 #endif
@@ -5088,7 +5131,7 @@ interfaceMenu_t *createBasicMenu( interfaceMenu_t *pMenu,
 	int i;
 
 	pMenu->menuType = type;
-
+#ifndef MENU_HAS_NO_BACK_BUTTON
 	if ( pParent != NULL )
 	{
 		if ( pParent->pParentMenu != NULL )
@@ -5099,6 +5142,7 @@ interfaceMenu_t *createBasicMenu( interfaceMenu_t *pMenu,
 			pMenu->selectedItem = MENU_ITEM_MAIN;
 		}
 	} else
+#endif
 	{
 		pMenu->selectedItem = 0;
 	}
@@ -5175,7 +5219,6 @@ interfaceListMenu_t * createListMenu( interfaceListMenu_t *pMenu,
 	pMenu->infoAreaWidth = interfaceInfo.clientWidth/2;
 	pMenu->infoAreaHeight = interfaceInfo.clientHeight;
 	pMenu->listMenuType = listMenuType;
-
 	interface_reinitializeListMenu(_M pMenu);
 
 	return pMenu;
@@ -5874,22 +5917,19 @@ static int interface_refreshClock(void *pArg)
 
 void interface_displayClock(int detached)
 {
-	int x,y,w;
 	time_t rawtime;
-	struct tm *cur_time;
+	struct tm cur_time;
 
-	if (interfaceInfo.enableClock == 0)
-	{
+	if(interfaceInfo.enableClock == 0) {
 		return;
 	}
 
-	time( &rawtime );
-	cur_time = localtime(&rawtime);
-	if (cur_time == NULL)
-	{
+	time(&rawtime);
+	if(!localtime_r(&rawtime, &cur_time)) {
 		return;
 	}
 
+	int x,y,w;
 	w = INTERFACE_CLOCK_DIGIT_WIDTH*4 + INTERFACE_CLOCK_COLON_WIDTH;
 	x = interfaceInfo.screenWidth - interfaceInfo.marginSize - w - INTERFACE_ROUND_CORNER_RADIUS/2;
 	y = interfaceInfo.screenHeight - interfaceInfo.marginSize + interfaceInfo.paddingSize;
@@ -5922,17 +5962,17 @@ void interface_displayClock(int detached)
 	interface_drawRoundedCorner(x+w-INTERFACE_ROUND_CORNER_RADIUS/2, y+INTERFACE_CLOCK_DIGIT_HEIGHT-INTERFACE_ROUND_CORNER_RADIUS/2, 1, 1);
 	
 	//
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time->tm_hour / 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time.tm_hour / 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
 	x += INTERFACE_CLOCK_DIGIT_WIDTH;
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time->tm_hour % 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time.tm_hour % 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
 	x += INTERFACE_CLOCK_DIGIT_WIDTH;
 	// draw :
 	interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "colon.png", x, y, INTERFACE_CLOCK_COLON_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, NULL, NULL);
 	//
 	x += INTERFACE_CLOCK_COLON_WIDTH;
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time->tm_min / 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time.tm_min / 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
 	x += INTERFACE_CLOCK_DIGIT_WIDTH;
-	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time->tm_min % 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time.tm_min % 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
 }
 
 inline int interface_playControlSliderIsEnabled()
@@ -6811,7 +6851,9 @@ void interface_init()
 		}
 	}
 #endif
-
+#ifdef INTERFACE_DRAW_ARROW
+	pArrow = gfx_decodeImage(IMAGE_DIR INTERFACE_ARROW_IMAGE, INTERFACE_ARROW_SIZE, INTERFACE_ARROW_SIZE, 0);
+#endif
 	mysem_create(&interface_semaphore);
 	mysem_create(&event_semaphore);
 
@@ -8226,6 +8268,7 @@ static int interface_editEntryDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect
 	{
 		pMenu->selectedItem = -1; // no selection rectangle trick
 	}
+
 	interface_listEntryDisplay(pMenu, &rectangle, i);
 	pMenu->selectedItem = selected;
 	rectangle.x = rectangle.x+rectangle.w;
@@ -8297,37 +8340,37 @@ static int interface_editDateDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 	}
 
 	entryText[0] = pEditEntry->info.date.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = pEditEntry->info.date.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = '.';
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dot_w;
 
 	entryText[0] = pEditEntry->info.date.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = pEditEntry->info.date.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = '.';
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dot_w;
 
 	for ( ; i < 8; i++ )
 	{
 		entryText[0] = pEditEntry->info.date.value[i];
-		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+		gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 		x += dig_w;
 	}
 	return 0;
@@ -8381,26 +8424,26 @@ static int interface_editTimeDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 	}
 
 	entryText[0] = pEditEntry->info.time.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = pEditEntry->info.time.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = ':';
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dot_w;
 
 	entryText[0] = pEditEntry->info.time.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 	x += dig_w;
 	i++;
 
 	entryText[0] = pEditEntry->info.time.value[i];
-	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, 0);
+	gfx_drawText(DRAWING_SURFACE, pgfx_font, r, g, b, a, x, y, entryText, 0, EDIT_ENTRY_TEXT_SHADOW);
 
 	return 0;
 }

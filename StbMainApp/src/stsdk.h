@@ -88,6 +88,13 @@ int st_rpcSync (elcdRpcCommand_t cmd, cJSON* params, elcdRpcType_t *type, cJSON 
 
 int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout, elcdRpcType_t *type, cJSON **result);
 
+int st_command0(elcdRpcCommand_t cmd, cJSON* param, int timeout);
+
+static inline int st_command(elcdRpcCommand_t cmd, cJSON* param)
+{
+	return st_command0(cmd, param, RPC_TIMEOUT);
+}
+
 /** Makes asynchronous call to elcd server. Waiting has no time constraint.
  * Caller should take care of freeing params and result returned in callback.
  * 
@@ -133,6 +140,12 @@ void st_getFormatResolution(const char *format, int *width, int *height);
 void st_reinitFb(char *currentFormat);
 
 int  st_applyZoom(zoomPreset_t preset);
+
+int st_setOutputWnd(int x, int y, int w, int h);
+
+int st_setOutputWnd2(float x, float y, float w, float h);
+
+int st_resetOutputWnd(void);
 
 /** Is need restart.
  * 
