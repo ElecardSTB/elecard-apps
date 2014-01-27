@@ -296,6 +296,11 @@ typedef struct
 typedef struct
 {
 	char		channelConfigFile[256];
+	char		channelNamesFile[256];
+	uint32_t lowFrequency;
+	uint32_t highFrequency;
+	uint32_t delSys;
+	uint32_t audioMode;
 	uint32_t	active;
 	uint32_t	id;
 } stb810_tvInfo;

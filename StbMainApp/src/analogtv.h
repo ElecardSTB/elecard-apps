@@ -52,16 +52,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * EXPORTED MACROS                              *
 ************************************************/
-#define MIN_FREQUENCY_HZ  (  43000000)
-#define MAX_FREQUENCY_HZ  ( 960000000)
 
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
-typedef struct {
-	uint32_t from_freqKHz;
-	uint32_t to_freqKHz;
-} analogtv_freq_range_t;
 
 typedef enum {
 	TV_SYSTEM_PAL = 0,
@@ -80,9 +74,6 @@ typedef enum {
 * EXPORTED DATA                                *
 ************************************************/
 extern int analogtv_service_count;
-extern analogtv_freq_range_t analogtv_range;
-extern analogtv_deliverySystem analogtv_delSys;
-extern analogtv_audioDemodMode analogtv_audio;
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *

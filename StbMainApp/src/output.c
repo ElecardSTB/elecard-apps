@@ -133,6 +133,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DVB_MIN_FREQUENCY_STEP          1000
 #define DVB_MAX_FREQUENCY_STEP          8000
 
+#define ATV_MIN_FREQUENCY		43000
+#define ATV_MAX_FREQUENCY		960000
+
 //fake curentmeter functions:
 #define currentmeter_isExist()					0
 #define currentmeter_getCalibrateHighValue()	0
@@ -606,6 +609,9 @@ stbTimeZoneDesc_t timezones[] = {
 	{"Etc/GMT-11", "(GMT +11:00) Magadan, Solomon Islands, New Caledonia"},
 	{"Etc/GMT-12", "(GMT +12:00) Auckland, Wellington, Fiji, Kamchatka"}
 };
+
+extern int8_t services_edit_able;
+extern char channel_names_file_full[256];
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -4429,15 +4435,25 @@ int analogtv_setRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	val = strtoul (value, NULL, 10);
 	if (option == 0) { // low
-		if (val != analogtv_range.from_freqKHz){
-			analogtv_range.from_freqKHz = val;
-			eprintf ("%s: from_freq = %d KHz\n", __FUNCTION__, analogtv_range.from_freqKHz);
+		if (val != appControlInfo.tvInfo.lowFrequency){
+			if (val < ATV_MIN_FREQUENCY) {
+				appControlInfo.tvInfo.lowFrequency = ATV_MIN_FREQUENCY;
+			}
+			else {
+				appControlInfo.tvInfo.lowFrequency = val;
+			}
+			eprintf ("%s: from_freq = %d KHz\n", __FUNCTION__, appControlInfo.tvInfo.lowFrequency);
 		}
 	}
 	else {
-		if (val != analogtv_range.to_freqKHz){
-			analogtv_range.to_freqKHz = val;
-			eprintf ("%s: to_freq = %d KHz\n", __FUNCTION__, analogtv_range.to_freqKHz);
+		if (val != appControlInfo.tvInfo.highFrequency){
+			if (val > ATV_MAX_FREQUENCY) {
+				appControlInfo.tvInfo.highFrequency = ATV_MAX_FREQUENCY;
+			}
+			else {
+				appControlInfo.tvInfo.highFrequency = val;
+			}
+			eprintf ("%s: to_freq = %d KHz\n", __FUNCTION__, appControlInfo.tvInfo.highFrequency);
 		}
 	}
 	interface_displayMenu(1);
@@ -4449,8 +4465,8 @@ static char* analogtv_getRange (int index, void* pArg)
 	if (index == 0){
 		static char buffer[32];
 		int id = GET_NUMBER(pArg);
-		if (id == 0) sprintf(buffer, "%u", analogtv_range.from_freqKHz);
-		else sprintf (buffer, "%u", analogtv_range.to_freqKHz);
+		if (id == 0) sprintf(buffer, "%u", appControlInfo.tvInfo.lowFrequency);
+		else sprintf (buffer, "%u", appControlInfo.tvInfo.highFrequency);
 		return buffer;
 	}
 	return NULL;
@@ -4459,7 +4475,7 @@ static char* analogtv_getRange (int index, void* pArg)
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
 {
 	if (!pArg) return -1;
-	analogtv_range.from_freqKHz = *((uint32_t *)pArg);
+	appControlInfo.tvInfo.lowFrequency = *((uint32_t *)pArg);
 
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_LOW_FREQ"));
@@ -4470,7 +4486,7 @@ int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
 {
 	if (!pArg) return -1;
-	analogtv_range.to_freqKHz = *((uint32_t *)pArg);
+	appControlInfo.tvInfo.highFrequency = *((uint32_t *)pArg);
 
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_HIGH_FREQ"));
@@ -4486,12 +4502,12 @@ char *analogtv_delSysName[] = {
 
 static int analogtv_changeAnalogDelSys(interfaceMenu_t *pMenu, void* pArg)
 {
-	analogtv_delSys++;
-	if(analogtv_delSys > TV_SYSTEM_NTSC) {
-		analogtv_delSys = TV_SYSTEM_PAL;
+	appControlInfo.tvInfo.delSys++;
+	if(appControlInfo.tvInfo.delSys > TV_SYSTEM_NTSC) {
+		appControlInfo.tvInfo.delSys = TV_SYSTEM_PAL;
 	}
 
-	return output_saveAndRedraw(0, pMenu);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 char *analogtv_audioName[] = {
@@ -4503,12 +4519,38 @@ char *analogtv_audioName[] = {
 
 static int analogtv_changeAnalogAudio(interfaceMenu_t *pMenu, void* pArg)
 {
-	analogtv_audio++;
-	if(analogtv_audio > TV_AUDIO_FM2) {
-		analogtv_audio = TV_AUDIO_SIF;
+	appControlInfo.tvInfo.audioMode++;
+	if(appControlInfo.tvInfo.audioMode > TV_AUDIO_FM2) {
+		appControlInfo.tvInfo.audioMode = TV_AUDIO_SIF;
 	}
 
-	return output_saveAndRedraw(0, pMenu);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static int analogtv_setServiceFileName(interfaceMenu_t *pMenu, char* pStr, void* pArg)
+{
+	(void)pArg;
+	if (pStr == NULL) {
+		return 0;
+	}
+	sprintf(channel_names_file_full, "/var/etc/%s.txt", pStr);
+	strncpy(appControlInfo.tvInfo.channelNamesFile, pStr, sizeof(appControlInfo.tvInfo.channelNamesFile));
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static int analogtv_changeServiceFileName(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, "Set name", "\\w+", analogtv_setServiceFileName, NULL, inputModeABC, pArg);
+}
+
+static int analogtv_sendToServer(interfaceMenu_t *pMenu, void* pArg)
+{
+	return -1;
+}
+
+static int analogtv_downloadFromServer(interfaceMenu_t *pMenu, void* pArg)
+{
+	return -1;
 }
 
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
@@ -4523,19 +4565,28 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
 
 	str = _T("ANALOGTV_SCAN_RANGE");
-	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, &analogtv_range, thumbnail_scan);
+	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
 	
-	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freqKHz);
-	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(analogtv_range.from_freqKHz), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), appControlInfo.tvInfo.lowFrequency);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(appControlInfo.tvInfo.lowFrequency), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
 
-	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freqKHz);
-	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freqKHz), thumbnail_configure); // SET_NUMBER(optionHighFreq)
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), appControlInfo.tvInfo.highFrequency);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(appControlInfo.tvInfo.highFrequency), thumbnail_configure); // SET_NUMBER(optionHighFreq)
 
-	sprintf(buf, "%s: %s", _T("ANALOGTV_DELSYS"), analogtv_delSysName[analogtv_delSys]);
+	sprintf(buf, "%s: %s", _T("ANALOGTV_DELSYS"), analogtv_delSysName[appControlInfo.tvInfo.delSys]);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogDelSys, NULL, thumbnail_configure); // SET_NUMBER(optionHighFreq
 
-	sprintf(buf, "%s: %s", _T("ANALOGTV_AUDIO_MODE"), analogtv_audioName[analogtv_audio]);
+	sprintf(buf, "%s: %s", _T("ANALOGTV_AUDIO_MODE"), analogtv_audioName[appControlInfo.tvInfo.audioMode]);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogAudio, NULL, thumbnail_configure);
+	if (services_edit_able)
+	{
+		sprintf(buf, "%s: %s", "Set file name: ", appControlInfo.tvInfo.channelNamesFile);
+		interface_addMenuEntry(tvMenu,buf , analogtv_changeServiceFileName, NULL, thumbnail_configure);
+		
+		interface_addMenuEntry(tvMenu, "Download channel file", analogtv_downloadFromServer, NULL, thumbnail_configure);
+		
+		interface_addMenuEntry(tvMenu, "Send channel file", analogtv_sendToServer, NULL, thumbnail_configure);//garb_sendToServer
+	}
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);

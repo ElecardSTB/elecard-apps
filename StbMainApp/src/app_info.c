@@ -509,6 +509,28 @@ int loadAppSettings()
 			//dprintf("%s: VoIP indication %d\n", __FUNCTION__, interfaceInfo.enableVoipIndication );
 		}
 #endif
+#ifdef ENABLE_ANALOGTV
+		else if (sscanf(buf, "ATVLOWFREQUENCY=%u", &appControlInfo.tvInfo.lowFrequency) == 1)
+		{
+			//dprintf("%s: Analog TV low frequency %s\n", __FUNCTION__, appControlInfo.tvInfo.lowFrequency);
+		}
+		else if (sscanf(buf, "ATVHIGHFREQUENCY=%u", &appControlInfo.tvInfo.highFrequency ) == 1)
+		{
+			//dprintf("%s: Analog TV high frequency %s\n", __FUNCTION__, appControlInfo.tvInfo.highFrequency );
+		}
+		else if (sscanf(buf, "ATVDELSYS=%d", &appControlInfo.tvInfo.delSys ) == 1)
+		{
+			//dprintf("%s: Analog TV delivery system %d\n", __FUNCTION__, appControlInfo.tvInfo.delSys );
+		}
+		else if (sscanf(buf, "ATVAUDIOMODE=%d", &appControlInfo.tvInfo.audioMode ) == 1)
+		{
+			//dprintf("%s: Analog TV audio mode %d\n", __FUNCTION__, appControlInfo.tvInfo.audioMode );
+		}
+		else if (sscanf(buf, "ATVCHANNELNAMESFILE=%[^\r\n]", appControlInfo.tvInfo.channelNamesFile ) == 1)
+		{
+			//dprintf("%s: Analog TV file with channel names %s\n", __FUNCTION__, appControlInfo.tvInfo.channelNamesFile );
+		}
+#endif
 	}
 
 	fclose(fd);
@@ -828,6 +850,13 @@ int saveAppSettings()
 	fprintf(fd, "3D_FACTOR=%d\n",			appControlInfo.outputInfo.factor);
 	fprintf(fd, "3D_OFFSET=%d\n",			appControlInfo.outputInfo.offset);
 #endif
+#ifdef ENABLE_ANALOGTV
+	fprintf(fd, "ATVLOWFREQUENCY=%u\n",      	appControlInfo.tvInfo.lowFrequency);
+	fprintf(fd, "ATVHIGHFREQUENCY=%u\n",     	appControlInfo.tvInfo.highFrequency);
+	fprintf(fd, "ATVDELSYS=%d\n",          		appControlInfo.tvInfo.delSys);
+	fprintf(fd, "ATVAUDIOMODE=%d\n",         	appControlInfo.tvInfo.audioMode);
+	fprintf(fd, "ATVCHANNELNAMESFILE=%s\n",         	appControlInfo.tvInfo.channelNamesFile);
+#endif
 	fclose(fd);
 	rename( SETTINGS_FILE ".tmp", SETTINGS_FILE );
 
@@ -961,8 +990,13 @@ void appInfo_init(void)
 #endif
 #ifdef ENABLE_ANALOGTV
 //	strcpy(appControlInfo.tvInfo.channelConfigFile, ANALOGTV_CHANNEL_FILE);
+	strcpy(appControlInfo.tvInfo.channelNamesFile, "");
 	appControlInfo.tvInfo.active	= 0;
 	appControlInfo.tvInfo.id		= 0;
+	appControlInfo.tvInfo.highFrequency	= 960000;
+	appControlInfo.tvInfo.lowFrequency		= 43000;
+	appControlInfo.tvInfo.delSys	= 0;
+	appControlInfo.tvInfo.audioMode		= 0;
 #endif
 	appControlInfo.dvbcInfo.fe.inversion          = 0;
 	appControlInfo.dvbcInfo.modulation            = QAM_64;
