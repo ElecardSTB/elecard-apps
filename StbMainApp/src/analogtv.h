@@ -127,6 +127,9 @@ uint32_t analogtv_getChannelCount(void);
 
 int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 
+int32_t analogtv_fillFoundServList(void);
+int32_t analogtv_updateFoundServiceFile(void);
+
 #endif /* ENABLE_ANALOGTV */
 
 #endif /* __ANALOGTV_H      Do not add any thing below this line */

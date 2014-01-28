@@ -4533,24 +4533,31 @@ static int analogtv_setServiceFileName(interfaceMenu_t *pMenu, char* pStr, void*
 	if (pStr == NULL) {
 		return 0;
 	}
-	sprintf(channel_names_file_full, "/var/etc/%s.txt", pStr);
+	sprintf(channel_names_file_full, "/tmp/%s.txt", pStr);
 	strncpy(appControlInfo.tvInfo.channelNamesFile, pStr, sizeof(appControlInfo.tvInfo.channelNamesFile));
+	analogtv_updateFoundServiceFile();
+
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 static int analogtv_changeServiceFileName(interfaceMenu_t *pMenu, void* pArg)
 {
-	return interface_getText(pMenu, "Set name", "\\w+", analogtv_setServiceFileName, NULL, inputModeABC, pArg);
+	return interface_getText(pMenu, _T("ANALOGTV_SET_CHANNEL_FILE_NAME"), "\\w+", analogtv_setServiceFileName, NULL, inputModeABC, pArg);
 }
 
 static int analogtv_sendToServer(interfaceMenu_t *pMenu, void* pArg)
 {
-	return -1;
+	interface_showMessageBox(_T("ANALOGTV_SENDING_CHFILE"), thumbnail_info, 0);
+	interface_hideMessageBox();
+	return 0;
 }
 
 static int analogtv_downloadFromServer(interfaceMenu_t *pMenu, void* pArg)
 {
-	return -1;
+	interface_showMessageBox(_T("ANALOGTV_DOWNLOADING_CHFILE"), thumbnail_info, 0);
+	interface_hideMessageBox();
+
+	return 0;
 }
 
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
@@ -4580,12 +4587,12 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogAudio, NULL, thumbnail_configure);
 	if (services_edit_able)
 	{
-		sprintf(buf, "%s: %s", "Set file name: ", appControlInfo.tvInfo.channelNamesFile);
+		sprintf(buf, "%s: %s", _T("ANALOGTV_SET_CHANNEL_FILE_NAME"), appControlInfo.tvInfo.channelNamesFile);
 		interface_addMenuEntry(tvMenu,buf , analogtv_changeServiceFileName, NULL, thumbnail_configure);
 		
-		interface_addMenuEntry(tvMenu, "Download channel file", analogtv_downloadFromServer, NULL, thumbnail_configure);
+		interface_addMenuEntry(tvMenu, _T("ANALOGTV_DOWNLOAD_CHFILE"), analogtv_downloadFromServer, NULL, thumbnail_configure);
 		
-		interface_addMenuEntry(tvMenu, "Send channel file", analogtv_sendToServer, NULL, thumbnail_configure);//garb_sendToServer
+		interface_addMenuEntry(tvMenu, _T("ANALOGTV_SEND_CHFILE"), analogtv_sendToServer, NULL, thumbnail_configure);//garb_sendToServer
 	}
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count

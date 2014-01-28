@@ -340,7 +340,19 @@ int32_t analogtv_updateName(uint32_t chanIndex, char* str)
 
 #define RPC_ANALOG_SCAN_TIMEOUT      (180)
 
-static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
+int32_t analogtv_updateFoundServiceFile(void)
+{
+	FILE *file = fopen(channel_names_file_full, "w");
+	if (file!=NULL) {
+		for(int i = 0; i < found_service_count; i++) {
+			fprintf(file ,"%d %d %s\n", found_service_list[i].freq/1000000, found_service_list[i].id, found_service_list[i].name);
+		}
+		fclose(file);
+	}
+	return 0;
+}
+
+static uint32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 {
 	uint32_t i;
 	uint8_t in_list = 0;
@@ -364,7 +376,8 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 	if(in_list) {	//if this channel exist in list
 		found_service_list[i].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
 		strncpy(found_service_list[i].name, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name, sizeof(found_service_list[i].name));
-	} else {		//if this channel not exist in list, then add it to list
+	}
+	else {		//if this channel not exist in list, then add it to list
 		found_service_list[found_service_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
 		strncpy(	found_service_list[found_service_count].name, 
 			full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name,
@@ -374,13 +387,7 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	//save renaming channel list to file
-	FILE *file = fopen(channel_names_file_full, "w");
-	if (file!=NULL) {
-		for(i = 0; i < found_service_count; i++) {
-			fprintf(file ,"%d %d %s\n", found_service_list[i].freq/1000000, found_service_list[i].id, found_service_list[i].name);
-		}
-		fclose(file);
-	}
+	analogtv_updateFoundServiceFile();
 
 	return 0;
 }
@@ -416,7 +423,7 @@ static int32_t analogtv_fillFullServList()
 	return 0;
 }
 
-static int32_t analogtv_fillFoundServList()
+int32_t analogtv_fillFoundServList()
 {
 	FILE *file;
 	//read already renaming channels from file
@@ -464,7 +471,7 @@ static int32_t analogtv_fillServiceNamesMenu(short_chinfo *list, int32_t list_co
 static int32_t analogtv_confInit()
 {
 	services_edit_able = 0;
-	sprintf(channel_names_file_full, "/var/etc/%s.txt", appControlInfo.tvInfo.channelNamesFile);
+	sprintf(channel_names_file_full, "/tmp/%s.txt", appControlInfo.tvInfo.channelNamesFile);
 
 	return 0;
 }
