@@ -121,6 +121,11 @@ typedef struct {
 	int32_t	textOffset;
 } rollTextInfo_t;
 
+typedef struct {
+	uint32_t	fd;
+	uint8_t		mask[FRAMEBUFFER_SIZE];
+} fbInfo_t;
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -160,12 +165,7 @@ rollTextInfo_t	g_rollTextInfo;
 MessageType_t	g_messageType = TIME;
 MessageType_t	g_beQuiet = 0;
 
-typedef struct {
-	uint32_t 				fd;
-	unsigned char 				mask[FRAMEBUFFER_SIZE];
-} fbInfo_t;
-
-fbInfo_t				g_fbInfo;
+fbInfo_t		g_fbInfo = { .fd = -1 };
 
 struct argHandler_s handlers[] = {
 	{"time",	ArgHandler_Time},
@@ -191,24 +191,38 @@ struct argHandler_s handlers[] = {
 * FUNCTION IMPLEMENTATION                                         *
 *******************************************************************/
 
-int32_t FrameBufferInit(void)
+int32_t FrameBufferOpen(void)
 {
-	g_fbInfo.fd = open(g_framebuffer_name, O_RDWR);
-
+	if (g_fbInfo.fd == (uint32_t)(-1)){
+		g_fbInfo.fd = open(g_framebuffer_name, O_RDWR);
+	}
+    
 	return 0;
 }
 
+
 void FrameBufferClose(void)
 {
-	close(g_fbInfo.fd);
-	g_fbInfo.fd = 0;
+	if(g_fbInfo.fd != (uint32_t)(-1)){
+		close(g_fbInfo.fd);
+		g_fbInfo.fd = (uint32_t)(-1);
+	}
+}
+
+void Terminate(void)
+{
+	FrameBufferClose();
+	
 }
 
 void UpdateDisplay(void)
-{	
-	FrameBufferInit();
-	write(g_fbInfo.fd, g_fbInfo.mask, FRAMEBUFFER_SIZE);	
-	FrameBufferClose();
+{
+	FrameBufferOpen();
+	write(g_fbInfo.fd, g_fbInfo.mask, FRAMEBUFFER_SIZE);
+	
+	if(lseek(g_fbInfo.fd, 0, SEEK_SET) == -1) {
+	      perror("Error on seek\n");
+	}
 }
 
 void SetPixel(uint32_t x, uint32_t y)
@@ -505,6 +519,7 @@ void Quit()
 {
 	if(!g_beQuiet)
 		SetFrontpanelText("byE");
+	Terminate();
 	exit(0);
 }
 
@@ -879,12 +894,12 @@ int MainLoop()
 
 	if(bind(socket_id, (struct sockaddr *) &sa, len) < 0) {
 		perror("server: bind");
-		exit(1);
+		return 0;
 	}
 
 	if(listen(socket_id, 5) < 0) {
 		perror("server: listen");
-		exit(1);
+		return 0;
 	}
 
 	SetBrightness(g_brightness);
@@ -899,7 +914,7 @@ int MainLoop()
 
 		if((accept_id = accept(socket_id, (struct sockaddr *) &ca, (socklen_t *)&ca_len)) < 0) {
 			perror("server: accept");
-			exit(1);
+			return 0;
 		}
 
 		ca_len = read(accept_id, buffer, sizeof(buffer) - 1);
@@ -951,7 +966,8 @@ int main(int argc, char **argv)
 {
 	int32_t	opt;
 	int32_t	daemonize = 1;
-
+	int n;
+	
 	while((opt = getopt(argc, argv, "qd")) != -1) {
 		switch(opt) {
 			case 'q':
@@ -969,20 +985,31 @@ int main(int argc, char **argv)
 	CheckBoardType();
 
 	if(CheckControllerType() != 0) {
+		Terminate();
 		exit(1);
 	}
 
 	if (g_board == eSTB850){
-		if (CheckOledControllerType() != 0) exit(1);
-		if (CheckFrameBuffer() != 0) exit(1);
+		if (CheckOledControllerType() != 0) {
+			Terminate();
+			exit(1);
+		}
+		if (CheckFrameBuffer() != 0) {
+			Terminate();
+			exit(1);
+		}
 	}
 
 
 	if(daemonize) {
 		if(daemon(0, 0)) {
 			perror("Failed to daemonize");
+			Terminate();
 			exit(1);
 		}
 	}
-	return MainLoop();
+	n = MainLoop();
+	Terminate();
+	
+	return n;
 }
