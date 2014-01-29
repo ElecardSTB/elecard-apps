@@ -245,6 +245,14 @@ typedef struct
 	int showAdvanced;
 } outputWifiInfo_t;
 
+typedef struct
+{
+	char inputName[20];
+	char inputType[20];
+	int inputSelect1;
+	int inputSelect2;
+} outputInputMode_t;
+
 #endif
 
 /******************************************************************
@@ -824,6 +832,93 @@ static int output_tryNewVideoMode_Event(void* pArg)
 	return 1;
 }
 
+static int32_t output_runInput(void *inputMode, char *inputName)
+{
+	elcdRpcType_t type;
+	cJSON        *res   = NULL;
+	cJSON * param = cJSON_CreateObject();
+	if (param){
+		cJSON_AddItemToObject(param, "input", cJSON_CreateString(inputMode));
+	}
+	st_rpcSync (elcmd_setvinput, param, &type, &res);
+	cJSON_Delete(param);
+	st_isOk(type, res, __FUNCTION__);
+	cJSON_Delete(res);
+	return 1;
+}
+
+static int32_t output_inputFilmTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	dprintf("%s: %d %s\n", __func__, interface_commandName(cmd->command));
+
+	outputInputMode_t *input = (outputInputMode_t *)pArg;
+	input->inputSelect2 = cmd->command - interfaceCommand1 + 1;
+	char text[60];
+
+	switch(cmd->command) {
+		case interfaceCommand1:
+		case interfaceCommand2:
+		case interfaceCommand5:
+		case interfaceCommand3:
+		case interfaceCommand4:
+		case interfaceCommand6: {
+			sprintf(text, "%s %d%d", input->inputType, input->inputSelect1, input->inputSelect2);
+			output_runInput((void*)input->inputName, text);
+			return 0;
+		}
+		case DIKS_HOME:
+		case interfaceCommandExit:
+		case interfaceCommandGreen:
+		case interfaceCommandRed:
+		default:
+			return 0;
+	}
+}
+
+static int32_t output_inputTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	dprintf("%s: %d %s\n", __func__, interface_commandName(cmd->command));
+
+	static outputInputMode_t input;
+	input.inputSelect1 = cmd->command - interfaceCommand1 + 1;
+	input.inputSelect2 = 0;
+	strcpy(input.inputName, (char*)pArg);
+
+	char text[60];
+	switch(cmd->command) {
+		case interfaceCommand1:
+		case interfaceCommand2:
+		case interfaceCommand5: {
+			strcpy(input.inputType, "VIDEO");
+			interface_showConfirmationBox("Choose type of film:\n"
+						      "\n1. Thriller"
+						      "\n2. Drama"
+						      "\n3. Romance"
+						      "\n4. Comedy"
+						      "\n5. Sports"
+						      "\n6. Documentary\n", thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
+			return 1;
+		}
+		case interfaceCommand3:
+		case interfaceCommand4: {
+			sprintf(text, "%s %d%d", "GAME", input.inputSelect1, input.inputSelect2);
+			output_runInput(pArg, text);
+			return 0;
+		}
+		case interfaceCommand6: {
+			sprintf(text, "%s %d%d", "ELSE", input.inputSelect1, input.inputSelect2);
+			output_runInput(pArg, text);
+			return 0;
+		}
+		case DIKS_HOME:
+		case interfaceCommandExit:
+		case interfaceCommandGreen:
+		case interfaceCommandRed:
+		default:
+			return 0;
+	}
+}
+
 int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 {
 	if (!pArg) {
@@ -836,17 +931,18 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 
 	if (strcmp(pArg, INPUT_NONE) == 0){
 		st_rpcSync (elcmd_disablevinput, NULL, &type, &res);
+		st_isOk(type, res, __FUNCTION__);
+		cJSON_Delete(res);
 	}
 	else {
-		cJSON * param = cJSON_CreateObject();
-		if (param){
-			cJSON_AddItemToObject(param, "input", cJSON_CreateString(pArg));
-		}
-		st_rpcSync (elcmd_setvinput, param, &type, &res);
-		cJSON_Delete(param);
+		interface_showConfirmationBox("Choose using device:\n"
+					      "\n1. DVD"
+					      "\n2. Video"
+					      "\n3. Video game"
+					      "\n4. Game from computer"
+					      "\n5. Film from computer"
+					      "\n6. Other\n", thumbnail_account_active, output_inputTypeCallback, pArg);
 	}
-	st_isOk(type, res, __FUNCTION__);
-	cJSON_Delete(res);
 #endif
 	return 0;
 }
