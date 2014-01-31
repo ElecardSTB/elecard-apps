@@ -132,6 +132,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 } while (0)
 #endif
 
+#define ZERO_SCAN_MESAGE()	//scan_messages[0] = 0
+#define SCAN_MESSAGE(...)	//sprintf(&scan_messages[strlen(scan_messages)], __VA_ARGS__)
+
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
@@ -204,7 +207,7 @@ enum running_mode {
 
 struct section_buf {
 	struct list_head list;
-	const char *dmx_devname;
+	tunerFormat tuner;
 	int fd;
 	int pid;
 	int table_id;
@@ -219,12 +222,16 @@ struct section_buf {
 	uint16_t transport_stream_id;
 	int is_dynamic;
 	int was_updated;
-	NIT_table_t *nit;
 	list_element_t **service_list;
 	int *running_counter; // if not null, used as reference counter by this and child (PAT->PMT) filters
-	struct section_buf *next_seg; /* this is used to handle
-	                               * segmented tables (like NIT-other)
-	                               */
+	struct section_buf *next_seg;  /* this is used to handle
+									* segmented tables (like NIT-other)
+									*/
+
+	struct pollfd	*poll_fd;
+#if (defined STSDK)
+	int32_t	pipeId;
+#endif
 };
 
 /***********************************************
@@ -232,6 +239,33 @@ struct section_buf {
 ************************************************/
 
 list_element_t *dvb_services = NULL;
+
+/******************************************************************
+* STATIC DATA                                                     *
+*******************************************************************/
+
+static LIST_HEAD(running_filters);
+static LIST_HEAD(waiting_filters);
+static int n_running = 0;
+static int lock_filters = 1;
+static inline void dvb_filtersLock(void)   { lock_filters = 1; }
+static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
+
+static struct dvb_instance dvbInstances[ADAPTER_COUNT];
+static __u32 currentFrequency[ADAPTER_COUNT];
+static char * fe_typeNames[FE_TYPE_COUNT] = {
+	"DVB-S",
+	"DVB-C",
+	"DVB-T",
+	"ATSC",
+};
+
+static pmysem_t dvb_semaphore;
+static pmysem_t dvb_fe_semaphore;
+static pmysem_t dvb_filter_semaphore;
+static NIT_table_t dvb_scan_network;
+
+//char scan_messages[64*1024];
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -275,71 +309,55 @@ static inline int isSubtitle( PID_info_t* stream)
 }
 
 /******************************************************************
-* STATIC DATA                                                     *
-*******************************************************************/
-
-static LIST_HEAD(running_filters);
-static LIST_HEAD(waiting_filters);
-static int n_running;
-static struct pollfd poll_fds[MAX_RUNNING];
-static struct section_buf* poll_section_bufs[MAX_RUNNING];
-static int lock_filters = 1;
-static inline void dvb_filtersLock(void)   { lock_filters = 1; }
-static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
-
-static struct dvb_instance dvbInstances[ADAPTER_COUNT];
-static __u32 currentFrequency[ADAPTER_COUNT];
-static char * fe_typeNames[FE_TYPE_COUNT] = {
-	"DVB-S",
-	"DVB-C",
-	"DVB-T",
-	"ATSC",
-};
-
-static pmysem_t dvb_semaphore;
-static pmysem_t dvb_fe_semaphore;
-static pmysem_t dvb_filter_semaphore;
-
-//char scan_messages[64*1024];
-#define ZERO_SCAN_MESAGE()	//scan_messages[0] = 0
-#define SCAN_MESSAGE(...)	//sprintf(&scan_messages[strlen(scan_messages)], __VA_ARGS__)
-
-/******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
 
-static void dvb_update_poll_fds(void)
+static int32_t dvb_getPollFds(struct pollfd **fds, nfds_t *count)
 {
-	struct list_head *p;
+	struct list_head *pos;
 	struct section_buf* s;
-	int i;
+	int32_t i;
+	int32_t ret = 0;
+	static struct pollfd poll_fds[MAX_RUNNING];
 
-	memset(poll_section_bufs, 0, sizeof(poll_section_bufs));
-	for (i = 0; i < MAX_RUNNING; i++)
+/*	for(i = 0; i < MAX_RUNNING; i++) {
 		poll_fds[i].fd = -1;
+	}*/
 	i = 0;
-	list_for_each (p, &running_filters) {
-		if (i >= MAX_RUNNING)
+	list_for_each(pos, &running_filters) {
+		if(i >= MAX_RUNNING) {
 			fatal("%s: too many poll_fds\n", __FUNCTION__);
-		s = list_entry (p, struct section_buf, list);
-		if (s->fd == -1)
+		}
+		s = list_entry(pos, struct section_buf, list);
+		if(s->fd == -1) {
 			fatal("%s: s->fd == -1 on running_filters\n", __FUNCTION__);
+		}
 		poll_fds[i].fd = s->fd;
 		poll_fds[i].events = POLLIN;
 		poll_fds[i].revents = 0;
-		poll_section_bufs[i] = s;
+		s->poll_fd = poll_fds + i;
 		i++;
 	}
-	if (i != n_running)
-		fatal("%s: n_running is hosed\n", __FUNCTION__);
+
+	if(i != n_running) {
+		fatal("%s: n_running is hosed: i=%d, n_running=%d\n", __FUNCTION__, i, n_running);
+		n_running = i;
+		ret = -1;
+	}
+	*fds = poll_fds;
+	*count = n_running;
+
+	return ret;
 }
 
 #if (defined LINUX_DVB_API_DEMUX)
-static int32_t dvb_filterStart_dvbApi(struct section_buf* s)
+static int32_t dvb_filterStart_arch(struct section_buf* s)
 {
 	struct dmx_sct_filter_params f;
+	char demux_devname[32];
 
-	s->fd = open(s->dmx_devname, O_RDWR | O_NONBLOCK);
+	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", dvb_getAdapter(s->tuner));
+	s->fd = open(demux_devname, O_RDWR | O_NONBLOCK);
 	if(s->fd < 0) {
 		return -1;
 	}
@@ -364,7 +382,7 @@ static int32_t dvb_filterStart_dvbApi(struct section_buf* s)
 	return 0;
 }
 
-static int32_t dvb_filterStop_dvbApi(struct section_buf *s)
+static int32_t dvb_filterStop_arch(struct section_buf *s)
 {
 	ioctl(s->fd, DMX_STOP);
 	close(s->fd);
@@ -373,17 +391,87 @@ static int32_t dvb_filterStop_dvbApi(struct section_buf *s)
 	return 0;
 }
 #elif (defined STSDK)
-
-static int32_t dvb_filterStart_st(struct section_buf* s)
+static char *dvb_getSectionPipeName(int32_t id)
 {
-	char pipeName[32];
+	static char pipeNameBuf[32];
+
+	snprintf(pipeNameBuf, sizeof(pipeNameBuf), "/tmp/section_pipe_%02d", id);
+	return pipeNameBuf;
+}
+
+static int32_t g_dvb_pipe[16];
+
+static int32_t dvb_sectionPipeStop(int32_t pipeId)
+{
 	elcdRpcType_t type;
 	cJSON *result = NULL;
 	cJSON *params;
+	char *pipeName;
 	int32_t ret = -1;
 
-	sprintf(pipeName, "/tmp/section_pipe_%02d", n_running);
-	s->dmx_devname = strdup(pipeName);
+	if(pipeId < 0) {
+		eprintf("%s(): Wrong argument: pipeId=%d\n", __func__, pipeId);
+		return -1;
+	}
+
+	params = cJSON_CreateObject();
+	if(params == NULL) {
+		eprintf("%s(): Error in creating params\n", __func__);
+		return -4;
+	}
+
+	pipeName = dvb_getSectionPipeName(pipeId);
+	cJSON_AddStringToObject(params, "uri", pipeName);
+	st_rpcSync(elcmd_TSsectionStreamOff, params, &type, &result);
+	if(result && (result->valuestring != NULL) &&
+		(strcmp(result->valuestring, "ok") == 0)) {
+		ret = 0;
+	}
+
+	cJSON_Delete(result);
+	cJSON_Delete(params);
+
+	unlink(pipeName);
+	g_dvb_pipe[pipeId] = 0;
+	return ret;
+}
+
+static int32_t dvb_lockSectionPipeId(void)
+{
+	static int32_t init = 0;
+	uint32_t i;
+
+	if(!init) {
+		for(i = 0; i < ARRAY_SIZE(g_dvb_pipe); i++) {
+			dvb_sectionPipeStop(i);
+		}
+		init = 1;
+	}
+
+	for(i = 0; i < ARRAY_SIZE(g_dvb_pipe); i++) {
+		if(g_dvb_pipe[i] == 0) {
+			g_dvb_pipe[i] = 1;
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+static int32_t dvb_filterStart_arch(struct section_buf* s)
+{
+	elcdRpcType_t type;
+	cJSON *result = NULL;
+	cJSON *params;
+	char *pipeName;
+	int32_t ret = -1;
+
+	s->pipeId = dvb_lockSectionPipeId();
+	if(s->pipeId < 0) {
+		eprintf("%s(): All slots are busy!\n", __func__);
+		return -1;
+	}
+	pipeName = dvb_getSectionPipeName(s->pipeId);
 	unlink(pipeName);
 	if(mkfifo(pipeName, 0640) < 0) {
 		eprintf("%s(): Unable to create a fifo file\n", __func__);
@@ -403,7 +491,7 @@ static int32_t dvb_filterStart_st(struct section_buf* s)
 	}
 
 	cJSON_AddStringToObject(params, "uri", pipeName);
-	cJSON_AddNumberToObject(params, "tuner", 0);//TODO: Use something more general
+	cJSON_AddNumberToObject(params, "tuner", s->tuner);
 	cJSON_AddNumberToObject(params, "pid", (uint16_t)s->pid);
 	if(s->table_id < 0x100 && s->table_id > 0) {
 		cJSON_AddNumberToObject(params, "tid", (uint8_t)s->table_id);
@@ -420,39 +508,19 @@ static int32_t dvb_filterStart_st(struct section_buf* s)
 	return ret;
 }
 
-static int32_t dvb_filterStop_st(struct section_buf *s)
+static int32_t dvb_filterStop_arch(struct section_buf *s)
 {
-	elcdRpcType_t type;
-	cJSON *result = NULL;
-	cJSON *params;
-	int32_t ret = -1;
-
-	params = cJSON_CreateObject();
-	if(params == NULL) {
-		eprintf("%s(): Error in creating params\n", __func__);
-		return -4;
-	}
-
-	cJSON_AddStringToObject(params, "uri", s->dmx_devname);
-	st_rpcSync(elcmd_TSsectionStreamOff, params, &type, &result);
-	if(result && (result->valuestring != NULL) &&
-		(strcmp(result->valuestring, "ok") == 0)) {
-		ret = 0;
-	}
+	int32_t ret;
+	ret = dvb_sectionPipeStop(s->pipeId);
 
 	close(s->fd);
-	unlink(s->dmx_devname);
-
-	cJSON_Delete(result);
-	cJSON_Delete(params);
-
 	return ret;
 }
 #else
-#define dvb_filterStart(args...)
-#define dvb_filterStop(args...)
+#define dvb_filterStart_arch(args...) -1
+#define dvb_filterStop_arch(args...) -1
 
-#warning "dvb_filterStart() and dvb_filterStop() not defined!!!"
+#warning "dvb_filterStart_arch() and dvb_filterStop_arch() not defined!!!"
 #endif
 
 static int dvb_filterStart(struct section_buf* s)
@@ -463,17 +531,9 @@ static int dvb_filterStart(struct section_buf* s)
 	}
 
 	debug("%s: start filter 0x%02x\n", __FUNCTION__, s->pid);
-#if (defined LINUX_DVB_API_DEMUX)
-	ret = dvb_filterStart_dvbApi(s);
-#elif (defined STSDK)
-	ret = dvb_filterStart_st(s);
-#else
-#warning "dvb_filterStart() not defined!!!"
-	ret = -1;
-#endif
-
+	ret = dvb_filterStart_arch(s);
 	if(ret != 0) {
-		eprintf("%s(): Cant start collecting section with pid=0x04x, table_id=0x%02x\n", __func__, (uint16_t)s->pid, (uint8_t)s->table_id);
+		eprintf("%s(): Cant start collecting section with pid=0x%04x, table_id=0x%02x\n", __func__, (uint16_t)s->pid, (uint8_t)s->table_id);
 		return ret;
 	}
 
@@ -482,122 +542,124 @@ static int dvb_filterStart(struct section_buf* s)
 	if(s->running_counter != NULL) {
 		(*s->running_counter)++;
 	}
-
-	list_del_init(&s->list);  /* might be in waiting filter list */
-	list_add(&s->list, &running_filters);
+	s->poll_fd = NULL;
 
 	n_running++;
-	dvb_update_poll_fds();
 
 	return 0;
 }
 
-static void dvb_filterStop (struct section_buf *s)
+static int32_t dvb_filterStop(struct section_buf *s)
 {
 	int32_t ret = 0;
 	debug("%s: stop filter %d\n", __FUNCTION__, s->pid);
 
-#if (defined LINUX_DVB_API_DEMUX)
-	ret = dvb_filterStop_dvbApi(s);
-#elif (defined STSDK)
-	ret = dvb_filterStop_st(s);
-#else
-#warning "dvb_filterStop() not defined!!!"
-	ret = -1;
-#endif
+	if(s->start_time == 0) {
+		return -1;
+	}
+	ret = dvb_filterStop_arch(s);
 	(void)ret;
 
-	list_del (&s->list);
 	s->running_time += time(NULL) - s->start_time;
 	if(s->running_counter != NULL) {
 		(*s->running_counter)--;
 	}
 
 	n_running--;
-	dvb_update_poll_fds();
+
+	return 0;
 }
 
-static void dvb_filterAdd (struct section_buf *s)
-{
-	if(!lock_filters) {
-		if (dvb_filterStart(s))
-			list_add_tail(&s->list, &waiting_filters);
-	} else {
-		debug("%s: filters are locked\n", __FUNCTION__);
-		if(s->is_dynamic) {
-			debug("%s: free dynamic filter\n", __FUNCTION__);
-			dfree(s);
-		}
-	}
-}
-
-static void dvb_filterRemove (struct section_buf *s)
+static int32_t dvb_filterRemove(struct section_buf *s)
 {
 	dvb_filterStop(s);
+	list_del(&s->list);
 	if(s->is_dynamic) {
 		debug("%s: free dynamic filter\n", __FUNCTION__);
 		dfree(s);
 	}
 	debug("%s: start waiting filters\n", __FUNCTION__);
 
-	while(!list_empty(&waiting_filters)) {
-		struct list_head *next = waiting_filters.next;
-		s = list_entry(next, struct section_buf, list);
-		if(dvb_filterStart(s)) {
-			break;
-		}
-	};
+	return 0;
 }
 
-static void dvb_filterSetup (struct section_buf* s, const char *dmx_devname,
-			  int pid, int tid, int timeout, NIT_table_t *nit, list_element_t **outServices)
+static void dvb_filterAdd(struct section_buf *s)
+{
+	if(!lock_filters) {
+		if(dvb_filterStart(s) == 0) {
+			list_add(&s->list, &running_filters);
+		} else {
+			if(!list_empty(&running_filters)) {
+				//add to waiting queue if there are any filter started
+				//to prevent infinty loop
+				list_add_tail(&s->list, &waiting_filters);
+			}
+		}
+	} else {
+		dvb_filterRemove(s);
+	}
+}
+
+static int32_t dvb_filterPushWaiters(void)
+{
+	struct list_head *pos;
+	struct list_head *n;
+
+	list_for_each_safe(pos, n, &waiting_filters) {
+		struct section_buf *s;
+		s = list_entry(pos, struct section_buf, list);
+
+		//dvb_filterAdd(s);
+		if(dvb_filterStart(s) == 0) {
+			list_del(pos);//remove from waiting_filters
+			list_add(&s->list, &running_filters);
+		} else {
+			if(list_empty(&running_filters)) {
+				printf("%s:%s()[%d]: Dropping: s->pid=0x%04x, s->table_id=0x%02x, table_id_ext=0x%04x\n", __FILE__, __func__, __LINE__, s->pid, s->table_id, s->table_id_ext);
+				dvb_filterRemove(s);
+			}
+		}
+	}
+
+	return 0;
+}
+
+static void dvb_filterSetup(struct section_buf* s, tunerFormat tuner,
+			  int pid, int tid, int timeout, list_element_t **outServices)
 {
 	memset (s, 0, sizeof(struct section_buf));
 
 	s->fd = -1;
-	s->dmx_devname = dmx_devname;
+	s->tuner = tuner;
 	s->pid = pid;
 	s->table_id = tid;
 	s->timeout = timeout;
 	s->table_id_ext = -1;
 	s->section_version_number = -1;
 	s->transport_stream_id = -1;
-	s->nit = nit;
 	s->service_list = outServices;
 
 	INIT_LIST_HEAD (&s->list);
 }
 
-static void dvb_filtersFlush()
+static int32_t dvb_filtersFlush(void)
 {
-	int i;
-	struct section_buf *s;
+	struct list_head *pos;
+	struct list_head *n;
 
 	dvb_filtersLock();
 
 	/* Flush waiting filter pool */
-	while (!list_empty(&waiting_filters)) {
-		struct list_head *next = waiting_filters.next;
-		s = list_entry (next, struct section_buf, list);
-		list_del (&s->list);
-		if (s->is_dynamic)
-		{
-			dfree(s);
-		}
+	list_for_each_safe(pos, n, &waiting_filters) {
+		struct section_buf *s = list_entry(pos, struct section_buf, list);
+		dvb_filterRemove(s);
 	};
 	/* Flush running filter pool */
-	while (n_running > 0)
-	{
-		for (i = 0; i < n_running; i++)
-		{
-			s = poll_section_bufs[i];
-			if (!s) {
-				fatal("%s: poll_section_bufs[%d] is NULL\n", __FUNCTION__, i);
-				continue;
-			}
-			dvb_filterRemove (s);
-		}
-	}
+	list_for_each_safe(pos, n, &running_filters) {
+		struct section_buf *s = list_entry(pos, struct section_buf, list);
+		dvb_filterRemove(s);
+	};
+	return 0;
 }
 
 static int get_bit (unsigned char *bitfield, int bit)
@@ -615,7 +677,7 @@ static void set_bit (unsigned char *bitfield, int bit)
  *	   1 when all sections are read on this pid
  *	   -1 on invalid table id
  */
-static int dvb_sectionParse (long frequency, char* demux_devname, struct section_buf *s)
+static int dvb_sectionParse(long frequency, struct section_buf *s)
 {
 	int table_id;
 	int table_id_ext;
@@ -630,11 +692,9 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 	int can_count_sections = 1;
 	int updated = 0;
 
-	if (s->service_list != NULL)
-	{
+	if(s->service_list != NULL) {
 		services = s->service_list;
-	} else
-	{
+	} else {
 		services = &dvb_services;
 	}
 
@@ -653,6 +713,22 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 			media.dvb_c.inversion = appControlInfo.dvbcInfo.fe.inversion;
 			media.dvb_c.symbol_rate = appControlInfo.dvbcInfo.symbolRate*1000;
 			media.dvb_c.modulation = appControlInfo.dvbcInfo.modulation;
+			break;
+		case DVBS:
+			media.type = serviceMediaDVBS;
+			media.dvb_s.frequency = frequency;
+			//media.dvb_s.orbital_position
+			//media.dvb_s.west_east_flag
+			media.dvb_s.polarization = appControlInfo.dvbsInfo.polarization;
+			//media.dvb_s.modulation
+			media.dvb_s.symbol_rate = appControlInfo.dvbsInfo.symbolRate * 1000;
+			//media.dvb_s.FEC_inner
+			//media.dvb_s.inversion
+			break;
+		case ATSC:
+			media.type = serviceMediaATSC;
+			media.atsc.frequency = frequency;
+			media.atsc.modulation = appControlInfo.atscInfo.modulation;
 			break;
 		default:
 			media.type = serviceMediaNone;
@@ -685,7 +761,7 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 		s->table_id_ext = table_id_ext;
 		s->section_version_number = section_version_number;
 		s->sectionfilter_done = 0;
-		memset (s->section_done, 0, sizeof(s->section_done));
+		memset(s->section_done, 0, sizeof(s->section_done));
 		s->next_seg = next_seg;
 	}
 
@@ -714,12 +790,11 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 					if( pmt_filter != NULL )
 					{
 						dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d\n", __FUNCTION__,
-						        service->common.transport_stream_id,
-						        service->program_map.program_map_PID,
-						        service->common.service_id,
-						        service->common.media_id);
-						dvb_filterSetup(pmt_filter, demux_devname,
-						                service->program_map.program_map_PID, 0x02, 2, s->nit, services);
+								service->common.transport_stream_id,
+								service->program_map.program_map_PID,
+								service->common.service_id,
+								service->common.media_id);
+						dvb_filterSetup(pmt_filter, s->tuner, service->program_map.program_map_PID, 0x02, 2, services);
 						pmt_filter->transport_stream_id = service->common.transport_stream_id;
 						pmt_filter->is_dynamic = 1;
 						pmt_filter->running_counter = s->running_counter;
@@ -762,10 +837,9 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 
     case 0x40:
 			verbose("%s: NIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
-			if (s->nit != NULL)
-			{
+			if(appControlInfo.dvbCommonInfo.networkScan) {
 				mysem_get(dvb_semaphore);
-				updated = parse_nit(services, (unsigned char *)s->buf, MEDIA_ID, &media, s->nit);
+				updated = parse_nit(services, (unsigned char *)s->buf, MEDIA_ID, &media, &dvb_scan_network);
 				mysem_release(dvb_semaphore);
 			}
 			break;
@@ -842,74 +916,80 @@ static int dvb_sectionParse (long frequency, char* demux_devname, struct section
 	return 0;
 }
 
-static int dvb_sectionRead (__u32 frequency, char * demux_devname, struct section_buf *s)
+static int32_t dvb_sectionRead(__u32 frequency, struct section_buf *s)
 {
 	int section_length, count;
 
-	if (s->sectionfilter_done)
+	if(s->sectionfilter_done) {
 		return 1;
+	}
 
-	/* 	the section filter API guarantess that we get one full section
+	/* the section filter API guarantess that we get one full section
 	 * per read(), provided that the buffer is large enough (it is)
 	 */
-	if(((count = read (s->fd, s->buf, sizeof(s->buf))) < 0) && (errno == EOVERFLOW)) {
-		count = read (s->fd, s->buf, sizeof(s->buf));
+	if(((count = read(s->fd, s->buf, sizeof(s->buf))) < 0) && (errno == EOVERFLOW)) {
+		count = read(s->fd, s->buf, sizeof(s->buf));
 	}
-	if (count < 0 && errno != EAGAIN) {
+	if(count < 0 && errno != EAGAIN) {
 		dprintf("%s: Read error %d (errno %d) pid 0x%04x\n", __FUNCTION__, count, errno, s->pid);
 		return -1;
 	}
 
 	//dprintf("%s: READ %d bytes!!!\n", __FUNCTION__, count);
-
-	if (count < 4)
+	if(count < 4) {
 		return -1;
+	}
 
 	section_length = ((s->buf[1] & 0x0f) << 8) | s->buf[2];
-
 	//dprintf("%s: READ %d bytes, section length %d!!!\n", __FUNCTION__, count, section_length);
-
-	if (count != section_length + 3)
+	if(count != section_length + 3) {
+#warning TODO: Handle if we read more data (several sections)
 		return -1;
+	}
 
-	if (dvb_sectionParse(frequency, demux_devname, s) == 1)
+	if(dvb_sectionParse(frequency, s) == 1) {
 		return 1;
+	}
 
 	return 0;
 }
 
-static void dvb_filtersRead (__u32 frequency, char* demux_devname)
+static void dvb_filtersRead(__u32 frequency)
 {
-	struct section_buf *s;
-	int i, n, done;
+	struct list_head *pos;
+	struct list_head *n;
+	struct pollfd *fds;
+	nfds_t nfds;
+//	int32_t ret;
 
 	mysem_get(dvb_filter_semaphore);
 
-	n = poll(poll_fds, n_running, 1000);
-	if (n == -1)
+	dvb_getPollFds(&fds, &nfds);
+	if(poll(fds, nfds, 1000) == -1) {
 		PERROR("%s: filter poll failed", __FUNCTION__);
+	}
 
-	for(i = 0; i < n_running; i++) {
-		s = poll_section_bufs[i];
+	list_for_each_safe(pos, n, &running_filters) {
+		int32_t done = 0;
+		struct section_buf *s = list_entry(pos, struct section_buf, list);
+
 		if(!s) {
-			fatal("%s: poll_section_bufs[%d] is NULL\n", __FUNCTION__, i);
+			fatal("%s: s is NULL\n", __FUNCTION__);
 			continue;
 		}
 
-		if(poll_fds[i].revents) {
-			done = dvb_sectionRead(frequency, demux_devname, s) == 1;
-		} else {
-			done = 0; /* timeout */
+		if(s->poll_fd && s->poll_fd->revents && (dvb_sectionRead(frequency, s) == 1)) {
+			done = 1;
 		}
-		if(  done ||
-			(time(NULL) > (s->start_time + s->timeout)) )
-		{
-			if(!done) {
-				SCAN_MESSAGE("DVB: filter timeout pid 0x%04x\n", s->pid);
-				debug("%s: filter timeout pid 0x%04x\n", __FUNCTION__, s->pid);
-			}
+
+		if(done) {
+			dvb_filterRemove(s);
+		} else if(time(NULL) > (s->start_time + s->timeout)) {
+			SCAN_MESSAGE("DVB: filter timeout pid 0x%04x\n", s->pid);
+			debug("%s: filter timeout pid 0x%04x\n", __FUNCTION__, s->pid);
 			dvb_filterRemove(s);
 		}
+		dvb_filterPushWaiters();
 	}
 
 	mysem_release(dvb_filter_semaphore);
@@ -938,9 +1018,8 @@ static void dvb_filterServices(list_element_t **head)
 }
 */
 
-static void dvb_scanForServices (long frequency, char * demux_devname, NIT_table_t *nit)
+static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enableNit)
 {
-#ifdef LINUX_DVB_API_DEMUX
 	struct section_buf pat_filter;
 	struct section_buf sdt_filter;
 	//struct section_buf sdt1_filter;
@@ -951,24 +1030,28 @@ static void dvb_scanForServices (long frequency, char * demux_devname, NIT_table
 	/**
 	 *  filter timeouts > min repetition rates specified in ETR211
 	 */
-	dvb_filterSetup (&pat_filter, demux_devname, 0x00, 0x00, 5, nit, &dvb_services); /* PAT */
-	dvb_filterSetup (&nit_filter, demux_devname, 0x10, 0x40, 5, nit, &dvb_services); /* NIT */
-	dvb_filterSetup (&sdt_filter, demux_devname, 0x11, 0x42, 5, nit, &dvb_services); /* SDT actual */
-	//dvb_filterSetup (&sdt1_filter, demux_devname, 0x11, 0x46, 5, nit, &dvb_services); /* SDT other */
-	dvb_filterSetup (&eit_filter, demux_devname, 0x12,   -1, 5, nit, &dvb_services); /* EIT */
+	dvb_filterSetup(&pat_filter, tuner, 0x00, 0x00, 5, &dvb_services); /* PAT */
+	dvb_filterSetup(&sdt_filter, tuner, 0x11, 0x42, 5, &dvb_services); /* SDT actual */
+	//dvb_filterSetup(&sdt1_filter, tuner, 0x11, 0x46, 5, &dvb_services); /* SDT other */
+	dvb_filterSetup(&eit_filter, tuner, 0x12,   -1, 5, &dvb_services); /* EIT */
 
-	dvb_filterAdd (&pat_filter);
-	dvb_filterAdd (&nit_filter);
-	dvb_filterAdd (&sdt_filter);
-	//dvb_filterAdd (&sdt1_filter);
-	dvb_filterAdd (&eit_filter);
+	dvb_filterAdd(&pat_filter);
+	dvb_filterAdd(&sdt_filter);
+	//dvb_filterAdd(&sdt1_filter);
+//	dvb_filterAdd(&eit_filter);
 
-	do
-	{
-		dvb_filtersRead (frequency, demux_devname);
-	} while (!(list_empty(&running_filters) && list_empty(&waiting_filters)));
+	if(enableNit) {
+		dvb_clearNIT(&dvb_scan_network);
+		dvb_filterSetup(&nit_filter, tuner, 0x10, 0x40, 5, &dvb_services); /* NIT */
+		dvb_filterAdd(&nit_filter);
+	}
+
+	do {
+		dvb_filtersRead(frequency);
+	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
 	dvb_filtersLock();
-#endif // LINUX_DVB_API_DEMUX
+	dvb_filtersFlush();
+
 	//dvb_filterServices(&dvb_services);
 }
 
@@ -996,20 +1079,17 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 {
 	int adapter = dvb_getAdapter(tuner);
 	struct section_buf eit_filter;
-	char demux_devname[32];
 	int counter = 0;
 
 	if(!dvb_isLinuxAdapter(adapter)) {
 		dvb_filtersUnlock();
 	}
 
-	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", adapter);
-
-	dvb_filterSetup(&eit_filter, demux_devname, 0x12, -1, 2, NULL, &dvb_services); /* EIT */
+	dvb_filterSetup(&eit_filter, tuner, 0x12, -1, 2, &dvb_services); /* EIT */
 	eit_filter.running_counter = &counter;
 	dvb_filterAdd(&eit_filter);
 	do {
-		dvb_filtersRead(frequency, demux_devname);
+		dvb_filtersRead(frequency);
 		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((eit_filter.start_time == 0) || (counter > 0));
@@ -1032,22 +1112,17 @@ void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out
 
 #ifdef LINUX_DVB_API_DEMUX
 	struct section_buf pat_filter;
-	char demux_devname[32];
 	int counter = 0;
 
-	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", adapter);
-
-	if (out_list == NULL)
-	{
+	if(out_list == NULL) {
 		out_list = &dvb_services;
 	}
 
-	dvb_filterSetup (&pat_filter, demux_devname, 0x00, 0x00, 2, NULL, out_list); /* PAT */
+	dvb_filterSetup(&pat_filter, tuner, 0x00, 0x00, 2, out_list); /* PAT */
 	pat_filter.running_counter = &counter;
-	dvb_filterAdd (&pat_filter);
-	do
-	{
-		dvb_filtersRead (frequency, demux_devname);
+	dvb_filterAdd(&pat_filter);
+	do {
+		dvb_filtersRead(frequency);
 		//dprintf("DVB: pat %d, counter %d\n", pat_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while (pat_filter.start_time == 0 || counter > 0);
@@ -1513,12 +1588,11 @@ void dvb_clearServiceList(int permanent)
 	mysem_get(dvb_semaphore);
 	free_services(&dvb_services);
 	mysem_release(dvb_semaphore);
-	if (permanent)
-	{
+	if(permanent) {
 #ifdef STSDK
 		elcdRpcType_t type;
 		cJSON *result = NULL;
-		st_rpcSync( elcmd_dvbclearservices, NULL, &type, &result );
+		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
 		cJSON_Delete(result);
 #endif
 		remove(appControlInfo.dvbCommonInfo.channelConfigFile);
@@ -1757,7 +1831,7 @@ int32_t dvb_serviceScan(tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 				dprintf("%s[%d]: aborted by user\n", __FUNCTION__, tuner);
 				break;
 			}
-			res = st_rpcSync(elcmd_dvbtune, params, &type, &result );
+			res = st_rpcSync(elcmd_dvbtune, params, &type, &result);
 			if(result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0) {
 				cJSON_Delete(result);
 				result = NULL;
@@ -1768,7 +1842,6 @@ int32_t dvb_serviceScan(tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 				dprintf("%s[%d]: Found something on %u, search channels!\n", __FUNCTION__, tuner, frequency);
 				res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result );
-				dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 			}
 			dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 			cJSON_Delete(result);
@@ -1776,7 +1849,6 @@ int32_t dvb_serviceScan(tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 		}
 		cJSON_Delete(params);
 
-		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 		return 0;
 	}
 
@@ -1789,9 +1861,7 @@ int32_t dvb_serviceScan(tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 	cJSON_AddItemToObject(params, "frequency", p_freq);
 #endif //defined STSDK
 
-	char demux_devname[32];
-	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", dvb_getAdapter(tuner));
-	dprintf("%s[%d]: Scan Adapter /dev/dvb/adapter%d/\n", __FUNCTION__, tuner, dvb_getAdapter(tuner));
+	dprintf("%s[%d]: Scan tuner %d\n", __FUNCTION__, tuner);
 
 	/* Clear any existing channel list */
 	//dvb_clearServiceList();
@@ -1867,7 +1937,7 @@ int32_t dvb_serviceScan(tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 						eprintf("%s[%d]: scan failed\n", __FUNCTION__, tuner);
 					}
 #else
-					dvb_scanForServices (f, demux_devname, NULL);
+					dvb_scanForServices(f, tuner, 0);
 #endif // STSDK
 					SCAN_MESSAGE("DVB[%d]: Found %d channels ...\n", tuner, dvb_getNumberOfServices());
 					dprintf("%s[%d]: Found %d channels ...\n", __FUNCTION__, tuner, dvb_getNumberOfServices());
@@ -1894,7 +1964,7 @@ int32_t dvb_serviceScan(tunerFormat tuner, dvb_displayFunctionDef* pFunction)
 
 		close(frontend_fd);
 	} else { // streamer input
-		dvb_scanForServices(0, demux_devname, NULL);
+		dvb_scanForServices(0, tuner, 0);
 		dprintf("%s[%d]: Found %d channels ...\n", __FUNCTION__, tuner, dvb_getNumberOfServices());
 	}
 	/* Write the channel list to the root file system */
@@ -1909,92 +1979,140 @@ service_scan_end:
 	return ret;
 }
 
+static int32_t dvb_frequencyScanOne(tunerFormat tuner, __u32 frequency, EIT_media_config_t *media,
+						dvb_displayFunctionDef* pFunction, dvb_cancelFunctionDef* pCancelFunction, uint32_t enableNit)
+{
+	uint32_t	freqKHz = st_frequency(tuner, frequency);
+	float		freqMHz = (float)freqKHz / (float)KHZ;
+	int32_t		frontend_fd = -1;
+	int32_t		tuneSuccess = 0;
+
+	if(dvb_isLinuxTuner(tuner)) {
+		if((frontend_fd = dvb_openFrontend(dvb_getAdapter(tuner), O_RDWR)) < 0) {
+			eprintf("%s[%d]: failed to open frontend %d\n", __FUNCTION__, tuner, dvb_getAdapter(tuner));
+			return -1;
+		}
+		if(dvb_setFrequency(dvb_getType(tuner), frequency, frontend_fd, dvb_getAdapter(tuner), 1, NULL, pCancelFunction) == 1) {
+			tuneSuccess = 1;
+		}
+	} else {
+		elcdRpcType_t	type = elcdRpcInvalid;
+		cJSON			*result = NULL;
+		cJSON			*params = NULL;
+
+		dvb_diseqcSetup(tuner, -1, frequency, media);
+
+		params = cJSON_CreateObject();
+		if(!params) {
+			eprintf("%s[%d]: out of memory\n", __FUNCTION__, tuner);
+			return -1;
+		}
+		st_setTuneParams(tuner, params, media);
+		cJSON_AddItemToObject(params, "frequency", cJSON_CreateNumber(freqKHz));
+		st_rpcSync(elcmd_dvbtune, params, &type, &result);
+		if(result && result->valuestring && (strcmp(result->valuestring, "ok") == 0)) {
+			tuneSuccess = 1;
+		}
+		cJSON_Delete(params);
+		cJSON_Delete(result);
+	}
+
+	if(tuneSuccess) {
+		eprintf("%s(): tuner=%d, scanning %.3f MHz\n", __FUNCTION__, tuner, freqMHz);
+
+		dvb_scanForServices(frequency, tuner, enableNit);
+//		res = 0;
+	} else {
+		eprintf("%s[%d]: failed to set frequency to %.3f MHz\n", __FUNCTION__, tuner, freqMHz);
+	}
+
+	if(frontend_fd >= 0) {
+		close(frontend_fd);
+	}
+/*	if(res != 0) {
+		eprintf("%s[%d]: failed to scan %6u\n", __FUNCTION__, tuner, freqKHz);
+		return -1;
+	}*/
+	return 0;
+}
+
+static int32_t dvb_isFrequencyesEqual(tunerFormat tuner, uint32_t freq1, uint32_t freq2)
+{
+	uint32_t diff;
+	uint32_t range = 0;
+	switch(dvb_getType(tuner)) {
+		case DVBT:
+		case DVBC:
+		case FE_ATSC:
+			range = 500000;//0,5MHz
+			break;
+		case DVBS:
+			//for dvb-s frequencies are in KHz
+			range = 1000;//1MHz
+			break;
+		default :
+			break;
+	}
+	if(freq1 > freq2) {
+		diff = freq1 - freq2;
+	} else {
+		diff = freq2 - freq1;
+	}
+	if(diff <= range) {
+		return 1;
+	}
+	return 0;
+}
+
 int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *media,
-						dvb_displayFunctionDef* pFunction, NIT_table_t *scan_network,
+						dvb_displayFunctionDef* pFunction,
 						int save_service_list, dvb_cancelFunctionDef* pCancelFunction)
 {
-	char demux_devname[32];
 	int frontend_fd = -1;
 	struct dvb_frontend_info fe_info;
 	int current_frequency_number = 1, max_frequency_number = 0;
 
 #ifdef STSDK
-	elcdRpcType_t type = elcdRpcInvalid;
-	cJSON		*result = NULL;
-	cJSON		*params = NULL;
-	int32_t		res;
-	uint32_t	freqKHz = st_frequency(tuner, frequency);
-	float		freqMHz = ((float)freqKHz) / ((float)KHZ);
+	dvb_frequencyScanOne(tuner, frequency, media, pFunction, pCancelFunction, appControlInfo.dvbCommonInfo.networkScan);
 
-	params = cJSON_CreateObject();
-	if(!params) {
-		eprintf("%s[%d]: out of memory\n", __FUNCTION__, tuner);
-		return -1;
-	}
-	st_setTuneParams(tuner, params, media);
+	if(appControlInfo.dvbCommonInfo.networkScan) {
+		list_element_t *tstream_element;
+		NIT_transport_stream_t *tsrtream;
 
-	if(dvb_isLinuxTuner(tuner)) {
-		if((frontend_fd = dvb_openFrontend(dvb_getAdapter(tuner), O_RDWR)) < 0) {
-			eprintf("%s[%d]: failed to open frontend %d\n", __FUNCTION__, tuner, dvb_getAdapter(tuner));
-			cJSON_Delete(params);
-			return -1;
+		/* Count frequencies in NIT */
+		tstream_element = dvb_scan_network.transport_streams;
+
+		while(tstream_element != NULL) {
+			tsrtream = (NIT_transport_stream_t *)tstream_element->data;
+
+			if( tsrtream != NULL &&
+				tsrtream->media.type > serviceMediaNone &&
+				tsrtream->media.frequency > 0 &&
+				!dvb_isFrequencyesEqual(tuner, tsrtream->media.frequency, frequency) )
+			{
+				dvb_frequencyScanOne(tuner, tsrtream->media.frequency, &tsrtream->media, pFunction, pCancelFunction, 0);
+//				max_frequency_number++;
+			}
+			tstream_element = tstream_element->next;
 		}
-		if(dvb_setFrequency(dvb_getType(tuner), frequency, frontend_fd, dvb_getAdapter(tuner), 1, NULL, pCancelFunction) != 1) {
-			eprintf("%s[%d]: failed to set frequency to %.3f MHz\n", __FUNCTION__, tuner, freqMHz);
-			cJSON_Delete(params);
-			close(frontend_fd);
-			return -1;
-		}
-		cJSON_AddItemToObject(params, "frequency", cJSON_CreateNumber(freqKHz));
-		st_rpcSync(elcmd_dvbtune, params, &type, &result); // ignore
-		cJSON_Delete(params);
-		cJSON_Delete(result);
-
-		// reset rpc variables
-		params = cJSON_CreateObject();
-		st_setTuneParams(tuner, params, media);
-
-		result = NULL;
-		type = elcdRpcInvalid;
-	} else {
-		dvb_diseqcSetup(tuner, -1, frequency, media);
-
-		cJSON_AddItemToObject(params, "start", cJSON_CreateNumber(freqKHz));
-		cJSON_AddItemToObject(params, "stop" , cJSON_CreateNumber(freqKHz));
 	}
 
-	eprintf("%s[%d]: scanning %.3f MHz\n", __FUNCTION__, tuner, freqMHz);
-	res = st_rpcSyncTimeout(elcmd_dvbscan, params, RPC_SCAN_TIMEOUT, &type, &result);
-	cJSON_Delete(params);
-	if(!st_isOk(type, result, "  service scan")) {
-		res = 1;
+	if(save_service_list) {
+		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 	}
-	cJSON_Delete(result);
-	if(frontend_fd >= 0) {
-		close(frontend_fd);
-	}
-	if(res != 0) {
-		eprintf("%s[%d]: failed to scan %6u\n", __FUNCTION__, tuner, freqKHz);
-		return -1;
-	}
-	dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
-
 	return 0;
 #endif
 
-	dprintf("%s: Scan Adapter %d\n", __FUNCTION__, tuner);
-	snprintf(demux_devname, sizeof(demux_devname), "/dev/dvb/adapter%d/demux0", dvb_getAdapter(tuner));
+	dprintf("%s: Scan tuner %d\n", __FUNCTION__, tuner);
 
-	if (!appControlInfo.dvbCommonInfo.streamerInput)
-	{
-		if ((frontend_fd = dvb_getFrontendInfo(dvb_getAdapter(tuner), O_RDWR, &fe_info)) < 0) {
+	if(!appControlInfo.dvbCommonInfo.streamerInput) {
+		if((frontend_fd = dvb_getFrontendInfo(dvb_getAdapter(tuner), O_RDWR, &fe_info)) < 0) {
 			eprintf("%s[%d]: failed to open frontend %d\n", __FUNCTION__, tuner, dvb_getAdapter(tuner));
 			return -1;
 		}
 
 		// Use the FE's own start/stop freq. for searching (if not explicitly app. defined).
-		if( frequency < fe_info.frequency_min || frequency > fe_info.frequency_max )
-		{
+		if(frequency < fe_info.frequency_min || frequency > fe_info.frequency_max) {
 			eprintf("%s[%d]: Frequency %u is out of range [%u:%u]!\n", __FUNCTION__, tuner,
 				frequency, fe_info.frequency_min, fe_info.frequency_max);
 			close(frontend_fd);
@@ -2017,17 +2135,14 @@ int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *me
 
 		int found = dvb_checkFrequency(dvb_getType(tuner), &f, frontend_fd, dvb_getAdapter(tuner),
 			&match_ber, fe_info.frequency_stepsize, media, pCancelFunction);
-		if (found == -1)
-		{
+		if(found == -1) {
 			dprintf("%s[%d]: aborted by user\n", __FUNCTION__, tuner);
 			goto frequency_scan_failed;
 		}
 
 		/* Just keep tuner on frequency */
-		if (save_service_list == -1)
-		{
-			for(;;)
-			{
+		if(save_service_list == -1) {
+			for(;;) {
 				if (pFunction == NULL ||
 				    pFunction(frequency, 0, tuner, current_frequency_number, max_frequency_number) == -1)
 				{
@@ -2038,10 +2153,7 @@ int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *me
 			}
 			close(frontend_fd);
 			return 1;
-		}
-		/* Or just return found value */
-		else if (save_service_list == -2)
-		{
+		} else if(save_service_list == -2) {/* Or just return found value */
 			close(frontend_fd);
 			return found;
 		}
@@ -2075,24 +2187,23 @@ int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *me
 			dprintf("%s[%d]: Found something on %u, search channels!\n", __FUNCTION__, tuner, f);
 			SCAN_MESSAGE("DVB[%d]: Found something on %u, search channels!\n", tuner, f);
 			/* Scan for channels within this frequency / transport stream */
-			dvb_scanForServices (f, demux_devname, scan_network);
+			dvb_scanForServices(f, tuner, 0);
 			SCAN_MESSAGE("DVB[%d]: Found %d channels ...\n", tuner, dvb_getNumberOfServices());
 			dprintf("%s[%d]: Found %d channels ...\n", __FUNCTION__, tuner, dvb_getNumberOfServices());
 		}
 
 		close(frontend_fd);
 	} else {
-		dvb_scanForServices(frequency, demux_devname, scan_network);
+		dvb_scanForServices(frequency, tuner, 0);
 		dprintf("%s[%d]: Found %d channels on %u\n", __FUNCTION__, tuner, dvb_getNumberOfServices(), frequency);
 	}
 
-	if (scan_network != NULL)
-	{
+	if(appControlInfo.dvbCommonInfo.networkScan) {
 		list_element_t *tstream_element;
 		NIT_transport_stream_t *tsrtream;
 
 		/* Count frequencies in NIT */
-		tstream_element = scan_network->transport_streams;
+		tstream_element = dvb_scan_network.transport_streams;
 		while (tstream_element != NULL)
 		{
 			tsrtream = (NIT_transport_stream_t *)tstream_element->data;
@@ -2107,7 +2218,7 @@ int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *me
 		}
 
 		/* Scan frequencies in NIT */
-		tstream_element = scan_network->transport_streams;
+		tstream_element = dvb_scan_network.transport_streams;
 		while (tstream_element != NULL)
 		{
 			tsrtream = (NIT_transport_stream_t *)tstream_element->data;
@@ -2125,15 +2236,16 @@ int dvb_frequencyScan(tunerFormat tuner, __u32 frequency, EIT_media_config_t *me
 				}
 				eprintf("%s[%d]: Network Scan: %u Hz\n", __FUNCTION__, tuner, tsrtream->media.frequency);
 				dvb_frequencyScan(tuner, tsrtream->media.frequency,
-				                  &tsrtream->media, pFunction, NULL, 0, pCancelFunction);
+				                  &tsrtream->media, pFunction, 0, pCancelFunction);
 				current_frequency_number++;
 			}
 			tstream_element = tstream_element->next;
 		}
 	}
 
-	if (save_service_list)
+	if(save_service_list) {
 		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+	}
 
 	dprintf("%s[%d]: Frequency %u scan completed\n", __FUNCTION__, tuner, frequency);
 	return 0;
@@ -3541,18 +3653,19 @@ void dvb_init(void)
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	for (i=0; i<inputTuners; i++)
+	for(i = 0; i < inputTuners; i++) {
 		appControlInfo.tunerInfo[i].status = tunerNotPresent;
+	}
 
 	tunerFormat tuner = 0;
-	for (i=0; i<ADAPTER_COUNT && tuner < inputTuners; i++)
-	{
+	for(i = 0; (i < ADAPTER_COUNT) && (tuner < inputTuners); i++) {
 		dvb_instanceReset(&dvbInstances[i], i);
 		currentFrequency[i] = 0;
 		appControlInfo.tunerInfo[tuner].adapter = i;
 
-		if (dvb_checkFrontend(tuner) < 0)
+		if(dvb_checkFrontend(tuner) < 0) {
 			continue;
+		}
 
 		tuner++;
 	}
@@ -3561,8 +3674,7 @@ void dvb_init(void)
 	mysem_create(&dvb_filter_semaphore);
 	mysem_create(&dvb_fe_semaphore);
 
-	if (helperFileExists(appControlInfo.dvbCommonInfo.channelConfigFile))
-	{
+	if(helperFileExists(appControlInfo.dvbCommonInfo.channelConfigFile)){
 		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 		dprintf("%s: loaded %d services\n", __FUNCTION__, dvb_getNumberOfServices());
 	}

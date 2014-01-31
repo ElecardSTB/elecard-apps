@@ -1010,25 +1010,50 @@ int offair_wizardStart(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
+static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, uint32_t frequency)
+{
+	int ok = 0;
+	appControlInfo.dvbtInfo.plp_id = 0;
+	do {
+		if(dvb_frequencyScan(tuner, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
+			ok = 1;
+		}
+		if(ok) {
+			interface_refreshMenu(pMenu);
+			output_showDVBMenu(pMenu, NULL);
+			offair_fillDVBTMenu();
+#ifdef ENABLE_PVR
+			pvr_updateSettings();
+#endif
+		}
+
+		if(ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
+			  appControlInfo.dvbtInfo.plp_id < 3)
+		{
+			appControlInfo.dvbtInfo.plp_id++;
+			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
+		} else {
+			ok = 0;
+		}
+	} while (ok);
+
+	return 0;
+}
+
+
 int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {	
 	tunerFormat tuner;
+	uint32_t low_freq, high_freq, freq_step, frequency;
+	int32_t which = GET_NUMBER(pArg);
+	char buf[256];
 
 	tuner = offair_getTuner();
-	__u32 low_freq, high_freq, freq_step, frequency;
-
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
-	
-	int which = GET_NUMBER(pArg);
-	char buf[256];
-	NIT_table_t nit;
-	
-	for(frequency = low_freq; frequency <= high_freq; frequency += freq_step)
-	{
 
+	for(frequency = low_freq; frequency <= high_freq; frequency += freq_step) {
 		dprintf( "%s: [ %u < %u < %u ]\n", __FUNCTION__, low_freq, frequency, high_freq);
-		if (frequency < low_freq || frequency > high_freq)
-		{
+		if(frequency < low_freq || frequency > high_freq) {
 			eprintf("offair: %u is out of frequency range\n", frequency);
 			interface_showMessageBox(_T("ERR_FREQUENCY_OUT_OF_RANGE"), thumbnail_error, 0);
 			return -1;
@@ -1036,38 +1061,13 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		interface_hideMessageBox();
 		offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-		int ok = 0;
-		do {
-
-			memset(&nit, 0, sizeof(NIT_table_t));
-			ok = 0 == dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay,
-						    appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL);
-			if (ok) {
-				interface_refreshMenu(pMenu);
-				output_showDVBMenu(pMenu, NULL);
-				offair_fillDVBTMenu();
-#ifdef ENABLE_PVR
-				pvr_updateSettings();
-#endif
-			}
-			dvb_clearNIT(&nit);
-
-			if (ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
-			    appControlInfo.dvbtInfo.plp_id < 3)
-			{
-				appControlInfo.dvbtInfo.plp_id++;
-				dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
-			} else
-				ok = 0;
-		} while (ok);
-		appControlInfo.dvbtInfo.plp_id = 0;
+		offair_scanFrequency(pMenu, tuner, frequency);
 		interface_sliderShow(0, 0);
 		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
 		interface_showMessageBox(buf, thumbnail_info, 5000);
 	}
-		return -1;
-	
-	
+	return -1;
+
 	/*tunerFormat tuner;
 
 	tuner = offair_getTuner();
@@ -1171,24 +1171,23 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	int which = GET_NUMBER(pArg);
-	__u32 low_freq = MIN_FREQUENCY_KHZ*KHZ, high_freq = MAX_FREQUENCY_KHZ*KHZ, frequency, freq_step;
 	tunerFormat tuner;
+	int32_t which = GET_NUMBER(pArg);
+	uint32_t low_freq = MIN_FREQUENCY_KHZ*KHZ, high_freq = MAX_FREQUENCY_KHZ*KHZ, frequency, freq_step;
 	char buf[256];
-	NIT_table_t nit;
 	
-	if( value == NULL)
+	if(value == NULL) {
 		return 1;
+	}
 
-	frequency  = strtoul(value,NULL,10)*KHZ;
+	frequency  = strtoul(value, NULL, 10)*KHZ;
 	tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 
 	dprintf( "%s: [ %u < %u < %u ]\n", __FUNCTION__, low_freq, frequency, high_freq);
-	if (frequency < low_freq || frequency > high_freq)
-	{
+	if(frequency < low_freq || frequency > high_freq) {
 		eprintf("offair: %u is out of frequency range\n", frequency);
 		interface_showMessageBox(_T("ERR_FREQUENCY_OUT_OF_RANGE"), thumbnail_error, 0);
 		return -1;
@@ -1196,35 +1195,12 @@ static int offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pA
 	interface_hideMessageBox();
 	offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-	int ok = 0;
-	do {
+	offair_scanFrequency(pMenu, tuner, frequency);
 
-		memset(&nit, 0, sizeof(NIT_table_t));
-		ok = 0 == dvb_frequencyScan( tuner, frequency, NULL, offair_updateDisplay,
-									appControlInfo.dvbCommonInfo.networkScan ? &nit : NULL, 1, NULL);
-		if (ok) {
-			interface_refreshMenu(pMenu);
-			output_showDVBMenu(pMenu, NULL);
-			offair_fillDVBTMenu();
-#ifdef ENABLE_PVR
-			pvr_updateSettings();
-#endif
-		}
-		dvb_clearNIT(&nit);
-
-		if (ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
-		    appControlInfo.dvbtInfo.plp_id < 3)
-		{
-			appControlInfo.dvbtInfo.plp_id++;
-			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
-		} else {
-			ok = 0;
-		}
-	} while (ok);
-	appControlInfo.dvbtInfo.plp_id = 0;
 	interface_sliderShow(0, 0);
 	sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
 	interface_showMessageBox(buf, thumbnail_info, 5000);
+
 	return -1;
 }
 
@@ -2027,13 +2003,11 @@ void offair_startVideo(int which)
 		offair_stopVideo(which, 1);
 		interface_showMessageBox(_T("DVB_SCANNING_SERVICE"), thumbnail_loading, 0);
 		eprintf("offair: Channel '%s' has no PMT info, force rescan on %lu Hz, type %d\n",
-			dvb_getServiceName(service),
-			service->media.frequency,
-			service->media.type);
-		dvb_frequencyScan(appControlInfo.dvbInfo.tuner,
-			 service->media.frequency,
-			&service->media, NULL, NULL, 1, NULL);
-// 		offair_fillDVBTMenu();
+				dvb_getServiceName(service),
+				service->media.frequency,
+				service->media.type);
+		dvb_frequencyScan(appControlInfo.dvbInfo.tuner, service->media.frequency,
+							&service->media, NULL, 1, NULL);
 		offair_updateChannelStatus();
 
 		interface_hideMessageBox();
@@ -2380,7 +2354,6 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 
 	offair_startVideo(screenMain);
-// 	offair_fillDVBTMenu();
 //	offair_updateChannelStatus();
 	saveAppSettings();
 
@@ -3532,7 +3505,7 @@ int32_t offair_updateChannelStatus(void)
 	int hasChannel = 0;
 //	int selectedMenuItem = MENU_ITEM_BACK; 
 	interfaceMenuEntry_t *dvbtEntry = interface_getMenuEntry(dvbtMenu, CHANNEL_STATUS_ID);
-	if (dvbtEntry == NULL) {
+	if(dvbtEntry == NULL) {
 		offair_fillDVBTMenu();
 		return -1;
 	}
@@ -3597,7 +3570,7 @@ int32_t offair_updateChannelStatus(void)
 	return 0;
 }
 
-void offair_fillDVBTMenu()
+void offair_fillDVBTMenu(void)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	interfaceMenu_t *dvbtMenu = _M &DVBTMenu;
@@ -4831,8 +4804,8 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			wizardSettings->frequencyIndex = pMenu->selectedItem;
 
 			wizard_infoTimerEvent(NULL);
-			dvb_frequencyScan( appControlInfo.dvbInfo.tuner, (unsigned long)pMenu->menuEntry[pMenu->selectedItem].pArg, NULL,
-			                   wizard_checkAbort, NULL, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
+			dvb_frequencyScan(appControlInfo.dvbInfo.tuner, (unsigned long)pMenu->menuEntry[pMenu->selectedItem].pArg, NULL,
+								wizard_checkAbort, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
 			wizard_cleanup(-1);
 		} else if (cmd->command == interfaceCommandUp ||
 			cmd->command == interfaceCommandDown)
@@ -4941,7 +4914,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 						minfreq = wizardSettings->frequency[wizardSettings->frequencyIndex];
 						minindex = wizardSettings->frequencyIndex;
 					}
-					if( (res = dvb_frequencyScan( appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, NULL, -2, (dvb_cancelFunctionDef*)wizard_checkAbort)) == 1)
+					if((res = dvb_frequencyScan(appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, -2, (dvb_cancelFunctionDef*)wizard_checkAbort)) == 1)
 					{
 						//dprintf("%s: found smth on %lu\n", __FUNCTION__, wizardSettings->frequency[wizardSettings->frequencyIndex]);
 						minfreq = wizardSettings->frequency[wizardSettings->frequencyIndex];
@@ -4974,7 +4947,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 					interface_displayMenu(1);
 
 					/* Stay in infinite loop until user takes action */
-					res = dvb_frequencyScan( appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, wizard_checkAbort, NULL, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
+					res = dvb_frequencyScan(appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, wizard_checkAbort, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
 
 					//dprintf("%s: done monitoring!\n", __FUNCTION__);
 
@@ -4992,9 +4965,8 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 						{
 							//dprintf("%s: scan %lu\n", __FUNCTION__, wizardSettings->frequency[wizardSettings->frequencyIndex]);
 							interface_displayMenu(1);
-							res = dvb_frequencyScan( appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, NULL, 0, (dvb_cancelFunctionDef*)wizard_checkAbort);
-							if (res == -1)
-							{
+							res = dvb_frequencyScan(appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, 0, (dvb_cancelFunctionDef*)wizard_checkAbort);
+							if(res == -1) {
 								//dprintf("%s: scan abort\n", __FUNCTION__);
 								break;
 							}
@@ -5457,11 +5429,10 @@ static int wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbac
 	interface_showMenu(1, displayMenu);
 	interfaceInfo.lockMenu = 1;
 
-	if (monitor_only_frequency > 0 && monitor_only_frequency != (unsigned long)-1)
-	{
+	if((monitor_only_frequency > 0) && (monitor_only_frequency != (unsigned long)-1)) {
 		wizard_infoTimerEvent(NULL);
-		dvb_frequencyScan( appControlInfo.dvbInfo.tuner,
-			monitor_only_frequency, NULL, wizard_checkAbort, NULL, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
+		dvb_frequencyScan(appControlInfo.dvbInfo.tuner,
+			monitor_only_frequency, NULL, wizard_checkAbort, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
 		wizard_cleanup(-1);
 	}
 
