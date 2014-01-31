@@ -3141,10 +3141,9 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %s", _T("DVB_SHOW_SCRAMBLED"), str);
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
 
-	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
-		sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
-		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
-	}
+	sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
+
 #ifdef STBPNX
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
