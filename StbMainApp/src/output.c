@@ -897,30 +897,40 @@ static int32_t output_inputTypeCallback(interfaceMenu_t *pMenu, pinterfaceComman
 	input.inputSelect1 = cmd->command - interfaceCommand1 + 1;
 	input.inputSelect2 = 0;
 	strcpy(input.inputName, (char*)pArg);
-
+	
+	char menuText[1024];
+	strncpy(menuText, "Choose type of film:\n", sizeof(menuText));
+	strncat(menuText, "\n1. Thriller", sizeof(menuText));
+	strncat(menuText, "\n2. Drama", sizeof(menuText));
+	strncat(menuText, "\n3. Romance", sizeof(menuText));
+	strncat(menuText, "\n4. Comedy", sizeof(menuText));
+	strncat(menuText, "\n5. Sports", sizeof(menuText));
+	strncat(menuText, "\n6. Documentary\n", sizeof(menuText));
+	
 	char text[60];
 	switch(cmd->command) {
-		case interfaceCommand1:
-		case interfaceCommand2:
-		case interfaceCommand5: {
-			strcpy(input.inputType, "VIDEO");
-			interface_showConfirmationBox("Choose type of film:\n"
-						      "\n1. Thriller"
-						      "\n2. Drama"
-						      "\n3. Romance"
-						      "\n4. Comedy"
-						      "\n5. Sports"
-						      "\n6. Documentary\n", thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
+		case interfaceCommand1: {
+			strcpy(input.inputType, "DVD");
+			interface_showConfirmationBox(menuText, thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
 			return 1;
 		}
-		case interfaceCommand3:
-		case interfaceCommand4: {
+		case interfaceCommand2: {
+			strcpy(input.inputType, "VCR");
+			interface_showConfirmationBox(menuText, thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
+			return 1;
+		}
+		case interfaceCommand3: {
 			sprintf(text, "%s %d%d", "GAME", input.inputSelect1, input.inputSelect2);
 			output_runInput(pArg, text);
 			return 0;
 		}
-		case interfaceCommand6: {
-			sprintf(text, "%s %d%d", "ELSE", input.inputSelect1, input.inputSelect2);
+		case interfaceCommand4: {
+			sprintf(text, "%s %d%d", "PC", input.inputSelect1, input.inputSelect2);
+			output_runInput(pArg, text);
+			return 0;
+		}
+		case interfaceCommand5: {
+			sprintf(text, "%s %d%d", "OTHER", input.inputSelect1, input.inputSelect2);
 			output_runInput(pArg, text);
 			return 0;
 		}
@@ -951,11 +961,10 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 	else {
 		interface_showConfirmationBox("Choose using device:\n"
 					      "\n1. DVD"
-					      "\n2. Video"
-					      "\n3. Video game"
-					      "\n4. Game from computer"
-					      "\n5. Film from computer"
-					      "\n6. Other\n", thumbnail_account_active, output_inputTypeCallback, pArg);
+					      "\n2. VCR"
+					      "\n3. Video Game"
+					      "\n4. PC"
+					      "\n5. Other\n", thumbnail_account_active, output_inputTypeCallback, pArg);
 	}
 #endif
 	return 0;
