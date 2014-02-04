@@ -876,7 +876,7 @@ static int32_t output_inputFilmTypeCallback(interfaceMenu_t *pMenu, pinterfaceCo
 		case interfaceCommand3:
 		case interfaceCommand4:
 		case interfaceCommand6: {
-			sprintf(text, "%s %d%d", input->inputType, input->inputSelect1, input->inputSelect2);
+			sprintf(text, "%s:%d%d", input->inputType, input->inputSelect1, input->inputSelect2);
 			output_runInput((void*)input->inputName, text);
 			return 0;
 		}
@@ -920,17 +920,17 @@ static int32_t output_inputTypeCallback(interfaceMenu_t *pMenu, pinterfaceComman
 			return 1;
 		}
 		case interfaceCommand3: {
-			sprintf(text, "%s %d%d", "GAME", input.inputSelect1, input.inputSelect2);
+			sprintf(text, "%s:%d%d", "GAME", input.inputSelect1, input.inputSelect2);
 			output_runInput(pArg, text);
 			return 0;
 		}
 		case interfaceCommand4: {
-			sprintf(text, "%s %d%d", "PC", input.inputSelect1, input.inputSelect2);
+			sprintf(text, "%s:%d%d", "PC", input.inputSelect1, input.inputSelect2);
 			output_runInput(pArg, text);
 			return 0;
 		}
 		case interfaceCommand5: {
-			sprintf(text, "%s %d%d", "OTHER", input.inputSelect1, input.inputSelect2);
+			sprintf(text, "%s:%d%d", "OTHER", input.inputSelect1, input.inputSelect2);
 			output_runInput(pArg, text);
 			return 0;
 		}
