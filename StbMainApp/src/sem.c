@@ -42,30 +42,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
 ********************************************************************************/
-
 int mysem_get(pmysem_t semaphore)
 {
-	if(semaphore == NULL)
-	{
+	if(semaphore == NULL) {
 		eprintf("Error: while trying get semaphore\n");
 		return -1;
 	}
 	int rc;
-	if ( (rc = pthread_mutex_lock(&(semaphore->mutex)))!=0 )
-	{
+	if((rc = pthread_mutex_lock(&(semaphore->mutex))) != 0) {
+		eprintf("%s:%s()[%d]: Error: rc=%d\n", __FILE__, __func__, __LINE__, rc);
 		return rc;
 	}
 
-	while ( semaphore->semCount <= 0 )
-	{
+	while(semaphore->semCount <= 0) {
 		rc = pthread_cond_wait(&(semaphore->condition), &(semaphore->mutex));
-		if ( (rc!=0) && (errno != EINTR) )
+		if((rc != 0) && (errno != EINTR)) {
+			eprintf("%s:%s()[%d]: Error: rc=%d\n", __FILE__, __func__, __LINE__, rc);
 			break;
+		}
 	}
 	semaphore->semCount--;
 
-	if ( (rc = pthread_mutex_unlock(&(semaphore->mutex)))!=0 )
-	{
+	if((rc = pthread_mutex_unlock(&(semaphore->mutex))) != 0) {
+		eprintf("%s:%s()[%d]: Error: rc=%d\n", __FILE__, __func__, __LINE__, rc);
 		return rc;
 	}
 
@@ -76,25 +75,28 @@ int mysem_get(pmysem_t semaphore)
 int mysem_release(pmysem_t semaphore)
 {
 	int rc;
-	if(semaphore == NULL)
-	{
+	if(semaphore == NULL) {
 		eprintf("Error: while trying release semaphore\n");
 		return -1;
 	}
-	if ( (rc = pthread_mutex_lock(&(semaphore->mutex)))!=0 )
-	{
+	if((rc = pthread_mutex_lock(&(semaphore->mutex))) != 0) {
+		eprintf("%s:%s()[%d]: Error: rc=%d\n", __FILE__, __func__, __LINE__, rc);
 		return rc;
 	}
 
-	semaphore->semCount ++;
+	if(semaphore->semCount < 0) {
+		eprintf("Error: semaphore->semCount=%d\n", semaphore->semCount);
+	}
 
-	if ( (rc = pthread_mutex_unlock(&(semaphore->mutex)))!=0 )
-	{
+	semaphore->semCount++;
+
+	if((rc = pthread_cond_signal(&(semaphore->condition))) != 0) {
+		eprintf("%s:%s()[%d]: Error: rc=%d\n", __FILE__, __func__, __LINE__, rc);
 		return rc;
 	}
 
-	if ( (rc = pthread_cond_signal(&(semaphore->condition)))!=0 )
-	{
+	if((rc = pthread_mutex_unlock(&(semaphore->mutex))) != 0) {
+		eprintf("%s:%s()[%d]: Error: rc=%d\n", __FILE__, __func__, __LINE__, rc);
 		return rc;
 	}
 

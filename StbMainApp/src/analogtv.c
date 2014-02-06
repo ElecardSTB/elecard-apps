@@ -72,7 +72,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAX_ANALOG_CHANNELS		128
 
 #define TV_STATION_FULL_LIST	"/tmp/tvchannels.txt"
-#define TV_STATION_FOUND_LIST	"/var/etc/tvchannelsnew.txt"
 
 #define MAX_SERVICE_COUNT 2048
 
@@ -111,12 +110,8 @@ static short_chinfo full_service_list[MAX_SERVICE_COUNT];
 static full_chinfo found_service_list[MAX_SERVICE_COUNT];
 static uint32_t found_service_count = 0;
 static uint32_t full_service_count = 0;
-static int8_t services_edit_able = 0;
-
-analogtv_freq_range_t analogtv_range = {MIN_FREQUENCY_HZ / 1000, MAX_FREQUENCY_HZ / 1000};
-
-analogtv_deliverySystem analogtv_delSys	= TV_SYSTEM_PAL;
-analogtv_audioDemodMode analogtv_audio	= TV_AUDIO_FM2;
+char channel_names_file_full[256];
+int8_t services_edit_able = 0;
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -345,7 +340,19 @@ int32_t analogtv_updateName(uint32_t chanIndex, char* str)
 
 #define RPC_ANALOG_SCAN_TIMEOUT      (180)
 
-static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
+int32_t analogtv_updateFoundServiceFile(void)
+{
+	FILE *file = fopen(channel_names_file_full, "w");
+	if (file!=NULL) {
+		for(int i = 0; i < found_service_count; i++) {
+			fprintf(file ,"%d %d %s\n", found_service_list[i].freq/1000000, found_service_list[i].id, found_service_list[i].name);
+		}
+		fclose(file);
+	}
+	return 0;
+}
+
+static uint32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 {
 	uint32_t i;
 	uint8_t in_list = 0;
@@ -369,7 +376,8 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 	if(in_list) {	//if this channel exist in list
 		found_service_list[i].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
 		strncpy(found_service_list[i].name, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name, sizeof(found_service_list[i].name));
-	} else {		//if this channel not exist in list, then add it to list
+	}
+	else {		//if this channel not exist in list, then add it to list
 		found_service_list[found_service_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
 		strncpy(	found_service_list[found_service_count].name, 
 			full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name,
@@ -379,13 +387,7 @@ static int analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	//save renaming channel list to file
-	FILE *file = fopen(TV_STATION_FOUND_LIST, "w");
-	if (file!=NULL) {
-		for(i = 0; i < found_service_count; i++) {
-			fprintf(file ,"%d %d %s\n", found_service_list[i].id, found_service_list[i].freq, found_service_list[i].name);
-		}
-		fclose(file);
-	}
+	analogtv_updateFoundServiceFile();
 
 	return 0;
 }
@@ -421,15 +423,16 @@ static int32_t analogtv_fillFullServList()
 	return 0;
 }
 
-static int32_t analogtv_fillFoundServList()
+int32_t analogtv_fillFoundServList()
 {
 	FILE *file;
 	//read already renaming channels from file
-	file = fopen(TV_STATION_FOUND_LIST, "r");
+	file = fopen(channel_names_file_full, "r");
 	found_service_count = 0;
 	if (file!=NULL) {
 		while(!feof(file)) {
-		      if(fscanf(file, "%d %d ", &found_service_list[found_service_count].id, &found_service_list[found_service_count].freq) == 0) {
+		      if(fscanf(file, "%d %d ", &found_service_list[found_service_count].freq, &found_service_list[found_service_count].id) == 0) {
+			      found_service_list[found_service_count].freq *= 1000000;
 			      fgets(found_service_list[found_service_count].name, sizeof(found_service_list[found_service_count].name), file);
 			      found_service_list[found_service_count].name[strlen(found_service_list[found_service_count].name)-1] = '\0';
 			      found_service_count++;
@@ -468,6 +471,7 @@ static int32_t analogtv_fillServiceNamesMenu(short_chinfo *list, int32_t list_co
 static int32_t analogtv_confInit()
 {
 	services_edit_able = 0;
+	sprintf(channel_names_file_full, "/tmp/%s.txt", appControlInfo.tvInfo.channelNamesFile);
 
 	return 0;
 }
@@ -555,22 +559,9 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 
 	sprintf(buf, "%s", _T("SCANNING_ANALOG_CHANNELS"));
 	interface_showMessageBox(buf, thumbnail_info, 0);
-
-	if (pArg != NULL){
-		from_freq = ((analogtv_freq_range_t*)pArg)->from_freqKHz * KHZ;
-		to_freq = ((analogtv_freq_range_t*)pArg)->to_freqKHz * KHZ;
-
-		if (from_freq > to_freq){
-			uint32_t tmp = from_freq;
-			from_freq = to_freq;
-			to_freq = tmp;
-		}
-		if (from_freq < MIN_FREQUENCY_HZ) from_freq = MIN_FREQUENCY_HZ;
-		if (to_freq > MAX_FREQUENCY_HZ) to_freq = MAX_FREQUENCY_HZ;
-	} else {
-		from_freq = MIN_FREQUENCY_HZ;
-		to_freq = MAX_FREQUENCY_HZ;
-	}
+	
+	from_freq = appControlInfo.tvInfo.lowFrequency * KHZ;
+	to_freq = appControlInfo.tvInfo.highFrequency * KHZ;
 
 	cJSON *params = cJSON_CreateObject();
 	cJSON *result = NULL;
@@ -589,7 +580,7 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		[TV_SYSTEM_SECAM]	= "secam",
 		[TV_SYSTEM_NTSC]	= "ntsc",
 	};
-	cJSON_AddItemToObject(params, "delsys", cJSON_CreateString(analogtv_delSysName[analogtv_delSys]));
+	cJSON_AddItemToObject(params, "delsys", cJSON_CreateString(analogtv_delSysName[appControlInfo.tvInfo.delSys]));
 
 	char *analogtv_audioName[] = {
 		[TV_AUDIO_SIF]	= "sif",
@@ -597,7 +588,7 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		[TV_AUDIO_FM1]	= "fm1",
 		[TV_AUDIO_FM2]	= "fm2",
 	};
-	cJSON_AddItemToObject(params, "audio", cJSON_CreateString(analogtv_audioName[analogtv_audio]));
+	cJSON_AddItemToObject(params, "audio", cJSON_CreateString(analogtv_audioName[appControlInfo.tvInfo.audioMode]));
 
 	int res = st_rpcSyncTimeout(elcmd_tvscan, params, RPC_ANALOG_SCAN_TIMEOUT, &type, &result );
 	(void)res;

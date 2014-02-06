@@ -133,6 +133,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DVB_MIN_FREQUENCY_STEP          1000
 #define DVB_MAX_FREQUENCY_STEP          8000
 
+#define ATV_MIN_FREQUENCY		43000
+#define ATV_MAX_FREQUENCY		960000
+
 //fake curentmeter functions:
 #define currentmeter_isExist()					0
 #define currentmeter_getCalibrateHighValue()	0
@@ -241,6 +244,14 @@ typedef struct
 	char key[IW_ENCODING_TOKEN_MAX+1];
 	int showAdvanced;
 } outputWifiInfo_t;
+
+typedef struct
+{
+	char inputName[20];
+	char inputType[20];
+	int inputSelect1;
+	int inputSelect2;
+} outputInputMode_t;
 
 #endif
 
@@ -607,6 +618,9 @@ stbTimeZoneDesc_t timezones[] = {
 	{"Etc/GMT-12", "(GMT +12:00) Auckland, Wellington, Fiji, Kamchatka"}
 };
 
+extern int8_t services_edit_able;
+extern char channel_names_file_full[256];
+
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
@@ -818,6 +832,93 @@ static int output_tryNewVideoMode_Event(void* pArg)
 	return 1;
 }
 
+static int32_t output_runInput(void *inputMode, char *inputName)
+{
+	elcdRpcType_t type;
+	cJSON        *res   = NULL;
+	cJSON * param = cJSON_CreateObject();
+	if (param){
+		cJSON_AddItemToObject(param, "input", cJSON_CreateString(inputMode));
+	}
+	st_rpcSync (elcmd_setvinput, param, &type, &res);
+	cJSON_Delete(param);
+	st_isOk(type, res, __FUNCTION__);
+	cJSON_Delete(res);
+	return 1;
+}
+
+static int32_t output_inputFilmTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	dprintf("%s: %d %s\n", __func__, interface_commandName(cmd->command));
+
+	outputInputMode_t *input = (outputInputMode_t *)pArg;
+	input->inputSelect2 = cmd->command - interfaceCommand1 + 1;
+	char text[60];
+
+	switch(cmd->command) {
+		case interfaceCommand1:
+		case interfaceCommand2:
+		case interfaceCommand5:
+		case interfaceCommand3:
+		case interfaceCommand4:
+		case interfaceCommand6: {
+			sprintf(text, "%s %d%d", input->inputType, input->inputSelect1, input->inputSelect2);
+			output_runInput((void*)input->inputName, text);
+			return 0;
+		}
+		case DIKS_HOME:
+		case interfaceCommandExit:
+		case interfaceCommandGreen:
+		case interfaceCommandRed:
+		default:
+			return 0;
+	}
+}
+
+static int32_t output_inputTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	dprintf("%s: %d %s\n", __func__, interface_commandName(cmd->command));
+
+	static outputInputMode_t input;
+	input.inputSelect1 = cmd->command - interfaceCommand1 + 1;
+	input.inputSelect2 = 0;
+	strcpy(input.inputName, (char*)pArg);
+
+	char text[60];
+	switch(cmd->command) {
+		case interfaceCommand1:
+		case interfaceCommand2:
+		case interfaceCommand5: {
+			strcpy(input.inputType, "VIDEO");
+			interface_showConfirmationBox("Choose type of film:\n"
+						      "\n1. Thriller"
+						      "\n2. Drama"
+						      "\n3. Romance"
+						      "\n4. Comedy"
+						      "\n5. Sports"
+						      "\n6. Documentary\n", thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
+			return 1;
+		}
+		case interfaceCommand3:
+		case interfaceCommand4: {
+			sprintf(text, "%s %d%d", "GAME", input.inputSelect1, input.inputSelect2);
+			output_runInput(pArg, text);
+			return 0;
+		}
+		case interfaceCommand6: {
+			sprintf(text, "%s %d%d", "ELSE", input.inputSelect1, input.inputSelect2);
+			output_runInput(pArg, text);
+			return 0;
+		}
+		case DIKS_HOME:
+		case interfaceCommandExit:
+		case interfaceCommandGreen:
+		case interfaceCommandRed:
+		default:
+			return 0;
+	}
+}
+
 int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 {
 	if (!pArg) {
@@ -830,17 +931,18 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg)
 
 	if (strcmp(pArg, INPUT_NONE) == 0){
 		st_rpcSync (elcmd_disablevinput, NULL, &type, &res);
+		st_isOk(type, res, __FUNCTION__);
+		cJSON_Delete(res);
 	}
 	else {
-		cJSON * param = cJSON_CreateObject();
-		if (param){
-			cJSON_AddItemToObject(param, "input", cJSON_CreateString(pArg));
-		}
-		st_rpcSync (elcmd_setvinput, param, &type, &res);
-		cJSON_Delete(param);
+		interface_showConfirmationBox("Choose using device:\n"
+					      "\n1. DVD"
+					      "\n2. Video"
+					      "\n3. Video game"
+					      "\n4. Game from computer"
+					      "\n5. Film from computer"
+					      "\n6. Other\n", thumbnail_account_active, output_inputTypeCallback, pArg);
 	}
-	st_isOk(type, res, __FUNCTION__);
-	cJSON_Delete(res);
 #endif
 	return 0;
 }
@@ -3141,10 +3243,9 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %s", _T("DVB_SHOW_SCRAMBLED"), str);
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbShowScrambled, NULL, thumbnail_configure);
 
-	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
-		sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
-		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
-	}
+	sprintf(buf, "%s: %s", _T("DVB_NETWORK_SEARCH"), _T( appControlInfo.dvbCommonInfo.networkScan ? "ON" : "OFF" ) );
+	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbNetworkSearch, NULL, thumbnail_configure);
+
 #ifdef STBPNX
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
@@ -4430,15 +4531,25 @@ int analogtv_setRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 
 	val = strtoul (value, NULL, 10);
 	if (option == 0) { // low
-		if (val != analogtv_range.from_freqKHz){
-			analogtv_range.from_freqKHz = val;
-			eprintf ("%s: from_freq = %d KHz\n", __FUNCTION__, analogtv_range.from_freqKHz);
+		if (val != appControlInfo.tvInfo.lowFrequency){
+			if (val < ATV_MIN_FREQUENCY) {
+				appControlInfo.tvInfo.lowFrequency = ATV_MIN_FREQUENCY;
+			}
+			else {
+				appControlInfo.tvInfo.lowFrequency = val;
+			}
+			eprintf ("%s: from_freq = %d KHz\n", __FUNCTION__, appControlInfo.tvInfo.lowFrequency);
 		}
 	}
 	else {
-		if (val != analogtv_range.to_freqKHz){
-			analogtv_range.to_freqKHz = val;
-			eprintf ("%s: to_freq = %d KHz\n", __FUNCTION__, analogtv_range.to_freqKHz);
+		if (val != appControlInfo.tvInfo.highFrequency){
+			if (val > ATV_MAX_FREQUENCY) {
+				appControlInfo.tvInfo.highFrequency = ATV_MAX_FREQUENCY;
+			}
+			else {
+				appControlInfo.tvInfo.highFrequency = val;
+			}
+			eprintf ("%s: to_freq = %d KHz\n", __FUNCTION__, appControlInfo.tvInfo.highFrequency);
 		}
 	}
 	interface_displayMenu(1);
@@ -4450,8 +4561,8 @@ static char* analogtv_getRange (int index, void* pArg)
 	if (index == 0){
 		static char buffer[32];
 		int id = GET_NUMBER(pArg);
-		if (id == 0) sprintf(buffer, "%u", analogtv_range.from_freqKHz);
-		else sprintf (buffer, "%u", analogtv_range.to_freqKHz);
+		if (id == 0) sprintf(buffer, "%u", appControlInfo.tvInfo.lowFrequency);
+		else sprintf (buffer, "%u", appControlInfo.tvInfo.highFrequency);
 		return buffer;
 	}
 	return NULL;
@@ -4460,7 +4571,7 @@ static char* analogtv_getRange (int index, void* pArg)
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
 {
 	if (!pArg) return -1;
-	analogtv_range.from_freqKHz = *((uint32_t *)pArg);
+	appControlInfo.tvInfo.lowFrequency = *((uint32_t *)pArg);
 
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_LOW_FREQ"));
@@ -4471,7 +4582,7 @@ int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg)
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg)
 {
 	if (!pArg) return -1;
-	analogtv_range.to_freqKHz = *((uint32_t *)pArg);
+	appControlInfo.tvInfo.highFrequency = *((uint32_t *)pArg);
 
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	sprintf(buf, "%s, kHz: ", _T("ANALOGTV_HIGH_FREQ"));
@@ -4487,12 +4598,12 @@ char *analogtv_delSysName[] = {
 
 static int analogtv_changeAnalogDelSys(interfaceMenu_t *pMenu, void* pArg)
 {
-	analogtv_delSys++;
-	if(analogtv_delSys > TV_SYSTEM_NTSC) {
-		analogtv_delSys = TV_SYSTEM_PAL;
+	appControlInfo.tvInfo.delSys++;
+	if(appControlInfo.tvInfo.delSys > TV_SYSTEM_NTSC) {
+		appControlInfo.tvInfo.delSys = TV_SYSTEM_PAL;
 	}
 
-	return output_saveAndRedraw(0, pMenu);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
 char *analogtv_audioName[] = {
@@ -4504,12 +4615,45 @@ char *analogtv_audioName[] = {
 
 static int analogtv_changeAnalogAudio(interfaceMenu_t *pMenu, void* pArg)
 {
-	analogtv_audio++;
-	if(analogtv_audio > TV_AUDIO_FM2) {
-		analogtv_audio = TV_AUDIO_SIF;
+	appControlInfo.tvInfo.audioMode++;
+	if(appControlInfo.tvInfo.audioMode > TV_AUDIO_FM2) {
+		appControlInfo.tvInfo.audioMode = TV_AUDIO_SIF;
 	}
 
-	return output_saveAndRedraw(0, pMenu);
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static int analogtv_setServiceFileName(interfaceMenu_t *pMenu, char* pStr, void* pArg)
+{
+	(void)pArg;
+	if (pStr == NULL) {
+		return 0;
+	}
+	sprintf(channel_names_file_full, "/tmp/%s.txt", pStr);
+	strncpy(appControlInfo.tvInfo.channelNamesFile, pStr, sizeof(appControlInfo.tvInfo.channelNamesFile));
+	analogtv_updateFoundServiceFile();
+
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
+static int analogtv_changeServiceFileName(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, _T("ANALOGTV_SET_CHANNEL_FILE_NAME"), "\\w+", analogtv_setServiceFileName, NULL, inputModeABC, pArg);
+}
+
+static int analogtv_sendToServer(interfaceMenu_t *pMenu, void* pArg)
+{
+	interface_showMessageBox(_T("ANALOGTV_SENDING_CHFILE"), thumbnail_info, 0);
+	interface_hideMessageBox();
+	return 0;
+}
+
+static int analogtv_downloadFromServer(interfaceMenu_t *pMenu, void* pArg)
+{
+	interface_showMessageBox(_T("ANALOGTV_DOWNLOADING_CHFILE"), thumbnail_info, 0);
+	interface_hideMessageBox();
+
+	return 0;
 }
 
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
@@ -4524,19 +4668,28 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
 
 	str = _T("ANALOGTV_SCAN_RANGE");
-	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, &analogtv_range, thumbnail_scan);
+	interface_addMenuEntry(tvMenu, str, analogtv_serviceScan, NULL, thumbnail_scan);
 	
-	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), analogtv_range.from_freqKHz);
-	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(analogtv_range.from_freqKHz), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_LOW_FREQ"), appControlInfo.tvInfo.lowFrequency);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogLowFreq, &(appControlInfo.tvInfo.lowFrequency), thumbnail_configure);  // SET_NUMBER(optionLowFreq)
 
-	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), analogtv_range.to_freqKHz);
-	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(analogtv_range.to_freqKHz), thumbnail_configure); // SET_NUMBER(optionHighFreq)
+	sprintf(buf, "%s: %u kHz", _T("ANALOGTV_HIGH_FREQ"), appControlInfo.tvInfo.highFrequency);
+	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogHighFreq, &(appControlInfo.tvInfo.highFrequency), thumbnail_configure); // SET_NUMBER(optionHighFreq)
 
-	sprintf(buf, "%s: %s", _T("ANALOGTV_DELSYS"), analogtv_delSysName[analogtv_delSys]);
+	sprintf(buf, "%s: %s", _T("ANALOGTV_DELSYS"), analogtv_delSysName[appControlInfo.tvInfo.delSys]);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogDelSys, NULL, thumbnail_configure); // SET_NUMBER(optionHighFreq
 
-	sprintf(buf, "%s: %s", _T("ANALOGTV_AUDIO_MODE"), analogtv_audioName[analogtv_audio]);
+	sprintf(buf, "%s: %s", _T("ANALOGTV_AUDIO_MODE"), analogtv_audioName[appControlInfo.tvInfo.audioMode]);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogAudio, NULL, thumbnail_configure);
+	if (services_edit_able)
+	{
+		sprintf(buf, "%s: %s", _T("ANALOGTV_SET_CHANNEL_FILE_NAME"), appControlInfo.tvInfo.channelNamesFile);
+		interface_addMenuEntry(tvMenu,buf , analogtv_changeServiceFileName, NULL, thumbnail_configure);
+		
+		interface_addMenuEntry(tvMenu, _T("ANALOGTV_DOWNLOAD_CHFILE"), analogtv_downloadFromServer, NULL, thumbnail_configure);
+		
+		interface_addMenuEntry(tvMenu, _T("ANALOGTV_SEND_CHFILE"), analogtv_sendToServer, NULL, thumbnail_configure);//garb_sendToServer
+	}
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);

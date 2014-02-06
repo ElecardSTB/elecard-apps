@@ -540,11 +540,13 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 			break;
 		}
 		case DVBS: {
-			int vertical = media ? media->dvb_s.polarization == 1 : appControlInfo.dvbsInfo.polarization != 0;
-			cJSON_AddItemToObject(params, "symbolrate",
-				cJSON_CreateNumber( media ? media->dvb_s.symbol_rate/1000 : appControlInfo.dvbsInfo.symbolRate ));
-			if (vertical)
+			int32_t vertical = media ? media->dvb_s.polarization == 1 : appControlInfo.dvbsInfo.polarization != 0;
+			uint32_t symbolRate = media ? media->dvb_s.symbol_rate / 1000 : appControlInfo.dvbsInfo.symbolRate;
+
+			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber(symbolRate));
+			if(vertical) {
 				cJSON_AddItemToObject(params, "vertical", cJSON_CreateTrue());
+			}
 			break;
 		}
 		case ATSC: {

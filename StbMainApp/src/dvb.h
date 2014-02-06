@@ -266,18 +266,16 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction);
  *   @param[in]  frequency         Frequency to scan
  *   @param[in]  media             Tune settings
  *   @param[in]  pFunction         Callback function to display progress and check for user cancel
- *   @param[in]  scan_network      NIT table to scan
  *   @param[in]  save_service_list Allow saving channel list to permanent storage
  *   @param[in]  pCancelFunction   Function used to cancel scanning during frequency check
  *
  *   @return 0 on success
  */
-int dvb_frequencyScan( tunerFormat tuner, __u32 frequency,
-                       EIT_media_config_t *media, 
-                       dvb_displayFunctionDef* pFunction,
-                       NIT_table_t *scan_network,
-                       int save_service_list,
-                       dvb_cancelFunctionDef* pCancelFunction);
+int dvb_frequencyScan(	tunerFormat tuner, __u32 frequency,
+						EIT_media_config_t *media, 
+						dvb_displayFunctionDef* pFunction,
+						int save_service_list,
+						dvb_cancelFunctionDef* pCancelFunction);
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
