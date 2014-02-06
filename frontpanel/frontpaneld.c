@@ -138,6 +138,7 @@ static int ArgHandler_Pulse(char *input, char *output);
 static int ArgHandler_Brightness(char *input, char *output);
 static int ArgHandler_OledBrightness(char *input, char *output);
 static int ArgHandler_Test(char *input, char *output);
+void Terminate(void);
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -207,12 +208,6 @@ void FrameBufferClose(void)
 		close(g_fbInfo.fd);
 		g_fbInfo.fd = (uint32_t)(-1);
 	}
-}
-
-void Terminate(void)
-{
-	FrameBufferClose();
-	
 }
 
 void UpdateDisplay(void)
@@ -961,6 +956,11 @@ int MainLoop()
 	return 1;
 }
 
+void Terminate(void)
+{
+	FrameBufferClose();
+	
+}
 
 int main(int argc, char **argv)
 {
