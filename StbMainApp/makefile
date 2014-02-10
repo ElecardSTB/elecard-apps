@@ -65,6 +65,7 @@ ENABLE_DLNA ?= 1
 ENABLE_HDDESIGN ?= 0
 ENABLE_USE_CJSON := 1
 ENABLE_ANALOGTV := 1
+ENABLE_USE_LIBDVBAPI := 1
 
 ROOTFSNFS_DIR := $(ROOTFS)_nfs
 else # $(ARCH) != sh4
@@ -114,6 +115,7 @@ ENABLE_GSTREAMER ?= 0
 ENABLE_USE_CJSON ?= 0
 ENABLE_TELETEXT ?= 0
 ENABLE_ANALOGTV ?= 0
+ENABLE_USE_LIBDVBAPI ?= 0
 
 TEST_SERVER ?= 1
 
@@ -376,6 +378,10 @@ endif
 
 ifeq ($(ENABLE_ANALOGTV),1)
 	LOCAL_CFLAGS += -DENABLE_ANALOGTV
+endif
+
+ifeq ($(ENABLE_USE_LIBDVBAPI),1)
+	LOCAL_LDFLAGS += -ldvbapi -lucsi
 endif
 
 # -----------------------------------------------------------------------------

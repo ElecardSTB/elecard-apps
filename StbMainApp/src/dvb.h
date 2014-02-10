@@ -57,8 +57,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sdp.h>
 #include <service.h>
 
-#include <linux/dvb/version.h>
-
 #ifdef ENABLE_DVB
 
 /***********************************************

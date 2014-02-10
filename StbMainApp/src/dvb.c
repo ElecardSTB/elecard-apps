@@ -68,6 +68,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 
+#include <libucsi/atsc/section.h>
+#include <libucsi/atsc/descriptor.h>
+
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
@@ -672,6 +675,190 @@ static void set_bit (unsigned char *bitfield, int bit)
 	bitfield[bit/8] |= 1 << (bit % 8);
 }
 
+static char *atsc_getText(struct atsc_text *atext, int len)
+{
+	struct atsc_text_string *cur_string;
+	struct atsc_text_string_segment *cur_segment;
+	int str_idx;
+	int seg_idx;
+	char *str = NULL;
+
+	if(len == 0) {
+		return NULL;
+	}
+
+	atsc_text_strings_for_each(atext, cur_string, str_idx) {
+		atsc_text_string_segments_for_each(cur_string, cur_segment, seg_idx) {
+			if(cur_segment->compression_type < 0x3e) {
+				uint8_t *decoded = NULL;
+				size_t decodedlen = 0;
+				size_t decodedpos = 0;
+
+				if(atsc_text_segment_decode(cur_segment, &decoded, &decodedlen, &decodedpos) < 0) {
+					printf("\t\t" "%s()[%d]: Decode error\n", __func__, __LINE__);
+				} else {
+					if(str) {
+						printf("%s()[%d]: Unused str=%s, str_idx=%d, seg_idx=%d\n", __func__, __LINE__, str, str_idx, seg_idx);
+						free(str);
+					}
+					str = strndup((char *)decoded, decodedpos);
+					printf("%s()[%d]: *** str=%s, strlen(str)=%d\n", __func__, __LINE__, str, strlen(str));
+				}
+				if(decoded) {
+					free(decoded);
+				}
+			}
+		}
+	}
+	return str;
+}
+
+static int32_t parse_descriptor(EIT_service_t *service, struct descriptor *d)
+{
+	switch(d->tag) {
+	case dtag_atsc_extended_channel_name:
+	{
+		struct atsc_extended_channel_name_descriptor *dx;
+		char *service_name = NULL;
+
+//		printf("\t\t" "%s()[%d]: DSC Decode atsc_extended_channel_name_descriptor\n", __func__, __LINE__);
+		dx = atsc_extended_channel_name_descriptor_codec(d);
+		if(dx == NULL) {
+			fprintf(stderr, "%s()[%d]: DSC XXXX atsc_extended_channel_name_descriptor decode error\n", __func__, __LINE__);
+			return -1;
+		}
+
+		service_name = atsc_getText(atsc_extended_channel_name_descriptor_text(dx), atsc_extended_channel_name_descriptor_text_length(dx));
+		if(service_name) {
+			if(service) {
+//				printf("%s()[%d]: *** service_name=%s, sizeof(service->service_descriptor.service_name)=%d\n",
+//							__func__, __LINE__, service_name, sizeof(service->service_descriptor.service_name));
+//				strcpy_iso((char *)service->service_descriptor.service_name, (char *)service_name);
+				strncpy((char *)service->service_descriptor.service_name, service_name, sizeof(service->service_descriptor.service_name));
+			}
+			free(service_name);
+		}
+		break;
+	}
+	default:
+		printf("\t\t" "%s()[%d]: *** d->tag=%d\n", __func__, __LINE__, d->tag);
+		break;
+	}
+	return 0;
+}
+
+static int32_t convert_UTF16_UTF8(uint16_t *src, uint8_t *dst, uint32_t src_len, uint32_t dst_len)
+{
+	int32_t i;
+	uint8_t *src_u8 = (uint8_t *)src;
+	//TODO: Add common UTF16->UTF8 converter
+	for(i = 0; i < 7; i++) {
+		dst[i] = src_u8[i * 2 + 1];
+	}
+	dst[7] = 0;
+	return 0;
+}
+
+static int32_t parse_atsc_section(list_element_t **head, uint32_t media_id, uint8_t *buf, int len, int pid)
+{
+	struct section_ext *section_ext = NULL;
+	struct atsc_section_psip *section_psip = NULL;
+	struct section *section = NULL;
+
+	if((section = section_codec(buf, len)) == NULL) {
+		return -1;
+	}
+	if((section_ext = section_ext_decode(section, 1)) == NULL) {
+		return -2;
+	}
+	if((section_psip = atsc_section_psip_decode(section_ext)) == NULL) {
+		return -3;
+	}
+	switch(section->table_id) {
+
+	case stag_atsc_terrestrial_virtual_channel:
+	{
+		struct atsc_tvct_section *tvct;
+		struct atsc_tvct_channel *cur_channel;
+		struct atsc_tvct_section_part2 *part2;
+		struct descriptor *curd;
+		int idx;
+		list_element_t *service_element = NULL;
+		EIT_service_t *service = NULL;
+
+		printf("SCT Decode TVCT (pid:0x%04x) (table:0x%02x)\n", pid, section->table_id);
+		if((tvct = atsc_tvct_section_codec(section_psip)) == NULL) {
+			fprintf(stderr, "SCT XXXX TVCT section decode error\n");
+			return -4;
+		}
+
+		atsc_tvct_section_channels_for_each(tvct, cur_channel, idx) {
+			service_element = find_or_allocate_service(head, cur_channel->program_number, cur_channel->channel_TSID, media_id, 1);
+			service = service_element ? (EIT_service_t *)service_element->data : NULL;
+
+//			printf("%s()[%d]: *** service=%p\n", __func__, __LINE__, service);
+			atsc_tvct_channel_descriptors_for_each(cur_channel, curd) {
+				parse_descriptor(service, curd);
+			}
+
+			if(service && (service->service_descriptor.service_name[0] == 0)) {
+				convert_UTF16_UTF8(cur_channel->short_name, service->service_descriptor.service_name, 7, sizeof(service->service_descriptor.service_name));
+			}
+		}
+
+		part2 = atsc_tvct_section_part2(tvct);
+		atsc_tvct_section_part2_descriptors_for_each(part2, curd) {
+//			parse_descriptor(service, curd);
+		}
+		break;
+	}
+
+	case stag_atsc_cable_virtual_channel:
+	{
+		struct atsc_cvct_section *cvct;
+		struct atsc_cvct_channel *cur_channel;
+		struct atsc_cvct_section_part2 *part2;
+		struct descriptor *curd;
+		int idx;
+		list_element_t *service_element = NULL;
+		EIT_service_t *service = NULL;
+
+		printf("SCT Decode CVCT (pid:0x%04x) (table:0x%02x)\n", pid, section->table_id);
+		if ((cvct = atsc_cvct_section_codec(section_psip)) == NULL) {
+			fprintf(stderr, "SCT XXXX CVCT section decode error\n");
+			return -4;
+		}
+
+		atsc_cvct_section_channels_for_each(cvct, cur_channel, idx) {
+			service_element = find_or_allocate_service(head, cur_channel->program_number, cur_channel->channel_TSID, media_id, 1);
+			service = service_element ? (EIT_service_t *)service_element->data : NULL;
+
+//			printf("%s()[%d]: *** service=%p\n", __func__, __LINE__, service);
+			atsc_cvct_channel_descriptors_for_each(cur_channel, curd) {
+				parse_descriptor(service, curd);
+			}
+
+			if(service && (service->service_descriptor.service_name[0] == 0)) {
+				convert_UTF16_UTF8(cur_channel->short_name, service->service_descriptor.service_name, 7, sizeof(service->service_descriptor.service_name));
+			}
+		}
+
+		part2 = atsc_cvct_section_part2(cvct);
+		atsc_cvct_section_part2_descriptors_for_each(part2, curd) {
+//			parse_descriptor(service, curd);
+		}
+		break;
+	}
+
+	default:
+		printf("\t\t" "%s()[%d]: *** section->table_id=%d\n", __func__, __LINE__, section->table_id);
+		break;
+	}
+
+	return 0;
+}
+
+
 /**
  *   returns 0 when more sections are expected
  *	   1 when all sections are read on this pid
@@ -698,8 +885,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 		services = &dvb_services;
 	}
 
-	switch(dvb_getType(appControlInfo.dvbInfo.tuner))
-	{
+	switch(dvb_getType(s->tuner)) {
 		case DVBT:
 			media.type = serviceMediaDVBT;
 			media.dvb_t.centre_frequency = frequency;
@@ -738,8 +924,9 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 
 	table_id = s->buf[0];
 
-	if (s->table_id >= 0 && table_id != s->table_id)
+	if((s->table_id >= 0) && (table_id != s->table_id)) {
 		return -1;
+	}
 
 	//unsigned int section_length = (((buf[1] & 0x0f) << 8) | buf[2]) - 11;
 	table_id_ext = (s->buf[3] << 8) | s->buf[4];
@@ -747,12 +934,11 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 	section_number = s->buf[6];
 	last_section_number = s->buf[7];
 
-	if (s->section_version_number != section_version_number ||
+	if(s->section_version_number != section_version_number ||
 			s->table_id_ext != table_id_ext) {
 		struct section_buf *next_seg = s->next_seg;
 
-		if (s->section_version_number != -1 && s->table_id_ext != -1)
-		{
+		if((s->section_version_number != -1) && (s->table_id_ext != -1)) {
 			verbose("%s: section version_number or table_id_ext changed "
 				"%d -> %d / %04x -> %04x\n", __FUNCTION__,
 				s->section_version_number, section_version_number,
@@ -765,153 +951,152 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 		s->next_seg = next_seg;
 	}
 
-	if (!get_bit(s->section_done, section_number))
-	{
+	if(!get_bit(s->section_done, section_number)) {
 		set_bit (s->section_done, section_number);
 
 		verbose("%s: pid 0x%02x tid 0x%02x table_id_ext 0x%04x, "
-		    "%i/%i (version %i)\n", __FUNCTION__,
-		    s->pid, table_id, table_id_ext, section_number,
-		    last_section_number, section_version_number);
+				"%i/%i (version %i)\n", __FUNCTION__,
+				s->pid, table_id, table_id_ext, section_number,
+				last_section_number, section_version_number);
 
 		switch (table_id) {
-		case 0x00:
-			verbose("%s: PAT\n", __FUNCTION__);
-			mysem_get(dvb_semaphore);
-			updated = parse_pat(services, (unsigned char *)s->buf, MEDIA_ID, &media);
-			cur = *services;
-			while ( cur != NULL)
-			{
-				service = (EIT_service_t*)cur->data;
-				if( (service->flags & serviceFlagHasPAT) &&
-				     service->media.frequency == (unsigned long)frequency )
-				{
-					pmt_filter = dmalloc(sizeof(struct section_buf));
-					if( pmt_filter != NULL )
+			case 0x00:
+				verbose("%s: PAT\n", __FUNCTION__);
+				mysem_get(dvb_semaphore);
+				updated = parse_pat(services, (unsigned char *)s->buf, MEDIA_ID, &media);
+				cur = *services;
+				while(cur != NULL) {
+					service = (EIT_service_t*)cur->data;
+					if( (service->flags & serviceFlagHasPAT) &&
+						service->media.frequency == (unsigned long)frequency )
 					{
-						dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d\n", __FUNCTION__,
+						pmt_filter = dmalloc(sizeof(struct section_buf));
+						if(pmt_filter != NULL) {
+							dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d\n", __FUNCTION__,
+									service->common.transport_stream_id,
+									service->program_map.program_map_PID,
+									service->common.service_id,
+									service->common.media_id);
+							dvb_filterSetup(pmt_filter, s->tuner, service->program_map.program_map_PID, 0x02, 2, services);
+							pmt_filter->transport_stream_id = service->common.transport_stream_id;
+							pmt_filter->is_dynamic = 1;
+							pmt_filter->running_counter = s->running_counter;
+							dvb_filterAdd(pmt_filter);
+						}
+					}
+					cur = cur->next;
+				}
+				mysem_release(dvb_semaphore);
+				break;
+
+			case 0x02:
+				dprintf("%s: got pmt filter ts %d, pid %d for service 0x%04x\n", __FUNCTION__, s->transport_stream_id, s->pid, table_id_ext);
+				mysem_get(dvb_semaphore);
+				cur = *services;
+				while(cur != NULL) {
+					service = ((EIT_service_t*)cur->data);
+					dprintf("%s: Check pmt for: pid %d/%d, media %lu/%lu, tsid %d/%d, freqs %lu/%lu, sid %d\n", __FUNCTION__,
+							service->program_map.program_map_PID, s->pid, service->common.media_id, MEDIA_ID,
+							service->common.transport_stream_id, s->transport_stream_id, service->media.frequency,
+							(unsigned long)frequency, service->common.service_id);
+					if (service->program_map.program_map_PID == s->pid &&
+						service->common.media_id == MEDIA_ID &&
+						service->common.transport_stream_id == s->transport_stream_id &&
+						service->media.frequency == (unsigned long)frequency )
+					{
+						dprintf("%s: parse pmt filter ts %d, pid %d, service %d, media %d\n", __FUNCTION__,
 								service->common.transport_stream_id,
 								service->program_map.program_map_PID,
 								service->common.service_id,
 								service->common.media_id);
-						dvb_filterSetup(pmt_filter, s->tuner, service->program_map.program_map_PID, 0x02, 2, services);
-						pmt_filter->transport_stream_id = service->common.transport_stream_id;
-						pmt_filter->is_dynamic = 1;
-						pmt_filter->running_counter = s->running_counter;
-						dvb_filterAdd(pmt_filter);
+						updated = parse_pmt(services, (unsigned char *)s->buf,
+											service->common.transport_stream_id, MEDIA_ID, &media);
 					}
+					cur = cur->next;
 				}
-				cur = cur->next;
-			}
-			mysem_release(dvb_semaphore);
-			break;
-
-		case 0x02:
-			dprintf("%s: got pmt filter ts %d, pid %d for service 0x%04x\n", __FUNCTION__, s->transport_stream_id, s->pid, table_id_ext);
-			mysem_get(dvb_semaphore);
-			cur = *services;
-			while (cur != NULL)
-			{
-				service = ((EIT_service_t*)cur->data);
-				dprintf("%s: Check pmt for: pid %d/%d, media %lu/%lu, tsid %d/%d, freqs %lu/%lu, sid %d\n", __FUNCTION__,
-				        service->program_map.program_map_PID, s->pid, service->common.media_id, MEDIA_ID,
-				        service->common.transport_stream_id, s->transport_stream_id, service->media.frequency,
-				        (unsigned long)frequency, service->common.service_id);
-				if (service->program_map.program_map_PID == s->pid &&
-				    service->common.media_id == MEDIA_ID &&
-				    service->common.transport_stream_id == s->transport_stream_id &&
-				    service->media.frequency == (unsigned long)frequency )
-				{
-					dprintf("%s: parse pmt filter ts %d, pid %d, service %d, media %d\n", __FUNCTION__,
-					        service->common.transport_stream_id,
-					        service->program_map.program_map_PID,
-					        service->common.service_id,
-					        service->common.media_id);
-					updated = parse_pmt(services, (unsigned char *)s->buf,
-					                    service->common.transport_stream_id, MEDIA_ID, &media);
-				}
-				cur = cur->next;
-			}
-			mysem_release(dvb_semaphore);
-			break;
-
-    case 0x40:
-			verbose("%s: NIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
-			if(appControlInfo.dvbCommonInfo.networkScan) {
-				mysem_get(dvb_semaphore);
-				updated = parse_nit(services, (unsigned char *)s->buf, MEDIA_ID, &media, &dvb_scan_network);
 				mysem_release(dvb_semaphore);
-			}
-			break;
+				break;
 
-    case 0x42:
-    case 0x46:
-			verbose("%s: SDT (%s TS)\n", __FUNCTION__, table_id == 0x42 ? "actual":"other");
-			mysem_get(dvb_semaphore);
-			//parse_sdt(services, (unsigned char *)s->buf, MEDIA_ID, &media);
-			updated = parse_sdt_with_nit(services, (unsigned char *)s->buf, MEDIA_ID, &media, NULL);
-			mysem_release(dvb_semaphore);
-			break;
-		case 0x4E:
-		case 0x50:
-		case 0x51:
-		case 0x52:
-		case 0x53:
-		case 0x54:
-		case 0x55:
-		case 0x56:
-		case 0x57:
-		case 0x58:
-		case 0x59:
-		case 0x5A:
-		case 0x5B:
-		case 0x5C:
-		case 0x5D:
-		case 0x5E:
-		case 0x5F:
+			case 0x40:
+				verbose("%s: NIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
+				if(appControlInfo.dvbCommonInfo.networkScan) {
+					mysem_get(dvb_semaphore);
+					updated = parse_nit(services, (unsigned char *)s->buf, MEDIA_ID, &media, &dvb_scan_network);
+					mysem_release(dvb_semaphore);
+				}
+				break;
+
+			case 0x42:
+			case 0x46:
+				verbose("%s: SDT (%s TS)\n", __FUNCTION__, table_id == 0x42 ? "actual":"other");
+				mysem_get(dvb_semaphore);
+				//parse_sdt(services, (unsigned char *)s->buf, MEDIA_ID, &media);
+				updated = parse_sdt_with_nit(services, (unsigned char *)s->buf, MEDIA_ID, &media, NULL);
+				mysem_release(dvb_semaphore);
+				break;
+			case 0x4E:
+			case 0x50:
+			case 0x51:
+			case 0x52:
+			case 0x53:
+			case 0x54:
+			case 0x55:
+			case 0x56:
+			case 0x57:
+			case 0x58:
+			case 0x59:
+			case 0x5A:
+			case 0x5B:
+			case 0x5C:
+			case 0x5D:
+			case 0x5E:
+			case 0x5F:
 				verbose("%s: EIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
 				mysem_get(dvb_semaphore);
 				updated = parse_eit(services, (unsigned char *)s->buf, MEDIA_ID, &media);
-				if (updated)
-				{
+				if(updated) {
 					s->timeout = 5;
 				}
 				mysem_release(dvb_semaphore);
 				can_count_sections = 0;
 				break;
-		default:
-			dprintf("%s: Unknown 0x%04x for service 0x%04x", __FUNCTION__, s->pid, table_id_ext);
+			case stag_atsc_terrestrial_virtual_channel:
+			case stag_atsc_cable_virtual_channel:
+				mysem_get(dvb_semaphore);
+				parse_atsc_section(services, MEDIA_ID, s->buf, ((s->buf[1] & 0x0f) << 8) | s->buf[2], s->pid);
+				mysem_release(dvb_semaphore);
+			default:
+				dprintf("%s: Unknown 0x%04x for service 0x%04x", __FUNCTION__, s->pid, table_id_ext);
 		};
 
 		// FIXME: This is the only quick solution I see now, because each service in EIT has its own last_section_number
 		// we need to count services and track each of them...
-
-		if (can_count_sections)
-		{
+		if(can_count_sections) {
 			int i;
 
-			for (i = 0; i <= last_section_number; i++)
-				if (get_bit (s->section_done, i) == 0)
+			for(i = 0; i <= last_section_number; i++) {
+				if(get_bit (s->section_done, i) == 0) {
 					break;
+				}
+			}
 
-			if (i > last_section_number)
-			{
+			if(i > last_section_number) {
 				dprintf("%s: Finished pid 0x%04x for table 0x%04x\n", __FUNCTION__, s->pid, s->table_id);
 				s->sectionfilter_done = 1;
 			}
 		}
 	}
 
-	if (updated)
-	{
+	if(updated) {
 		s->was_updated = 1;
 	}
 
 	dprintf("%s: parsed media %d,  0x%04X table 0x%02X, updated %d, done %d\n", __FUNCTION__,
-	        MEDIA_ID, s->pid, table_id, updated, s->sectionfilter_done);
+			MEDIA_ID, s->pid, table_id, updated, s->sectionfilter_done);
 
-	if (s->sectionfilter_done)
+	if(s->sectionfilter_done) {
 		return 1;
+	}
 
 	return 0;
 }
@@ -1022,6 +1207,8 @@ static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enab
 {
 	struct section_buf pat_filter;
 	struct section_buf sdt_filter;
+	struct section_buf tvct_filter;
+	struct section_buf cvct_filter;
 	//struct section_buf sdt1_filter;
 	struct section_buf eit_filter;
 	struct section_buf nit_filter;
@@ -1031,14 +1218,22 @@ static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enab
 	 *  filter timeouts > min repetition rates specified in ETR211
 	 */
 	dvb_filterSetup(&pat_filter, tuner, 0x00, 0x00, 5, &dvb_services); /* PAT */
-	dvb_filterSetup(&sdt_filter, tuner, 0x11, 0x42, 5, &dvb_services); /* SDT actual */
 	//dvb_filterSetup(&sdt1_filter, tuner, 0x11, 0x46, 5, &dvb_services); /* SDT other */
 	dvb_filterSetup(&eit_filter, tuner, 0x12,   -1, 5, &dvb_services); /* EIT */
 
 	dvb_filterAdd(&pat_filter);
-	dvb_filterAdd(&sdt_filter);
 	//dvb_filterAdd(&sdt1_filter);
-//	dvb_filterAdd(&eit_filter);
+	dvb_filterAdd(&eit_filter);
+
+	if(dvb_getType(tuner) == ATSC) {
+		dvb_filterSetup(&tvct_filter, tuner, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, &dvb_services); //Terrestrial Virtual Channel Table (TVCT)
+		dvb_filterAdd(&tvct_filter);
+		dvb_filterSetup(&cvct_filter, tuner, 0x1ffb, stag_atsc_cable_virtual_channel, 5, &dvb_services); //Cable Virtual Channel Table (CVCT)
+		dvb_filterAdd(&cvct_filter);
+	} else {
+		dvb_filterSetup(&sdt_filter, tuner, 0x11, 0x42, 5, &dvb_services); /* SDT actual */
+		dvb_filterAdd(&sdt_filter);
+	}
 
 	if(enableNit) {
 		dvb_clearNIT(&dvb_scan_network);
@@ -1715,7 +1910,7 @@ int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, _
 				*freq_step = (appControlInfo.dvbsInfo.k_band.frequencyStep * KHZ);
 			}
 			break;
-		case FE_ATSC:
+		case ATSC:
 			*low_freq  = (appControlInfo.atscInfo.fe.lowFrequency * KHZ);
 			*high_freq = (appControlInfo.atscInfo.fe.highFrequency * KHZ);
 			*freq_step = (appControlInfo.atscInfo.fe.frequencyStep * KHZ);
@@ -2043,7 +2238,7 @@ static int32_t dvb_isFrequencyesEqual(tunerFormat tuner, uint32_t freq1, uint32_
 	switch(dvb_getType(tuner)) {
 		case DVBT:
 		case DVBC:
-		case FE_ATSC:
+		case ATSC:
 			range = 500000;//0,5MHz
 			break;
 		case DVBS:
