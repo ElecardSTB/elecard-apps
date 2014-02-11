@@ -709,7 +709,7 @@ void clean_list(rutube_asset_t *asset)
 static void rutube_freeAssets()
 {
 	rutube_asset_t *tmp;
-	eprintf("%s: start function...\n", __FUNCTION__);
+	dprintf("%s: start function...\n", __FUNCTION__);
 /* the first element of RutubeCategories menu is search */
 	for(int i = 1; i < RutubeCategories.baseMenu.menuEntryCount; i++)
 	{
@@ -722,7 +722,7 @@ static void rutube_freeAssets()
 	for(int i = 1; i < RutubeSubCategories.baseMenu.menuEntryCount; i++)
 		FREE(RutubeSubCategories.baseMenu.menuEntry[i].image);
 
-	eprintf("%s: done\n", __FUNCTION__);
+	dprintf("%s: done\n", __FUNCTION__);
 }
 
 void rutube_cleanupMenu()
