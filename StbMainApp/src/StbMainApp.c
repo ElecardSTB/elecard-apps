@@ -149,8 +149,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
-
+#ifndef STSDK
 static int helper_confirmFirmwareUpdate(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
+#endif
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -2651,6 +2652,7 @@ int helperCheckUpdates()
 	return WIFEXITED(ret) == 1 && WEXITSTATUS(ret) == 1;
 }
 
+#ifndef STSDK
 static int helper_confirmFirmwareUpdate(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	if(cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft) {
@@ -2662,6 +2664,7 @@ static int helper_confirmFirmwareUpdate(interfaceMenu_t *pMenu, pinterfaceComman
 	}
 	return 1;
 }
+#endif
 
 inline time_t gmktime(struct tm *t)
 {

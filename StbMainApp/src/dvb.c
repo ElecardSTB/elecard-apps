@@ -240,6 +240,31 @@ struct section_buf {
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
+table_IntStr_t fe_typeName[] = {
+	{serviceMediaDVBT,	"DVB-T"},
+	{serviceMediaDVBC,	"DVB-C"},
+	{serviceMediaDVBS,	"DVB-S"},
+	{serviceMediaATSC,	"ATSC"},
+	{-1,				TABLE_STR_END_VALUE},
+};
+
+table_IntStr_t fe_modulationName[] = {
+	{QPSK,		"QPSK"},
+	{QAM_16,	"QAM_16"},
+	{QAM_32,	"QAM_32"},
+	{QAM_64,	"QAM_64"},
+	{QAM_128,	"QAM_128"},
+	{QAM_256,	"QAM_256"},
+	{QAM_AUTO,	"QAM_AUTO"},
+	{VSB_8,		"VSB_8"},
+	{VSB_16,	"VSB_16"},
+	{PSK_8,		"PSK_8"},
+	{APSK_16,	"APSK_16"},
+	{APSK_32,	"APSK_32"},
+	{DQPSK,		"DQPSK"},
+	{QAM_4_NR,	"QAM_4_NR"},
+	{-1,		TABLE_STR_END_VALUE},
+};
 
 list_element_t *dvb_services = NULL;
 
@@ -3527,30 +3552,54 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 {
 	list_element_t *stream_element;
 	PID_info_t* stream;
-	int type;
-	if( service == NULL )
-	{
+	int32_t	type;
+	const char	*typeName;
+	const char	*modName;
+
+	if(service == NULL) {
 		dprintf("%s: service is NULL\n", __FUNCTION__);
 		buf[0] = 0;
 		return -1;
 	}
 	mysem_get(dvb_semaphore);
-	sprintf(buf,"%s\n%s: %s\n",
+	sprintf(buf, "\"%s\"\n%s: %s\n",
 		service->service_descriptor.service_name,
 		_T("DVB_PROVIDER"), service->service_descriptor.service_provider_name);
 	buf += strlen(buf);
 
-	switch(service->media.type)
-	{
+	typeName = table_IntStrLookup(fe_typeName, service->media.type, NULL);
+	if(typeName) {
+		sprintf(buf, "%s:\n", typeName);
+		buf += strlen(buf);
+	}
+	sprintf(buf,"  %s: %u MHz\n", _T("DVB_FREQUENCY"),
+			(service->media.type == serviceMediaDVBS) ? service->media.frequency / 1000 : service->media.frequency / 1000000);
+	buf += strlen(buf);
+
+	switch(service->media.type) {
 		case serviceMediaDVBT:
-			sprintf(buf,"DVB-T\n %s: %u\n",
-			_T("DVB_FREQUENCY"), service->media.dvb_t.centre_frequency);
-			buf += strlen(buf);
+			//TODO: show plp id for dvb-t2
 			break;
 		case serviceMediaDVBC:
-			sprintf(buf,"DVB-C\n %s: %u\n",
-			_T("DVB_FREQUENCY"), service->media.dvb_c.frequency);
+			sprintf(buf,"  %s: %u KBd\n", _T("DVB_SYMBOL_RATE"), service->media.dvb_c.symbol_rate / 1000);
+			modName = table_IntStrLookup(fe_modulationName, service->media.dvb_c.modulation, NULL);
+			if(modName) {
+				sprintf(buf, "  %s: %s\n", _T("DVB_MODULATION"), modName);
+				buf += strlen(buf);
+			}
+			break;
+		case serviceMediaDVBS:
+			sprintf(buf,"  %s: %u KBd\n", _T("DVB_SYMBOL_RATE"), service->media.dvb_s.symbol_rate / 1000);
 			buf += strlen(buf);
+			sprintf(buf,"  %s: %s\n", _T("DVB_POLARIZATION"), service->media.dvb_s.polarization ? "V" : "H");
+			buf += strlen(buf);
+			break;
+		case serviceMediaATSC:
+			modName = table_IntStrLookup(fe_modulationName, service->media.atsc.modulation, NULL);
+			if(modName) {
+				sprintf(buf, "  %s: %s\n", _T("DVB_MODULATION"), modName);
+				buf += strlen(buf);
+			}
 			break;
 		default: ;
 	}
@@ -3560,18 +3609,15 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 		service->program_map.map.PCR_PID, _T("DVB_STREAMS"));
 	buf += strlen(buf);
 	stream_element = service->program_map.map.streams;
-	while( stream_element != NULL)
-	{
+	while(stream_element != NULL) {
 		stream = (PID_info_t*)stream_element->data;
 		type = dvb_getStreamType( stream );
-		switch( type )
-		{
+		switch(type) {
 			case payloadTypeMpegAudio:
 			case payloadTypeMpeg2:
 			case payloadTypeAAC:
 			case payloadTypeAC3:
-				switch(type)
-				{
+				switch(type) {
 					case payloadTypeMpegAudio:
 						sprintf( buf, "  PID: %hu MP3 %s", stream->elementary_PID, _T("AUDIO") );
 						break;
@@ -3585,29 +3631,25 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 						sprintf( buf, "  PID: %hu AC3 %s", stream->elementary_PID , _T("AUDIO") );
 						break;
 				}
-				buf+=strlen(buf);
-				if( stream->ISO_639_language_code[0] )
-				{
+				buf += strlen(buf);
+				if(stream->ISO_639_language_code[0]) {
 					eprintf("%s: '%s'\n", __FUNCTION__, stream->ISO_639_language_code);
-					sprintf( buf, " (%3s)", stream->ISO_639_language_code );
-					buf+=strlen(buf);
+					sprintf( buf, " (%3s)", stream->ISO_639_language_code);
+					buf += strlen(buf);
 				}
 				*buf++ = '\n';
 				break;
 			case payloadTypeMpeg4:
 				sprintf( buf, "  PID: %hu MPEG4 %s\n", stream->elementary_PID, _T("VIDEO") );
-				buf+=strlen(buf);
+				buf += strlen(buf);
 				break;
 			case payloadTypeH264:
 				sprintf( buf, "  PID: %hu H264  %s\n", stream->elementary_PID, _T("VIDEO") );
-				buf+=strlen(buf);
+				buf += strlen(buf);
 				break;
 			case payloadTypeText:
-				if (isSubtitle(stream))
-					sprintf( buf, "  PID: %hu %s\n", stream->elementary_PID , _T("SUBTITLES") );
-				else
-				sprintf( buf, "  PID: %hu %s\n", stream->elementary_PID , _T("TELETEXT") );
-				buf+=strlen(buf);
+				sprintf(buf, "  PID: %hu %s\n", stream->elementary_PID , isSubtitle(stream) ? _T("SUBTITLES") : _T("TELETEXT") );
+				buf += strlen(buf);
 				break;
 			default: ;
 		}

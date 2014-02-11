@@ -3145,25 +3145,12 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
 		break;
 	case DVBC:
-		switch(appControlInfo.dvbcInfo.modulation) {
-			case QAM_16:  str = "QAM16"; break;
-			case QAM_32:  str = "QAM32"; break;
-			case QAM_64:  str = "QAM64"; break;
-			case QAM_128: str = "QAM128"; break;
-			case QAM_256: str = "QAM256"; break;
-			default:      str = _T("NOT_AVAILABLE_SHORT");
-		}
+		str = table_IntStrLookup(fe_modulationName, appControlInfo.dvbcInfo.modulation, _T("NOT_AVAILABLE_SHORT"));
 		sprintf(buf, "%s: %s", _T("DVB_QAM_MODULATION"), str);
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
 		break;
 	case ATSC:
-		switch(appControlInfo.atscInfo.modulation) {
-			case VSB_8:		str = "VSB8"; break;
-			case VSB_16:	str = "VSB16"; break;
-			case QAM_64:	str = "QAM64"; break;
-			case QAM_256:	str = "QAM256"; break;
-			default:		str = _T("NOT_AVAILABLE_SHORT");
-		}
+		str = table_IntStrLookup(fe_modulationName, appControlInfo.atscInfo.modulation, _T("NOT_AVAILABLE_SHORT"));
 		sprintf(buf, "%s: %s", _T("DVB_MODULATION"), str);
 		interface_addMenuEntry(dvbMenu, buf, output_toggleAtscModulation, NULL, thumbnail_configure);
 		break;

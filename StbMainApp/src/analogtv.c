@@ -353,7 +353,7 @@ int32_t analogtv_updateFoundServiceFile(void)
 	return 0;
 }
 
-static uint32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
+static int32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 {
 	uint32_t i;
 	uint8_t in_list = 0;

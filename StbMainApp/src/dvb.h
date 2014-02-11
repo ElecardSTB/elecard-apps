@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "app_info.h"
 #include "dvb_types.h"
+#include "helper.h"
 
 #include <platform.h>
 #include <sdp.h>
@@ -152,7 +153,8 @@ typedef struct __dvb_param {
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-
+extern table_IntStr_t fe_typeName[];
+extern table_IntStr_t fe_modulationName[];
 extern list_element_t *dvb_services;
 
 /******************************************************************
