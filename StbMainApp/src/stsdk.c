@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "client.h"
 #include "app_info.h"
 #include "interface.h"
-#include "StbMainApp.h"
+#include "helper.h"
 
 #include <semaphore.h>
 #include <errno.h>

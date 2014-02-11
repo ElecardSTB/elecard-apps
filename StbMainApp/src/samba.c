@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "debug.h"
 #include "l10n.h"
-#include "StbMainApp.h"
+#include "helper.h"
 #include "media.h"
 
 #include <service.h>

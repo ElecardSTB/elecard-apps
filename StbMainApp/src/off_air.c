@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "menu_app.h"
 #include "output.h"
 #include "StbMainApp.h"
+#include "helper.h"
 #include "media.h"
 #include "playlist.h"
 #include "rtp.h"

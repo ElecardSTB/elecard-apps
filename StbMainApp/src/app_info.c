@@ -37,12 +37,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "debug.h"
 #include "interface.h"
-#include "StbMainApp.h"
 #include "l10n.h"
-#include "output.h"
 #include "messages.h"
 #include "playlist.h"
 #include "media.h"
+#include "helper.h"
 
 #include <stdio.h>
 #include <stdlib.h>

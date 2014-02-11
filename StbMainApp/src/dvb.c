@@ -40,13 +40,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "debug.h"
 #include "list.h"
 #include "app_info.h"
-#include "StbMainApp.h"
 #include "interface.h"
 #include "l10n.h"
 #include "playlist.h"
 #include "sem.h"
 #include "teletext.h"
 #include "stsdk.h"
+#include "helper.h"
 
 #include <fcntl.h>
 #include <stdint.h>

@@ -126,9 +126,6 @@ char* inet_addr_prepare( char *value);
 long output_getColorValue(void *pArg);
 void output_setColorValue(long value, void *pArg);
 
-int  getParam(const char *path, const char *param, const char *defaultValue, char *output);
-int  setParam(const char *path, const char *param, const char *value);
-
 int output_isBridge(void);
 
 #ifdef ENABLE_WIFI

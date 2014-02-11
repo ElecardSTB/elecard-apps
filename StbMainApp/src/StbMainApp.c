@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "sem.h"
 #include "gfx.h"
 #include "interface.h"
+#include "helper.h"
 #include "l10n.h"
 #include "sound.h"
 #include "dvb.h"
@@ -183,29 +184,6 @@ int gIgnoreEventTimestamp = 0;
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
 
-int helperFileExists(const char* filename)
-{
-	int file;
-	int ret = 0;
-#if (defined STB225)
-	const char *filename_t = filename;
-	const char *prefix = "file://";
-	if(strncmp(filename, prefix, strlen(prefix))==0)
-		filename_t = filename + strlen(prefix);
-	file = open(filename_t, O_RDONLY);
-//printf("%s[%d]: file=%d, filename_t=%s\n", __FILE__, __LINE__, file, filename_t);
-#else
-	file = open(filename, O_RDONLY);
-#endif
-	if(file >= 0) {
-		close(file);
-		ret = 1;
-	}
-
-	return ret;
-}
-
-
 int helperReadLine(int file, char* buffer)
 {
 	if ( file )
@@ -271,21 +249,7 @@ int helperParseMmio(int addr)
 	return num;
 }
 
-int helperCheckDirectoryExsists(const char *path)
-{
-	DIR *d;
 
-	d = opendir(path);
-
-	if (d == NULL)
-	{
-		return 0;
-	}
-
-	closedir(d);
-
-	return 1;
-}
 
 int helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar )
 {
@@ -2500,8 +2464,7 @@ int main(int argc, char *argv[])
 	FILE *pidfile;
 
 	pidfile = fopen("/var/run/mainapp.pid", "w");
-	if (pidfile)
-	{
+	if(pidfile) {
 		fprintf(pidfile, "%d", getpid());
 		fclose(pidfile);
 	}
@@ -2520,8 +2483,7 @@ int main(int argc, char *argv[])
 	}
 */
 	/* By default send all output to stdout, except for error and warning output */
-	for (i=0;i<errorLevelCount; i++)
-	{
+	for(i = 0; i < errorLevelCount; i++) {
 		setoutput((errorLevel_t)i, (i == errorLevelError || i == errorLevelWarning) ? stderr : stdout);
 	}
 #ifdef DEBUG
@@ -2534,26 +2496,20 @@ int main(int argc, char *argv[])
 		restart = 0;
 
 		//dprintf("%s: initialize\n", __FUNCTION__);
-
 		initialize(argc, argv);
-
 		//dprintf("%s: process\n", __FUNCTION__);
 
 		process();
-
 		//dprintf("%s: Wait for key thread\n", __FUNCTION__);
 
-		while (keyThreadActive != 0)
-		{
+		while(keyThreadActive != 0) {
 			usleep(100000);
 		}
 
 		//dprintf("%s: Do cleanup\n", __FUNCTION__);
-
 		cleanup();
 
-		if (startApp[0] != 0)
-		{
+		if(startApp[0] != 0) {
 			eprintf("App: Starting %s\n", startApp);
 			//sleep(1);
 #ifdef ENABLE_BROWSER
@@ -2566,10 +2522,9 @@ int main(int argc, char *argv[])
 			sleep(1);*/
 		}
 
-	} while (restart);
+	} while(restart);
 
 	unlink("/var/run/mainapp.pid");
-
 	eprintf("App: Goodbye.\n");
 
 	return 0;
@@ -2613,18 +2568,16 @@ char *helperEthDevice(int i)
 char *helperStrCpyTrimSystem(char *dst, char *src)
 {
 	char *ptr = dst;
-	while( *src )
-	{
-		if( (unsigned char)(*src) > 127 )
-		{
+	while(*src) {
+		if((unsigned char)(*src) > 127) {
 			*ptr++ = *src;
-		} else if( *src >= ' ' )
-			switch(*src)
-			{
+		} else if( *src >= ' ' ) {
+			switch(*src) {
 				case '"': case '*': case '/': case ':': case '|':
 				case '<': case '>': case '?': case '\\': case 127: break;
 				default: *ptr++ = *src;
 			}
+		}
 		src++;
 	}
 	*ptr = 0;
@@ -2633,31 +2586,27 @@ char *helperStrCpyTrimSystem(char *dst, char *src)
 
 int helperSafeStrCpy( char** dest, const char* src )
 {
-	if (NULL == dest)
+	if(NULL == dest) {
 		return -2;
+	}
 
-	if (NULL == src)
-	{
-		if (NULL != *dest)
-		{
-			free( *dest );
+	if(NULL == src) {
+		if(*dest) {
+			free(*dest);
 			*dest = NULL;
 		}
 		return 0;
 	}
 
 	size_t src_length = strlen(src);
-	if (NULL == *dest)
-	{
-		if ( NULL == (*dest = (char*)dmalloc(src_length+1)) )
+	if(NULL == *dest) {
+		if(NULL == (*dest = (char*)dmalloc(src_length + 1))) {
 			return 1;
-	} else
-	{
-		if (strlen(*dest ) < src_length)
-		{
-			char *new_str = (char*)drealloc(*dest, src_length+1);
-			if (NULL == new_str)
-			{
+		}
+	} else {
+		if(strlen(*dest ) < src_length) {
+			char *new_str = (char*)drealloc(*dest, src_length + 1);
+			if(NULL == new_str) {
 				free(*dest);
 				*dest = NULL;
 				return 1; // we don't want old content to stay
@@ -2665,7 +2614,7 @@ int helperSafeStrCpy( char** dest, const char* src )
 			*dest = new_str;
 		}
 	}
-	memcpy( *dest, src, src_length+1 );
+	memcpy(*dest, src, src_length + 1);
 
 	return 0;
 }
@@ -2679,18 +2628,16 @@ int helperCheckUpdates()
 	url_desc_t url_desc;
 
 	str = cmd + sprintf(cmd, "clientUpdater -cs");
-	if( str < cmd )
+	if(str < cmd) {
 		return 1;
+	}
 
 	file = popen("hwconfigManager a -1 UPURL 2>/dev/null | grep \"VALUE:\" | sed 's/VALUE: \\(.*\\)/\\1/'","r");
-	if( file )
-	{
+	if(file) {
 		url = str + (sizeof(" -h ")-1);
-		if ( fgets(url, MAX_URL-sizeof("clientUpdater -cs -h "), file) != NULL && url[0] != 0 && url[0] != '\n' )
-		{
+		if(fgets(url, MAX_URL-sizeof("clientUpdater -cs -h "), file) != NULL && url[0] != 0 && url[0] != '\n') {
 			for( ptr = &url[strlen(url)]; *ptr <= ' '; *ptr-- = 0 );
-			if( parseURL( url, &url_desc ) == 0 && (url_desc.protocol == mediaProtoFTP || url_desc.protocol == mediaProtoHTTP) )
-			{
+			if(parseURL(url, &url_desc) == 0 && (url_desc.protocol == mediaProtoFTP || url_desc.protocol == mediaProtoHTTP)) {
 				strncpy(str, " -h ", sizeof(" -h ")-1);
 			}
 		}
@@ -2706,11 +2653,9 @@ int helperCheckUpdates()
 
 static int helper_confirmFirmwareUpdate(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
-	{
+	if(cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft) {
 		return 0;
-	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
+	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk) {
 		system("sync");
 		system("reboot");
 		return 0;

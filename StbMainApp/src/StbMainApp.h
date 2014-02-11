@@ -53,8 +53,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FREE(x) if(x) { dfree(x); (x) = NULL; }
 
-#define ARRAY_SIZE(arr)	(sizeof(arr)/sizeof(*arr))
-
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
@@ -70,7 +68,6 @@ extern volatile int keyThreadActive;
 extern "C" {
 #endif
 
-int  helperFileExists(const char* filename);
 
 int  helperStartApp(const char* filename);
 
@@ -90,8 +87,6 @@ char *helperStrCpyTrimSystem(char *dst, char *src);
 void helperFlushEvents(void);
 
 interfaceCommand_t helperGetEvent(int flush);
-
-int  helperCheckDirectoryExsists(const char *path);
 
 char *helperEthDevice(int i);
 

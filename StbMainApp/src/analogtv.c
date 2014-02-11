@@ -343,8 +343,9 @@ int32_t analogtv_updateName(uint32_t chanIndex, char* str)
 int32_t analogtv_updateFoundServiceFile(void)
 {
 	FILE *file = fopen(channel_names_file_full, "w");
-	if (file!=NULL) {
-		for(int i = 0; i < found_service_count; i++) {
+	if(file) {
+		uint32_t i;
+		for(i = 0; i < found_service_count; i++) {
 			fprintf(file ,"%d %d %s\n", found_service_list[i].freq/1000000, found_service_list[i].id, found_service_list[i].name);
 		}
 		fclose(file);

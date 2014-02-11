@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "debug.h"
 #include "l10n.h"
 #include "StbMainApp.h"
+#include "helper.h"
 #include "sem.h"
 #include "gfx.h"
 #include "backend.h"
@@ -111,8 +112,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define MOBILE_APN_FILE             SYSTEM_CONFIG_DIR "/ppp/chatscripts/apn"
 #define MOBILE_PHONE_FILE           SYSTEM_CONFIG_DIR "/ppp/chatscripts/phone"
-
-#define TEMP_CONFIG_FILE            "/var/tmp/cfg.tmp"
 
 #define OUTPUT_INFO_SET(type,index) (void*)(intptr_t)(((int)type << 16) | (index))
 #define OUTPUT_INFO_GET_TYPE(info)  ((int)(intptr_t)info >> 16)
@@ -1370,126 +1369,6 @@ static int output_toggleVoipBuzzer(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 #endif
-
-int getParam(const char *path, const char *param, const char *defaultValue, char *output)
-{
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	FILE *fd;
-	int found = 0;
-	int plen, vlen;
-
-	fd = fopen(path, "r");
-	if (fd != NULL)
-	{
-		while (fgets(buf, sizeof(buf), fd) != NULL)
-		{
-			plen = strlen(param);
-			vlen = strlen(buf)-1;
-			if (strncmp(buf, param, plen) == 0 && buf[plen] == '=')
-			{
-				while (buf[vlen] == '\r' || buf[vlen] == '\n' || buf[vlen] == ' ')
-				{
-					buf[vlen] = 0;
-					vlen--;
-				}
-				if (vlen-plen > 0)
-				{
-					if (output != NULL)
-					{
-						strcpy(output, &buf[plen+1]);
-					}
-					found = 1;
-				}
-				break;
-			}
-		}
-		fclose(fd);
-	}
-
-	if (!found && defaultValue != NULL && output != NULL)
-	{
-		strcpy(output, defaultValue);
-	}
-	return found;
-}
-
-int setParam(const char *path, const char *param, const char *value)
-{
-	FILE *fdi, *fdo;
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	int found = 0;
-
-	//dprintf("%s: %s: %s -> %s\n", __FUNCTION__, path, param, value);
-
-#ifdef STB225
-//	system("mount -o rw,remount /");
-#endif
-
-	fdo = fopen(TEMP_CONFIG_FILE, "w");
-
-	if (fdo == NULL)
-	{
-		eprintf("output: Failed to open out file '%s'\n", TEMP_CONFIG_FILE);
-		interface_showMessageBox(_T("SETTINGS_SAVE_ERROR"), thumbnail_warning, 0);
-#ifdef STB225
-//		system("mount -o ro,remount /");
-#endif
-		return -1;
-	}
-
-	fdi = fopen(path, "r");
-
-	if (fdi != NULL)
-	{
-		while (fgets(buf, sizeof(buf), fdi) != NULL)
-		{
-			//dprintf("%s: line %s\n", __FUNCTION__, buf);
-			if (strncasecmp(param, buf, strlen(param)) == 0 ||
-				(buf[0] == '#' && strncasecmp(param, &buf[1], strlen(param)) == 0))
-			{
-				//dprintf("%s: line matched param %s\n", __FUNCTION__, param);
-				if (!found)
-				{
-					if (value != NULL)
-					{
-						fprintf(fdo, "%s=%s\n", param, value);
-					} else
-					{
-						fprintf(fdo, "#%s=\n", param);
-					}
-					found = 1;
-				}
-			} else
-			{
-				fwrite(buf, strlen(buf), 1, fdo);
-			}
-		}
-		fclose(fdi);
-	}
-
-	if (found == 0)
-	{
-		if (value != NULL)
-		{
-			fprintf(fdo, "%s=%s\n", param, value);
-		} else
-		{
-			fprintf(fdo, "#%s=\n", param);
-		}
-	}
-
-	fclose(fdo);
-
-	//dprintf("%s: replace!\n", __FUNCTION__);
-	sprintf(buf, "mv -f '%s' '%s'", TEMP_CONFIG_FILE, path);
-	system(buf);
-
-#ifdef STB225
-//	system("mount -o ro,remount /");
-#endif
-
-	return 0;
-}
 
 #ifdef ENABLE_WIFI
 int output_setESSID(interfaceMenu_t *pMenu, char *value, void* pArg)

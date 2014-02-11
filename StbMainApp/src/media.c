@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gfx.h"
 #include "l10n.h"
 #include "StbMainApp.h"
+#include "helper.h"
 #include "menu_app.h"
 #include "rtp.h"
 #include "rtsp.h"
