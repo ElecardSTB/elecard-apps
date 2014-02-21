@@ -679,7 +679,7 @@ int32_t analogtv_setNextAudioMode()
 	
 	printf("Audio mode = %s\n",analogtv_channelParam[id].audio);
 	analogtv_activateChannel(interfaceInfo.currentMenu, (void *)id);
-	return 0;
+	return analogtv_saveConfigFile();
 }
 
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
