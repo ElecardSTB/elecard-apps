@@ -650,6 +650,37 @@ void analogtv_terminate(void)
 
 	mysem_destroy(analogtv_semaphore);
 }
+//----------------------SET NEXT AUDIO MODE ----  button F3--------------
+int32_t analogtv_setNextAudioMode()
+{
+	printf("%s[%d]\n",__func__, __LINE__);
+	char *analogtv_audioName[] = {
+		[TV_AUDIO_SIF]	= "sif",
+		[TV_AUDIO_AM]	= "am",
+		[TV_AUDIO_FM1]	= "fm1",
+		[TV_AUDIO_FM2]	= "fm2",
+	};
+	printf("%s[%d]\n",__func__, __LINE__);
+	uint32_t id = appControlInfo.tvInfo.id;
+	uint32_t i = 0;
+	printf("%s[%d]\n",__func__, __LINE__);
+	for (i = 0; i <= TV_AUDIO_FM2; i++) {
+		if ( !strcmp(analogtv_channelParam[id].audio, analogtv_audioName[i]) )
+			break;
+	}
+	printf("%s[%d]\n",__func__, __LINE__);
+	i++;
+	if(i > TV_AUDIO_FM2)
+		i = 0;
+	
+	printf("%s[%d]\n",__func__, __LINE__);
+	strncpy(analogtv_channelParam[id].audio, analogtv_audioName[i], sizeof(analogtv_audioName[i]));
+
+	
+	printf("Audio mode = %s\n",analogtv_channelParam[id].audio);
+	analogtv_activateChannel(interfaceInfo.currentMenu, (void *)id);
+	return 0;
+}
 
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
@@ -664,6 +695,7 @@ int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 			return 0;
 		case interfaceCommandMainMenu://DIKS_HOME
 		case interfaceCommandYellow:
+			analogtv_setNextAudioMode();
 			return 0;
 		default:;
 	}
