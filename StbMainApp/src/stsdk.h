@@ -114,7 +114,7 @@ void st_cancelAsync(int index, int execute);
 #ifdef ENABLE_DVB
 static inline uint32_t st_frequency(tunerFormat tuner, uint32_t frequency)
 {
-	return (dvb_getType(tuner) == DVBS) ? frequency : (frequency / KHZ);
+	return (dvb_getType(tuner) == SYS_DVBS) ? frequency : (frequency / KHZ);
 }
 
 static inline int32_t st_getTunerIndex(tunerFormat tuner)

@@ -805,7 +805,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, & freq_step);
 
-	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvb_getType(tuner) == FE_QPSK ? _T("MHZ") : _T("KHZ"), numChannels);
+	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvb_getType(tuner) == SYS_DVBS ? _T("MHZ") : _T("KHZ"), numChannels);
 	// in this moment semaphore is busy
 	for ( i = numChannels-1; i > numChannels-4; i-- )
 	{
@@ -1053,6 +1053,7 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 #endif
 		}
 
+//------------------>
 		if(ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
 			  appControlInfo.dvbtInfo.plp_id < 3)
 		{
@@ -1060,7 +1061,21 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
 		} else {
 			ok = 0;
+    	}
+//------------------>
+
+// The above described code do one more scan to plp = 3
+/*
+		if(ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1))
+		{
+			appControlInfo.dvbtInfo.plp_id++;
+			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
 		}
+
+		if(appControlInfo.dvbtInfo.plp_id > 2) {
+			ok = 0;
+		}
+*/
 	} while (ok);
 
 	return 0;
@@ -1189,9 +1204,9 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 		dvb.scan.frequency = low_freq/KHZ;
 
 	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"),
-		low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == DVBS ? _T("MHZ") : _T("KHZ"));
+		low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == SYS_DVBS ? _T("MHZ") : _T("KHZ"));
 	const char *mask = "\\d{6}";
-	if (dvb_getType(tuner) == DVBS)
+	if (dvb_getType(tuner) == SYS_DVBS)
 		mask = appControlInfo.dvbsInfo.band == dvbsBandK ? "\\d{5}" : "\\d{4}";
 	interface_getText(pMenu, buf, mask, offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
 	return 0;
@@ -2006,6 +2021,18 @@ static int offair_audioChanged(void* pArg)
 		dvbChannel_writeOrderConfig();
 	}
 	return 0;
+}
+
+int offair_getChannelIndex(void){
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+	EIT_service_t *service;
+	if((srvIdx == NULL) || (srvIdx->service == NULL)) {
+		eprintf("%s: Failed to start channel %d: offair service is NULL\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
+		return;
+	}
+	service = srvIdx->service;
+
+    return dvb_getServiceIndex(service);
 }
 
 void offair_startVideo(int which)

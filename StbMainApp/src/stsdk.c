@@ -527,6 +527,8 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 		case DVBT:
 			cJSON_AddItemToObject(params, "stream",
 				cJSON_CreateNumber( media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id ));
+//			cJSON_AddItemToObject(params, "generation",
+//				cJSON_CreateNumber( media ? media->dvb_t.generation : appControlInfo.dvbtInfo.generation ));
 			break;
 		case DVBC: {
 			fe_modulation_t modulation = media ? media->dvb_c.modulation : appControlInfo.dvbcInfo.modulation;

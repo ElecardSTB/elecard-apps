@@ -265,7 +265,7 @@ typedef struct
 {
 	stb810_tunerStatus   status;
 	fe_status_t          fe_status;
-	fe_type_t            type;
+	fe_delivery_system_t type;
 	// Tuner info is always numbered from zero.
 	// adapter field is used to describe the real port/adapter number
 	// On ST if this index is greater than ADAPTER_COUNT, then it is a ST tuner
@@ -549,6 +549,7 @@ typedef struct __stb810_dvbtInfo
 	stb810_dvbfeInfo     fe;
 	fe_bandwidth_t       bandwidth;
 	uint8_t              plp_id;
+	uint8_t              generation;
 } stb810_dvbtInfo;
 
 typedef struct __stb810_dvbcInfo

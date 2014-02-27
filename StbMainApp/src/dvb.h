@@ -182,7 +182,7 @@ void dvb_terminate(void);
  *
  *   @return fe_type or -1 if failed
  */
-static inline fe_type_t dvb_getType(tunerFormat tuner)
+static inline fe_delivery_system_t dvb_getType(tunerFormat tuner)
 {
 	return appControlInfo.tunerInfo[tuner].type;
 }
@@ -543,7 +543,7 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 #endif
 
 //TODO: remove modulation argument, this used for separate ATSC and ANNEX-B delivery systems
-int32_t dvb_setType(tunerFormat tuner, int type, fe_modulation_t modulation);
+//int32_t dvb_setType(tunerFormat tuner, int type, fe_modulation_t modulation);
 int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
 /** Function return if there has teletext in playing program

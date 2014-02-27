@@ -185,6 +185,7 @@ typedef struct {
 
 	int               vmsp;
 	fe_type_t         fe_type;
+	//fe_delivery_system_t	fe_type;
 
 	int               fdin;
 	int               fdplay;
@@ -485,7 +486,7 @@ static int dvb_instance_open (dvbRecordInfo_t * dvb)
 		//return -1;
 	}
 
-	dvb->fe_type = fe_info.type;
+	dvb->fe_type = fe_info.type; //dvb_typeConversionForwardOld(fe_info.type);
 #endif
 
 	sprintf(path, "/dev/dvb/adapter%i/demux0", dvb->vmsp);
@@ -587,9 +588,10 @@ static int dvb_setTuner(dvbRecordInfo_t *dvb, long frequency)
 			dvb->currentFrequency = 0;
 		}
 	}
-	if (dvb->fe_type == FE_OFDM)
+	if ((dvb->fe_type == FE_OFDM/*SYS_DVBT*/))
 	{
 		INFO("fe_type=FE_OFDM\n");
+		//INFO("fe_type=DVBT/DVBT2\n");
 		dvb->tuner.u.ofdm.bandwidth = dvb->info.dvbtInfo.bandwidth;
 		dvb->tuner.u.ofdm.code_rate_HP = FEC_AUTO;
 		dvb->tuner.u.ofdm.code_rate_LP = FEC_AUTO;
@@ -599,9 +601,10 @@ static int dvb_setTuner(dvbRecordInfo_t *dvb, long frequency)
 		dvb->tuner.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
 		dvb->tuner.inversion = dvb->info.dvbtInfo.inversion;
 	}
-	else if (dvb->fe_type == FE_QAM)
+	else if (dvb->fe_type == FE_QAM/*SYS_DVBC_ANNEX_AC*/)
 	{
 		INFO("fe_type=FE_QAM\n");
+		//INFO("fe_type=SYS_DVBC_ANNEX_AC\n");
 		dvb->tuner.u.qam.modulation  = dvb->info.dvbcInfo.modulation;
 		dvb->tuner.u.qam.symbol_rate = dvb->info.dvbcInfo.symbolRate*1000;
 		dvb->tuner.u.qam.fec_inner   = FEC_NONE;
@@ -1010,7 +1013,7 @@ static int rtp_recording_start(pvrInfo_t *pvr, media_desc *desc, struct in_addr 
 	st = stat( pvr->path, &stat_info );
 	if( st < 0 || (stat_info.st_mode & S_IFDIR) != S_IFDIR )
 	{
-		PERROR("Can't acces output path");
+		PERROR("Can't access output path");
 		write_chunk( "ed", 3 );
 		goto failure;
 	}
