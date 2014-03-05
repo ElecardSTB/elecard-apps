@@ -284,24 +284,10 @@ static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
 static struct dvb_instance dvbInstances[ADAPTER_COUNT];
 static __u32 currentFrequency[ADAPTER_COUNT];
 static char * fe_typeNames[FE_TYPE_COUNT] = {
-	"SYS_UNDEFINED",
-	"DVBC_ANNEX_AC",
-	"DVBC_ANNEX_B",
-	"DVBT",
-	"DSS",
-	"DVBS",
-	"DVBS2",
-	"DVBH",
-	"ISDBT",
-	"ISDBS",
-	"ISDBC",
-	"ATSC",
-	"ATSCMH",
-	"DMBTH",
-	"CMMB",
-	"DAB",
-	"DVBT2",
-	"TURBO",
+	"DVB-S",
+	"DVB-C",
+	"DVB-T",
+	"ATSC"
 };
 
 static pmysem_t dvb_semaphore;
@@ -1514,12 +1500,12 @@ int dvb_checkFrontend(tunerFormat tuner)
 #endif
 	}
 
-	appControlInfo.tunerInfo[tuner].type = info.type;
+	appControlInfo.tunerInfo[tuner].type = dvb_typeConversionForwardOld(info.type);
 	dvbInstances[dvb_getAdapter(tuner)].fe_type = dvb_typeConversionForwardOld(info.type);
 
 	appControlInfo.tunerInfo[tuner].status = tunerInactive;
 	eprintf("%s[%d]: %s (%s) caps: %02x\n", __FUNCTION__, dvb_getAdapter(tuner),
-		info.name, fe_typeNames[dvb_typeConversionForwardOld(info.type)], appControlInfo.tunerInfo[tuner].caps);
+		info.name, fe_typeNames[info.type], appControlInfo.tunerInfo[tuner].caps);
 
 	close(fd);
 	return 0;
@@ -1641,7 +1627,7 @@ static int dvb_setFrequency(fe_delivery_system_t  type, __u32 frequency, int fro
 		cmdseq.num = 3;
 	} else {
 		eprintf("%s[%d]: ERROR: Unsupported frontend type=%s (media %d).\n", __FUNCTION__, tuner,
-			fe_typeNames[type], media ? (int)media->type : -1);
+			fe_typeNames[dvb_typeConversionBackwardOld(type)], media ? (int)media->type : -1);
 		return -1;
 	}
 	cmdseq.props = dtv;
@@ -1857,21 +1843,22 @@ int dvb_readServicesFromDump(char* filename)
 
 const char *dvb_getTypeName(tunerFormat tuner)
 {
-	if ((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) &&
-		(appControlInfo.tunerInfo[tuner].caps & tunerDVBT2)/* &&
-		appControlInfo.tunerInfo[tuner].type == SYS_DVBT2*/)
+	if (((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||
+		(appControlInfo.tunerInfo[tuner].type == SYS_DVBT2)) &&
+		(appControlInfo.tunerInfo[tuner].caps & tunerDVBT2))
 		return "DVB-T/T2";
-	return fe_typeNames[appControlInfo.tunerInfo[tuner].type];
+	return fe_typeNames[dvb_typeConversionBackwardOld(appControlInfo.tunerInfo[tuner].type)];
 }
 
 static int dvb_setFrontendType(int adapter, fe_delivery_system_t type){
- 
+
 //	if(neededType != type){
 //		return -1;
 //	}
 
 #ifdef DTV_DELIVERY_SYSTEM
 	int fdf;
+	tunerFormat tuner = offair_getTuner();//appControlInfo.dvbInfo.tuner;
 	struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
 	struct dtv_properties cmdseq = {
 		.num = 1,
@@ -1892,6 +1879,7 @@ static int dvb_setFrontendType(int adapter, fe_delivery_system_t type){
 	}
 
 	close(fdf);
+	appControlInfo.tunerInfo[tuner].type = type;
 	dvbInstances[adapter].fe_type = type;
 
 	return 0;
@@ -1902,39 +1890,91 @@ static int dvb_setFrontendType(int adapter, fe_delivery_system_t type){
 
 int dvb_toggleType(tunerFormat tuner)
 {
-	fe_delivery_system_t type = dvb_getType(tuner);
-	int caps = 0;
-	int res = 0;
-
-	switch(type) {
+	int cap = 0;
+	fe_delivery_system_t type = (dvb_getType(tuner) + 1) % FE_TYPE_COUNT;
+	switch (type) {
 		case SYS_DVBC_ANNEX_AC:
-			caps = tunerDVBC;
+			cap = tunerDVBC;
 			break;
 		case SYS_DVBS:
-			caps = tunerDVBS;
+			cap = tunerDVBS;
 			break;
 		case SYS_DVBT:
-			caps = tunerDVBT;
+			cap = tunerDVBT;
 			break;
 		case SYS_DVBT2:
-			caps = tunerDVBT2;
+			cap = tunerDVBT2;
 			break;
 		case SYS_ATSC:
 		case SYS_DVBC_ANNEX_B:
-			caps = tunerATSC;
+			cap = tunerATSC;
 			break;
-		default:;
+		default:
+			cap = 0;
+			break;
 	}
-	if ((appControlInfo.tunerInfo[tuner].caps & caps) == 0) {
-		res = dvb_setFrontendType(dvb_getAdapter(tuner), type);
+
+	while ((appControlInfo.tunerInfo[tuner].caps & cap) == 0){
+		if (type == dvb_getType(tuner)) break;
+		type = (type + 1) % FE_TYPE_COUNT;
+		switch (type) {
+			case SYS_DVBC_ANNEX_AC:
+				cap = tunerDVBC;
+				break;
+			case SYS_DVBS:
+				cap = tunerDVBS;
+				break;
+			case SYS_DVBT:
+				cap = tunerDVBT;
+				break;
+			case SYS_DVBT2:
+				cap = tunerDVBT2;
+				break;
+			case SYS_ATSC:
+			case SYS_DVBC_ANNEX_B:
+				cap = tunerATSC;
+				break;
+			default:
+				cap = 0;
+				break;
+		}
 	}
-	return res;
+	return dvb_setFrontendType(dvb_getAdapter(tuner), type);
+
 /*
-	fe_type_t type = (dvb_getType(tuner)+1)%FE_TYPE_COUNT;
+	do {
+		type = (type + 1) % FE_TYPE_COUNT;
+		switch (type) {
+			case SYS_DVBC_ANNEX_AC:
+				caps = tunerDVBC;
+				break;
+			case SYS_DVBS:
+				caps = tunerDVBS;
+				break;
+			case SYS_DVBT:
+				caps = tunerDVBT;
+				break;
+			case SYS_DVBT2:
+				caps = tunerDVBT2;
+				break;
+			case SYS_ATSC:
+			case SYS_DVBC_ANNEX_B:
+				caps = tunerATSC;
+				break;
+			default:
+				break;
+		}
+	} while ((type != dvb_getType(tuner)) && ((appControlInfo.tunerInfo[tuner].caps & caps) == 0));
+
+    return dvb_setFrontendType(dvb_getAdapter(tuner), type);
+*/
+
+/*
+	fe_delivery_system_t type = (dvb_getType(tuner)+1)%FE_TYPE_COUNT;
 	while((type != dvb_getType(tuner)) && ((appControlInfo.tunerInfo[tuner].caps & (1 << type)) == 0)) {
 		type = (type + 1) % FE_TYPE_COUNT;
 	}
-    return dvb_setFrontendType(dvb_getAdapter(tuner), dvb_typeConversionForwardOld(type));
+    return dvb_setFrontendType(dvb_getAdapter(tuner), type);
 */
 }
 
@@ -1999,7 +2039,7 @@ static int dvb_openFrontend(int adapter, int flags)
 
 int dvb_getFrontendInfo(int adapter, int flags, struct dvb_frontend_info *fe_info)
 {
-	fe_delivery_system_t type = dvb_typeConversionForwardOld(fe_info->type);
+//	fe_delivery_system_t type = dvb_typeConversionForwardOld(fe_info->type);
 	int frontend_fd = dvb_openFrontend(adapter, flags);
 	if (frontend_fd < 0) {
 		eprintf("%s[%d]: failed to open frontend\n", __FUNCTION__, adapter);
@@ -2009,7 +2049,7 @@ int dvb_getFrontendInfo(int adapter, int flags, struct dvb_frontend_info *fe_inf
 	ioctl_loop(adapter, err, frontend_fd, FE_GET_INFO, fe_info);
 
 	eprintf("%s[%d]: DVB Model=%s, Type=%s, FineStepSize=%u\n", __FUNCTION__,
-		adapter, fe_info->name, fe_typeNames[type], fe_info->frequency_stepsize);
+		adapter, fe_info->name, fe_typeNames[fe_info->type], fe_info->frequency_stepsize);
 	return frontend_fd;
 }
 
@@ -3810,7 +3850,7 @@ fe_delivery_system_t dvb_typeConversionForwardOld(fe_type_t typeBefore){
 
 serviceMediaType_t dvb_typeConversionBackwardNew(fe_delivery_system_t typeBefore){
 	serviceMediaType_t typeAfter = 0;
- 
+
 	switch (typeBefore) {
 		case SYS_UNDEFINED:
 			typeAfter = serviceMediaNone;
@@ -3836,7 +3876,7 @@ serviceMediaType_t dvb_typeConversionBackwardNew(fe_delivery_system_t typeBefore
 
 fe_type_t dvb_typeConversionBackwardOld(fe_delivery_system_t typeBefore){
 	fe_type_t typeAfter = 0;
- 
+
 	switch (typeBefore) {
 		case SYS_DVBT:
 		case SYS_DVBT2:

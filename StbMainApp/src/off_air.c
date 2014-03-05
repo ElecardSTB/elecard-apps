@@ -3650,16 +3650,18 @@ void offair_fillDVBTMenu(void)
 #ifndef HIDE_EXTRA_FUNCTIONS
 	switch ( dvb_getType(0) )  // Assumes same type FEs
 	{
-	case FE_OFDM:
+	case SYS_DVBT:
+	case SYS_DVBT2:
 		sprintf(buf,"%s: DVB-T", _T("DVB_MODE") );
 		break;
-	case FE_QAM:
+	case SYS_DVBC_ANNEX_AC:
 		sprintf(buf,"%s: DVB-C", _T("DVB_MODE") );
 		break;
-	case FE_QPSK:
+	case SYS_DVBS:
 		sprintf(buf,"%s: DVB-S", _T("DVB_MODE") );
 		break;
-	//case FE_ATSC:
+	//case SYS_ATSC:
+	//case SYS_DVBC_ANNEX_B:
 	default:
 		eprintf("offair: unsupported FE type %d\n", dvb_getType(0));
 		sprintf(buf,"%s: %s", _T("DVB_MODE"), _T("NOT_AVAILABLE_SHORT") );
