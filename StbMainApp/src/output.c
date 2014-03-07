@@ -3021,20 +3021,22 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
 {
-//	tunerFormat tuner = offair_getTuner();
-	fe_modulation_t atscModulations[] = {VSB_8, /*VSB_16, */QAM_64, QAM_256};
+	table_IntInt_t mod_to_delSys[] = {
+		{VSB_8,		SYS_ATSC},
+//		{VSB_16,	SYS_ATSC},
+		{QAM_64,	SYS_DVBC_ANNEX_B},
+		{QAM_256,	SYS_DVBC_ANNEX_B},
+		TABLE_INT_INT_END_VALUE
+	};
 	static uint32_t curAtscModulation = 0;
 
 	curAtscModulation++;
-	if(curAtscModulation >= ARRAY_SIZE(atscModulations)) {
+	if(curAtscModulation >= ARRAY_SIZE(mod_to_delSys)) {
 		curAtscModulation = 0;
 	}
-	appControlInfo.atscInfo.modulation = atscModulations[curAtscModulation];
-/*
-	if((atscModulations[curAtscModulation] == VSB_8) || (atscModulations[curAtscModulation] == QAM_64)) {
-		dvb_setType(appControlInfo.dvbInfo.tuner, ATSC, atscModulations[curAtscModulation]);
-	}
-*/
+	appControlInfo.atscInfo.modulation = mod_to_delSys[curAtscModulation].key;
+
+	dvb_setFrontendType(dvb_getAdapter(appControlInfo.dvbInfo.tuner), mod_to_delSys[curAtscModulation].value);
 
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }

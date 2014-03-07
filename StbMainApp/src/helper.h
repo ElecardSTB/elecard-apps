@@ -17,8 +17,11 @@
 *******************************************************************/
 #define ARRAY_SIZE(arr)	(sizeof(arr)/sizeof(*arr))
 
-#define TABLE_INT_END_VALUE	0xdeadbeaf
-#define TABLE_STR_END_VALUE	NULL
+#define TABLE_INT_END_VALUE			0xdeadbeaf
+#define TABLE_STR_END_VALUE			NULL
+
+#define TABLE_INT_INT_END_VALUE		{ TABLE_INT_END_VALUE, TABLE_INT_END_VALUE }
+#define TABLE_INT_STR_END_VALUE		{ TABLE_INT_END_VALUE, TABLE_STR_END_VALUE }
 
 /******************************************************************
 * EXPORTED TYPEDEFS                            [for headers only] *

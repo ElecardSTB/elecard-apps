@@ -1041,6 +1041,7 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 	int ok = 0;
 	appControlInfo.dvbtInfo.plp_id = 0;
 	do {
+		dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
 		if(dvb_frequencyScan(tuner, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
 			ok = 1;
 		}
@@ -1053,30 +1054,11 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 #endif
 		}
 
-//------------------>
-		if(ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
-			  appControlInfo.dvbtInfo.plp_id < 3)
-		{
-			appControlInfo.dvbtInfo.plp_id++;
-			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
-		} else {
-			ok = 0;
-    	}
-//------------------>
-
-// The above described code do one more scan to plp = 3
-/*
-		if(ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1))
-		{
-			appControlInfo.dvbtInfo.plp_id++;
-			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
+		if(ok == 0) {
+			break;
 		}
-
-		if(appControlInfo.dvbtInfo.plp_id > 2) {
-			ok = 0;
-		}
-*/
-	} while (ok);
+		appControlInfo.dvbtInfo.plp_id++;
+	} while((dvb_isCurrentDelSys_dvbt2(tuner) == 1) && (appControlInfo.dvbtInfo.plp_id <= 3));
 
 	return 0;
 }
@@ -2021,18 +2003,6 @@ static int offair_audioChanged(void* pArg)
 		dvbChannel_writeOrderConfig();
 	}
 	return 0;
-}
-
-int offair_getChannelIndex(void){
-	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
-	EIT_service_t *service;
-	if((srvIdx == NULL) || (srvIdx->service == NULL)) {
-		eprintf("%s: Failed to start channel %d: offair service is NULL\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
-		return;
-	}
-	service = srvIdx->service;
-
-    return dvb_getServiceIndex(service);
 }
 
 void offair_startVideo(int which)

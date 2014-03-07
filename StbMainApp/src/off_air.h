@@ -275,8 +275,6 @@ int  offair_checkForUpdates(void);
 
 int  offair_setChannel(int channel, void* pArg);
 
-int  offair_getChannelIndex(void);
-
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg);
 void offair_displayPlayControl(void);
 
