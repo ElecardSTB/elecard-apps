@@ -853,17 +853,17 @@ static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerForma
 	offair_buildInstallSlider(channelCount, tuner);
 	//interface_displayMenu(1);
 
-	while ((cmd = helperGetEvent(0)) != interfaceCommandNone)
+/*	while ((cmd = helperGetEvent(0)) != interfaceCommandNone)
 	{
 		//dprintf("%s: got command %d\n", __FUNCTION__, cmd);
 		if (cmd != interfaceCommandCount)
 		{
 			dprintf("%s: exit on command %d\n", __FUNCTION__, cmd);
-			/* Flush any waiting events */
+			// Flush any waiting events
 			helperGetEvent(1);
 			return -1;
 		}
-	}
+	}*/
 
 	//dprintf("%s: got none %d\n", __FUNCTION__, cmd);
 
@@ -1040,8 +1040,15 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 {
 	int ok = 0;
 	appControlInfo.dvbtInfo.plp_id = 0;
+
 	do {
 		dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
+
+		interfaceCommand_t cmd = helperGetEvent(1);
+		if (cmd == interfaceCommandRed) {
+			return -1;
+		}
+		
 		if(dvb_frequencyScan(tuner, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
 			ok = 1;
 		}
@@ -1070,7 +1077,8 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	uint32_t low_freq, high_freq, freq_step, frequency;
 	int32_t which = GET_NUMBER(pArg);
 	char buf[256];
-
+	int res = 0;
+	
 	tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 
@@ -1084,7 +1092,14 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		interface_hideMessageBox();
 		offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-		offair_scanFrequency(pMenu, tuner, frequency);
+		res = offair_scanFrequency(pMenu, tuner, frequency);
+		if(res < 0){
+			interface_hideMessageBox();
+			interface_sliderShow(0, 0);
+			sprintf(buf, _T("Scan was stopped. Found %d channels"), dvb_getNumberOfServices());
+			interface_showMessageBox(buf, thumbnail_info, 5000);
+			return -1;
+		}
 		interface_sliderShow(0, 0);
 		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
 		interface_showMessageBox(buf, thumbnail_info, 5000);
@@ -1200,7 +1215,8 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	int32_t which = GET_NUMBER(pArg);
 	uint32_t low_freq = MIN_FREQUENCY_KHZ*KHZ, high_freq = MAX_FREQUENCY_KHZ*KHZ, frequency, freq_step;
 	char buf[256];
-	
+	int res = 0;
+
 	if(value == NULL) {
 		return 1;
 	}
@@ -1218,7 +1234,14 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	interface_hideMessageBox();
 	offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-	offair_scanFrequency(pMenu, tuner, frequency);
+	res = offair_scanFrequency(pMenu, tuner, frequency);
+	if(res < 0){
+		interface_hideMessageBox();
+		interface_sliderShow(0, 0);
+		sprintf(buf, _T("Scan was stopped. Found %d channels"), dvb_getNumberOfServices());
+		interface_showMessageBox(buf, thumbnail_info, 5000);
+		return -1;
+	}
 
 	interface_sliderShow(0, 0);
 	sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
