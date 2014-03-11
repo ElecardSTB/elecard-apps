@@ -1848,10 +1848,10 @@ int dvb_readServicesFromDump(char* filename)
 
 const char *dvb_getTypeName(tunerFormat tuner)
 {
-	if ((/*(appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||*/
+	if (((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||
 		(appControlInfo.tunerInfo[tuner].type == SYS_DVBT2)) &&
 		(appControlInfo.tunerInfo[tuner].caps & tunerDVBT2))
-		return "DVB-T2";
+		return "DVB-T/T2";
 	return fe_typeNames[table_IntIntLookupR(type_to_delsys, appControlInfo.tunerInfo[tuner].type, FE_QPSK)];
 }
 
@@ -1910,9 +1910,10 @@ int dvb_toggleType(tunerFormat tuner)
 			case SYS_DVBT:
 				cap = tunerDVBT;
 				break;
-			case SYS_DVBT2:
+// DVBT2 is support, but don't process, because we need toggle between DVBT and DVBC type only.
+/*			case SYS_DVBT2:
 				cap = tunerDVBT2;
-				break;
+				break; */
 			case SYS_ATSC:
 			case SYS_DVBC_ANNEX_B:
 				cap = tunerATSC;
