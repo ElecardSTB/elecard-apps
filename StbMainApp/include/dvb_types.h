@@ -45,7 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define FE_TYPE_COUNT (4)
+#define FE_TYPE_NAMES_COUNT (4)
+#define FE_TYPE_COUNT (18)
 
 #define TS_PACKET_SIZE (188)
 

@@ -294,7 +294,7 @@ static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
 
 static struct dvb_instance dvbInstances[ADAPTER_COUNT];
 static __u32 currentFrequency[ADAPTER_COUNT];
-static char * fe_typeNames[FE_TYPE_COUNT] = {
+static char * fe_typeNames[FE_TYPE_NAMES_COUNT] = {
 	"DVB-S",
 	"DVB-C",
 	"DVB-T",
@@ -1848,10 +1848,10 @@ int dvb_readServicesFromDump(char* filename)
 
 const char *dvb_getTypeName(tunerFormat tuner)
 {
-	if (((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||
+	if ((/*(appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||*/
 		(appControlInfo.tunerInfo[tuner].type == SYS_DVBT2)) &&
 		(appControlInfo.tunerInfo[tuner].caps & tunerDVBT2))
-		return "DVB-T/T2";
+		return "DVB-T2";
 	return fe_typeNames[table_IntIntLookupR(type_to_delsys, appControlInfo.tunerInfo[tuner].type, FE_QPSK)];
 }
 
@@ -1859,7 +1859,7 @@ int dvb_setFrontendType(int adapter, fe_delivery_system_t type)
 {
 #ifdef DTV_DELIVERY_SYSTEM
 	int fdf;
-	tunerFormat tuner = offair_getTuner();//appControlInfo.dvbInfo.tuner;
+	tunerFormat tuner = offair_getTuner();
 	struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
 	struct dtv_properties cmdseq = {
 		.num = 1,
@@ -1918,7 +1918,7 @@ int dvb_toggleType(tunerFormat tuner)
 				cap = tunerATSC;
 				break;
 			default:
-				cap = 0xffffffff;
+				cap = 0;
 				break;
 		}
 	} while((appControlInfo.tunerInfo[tuner].caps & cap) == 0);
