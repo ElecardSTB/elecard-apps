@@ -146,6 +146,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define kprintf(x...)
 #endif
 
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -600,6 +601,7 @@ static int toggleStandby(void)
 
 static int checkPowerOff(DFBEvent *pEvent)
 {
+#if (!defined DISABLE_STANDBY)
 	int isFrontpanelPower = 0;
 #ifdef STSDK
 	//for STB840 PromSvyaz frontpanel POWER button
@@ -669,7 +671,7 @@ static int checkPowerOff(DFBEvent *pEvent)
 	} else if(pEvent->input.button == 9) {// PSU button, just do power off
 		PowerOff(NULL);
 	}
-
+#endif
 	return 0;
 }
 
@@ -1866,7 +1868,6 @@ void fusion_startup()
 	appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
 	appControlInfo.mediaInfo.bHttp = 1;
 
-	//interface_showMenu (0, 0);
 	int result = media_startPlayback();
 	if (result == 0){
 		eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FUSION_STUB);
@@ -1880,6 +1881,8 @@ void fusion_startup()
 	
 	fusion_getCreepAndLogo();
 	eprintf ("%s(%d): fusion_getCreepAndLogo OK.\n", __FUNCTION__, __LINE__);
+
+	interface_displayMenu(1);
 
 	pthread_t handle; 
 	eprintf ("%s(%d): pthread_create fusion_threadCreepline...\n", __FUNCTION__, __LINE__);
@@ -2027,7 +2030,7 @@ int fusion_getCreepAndLogo ()
 			sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, logoPath);
 			system(cmd);
 		}
-		if (FusionObject.logoCount > 0) sleep(8);
+		//if (FusionObject.logoCount > 0) sleep(8);
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 	}
 

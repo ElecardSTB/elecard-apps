@@ -2002,7 +2002,6 @@ static void interface_displayLogo(void)
 #define FUSION_LOGO2_H 134
 
 	// top left
-	eprintf ("%s(%d): pthread_mutex_lock mutexLogo.. FusionObject.logoCount = %d\n", __FUNCTION__, __LINE__, FusionObject.logoCount);
 	pthread_mutex_lock(&FusionObject.mutexLogo);
 	for (int i=0; i<FusionObject.logoCount; i++){
 		char logoPath[PATH_MAX];
@@ -2032,7 +2031,6 @@ static void interface_displayLogo(void)
 				top = interfaceInfo.screenHeight - 200;
 				break;
 		}
-		eprintf ("%s(%d): interface_drawImage %s at (%d, %d) of size (%d, %d)\n", __FUNCTION__, __LINE__, logoPath, left, top, w, h);
 		interface_drawImage(DRAWING_SURFACE, 
 			logoPath,
 			left, top,
