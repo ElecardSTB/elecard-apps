@@ -180,6 +180,7 @@ int st_init(void)
 	if (result->type == cJSON_Array)
 	{
 		tunerFormat tuner;
+		fe_delivery_system_t type;
 		for (tuner = inputTuner0; tuner < inputTuners && appControlInfo.tunerInfo[tuner].status != tunerNotPresent; tuner++);
 		dprintf("%s: tuner %d\n", __func__, tuner);
 
@@ -191,16 +192,17 @@ int st_init(void)
 			if (t->type == cJSON_String)
 			{
 				if(strcasecmp( t->valuestring, "DVB-T" ) == 0) {
-					appControlInfo.tunerInfo[tuner].type = SYS_DVBT;
-					appControlInfo.tunerInfo[tuner].caps = tunerDVBT;
+					type = SYS_DVBT;
 				} else if(strcasecmp( t->valuestring, "DVB-S" ) == 0) {
-					appControlInfo.tunerInfo[tuner].type = SYS_DVBS;
-					appControlInfo.tunerInfo[tuner].caps = tunerDVBS;
+					type = SYS_DVBS;
 				} else if(strcasecmp( t->valuestring, "DVB-C" ) == 0) {
-					appControlInfo.tunerInfo[tuner].type = SYS_DVBC_ANNEX_AC;
-					appControlInfo.tunerInfo[tuner].caps = tunerDVBC;
+					type = SYS_DVBC_ANNEX_AC;
 				} else {
 					continue;
+				}
+				appControlInfo.tunerInfo[tuner].type = type;
+				if (dvb_checkDelSysSupport(tuner, type) < 0){
+					appControlInfo.tunerInfo[tuner].delSys[appControlInfo.tunerInfo[tuner].delSysCount++] = type;
 				}
 
 				appControlInfo.tunerInfo[tuner].status = tunerInactive;

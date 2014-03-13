@@ -537,6 +537,7 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 #define dvb_isLinuxTuner(tuner) 1
 #endif
 
+int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys);
 int dvb_setFrontendType(int adapter, fe_delivery_system_t type);
 int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 

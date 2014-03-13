@@ -250,16 +250,6 @@ typedef enum
 	signalStatusNoProblems
 } stb810_signalStatus;
 
-typedef enum
-{
-	tunerDVBS = 1,
-	tunerDVBC = 2,
-	tunerDVBT = 4,
-	tunerATSC = 8,
-	tunerDVBT2 = 16,
-	tunerMultistandard = 0x80,
-} stb810_tunerCaps_t;
-
 /* DVB tuner information */
 typedef struct
 {
@@ -270,7 +260,8 @@ typedef struct
 	// adapter field is used to describe the real port/adapter number
 	// On ST if this index is greater than ADAPTER_COUNT, then it is a ST tuner
 	int                  adapter;
-	uint8_t              caps;
+	fe_delivery_system_t delSys[8];
+	uint8_t				 delSysCount;
 	uint32_t             ber;
 	uint16_t             signal_strength;
 	uint16_t             snr;

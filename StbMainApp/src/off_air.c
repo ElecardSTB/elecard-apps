@@ -842,7 +842,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 
 static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerFormat tuner, int frequencyIndex, int frequencyCount)
 {
-	interfaceCommand_t cmd;
+//	interfaceCommand_t cmd;
 
 	dprintf("%s: in\n", __FUNCTION__);
 
@@ -4701,16 +4701,16 @@ static int offair_updateStatsEvent(void *pArg)
 
 int offair_findCapableTuner(EIT_service_t *service)
 {
-	uint8_t type = 0;
+	fe_delivery_system_t type = 0;
 	switch (service->media.type) {
-		case serviceMediaDVBT: type = tunerDVBT; break;
-		case serviceMediaDVBC: type = tunerDVBC; break;
-		case serviceMediaDVBS: type = tunerDVBS; break;
-		case serviceMediaATSC: type = tunerATSC; break;
+		case serviceMediaDVBT: type = SYS_DVBT; break;
+		case serviceMediaDVBC: type = SYS_DVBC_ANNEX_AC; break;
+		case serviceMediaDVBS: type = SYS_DVBS; break;
+		case serviceMediaATSC: type = SYS_ATSC; break;
 		default: return -1;
 	}
 	for (tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++)
-		if (appControlInfo.tunerInfo[tuner].caps & type)
+		if (dvb_checkDelSysSupport(tuner, type) == 0)
 			return tuner;
 	return -1;
 }

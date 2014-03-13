@@ -953,13 +953,15 @@ void appInfo_init(void)
 	appControlInfo.commandInfo.outputFile         = 0;
 
 #ifdef ENABLE_DVB
-	appControlInfo.tunerInfo[0].caps              = 0;
+//	appControlInfo.tunerInfo[0].delSys[8]         = {0};
+	memset (appControlInfo.tunerInfo[0].delSys, 0, 8);
 	appControlInfo.tunerInfo[0].fe_status         = 0;
 	appControlInfo.tunerInfo[0].ber               = 0;
 	appControlInfo.tunerInfo[0].signal_strength   = 0;
 	appControlInfo.tunerInfo[0].snr               = 0;
 	appControlInfo.tunerInfo[0].uncorrected_blocks= 0;
-	appControlInfo.tunerInfo[1].caps              = 0;
+//	appControlInfo.tunerInfo[1].delSys[8]         = {0};
+	memset (appControlInfo.tunerInfo[1].delSys, 0, 8);
 	appControlInfo.tunerInfo[1].fe_status         = 0;
 	appControlInfo.tunerInfo[1].ber               = 0;
 	appControlInfo.tunerInfo[1].signal_strength   = 0;

@@ -1287,11 +1287,20 @@ static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enab
 	//dvb_filterServices(&dvb_services);
 }
 
+int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys){
+	int i;
+	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++)
+		if(appControlInfo.tunerInfo[tuner].delSys[i] == delSys) {
+			return 0;
+		}
+	return -1;
+}
+
 int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner)
 {
 #ifdef DTV_DELIVERY_SYSTEM
-	if ((appControlInfo.tunerInfo[tuner].caps & tunerDVBT2) == 0)
-	  return 0;
+	if (dvb_checkDelSysSupport(tuner, SYS_DVBT2) < 0)
+		return 0;
 
 	int fdf = dvb_openFrontend(dvb_getAdapter(tuner), O_RDONLY);
 	if (fdf >= 0) {
@@ -1421,6 +1430,7 @@ int dvb_initFrontend(tunerFormat tuner)
 	struct dvb_frontend_info	info;
 	fe_delivery_system_t		current_sys;
 	struct dtv_property			dvb_prop[DTV_MAX_COMMAND];
+	uint8_t i;
 
 	if((fd = dvb_getFrontendInfo(dvb_getAdapter(tuner), O_RDONLY, &info)) < 0) {
 	    close(fd);
@@ -1448,16 +1458,26 @@ int dvb_initFrontend(tunerFormat tuner)
 		current_sys);
 
 	if (appControlInfo.dvbApiVersion < 0x505) {
-		appControlInfo.tunerInfo[tuner].caps = 1 << info.type;
+		appControlInfo.tunerInfo[tuner].delSys[0] = table_IntIntLookup(type_to_delsys, info.type, SYS_DVBT);
 		if(strstr(info.name, "CXD2820R") ||
 			strstr(info.name, "MN88472")) {
-			appControlInfo.tunerInfo[tuner].caps = tunerMultistandard | tunerDVBC | tunerDVBT | tunerDVBT2;
+			if((appControlInfo.tunerInfo[tuner].delSys[0] == SYS_DVBC_ANNEX_AC) ||
+			   (appControlInfo.tunerInfo[tuner].delSys[0] == SYS_DVBT) ||
+			   (appControlInfo.tunerInfo[tuner].delSys[0] == SYS_DVBT2))
+			{
+				appControlInfo.tunerInfo[tuner].delSys[0] = SYS_DVBC_ANNEX_AC;
+				appControlInfo.tunerInfo[tuner].delSys[1] = SYS_DVBT;
+				appControlInfo.tunerInfo[tuner].delSys[2] = SYS_DVBT2;
+			}
+			else
+			{
+				appControlInfo.tunerInfo[tuner].delSys[1] = SYS_DVBC_ANNEX_AC;
+				appControlInfo.tunerInfo[tuner].delSys[2] = SYS_DVBT;
+				appControlInfo.tunerInfo[tuner].delSys[3] = SYS_DVBT2;
+			}
 		}
 	} else {
 #ifdef DTV_ENUM_DELSYS
-		int32_t num_systems;
-		int32_t i;
-
 		dvb_prop[0].cmd = DTV_ENUM_DELSYS;
 		dtv_prop.num = 1;
 		dtv_prop.props = dvb_prop;
@@ -1465,42 +1485,16 @@ int dvb_initFrontend(tunerFormat tuner)
 			close(fd);
 			return -1;
 		}
-		num_systems = dvb_prop[0].u.buffer.len;
+		appControlInfo.tunerInfo[tuner].delSysCount = dvb_prop[0].u.buffer.len;
 
-		if(num_systems == 0) {
+		if(appControlInfo.tunerInfo[tuner].delSysCount == 0) {
 			close(fd);
 			return -1;
 		}
-		if(num_systems > 1) {
-			appControlInfo.tunerInfo[tuner].caps = tunerMultistandard;
-		} else {
-			appControlInfo.tunerInfo[tuner].caps = 0;
+		for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++) {
+			appControlInfo.tunerInfo[tuner].delSys[i] = dvb_prop[0].u.buffer.data[i];
 		}
 
-		for(i = 0; i < num_systems; i++) {
-			fe_delivery_system_t delSys = dvb_prop[0].u.buffer.data[i];
-			switch(delSys) {
-			  case SYS_DVBC_ANNEX_AC:
-				appControlInfo.tunerInfo[tuner].caps |= tunerDVBC;
-				break;
-			  case SYS_DVBS:
-				appControlInfo.tunerInfo[tuner].caps |= tunerDVBS;
-				break;
-			  case SYS_DVBT:
-				appControlInfo.tunerInfo[tuner].caps |= tunerDVBT;
-				break;
-			  case SYS_DVBT2:
-				appControlInfo.tunerInfo[tuner].caps |= tunerDVBT2;
-				break;
-			  case SYS_ATSC:
-			  case SYS_DVBC_ANNEX_B:
-				appControlInfo.tunerInfo[tuner].caps |= tunerATSC;
-				break;
-			  default:
-				eprintf("%s: unknown frontend type %d\n", __FUNCTION__, delSys);
-				continue;
-			}
-		}
 #endif
 	}
 
@@ -1509,8 +1503,12 @@ int dvb_initFrontend(tunerFormat tuner)
 	dvbInstances[dvb_getAdapter(tuner)].fe_type = current_sys;
 
 	appControlInfo.tunerInfo[tuner].status = tunerInactive;
-	eprintf("%s[%d]: %s (%s) caps: %02x\n", __FUNCTION__, dvb_getAdapter(tuner),
-		info.name, fe_typeNames[info.type], appControlInfo.tunerInfo[tuner].caps);
+	eprintf("%s[%d]: %s (%s) supported types: ", __FUNCTION__, dvb_getAdapter(tuner),
+		info.name, fe_typeNames[info.type]);
+	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++) {
+		printf("%u ", appControlInfo.tunerInfo[tuner].delSys[i]);
+	}
+	printf("\n");
 
 	close(fd);
 	return 0;
@@ -1848,9 +1846,8 @@ int dvb_readServicesFromDump(char* filename)
 
 const char *dvb_getTypeName(tunerFormat tuner)
 {
-	if (((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||
-		(appControlInfo.tunerInfo[tuner].type == SYS_DVBT2)) &&
-		(appControlInfo.tunerInfo[tuner].caps & tunerDVBT2))
+	if ((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||
+		(appControlInfo.tunerInfo[tuner].type == SYS_DVBT2))
 		return "DVB-T/T2";
 	return fe_typeNames[table_IntIntLookupR(type_to_delsys, appControlInfo.tunerInfo[tuner].type, FE_QPSK)];
 }
@@ -1891,7 +1888,6 @@ int dvb_setFrontendType(int adapter, fe_delivery_system_t type)
 
 int dvb_toggleType(tunerFormat tuner)
 {
-	int cap = 0;
 	fe_delivery_system_t prev_type = dvb_getType(tuner);
 	fe_delivery_system_t type = prev_type;
 
@@ -1900,29 +1896,9 @@ int dvb_toggleType(tunerFormat tuner)
 		if(type == prev_type) {
 			return 0;
 		}
-		switch (type) {
-			case SYS_DVBC_ANNEX_AC:
-				cap = tunerDVBC;
-				break;
-			case SYS_DVBS:
-				cap = tunerDVBS;
-				break;
-			case SYS_DVBT:
-				cap = tunerDVBT;
-				break;
-// DVBT2 is support, but don't process, because we need toggle between DVBT and DVBC type only.
-/*			case SYS_DVBT2:
-				cap = tunerDVBT2;
-				break; */
-			case SYS_ATSC:
-			case SYS_DVBC_ANNEX_B:
-				cap = tunerATSC;
-				break;
-			default:
-				cap = 0;
-				break;
-		}
-	} while((appControlInfo.tunerInfo[tuner].caps & cap) == 0);
+
+	// DVBT2 is supports, but don't process, because we need toggle between DVBT and DVBC type only.
+	} while ((dvb_checkDelSysSupport(tuner, type) < 0) || (type == SYS_DVBT2));
 
 	return dvb_setFrontendType(dvb_getAdapter(tuner), type);
 }

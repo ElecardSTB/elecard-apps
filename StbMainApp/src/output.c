@@ -3116,7 +3116,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbDiagnosticsOnStart, NULL, thumbnail_configure);
 #endif
 
-	if((appControlInfo.tunerInfo[tuner].caps & tunerMultistandard) == tunerMultistandard) {
+	if(appControlInfo.tunerInfo[tuner].delSysCount > 1) {
 		snprintf(buf, sizeof(buf), "%s: %s", _T("DVB_MODE"), dvb_getTypeName(tuner));
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbType, NULL, thumbnail_scan);
 	}
