@@ -294,7 +294,7 @@ static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
 
 static struct dvb_instance dvbInstances[ADAPTER_COUNT];
 static __u32 currentFrequency[ADAPTER_COUNT];
-static char * fe_typeNames[FE_TYPE_NAMES_COUNT] = {
+static char * fe_typeNames[] = {
 	"DVB-S",
 	"DVB-C",
 	"DVB-T",
@@ -1287,20 +1287,23 @@ static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enab
 	//dvb_filterServices(&dvb_services);
 }
 
-int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys){
+int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys)
+{
 	int i;
-	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++)
+	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++) {
 		if(appControlInfo.tunerInfo[tuner].delSys[i] == delSys) {
-			return 0;
+			return 1;
 		}
-	return -1;
+	}
+	return 0;
 }
 
 int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner)
 {
 #ifdef DTV_DELIVERY_SYSTEM
-	if (dvb_checkDelSysSupport(tuner, SYS_DVBT2) < 0)
+	if(!dvb_checkDelSysSupport(tuner, SYS_DVBT2)) {
 		return 0;
+	}
 
 	int fdf = dvb_openFrontend(dvb_getAdapter(tuner), O_RDONLY);
 	if (fdf >= 0) {
@@ -1458,23 +1461,16 @@ int dvb_initFrontend(tunerFormat tuner)
 		current_sys);
 
 	if (appControlInfo.dvbApiVersion < 0x505) {
-		appControlInfo.tunerInfo[tuner].delSys[0] = table_IntIntLookup(type_to_delsys, info.type, SYS_DVBT);
 		if(strstr(info.name, "CXD2820R") ||
-			strstr(info.name, "MN88472")) {
-			if((appControlInfo.tunerInfo[tuner].delSys[0] == SYS_DVBC_ANNEX_AC) ||
-			   (appControlInfo.tunerInfo[tuner].delSys[0] == SYS_DVBT) ||
-			   (appControlInfo.tunerInfo[tuner].delSys[0] == SYS_DVBT2))
-			{
-				appControlInfo.tunerInfo[tuner].delSys[0] = SYS_DVBC_ANNEX_AC;
-				appControlInfo.tunerInfo[tuner].delSys[1] = SYS_DVBT;
-				appControlInfo.tunerInfo[tuner].delSys[2] = SYS_DVBT2;
-			}
-			else
-			{
-				appControlInfo.tunerInfo[tuner].delSys[1] = SYS_DVBC_ANNEX_AC;
-				appControlInfo.tunerInfo[tuner].delSys[2] = SYS_DVBT;
-				appControlInfo.tunerInfo[tuner].delSys[3] = SYS_DVBT2;
-			}
+			strstr(info.name, "MN88472"))
+		{
+			appControlInfo.tunerInfo[tuner].delSysCount = 3;
+			appControlInfo.tunerInfo[tuner].delSys[0] = SYS_DVBC_ANNEX_AC;
+			appControlInfo.tunerInfo[tuner].delSys[1] = SYS_DVBT;
+			appControlInfo.tunerInfo[tuner].delSys[2] = SYS_DVBT2;
+		} else {
+			appControlInfo.tunerInfo[tuner].delSysCount = 1;
+			appControlInfo.tunerInfo[tuner].delSys[0] = table_IntIntLookup(type_to_delsys, info.type, SYS_DVBT);
 		}
 	} else {
 #ifdef DTV_ENUM_DELSYS
@@ -1888,19 +1884,30 @@ int dvb_setFrontendType(int adapter, fe_delivery_system_t type)
 
 int dvb_toggleType(tunerFormat tuner)
 {
-	fe_delivery_system_t prev_type = dvb_getType(tuner);
-	fe_delivery_system_t type = prev_type;
+	fe_delivery_system_t cur_type = dvb_getType(tuner);
+	fe_delivery_system_t next_type;
+	uint32_t i;
+
+	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++) {
+		if(appControlInfo.tunerInfo[tuner].delSys[i] == cur_type) {
+			return 1;
+		}
+	}
 
 	do {
-		type = (type + 1) % FE_TYPE_COUNT;
-		if(type == prev_type) {
+		i = (i + 1) % appControlInfo.tunerInfo[tuner].delSysCount;
+		next_type = appControlInfo.tunerInfo[tuner].delSys[i];
+		if(next_type == cur_type) {
 			return 0;
 		}
 
-	// DVBT2 is supports, but don't process, because we need toggle between DVBT and DVBC type only.
-	} while ((dvb_checkDelSysSupport(tuner, type) < 0) || (type == SYS_DVBT2));
+		// DVBT2 is supports, but don't process, because we need toggle between DVBT and DVBC type only.
+		if(next_type == SYS_DVBT2) {
+			continue;
+		}
+	} while(0);
 
-	return dvb_setFrontendType(dvb_getAdapter(tuner), type);
+	return dvb_setFrontendType(dvb_getAdapter(tuner), next_type);
 }
 
 int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, __u32 * freq_step)

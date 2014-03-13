@@ -201,7 +201,7 @@ int st_init(void)
 					continue;
 				}
 				appControlInfo.tunerInfo[tuner].type = type;
-				if (dvb_checkDelSysSupport(tuner, type) < 0){
+				if(!dvb_checkDelSysSupport(tuner, type)) {
 					appControlInfo.tunerInfo[tuner].delSys[appControlInfo.tunerInfo[tuner].delSysCount++] = type;
 				}
 

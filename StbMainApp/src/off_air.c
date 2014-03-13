@@ -4709,9 +4709,11 @@ int offair_findCapableTuner(EIT_service_t *service)
 		case serviceMediaATSC: type = SYS_ATSC; break;
 		default: return -1;
 	}
-	for (tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++)
-		if (dvb_checkDelSysSupport(tuner, type) == 0)
+	for(tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++) {
+		if(dvb_checkDelSysSupport(tuner, type)) {
 			return tuner;
+		}
+	}
 	return -1;
 }
 
