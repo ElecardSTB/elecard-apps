@@ -83,6 +83,8 @@ typedef enum
 	elcmd_TSsectionStreamOff,
 	elcmd_setOutputWnd,
 	elcmd_getDvbTunerStatus,
+	elcmd_TSstreamerOn,
+	elcmd_TSstreamerOff,
 
 	// All following commands are asynchronous
 	elcmd_async = 0x1000, //should be enough for synchronous commands
@@ -136,7 +138,9 @@ typedef enum
 	case elcmd_TSsectionStreamOn: \
 	case elcmd_TSsectionStreamOff: \
 	case elcmd_setOutputWnd: \
-	case elcmd_getDvbTunerStatus
+	case elcmd_getDvbTunerStatus: \
+	case elcmd_TSstreamerOn: \
+	case elcmd_TSstreamerOff
 
 #define case_all_async \
 	case elcmd_closestream: \
