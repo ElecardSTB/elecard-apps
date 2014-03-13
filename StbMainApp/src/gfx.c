@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtsp.h"
 #include "sound.h"
 #include "off_air.h"
+#include "analogtv.h"
 #include "l10n.h"
 #include "downloader.h"
 #include "stsdk.h"

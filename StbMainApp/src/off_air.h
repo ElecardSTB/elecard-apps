@@ -201,8 +201,6 @@ int  offair_serviceScan(interfaceMenu_t *pMenu, void* pArg);
 
 int  offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg);
 
-int  offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg);
-
 int  offair_frequencyMonitor(interfaceMenu_t *pMenu, void* pArg);
 
 int  offair_wizardStart(interfaceMenu_t *pMenu, void* pArg);

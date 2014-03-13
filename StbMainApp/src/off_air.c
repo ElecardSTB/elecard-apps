@@ -805,7 +805,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, & freq_step);
 
-	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvb_getType(tuner) == FE_QPSK ? _T("MHZ") : _T("KHZ"), numChannels);
+	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvb_getType(tuner) == SYS_DVBS ? _T("MHZ") : _T("KHZ"), numChannels);
 	// in this moment semaphore is busy
 	for ( i = numChannels-1; i > numChannels-4; i-- )
 	{
@@ -842,7 +842,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 
 static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerFormat tuner, int frequencyIndex, int frequencyCount)
 {
-	interfaceCommand_t cmd;
+//	interfaceCommand_t cmd;
 
 	dprintf("%s: in\n", __FUNCTION__);
 
@@ -853,17 +853,17 @@ static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerForma
 	offair_buildInstallSlider(channelCount, tuner);
 	//interface_displayMenu(1);
 
-	while ((cmd = helperGetEvent(0)) != interfaceCommandNone)
+/*	while ((cmd = helperGetEvent(0)) != interfaceCommandNone)
 	{
 		//dprintf("%s: got command %d\n", __FUNCTION__, cmd);
 		if (cmd != interfaceCommandCount)
 		{
 			dprintf("%s: exit on command %d\n", __FUNCTION__, cmd);
-			/* Flush any waiting events */
+			// Flush any waiting events
 			helperGetEvent(1);
 			return -1;
 		}
-	}
+	}*/
 
 	//dprintf("%s: got none %d\n", __FUNCTION__, cmd);
 
@@ -1040,7 +1040,15 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 {
 	int ok = 0;
 	appControlInfo.dvbtInfo.plp_id = 0;
+
 	do {
+		dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
+
+		interfaceCommand_t cmd = helperGetEvent(1);
+		if (cmd == interfaceCommandRed) {
+			return -1;
+		}
+		
 		if(dvb_frequencyScan(tuner, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
 			ok = 1;
 		}
@@ -1053,15 +1061,11 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 #endif
 		}
 
-		if(ok && (dvb_isCurrentDelSys_dvbt2(tuner) == 1) &&
-			  appControlInfo.dvbtInfo.plp_id < 3)
-		{
-			appControlInfo.dvbtInfo.plp_id++;
-			dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
-		} else {
-			ok = 0;
+		if(ok == 0) {
+			break;
 		}
-	} while (ok);
+		appControlInfo.dvbtInfo.plp_id++;
+	} while((dvb_isCurrentDelSys_dvbt2(tuner) == 1) && (appControlInfo.dvbtInfo.plp_id <= 3));
 
 	return 0;
 }
@@ -1073,7 +1077,8 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	uint32_t low_freq, high_freq, freq_step, frequency;
 	int32_t which = GET_NUMBER(pArg);
 	char buf[256];
-
+	int res = 0;
+	
 	tuner = offair_getTuner();
 	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
 
@@ -1087,7 +1092,14 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		interface_hideMessageBox();
 		offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-		offair_scanFrequency(pMenu, tuner, frequency);
+		res = offair_scanFrequency(pMenu, tuner, frequency);
+		if(res < 0){
+			interface_hideMessageBox();
+			interface_sliderShow(0, 0);
+			sprintf(buf, _T("Scan was stopped. Found %d channels"), dvb_getNumberOfServices());
+			interface_showMessageBox(buf, thumbnail_info, 5000);
+			return -1;
+		}
 		interface_sliderShow(0, 0);
 		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
 		interface_showMessageBox(buf, thumbnail_info, 5000);
@@ -1189,9 +1201,9 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 		dvb.scan.frequency = low_freq/KHZ;
 
 	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"),
-		low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == DVBS ? _T("MHZ") : _T("KHZ"));
+		low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == SYS_DVBS ? _T("MHZ") : _T("KHZ"));
 	const char *mask = "\\d{6}";
-	if (dvb_getType(tuner) == DVBS)
+	if (dvb_getType(tuner) == SYS_DVBS)
 		mask = appControlInfo.dvbsInfo.band == dvbsBandK ? "\\d{5}" : "\\d{4}";
 	interface_getText(pMenu, buf, mask, offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
 	return 0;
@@ -1203,7 +1215,8 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	int32_t which = GET_NUMBER(pArg);
 	uint32_t low_freq = MIN_FREQUENCY_KHZ*KHZ, high_freq = MAX_FREQUENCY_KHZ*KHZ, frequency, freq_step;
 	char buf[256];
-	
+	int res = 0;
+
 	if(value == NULL) {
 		return 1;
 	}
@@ -1221,7 +1234,14 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	interface_hideMessageBox();
 	offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-	offair_scanFrequency(pMenu, tuner, frequency);
+	res = offair_scanFrequency(pMenu, tuner, frequency);
+	if(res < 0){
+		interface_hideMessageBox();
+		interface_sliderShow(0, 0);
+		sprintf(buf, _T("Scan was stopped. Found %d channels"), dvb_getNumberOfServices());
+		interface_showMessageBox(buf, thumbnail_info, 5000);
+		return -1;
+	}
 
 	interface_sliderShow(0, 0);
 	sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
@@ -3622,16 +3642,18 @@ void offair_fillDVBTMenu(void)
 #ifndef HIDE_EXTRA_FUNCTIONS
 	switch ( dvb_getType(0) )  // Assumes same type FEs
 	{
-	case FE_OFDM:
+	case SYS_DVBT:
+	case SYS_DVBT2:
 		sprintf(buf,"%s: DVB-T", _T("DVB_MODE") );
 		break;
-	case FE_QAM:
+	case SYS_DVBC_ANNEX_AC:
 		sprintf(buf,"%s: DVB-C", _T("DVB_MODE") );
 		break;
-	case FE_QPSK:
+	case SYS_DVBS:
 		sprintf(buf,"%s: DVB-S", _T("DVB_MODE") );
 		break;
-	//case FE_ATSC:
+	//case SYS_ATSC:
+	//case SYS_DVBC_ANNEX_B:
 	default:
 		eprintf("offair: unsupported FE type %d\n", dvb_getType(0));
 		sprintf(buf,"%s: %s", _T("DVB_MODE"), _T("NOT_AVAILABLE_SHORT") );
@@ -4678,17 +4700,19 @@ static int offair_updateStatsEvent(void *pArg)
 
 int offair_findCapableTuner(EIT_service_t *service)
 {
-	uint8_t type = 0;
+	fe_delivery_system_t type = 0;
 	switch (service->media.type) {
-		case serviceMediaDVBT: type = tunerDVBT; break;
-		case serviceMediaDVBC: type = tunerDVBC; break;
-		case serviceMediaDVBS: type = tunerDVBS; break;
-		case serviceMediaATSC: type = tunerATSC; break;
+		case serviceMediaDVBT: type = SYS_DVBT; break;
+		case serviceMediaDVBC: type = SYS_DVBC_ANNEX_AC; break;
+		case serviceMediaDVBS: type = SYS_DVBS; break;
+		case serviceMediaATSC: type = SYS_ATSC; break;
 		default: return -1;
 	}
-	for (tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++)
-		if (appControlInfo.tunerInfo[tuner].caps & type)
+	for(tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++) {
+		if(dvb_checkDelSysSupport(tuner, type)) {
 			return tuner;
+		}
+	}
 	return -1;
 }
 

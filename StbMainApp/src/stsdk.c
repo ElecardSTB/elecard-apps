@@ -180,6 +180,7 @@ int st_init(void)
 	if (result->type == cJSON_Array)
 	{
 		tunerFormat tuner;
+		fe_delivery_system_t type;
 		for (tuner = inputTuner0; tuner < inputTuners && appControlInfo.tunerInfo[tuner].status != tunerNotPresent; tuner++);
 		dprintf("%s: tuner %d\n", __func__, tuner);
 
@@ -190,19 +191,19 @@ int st_init(void)
 				break;
 			if (t->type == cJSON_String)
 			{
-				if (strcasecmp( t->valuestring, "DVB-T" ) == 0) {
-					appControlInfo.tunerInfo[tuner].type = DVBT;
-					appControlInfo.tunerInfo[tuner].caps = tunerDVBT;
-				} else
-				if (strcasecmp( t->valuestring, "DVB-S" ) == 0) {
-					appControlInfo.tunerInfo[tuner].type = DVBS;
-					appControlInfo.tunerInfo[tuner].caps = tunerDVBS;
-				} else
-				if (strcasecmp( t->valuestring, "DVB-C" ) == 0) {
-					appControlInfo.tunerInfo[tuner].type = DVBC;
-					appControlInfo.tunerInfo[tuner].caps = tunerDVBC;
-				} else
+				if(strcasecmp( t->valuestring, "DVB-T" ) == 0) {
+					type = SYS_DVBT;
+				} else if(strcasecmp( t->valuestring, "DVB-S" ) == 0) {
+					type = SYS_DVBS;
+				} else if(strcasecmp( t->valuestring, "DVB-C" ) == 0) {
+					type = SYS_DVBC_ANNEX_AC;
+				} else {
 					continue;
+				}
+				appControlInfo.tunerInfo[tuner].type = type;
+				if(!dvb_checkDelSysSupport(tuner, type)) {
+					appControlInfo.tunerInfo[tuner].delSys[appControlInfo.tunerInfo[tuner].delSysCount++] = type;
+				}
 
 				appControlInfo.tunerInfo[tuner].status = tunerInactive;
 				appControlInfo.tunerInfo[tuner].adapter = ADAPTER_COUNT+i;
@@ -524,11 +525,14 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
 	switch (appControlInfo.tunerInfo[tuner].type)
 	{
-		case DVBT:
+		case SYS_DVBT:
+		case SYS_DVBT2:
 			cJSON_AddItemToObject(params, "stream",
 				cJSON_CreateNumber( media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id ));
+//			cJSON_AddItemToObject(params, "generation",
+//				cJSON_CreateNumber( media ? media->dvb_t.generation : appControlInfo.dvbtInfo.generation ));
 			break;
-		case DVBC: {
+		case SYS_DVBC_ANNEX_AC: {
 			fe_modulation_t modulation = media ? media->dvb_c.modulation : appControlInfo.dvbcInfo.modulation;
 			uint32_t symbolRate = media ? media->dvb_c.symbol_rate / 1000 : appControlInfo.dvbcInfo.symbolRate;
 			const char *modName;
@@ -539,7 +543,7 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber(symbolRate));
 			break;
 		}
-		case DVBS: {
+		case SYS_DVBS: {
 			int32_t vertical = media ? media->dvb_s.polarization == 1 : appControlInfo.dvbsInfo.polarization != 0;
 			uint32_t symbolRate = media ? media->dvb_s.symbol_rate / 1000 : appControlInfo.dvbsInfo.symbolRate;
 
@@ -549,7 +553,8 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 			}
 			break;
 		}
-		case ATSC: {
+		case SYS_ATSC:
+		case SYS_DVBC_ANNEX_B:{
 			fe_modulation_t modulation = media ? media->atsc.modulation : appControlInfo.atscInfo.modulation;
 			const char *modName;
 			modName = getModulationName(modulation);

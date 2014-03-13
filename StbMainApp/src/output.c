@@ -2787,10 +2787,11 @@ static int output_toggleDvbInversion(interfaceMenu_t *pMenu, void* pArg)
 
 	switch (dvb_getType(appControlInfo.dvbInfo.tuner))
 	{
-		case DVBT:
+		case SYS_DVBT:
+		case SYS_DVBT2:
 			fe = &appControlInfo.dvbtInfo.fe;
 			break;
-		case DVBC:
+		case SYS_DVBC_ANNEX_AC:
 			fe = &appControlInfo.dvbcInfo.fe;
 			break;
 		default:
@@ -2856,7 +2857,7 @@ static int output_toggleDiseqcUncommited(interfaceMenu_t *pMenu, void* pArg)
 static void getDvbLimits(tunerFormat tuner, uint32_t *min, uint32_t *max)
 {
 	switch (dvb_getType(tuner)) {
-		case DVBS:
+		case SYS_DVBS:
 			if (appControlInfo.dvbsInfo.band == dvbsBandC) {
 				*min = DVB_MIN_FREQUENCY_C_BAND;
 				*max = DVB_MAX_FREQUENCY_C_BAND;
@@ -2865,7 +2866,7 @@ static void getDvbLimits(tunerFormat tuner, uint32_t *min, uint32_t *max)
 				*max = DVB_MAX_FREQUENCY_K_BAND;
 			}
 			break;
-		case DVBC:
+		case SYS_DVBC_ANNEX_AC:
 			*min = DVB_MIN_FREQUENCY_C;
 			*max = DVB_MAX_FREQUENCY_C;
 			break;
@@ -2880,19 +2881,21 @@ static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 	stb810_dvbfeInfo *fe = NULL;
 
 	switch (dvb_getType(tuner)) {
-		case DVBT:
+		case SYS_DVBT:
+		case SYS_DVBT2:
 			fe = &appControlInfo.dvbtInfo.fe;
 			break;
-		case DVBC:
+		case SYS_DVBC_ANNEX_AC:
 			fe = &appControlInfo.dvbcInfo.fe;
 			break;
-		case DVBS:
+		case SYS_DVBS:
 			if (appControlInfo.dvbsInfo.band == dvbsBandC)
 				fe = &appControlInfo.dvbsInfo.c_band;
 			else
 				fe = &appControlInfo.dvbsInfo.k_band;
 			break;
-		case ATSC:
+		case SYS_ATSC:
+		case SYS_DVBC_ANNEX_B:
 			fe = &appControlInfo.atscInfo.fe;
 			break;
 		default:;
@@ -2903,8 +2906,8 @@ static stb810_dvbfeInfo* getDvbRange(tunerFormat tuner)
 static uint32_t* getDvbSymbolRate(void)
 {
 	switch (dvb_getType(appControlInfo.dvbInfo.tuner)) {
-		case DVBC: return &appControlInfo.dvbcInfo.symbolRate;
-		case DVBS: return &appControlInfo.dvbsInfo.symbolRate;
+		case SYS_DVBC_ANNEX_AC: return &appControlInfo.dvbcInfo.symbolRate;
+		case SYS_DVBS: return &appControlInfo.dvbsInfo.symbolRate;
 		default:   break;
 	}
 	return NULL;
@@ -3018,32 +3021,36 @@ static int output_toggleDvbModulation(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
 {
-	fe_modulation_t atscModulations[] = {VSB_8, /*VSB_16, */QAM_64, QAM_256};
+	table_IntInt_t mod_to_delSys[] = {
+		{VSB_8,		SYS_ATSC},
+//		{VSB_16,	SYS_ATSC},
+		{QAM_64,	SYS_DVBC_ANNEX_B},
+		{QAM_256,	SYS_DVBC_ANNEX_B},
+		TABLE_INT_INT_END_VALUE
+	};
 	static uint32_t curAtscModulation = 0;
 
 	curAtscModulation++;
-	if(curAtscModulation >= ARRAY_SIZE(atscModulations)) {
+	if(curAtscModulation >= ARRAY_SIZE(mod_to_delSys)) {
 		curAtscModulation = 0;
 	}
-	appControlInfo.atscInfo.modulation = atscModulations[curAtscModulation];
+	appControlInfo.atscInfo.modulation = mod_to_delSys[curAtscModulation].key;
 
-	if((atscModulations[curAtscModulation] == VSB_8) || (atscModulations[curAtscModulation] == QAM_64)) {
-		dvb_setType(appControlInfo.dvbInfo.tuner, ATSC, atscModulations[curAtscModulation]);
-	}
+	dvb_setFrontendType(dvb_getAdapter(appControlInfo.dvbInfo.tuner), mod_to_delSys[curAtscModulation].value);
 
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
-static inline char *get_HZprefix(int tunerType)
+static inline char *get_HZprefix(fe_delivery_system_t tunerType)
 {
-	return _T(tunerType == DVBS ? "MHZ" : "KHZ");
+	return _T(tunerType == SYS_DVBS ? "MHZ" : "KHZ");
 }
 
 static int output_changeDvbRange(interfaceMenu_t *pMenu, void* pArg)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	int id = GET_NUMBER(pArg);
-	int tunerType = dvb_getType(appControlInfo.dvbInfo.tuner);
+	fe_delivery_system_t tunerType = dvb_getType(appControlInfo.dvbInfo.tuner);
 	switch (id)
 	{
 		case optionLowFreq:    sprintf(buf, "%s, %s: ", _T("DVB_LOW_FREQ"),  get_HZprefix(tunerType)); break;
@@ -3066,7 +3073,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	const char *str;
 	tunerFormat tuner = appControlInfo.dvbInfo.tuner;
 	stb810_dvbfeInfo *fe = getDvbRange(tuner);
-	int tunerType = dvb_getType(tuner);
+	fe_delivery_system_t tunerType = dvb_getType(tuner);
 
 	dprintf("%s: tuner %d (%d) - %s (%d)\n", __func__, tuner, appControlInfo.tunerInfo[tuner].adapter, dvb_getTypeName(tuner), appControlInfo.tunerInfo[tuner].type);
 
@@ -3109,7 +3116,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbDiagnosticsOnStart, NULL, thumbnail_configure);
 #endif
 
-	if((appControlInfo.tunerInfo[tuner].caps & tunerMultistandard) == tunerMultistandard) {
+	if(appControlInfo.tunerInfo[tuner].delSysCount > 1) {
 		snprintf(buf, sizeof(buf), "%s: %s", _T("DVB_MODE"), dvb_getTypeName(tuner));
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbType, NULL, thumbnail_scan);
 	}
@@ -3129,12 +3136,13 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s: %s", _T("DVB_INVERSION"), _T( fe->inversion ? "ON" : "OFF" ) );
 	interface_addMenuEntry(dvbMenu, buf, output_toggleDvbInversion, NULL, thumbnail_configure);
 #endif
-	if(tunerType == DVBC || tunerType == DVBS) {
+	if(tunerType == SYS_DVBC_ANNEX_AC || tunerType == SYS_DVBS) {
 		sprintf(buf, "%s: %u %s", _T("DVB_SYMBOL_RATE"), getDvbSymbolRate()?*(getDvbSymbolRate()):0, _T("KHZ"));
 		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, SET_NUMBER(optionSymbolRate), thumbnail_configure);
 	}
 	switch(tunerType) {
-	case DVBT:
+	case SYS_DVBT:
+	case SYS_DVBT2:
 		switch(appControlInfo.dvbtInfo.bandwidth) {
 			case BANDWIDTH_8_MHZ: sprintf(buf, "%s: 8 %s", _T("DVB_BANDWIDTH"), _T( "MHZ" ) ); break;
 			case BANDWIDTH_7_MHZ: sprintf(buf, "%s: 7 %s", _T("DVB_BANDWIDTH"), _T( "MHZ" ) ); break;
@@ -3144,19 +3152,22 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		}
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbBandwidth, NULL, thumbnail_configure);
 		break;
-	case DVBC:
+	case SYS_DVBC_ANNEX_AC:
 		str = table_IntStrLookup(fe_modulationName, appControlInfo.dvbcInfo.modulation, _T("NOT_AVAILABLE_SHORT"));
 		sprintf(buf, "%s: %s", _T("DVB_QAM_MODULATION"), str);
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbModulation, NULL, thumbnail_configure);
 		break;
-	case ATSC:
+	case SYS_ATSC:
+	case SYS_DVBC_ANNEX_B:
 		str = table_IntStrLookup(fe_modulationName, appControlInfo.atscInfo.modulation, _T("NOT_AVAILABLE_SHORT"));
 		sprintf(buf, "%s: %s", _T("DVB_MODULATION"), str);
 		interface_addMenuEntry(dvbMenu, buf, output_toggleAtscModulation, NULL, thumbnail_configure);
 		break;
-	case DVBS:
+	case SYS_DVBS:
 		sprintf(buf, "%s: %c", _T("DVB_POLARIZATION"), appControlInfo.dvbsInfo.polarization ? 'V' : 'H');
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbPolarization, NULL, thumbnail_configure);
+		break;
+	default:
 		break;
 	}
 
@@ -3181,7 +3192,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 		interface_addMenuEntry(dvbMenu, buf, output_changeDvbRange, (void*)2, thumbnail_configure);
 	}
 
-	if(tunerType == DVBS) {
+	if(tunerType == SYS_DVBS) {
 		interface_addMenuEntry(dvbMenu, "DiSEqC", interface_menuActionShowMenu, &DiSEqCMenu, thumbnail_scan);
 	}
 

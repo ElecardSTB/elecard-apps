@@ -107,6 +107,8 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg);
  *   @param[in]  filename  Channel file name
  */
 
+void analogtv_stop();
+
 int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);

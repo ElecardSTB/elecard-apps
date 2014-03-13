@@ -66,11 +66,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define ADAPTER_COUNT      (2)
 
-#define DVBS FE_QPSK
-#define DVBC FE_QAM
-#define DVBT FE_OFDM
-#define ATSC FE_ATSC
-
 #define MIN_FREQUENCY_KHZ  (  40000)
 #define MAX_FREQUENCY_KHZ  ( 860000)
 #define FREQUENCY_STEP_KHZ (   8000)
@@ -182,7 +177,7 @@ void dvb_terminate(void);
  *
  *   @return fe_type or -1 if failed
  */
-static inline fe_type_t dvb_getType(tunerFormat tuner)
+static inline fe_delivery_system_t dvb_getType(tunerFormat tuner)
 {
 	return appControlInfo.tunerInfo[tuner].type;
 }
@@ -542,8 +537,8 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 #define dvb_isLinuxTuner(tuner) 1
 #endif
 
-//TODO: remove modulation argument, this used for separate ATSC and ANNEX-B delivery systems
-int32_t dvb_setType(tunerFormat tuner, int type, fe_modulation_t modulation);
+int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys);
+int dvb_setFrontendType(int adapter, fe_delivery_system_t type);
 int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
 /** Function return if there has teletext in playing program
