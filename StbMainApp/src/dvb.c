@@ -1890,11 +1890,14 @@ int dvb_toggleType(tunerFormat tuner)
 
 	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++) {
 		if(appControlInfo.tunerInfo[tuner].delSys[i] == cur_type) {
-			return 1;
+			break;
 		}
 	}
+	if(i == appControlInfo.tunerInfo[tuner].delSysCount) {
+		return -1;
+	}
 
-	do {
+	while(1) {
 		i = (i + 1) % appControlInfo.tunerInfo[tuner].delSysCount;
 		next_type = appControlInfo.tunerInfo[tuner].delSys[i];
 		if(next_type == cur_type) {
@@ -1902,10 +1905,10 @@ int dvb_toggleType(tunerFormat tuner)
 		}
 
 		// DVBT2 is supports, but don't process, because we need toggle between DVBT and DVBC type only.
-		if(next_type == SYS_DVBT2) {
-			continue;
+		if(next_type != SYS_DVBT2) {
+			break;
 		}
-	} while(0);
+	}
 
 	return dvb_setFrontendType(dvb_getAdapter(tuner), next_type);
 }
