@@ -1508,17 +1508,17 @@ void *keyThread(void *pArg)
 					continue;
 				}
 #ifdef STSDK
-				if (event.input.key_symbol == DIKS_CUSTOM0) { //VFMT
+				if(event.input.key_symbol == DIKS_CUSTOM0) { //VFMT
 					output_toggleOutputModes();
 					continue;
 				}
-				if (event.input.key_symbol == DIKS_CUSTOM2) { // Source
+				if(event.input.key_symbol == DIKS_CUSTOM2) { // Source
 					output_toggleInputs();
 					continue;
 				}
 
 				/// TODO : redo: F1 will always disable inputs first
-				if (event.input.key_symbol == DIKS_F1) { // interfaceCommandRed, Cancel all inputs
+				if(event.input.key_symbol == DIKS_F1) { // interfaceCommandRed, Cancel all inputs
 					output_setInput(NULL, INPUT_NONE);
 				}
 #endif
@@ -2364,8 +2364,7 @@ void process()
 			case('8') : event.input.key_symbol = DIKS_8; break;
 			case('9') : event.input.key_symbol = DIKS_9; break;
 			}
-			if (event.input.key_symbol != 0)
-			{
+			if(event.input.key_symbol != 0) {
 				dprintf("%s: '%c' [%d]\n", __FUNCTION__, value, value);
 				event.input.flags = DIEF_KEYSYMBOL;
 				gettimeofday(&event.input.timestamp, 0);

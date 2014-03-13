@@ -564,11 +564,9 @@ static void interface_animateSurface()
 {
 	static char new_frame[720 * 576 * 4], *src;
 	int stride, line_size = 720 * 4; // Bpp
-#ifdef STB82
 	char* pPhysAddrSurface;
 	char* pVirtAddrSurface;
 	int frame_size;
-#endif
 	int y, i;
 	IDirectFBSurface_data *dst_data;
 	CoreSurface *dst_surface;
@@ -609,7 +607,6 @@ static void interface_animateSurface()
 
 //SergA
 //FIXME: 'CoreSurface' has no member named 'front_buffer'
-#ifdef STB82
 	pVirtAddrSurface = (char*)dfb_system_video_memory_virtual(dst_surface->front_buffer->video.offset); 
 	if (!pVirtAddrSurface) 
 	{ 
@@ -638,13 +635,10 @@ static void interface_animateSurface()
 	//get new addr before flip, is second addr 
 	pPhysAddrSurface = (char*)dfb_system_video_memory_physical(dst_surface->front_buffer->video.offset);
 	gfx_flipSurface(DRAWING_SURFACE);
-#endif
 
 	switch (interfaceInfo.animation)
 	{
 		case interfaceAnimationVerticalCinema:
-//SergA
-#ifdef STB82
 			for ( y = 1; y <= (interfaceInfo.screenHeight/INTERFACE_ANIMATION_STEP); y ++ )
 			{
 				int is_first = 0;
@@ -668,7 +662,7 @@ static void interface_animateSurface()
 				pPhysAddrSurface = (char*)dfb_system_video_memory_physical(dst_surface->front_buffer->video.offset);
 				gfx_flipSurface(DRAWING_SURFACE);
 			}
-#endif
+
 			break;
 		case interfaceAnimationHorizontalPanorama:
 			for ( y = 1; y <= (interfaceInfo.screenHeight/(20*2)); y ++ )

@@ -1727,8 +1727,7 @@ void offair_displayPlayControl(void)
 			interfacePlayControl.showState ||
 			appControlInfo.dvbInfo.reportedSignalStatus ||
 			teletext_isTeletextShowing()
-		) && 
-		(current_service() != NULL) )
+		))
 	{
 		DFBCHECK( pgfx_font->GetHeight(pgfx_font, &fh) );
 		DFBCHECK( pgfx_font->GetAscender(pgfx_font, &fa) );
