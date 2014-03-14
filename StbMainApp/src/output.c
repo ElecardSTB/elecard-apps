@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "output.h"
 
 #include "debug.h"
+#include "dvbChannel.h"
 #include "l10n.h"
 #include "StbMainApp.h"
 #include "helper.h"

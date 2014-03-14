@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "dvb.h"
 #include "interface.h"
+#include "dvbChannel.h"
 
 #include <time.h>
 #include <stdint.h>
@@ -153,12 +154,7 @@ extern interfaceColor_t    genre_colors[];
 *********************************/
 
 #ifdef ENABLE_DVB
-EIT_service_t *dvbChannel_getService(uint32_t id);
-int32_t dvbChannel_getServiceId(EIT_common_t *header);
-int32_t dvbChannel_getIndex(EIT_service_t *service);
-int32_t dvbChannel_getCount(void);
-int32_t dvbChannel_clearServices(void);
-int32_t dvbChannel_hasAnyEPG(void);
+void offair_sortSchedule(void);
 
 char *offair_getChannelNumberPrefix(uint32_t id);
 
