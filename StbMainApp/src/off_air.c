@@ -82,7 +82,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/ioctl.h>
 
 //extern char scan_messages[64*1024];
-extern dvb_channels_t g_dvb_channels;
 
 /*********************************************************(((((((**********
 * EXPORTED DATA      g[k|p|kp|pk|kpk]ph[<lnx|tm|NONE>]StbTemplate_<Word>+ *
@@ -1977,7 +1976,7 @@ static void offair_addDVBChannelsToMenu()
 
 // 	for(int i = 0; i < dvbChannel_getCount(); ++i) {
 // 		EIT_service_t *service = dvbChannel_getService(i);
-	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+	list_for_each(pos, dvbChannel_getSortList()) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
 		EIT_service_t *service = srv->service;
 		interfaceMenuEntry_t *entry;
@@ -2177,7 +2176,7 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 	} else {
 		struct list_head *pos;
 
-		list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		list_for_each(pos, dvbChannel_getSortList()) {
 			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderSort);
 			if(srvIdx2 && srvIdx2->first_event) {
 				pEpg->highlightedEvent = srvIdx2->first_event;

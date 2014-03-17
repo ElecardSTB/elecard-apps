@@ -59,22 +59,13 @@ typedef struct {
     struct list_head	orderSort;
 } service_index_t;
 
-typedef struct {
-    struct list_head	orderNoneHead;
-    struct list_head	orderSortHead;
-
-    uint32_t		count;
-    serviceSort_t	sortOrderType;
-
-//	uint32_t		initialized;
-} dvb_channels_t;
-
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
 service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_add(void);
+struct list_head *dvbChannel_getSortList(void);
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);
 int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track);
 int32_t dvbChannel_addService(EIT_service_t *service);
@@ -84,6 +75,7 @@ int32_t dvbChannel_writeOrderConfig(void);
 int32_t dvbChannel_update(void);
 int32_t dvbChannel_sort(serviceSort_t sortType);
 int32_t dvbChannel_initServices(void);
+int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
 
 int32_t dvbChannel_hasSchedule( uint32_t channelNumber );
 
