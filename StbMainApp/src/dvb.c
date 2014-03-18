@@ -3774,6 +3774,7 @@ int dvb_startDVB(DvbParam_t *pParam)
 	dvb->mode = pParam->mode;
 	dvb->setFrequency = pParam->frequency;
 	fe_delivery_system_t neededType;
+	fe_delivery_system_t currentType;
 	if (pParam->mode == DvbMode_Watch) {
 		EIT_service_t *service = dvb_getService( pParam->param.liveParam.channelIndex );
 		if (dvb->setFrequency == 0 && dvb_getServiceFrequency( service, &dvb->setFrequency) != 0) {
@@ -3781,8 +3782,9 @@ int dvb_startDVB(DvbParam_t *pParam)
 			return -1;
 		}
 		neededType = dvb_getDelSysFromService(service);
+		currentType = appControlInfo.tunerInfo[offair_getTuner()].type;
 
-		if((neededType != dvb->fe_type) && (dvb_setFrontendType(dvb->adapter, neededType) != 0)) {
+		if((neededType != currentType) && (dvb_setFrontendType(dvb->adapter, neededType) != 0)) {
 			eprintf("%s[%d]: Watch failed to set frontend type for %d service\n", __FUNCTION__, pParam->adapter, pParam->param.liveParam.channelIndex);
 			return -1;
 		}
