@@ -2012,9 +2012,10 @@ static void offair_addDVBChannelsToMenu()
 int offair_setChannel(int channel, void* pArg)
 {
 	int which = GET_NUMBER(pArg);
-	if(channel < 0) {
+	if(channel <= 0) {
 		return 1;
 	}
+	channel--;
 
 	if((channel < dvbChannel_getCount()) && (dvbChannel_getService(channel) != NULL)) {
 		printf("%s: offair_channelChange...\n", __FUNCTION__);
