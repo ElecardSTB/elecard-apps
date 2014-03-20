@@ -48,7 +48,8 @@ typedef struct {
 	struct list_head	orderNoneHead;
 	struct list_head	orderSortHead;
 
-	uint32_t		count;
+	uint32_t		viewedCount;
+	uint32_t		totalCount;
 	serviceSort_t	sortOrderType;
 
 //	uint32_t		initialized;
@@ -62,7 +63,8 @@ static dvb_channels_t g_dvb_channels = {
 	.orderNoneHead	= LIST_HEAD_INIT(g_dvb_channels.orderNoneHead),
 	.orderSortHead	= LIST_HEAD_INIT(g_dvb_channels.orderSortHead),
 
-	.count			= 0,
+	.viewedCount	= 0,
+	.totalCount		= 0,
 	.sortOrderType	= serviceSortNone,
 //	.initialized	= 0,
 };
@@ -73,20 +75,31 @@ static dvb_channels_t g_dvb_channels = {
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
 ********************************************************************************/
 #ifdef ENABLE_DVB
-service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount)
+static int32_t dvbChannel_isServiceEnabled(EIT_service_t *service)
+{
+	if(service == NULL) {
+		return 0;
+	}
+	if((appControlInfo.offairInfo.dvbShowScrambled != 0) || !dvb_getScrambled(service)) {
+		return 1;
+	}
+	return 0;
+}
+
+static service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount)
 {
 	struct list_head *pos;
 	uint32_t i = 0;
 
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
+		if(i >= searchCount) {
+			break;
+		}
 		if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) {
 			return srv;
 		}
 		i++;
-		if(i >= searchCount) {
-			break;
-		}
 	}
 	return NULL;
 }
@@ -98,32 +111,15 @@ int32_t dvbChannel_getServiceId(EIT_common_t *header)
 
 	list_for_each(pos, &g_dvb_channels.orderSortHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		if(!srv->visible) {
+			continue;
+		}
 		if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) {
 			return i;
 		}
 		i++;
 	}
 	return -1;
-}
-
-service_index_t *dvbChannel_getServiceIndex(uint32_t id)
-{
-	struct list_head *pos;
-	uint32_t i = 0;
-
-	list_for_each(pos, &g_dvb_channels.orderSortHead) {
-		if(i == id) {
-			return list_entry(pos, service_index_t, orderSort);
-		}
-		i++;
-	}
-	return NULL;
-}
-
-EIT_service_t *dvbChannel_getService(uint32_t id)
-{
-	service_index_t *srv = dvbChannel_getServiceIndex(id);
-	return srv ? srv->service : NULL;
 }
 
 int32_t dvbChannel_getIndex(EIT_service_t *service)
@@ -137,6 +133,9 @@ int32_t dvbChannel_getIndex(EIT_service_t *service)
 
 	list_for_each(pos, &g_dvb_channels.orderSortHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		if(!srv->visible) {
+			continue;
+		}
 		if(srv && (srv->service == service)) {
 			return i;
 		}
@@ -144,6 +143,30 @@ int32_t dvbChannel_getIndex(EIT_service_t *service)
 	}
 
 	return -1;
+}
+
+service_index_t *dvbChannel_getServiceIndex(uint32_t id)
+{
+	struct list_head *pos;
+	uint32_t i = 0;
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		if(!srv->visible) {
+			continue;
+		}
+		if(i == id) {
+			return srv;
+		}
+		i++;
+	}
+	return NULL;
+}
+
+EIT_service_t *dvbChannel_getService(uint32_t id)
+{
+	service_index_t *srv = dvbChannel_getServiceIndex(id);
+	return srv ? srv->service : NULL;
 }
 
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber)
@@ -187,7 +210,7 @@ int32_t dvbChannel_hasAnyEPG(void)
 
 	list_for_each(pos, &g_dvb_channels.orderSortHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
-		if((srvIdx == NULL) || (srvIdx->service == NULL)) {
+		if((srvIdx == NULL) || (srvIdx->service == NULL) || !srvIdx->visible) {
 			continue;
 		}
 		if((srvIdx->service->schedule != NULL) && dvb_hasMedia(srvIdx->service)) {
@@ -201,7 +224,7 @@ int32_t dvbChannel_hasAnyEPG(void)
 //dvb_getNumberOfServices
 int32_t dvbChannel_getCount(void)
 {
-	return g_dvb_channels.count;
+	return g_dvb_channels.viewedCount;
 }
 
 service_index_t *dvbChannel_add(void)
@@ -212,14 +235,15 @@ service_index_t *dvbChannel_add(void)
 		return NULL;
 	}
 	memset(new, 0, sizeof(service_index_t));
-	list_add_tail(&new->orderNone, &g_dvb_channels.orderNoneHead);
-	list_add_tail(&new->orderSort, &g_dvb_channels.orderSortHead);
-	g_dvb_channels.count++;
+	list_add_tail(&(new->orderNone), &g_dvb_channels.orderNoneHead);
+	g_dvb_channels.totalCount++;
+	list_add_tail(&(new->orderSort), &g_dvb_channels.orderSortHead);
+	g_dvb_channels.viewedCount++;
 
 	return new;
 }
 
-int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
+static int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
@@ -233,13 +257,13 @@ int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
 	return 0;
 }
 
-int32_t dvbChannel_addService(EIT_service_t *service)
+static int32_t dvbChannel_addService(EIT_service_t *service)
 {
-
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->service = service;
 		new->common = service->common;
+
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -248,17 +272,21 @@ int32_t dvbChannel_addService(EIT_service_t *service)
 	return 0;
 }
 
-int32_t dvbChannel_remove(service_index_t *srvIdx)
+static int32_t dvbChannel_remove(service_index_t *srvIdx)
 {
 	list_del(&srvIdx->orderNone);
-	list_del(&srvIdx->orderSort);
+	g_dvb_channels.totalCount--;
+	if(!list_empty(&srvIdx->orderSort)) {
+		list_del(&srvIdx->orderSort);
+		g_dvb_channels.viewedCount--;
+	}
 	free(srvIdx);
-	g_dvb_channels.count--;
+
 
 	return 0;
 }
 
-int32_t dvbChannel_readOrderConfig(void)
+static int32_t dvbChannel_readOrderConfig(void)
 {
 	char buf[BUFFER_SIZE];
 	FILE* fd;
@@ -331,7 +359,7 @@ int32_t dvbChannel_writeOrderConfig(void)
 	return 0;
 }
 
-int32_t dvbChannel_clearServices(void)
+static int32_t dvbChannel_invalidateServices(void)
 {
 	struct list_head *pos;
 	//invalidate service pointers
@@ -342,42 +370,68 @@ int32_t dvbChannel_clearServices(void)
 	return 0;
 }
 
-int32_t dvbChannel_update(void)
+static void dvbChannel_sortOrderEmpty(void)
+{
+	struct list_head	*pos;
+	struct list_head	*n;
+
+	//empty orderSort list
+	list_for_each_safe(pos, n, &g_dvb_channels.orderSortHead) {
+		list_del_init(pos);
+		g_dvb_channels.viewedCount--;
+	}
+	if(!list_empty(&g_dvb_channels.orderSortHead) || (g_dvb_channels.viewedCount != 0)) {
+		eprintf("%s()[%d]: Something wrong viewedCount=%d!!!!!!\n", __func__, __LINE__, g_dvb_channels.viewedCount);
+		INIT_LIST_HEAD(&g_dvb_channels.orderSortHead);
+		g_dvb_channels.viewedCount = 0;
+	}
+}
+
+static void dvbChannel_sortOrderRecheck(void)
+{
+	struct list_head	*pos;
+	g_dvb_channels.viewedCount = 0;
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
+		if(dvbChannel_isServiceEnabled(srvIdx->service)) {
+			srvIdx->visible = 1;
+			g_dvb_channels.viewedCount++;
+		} else {
+			srvIdx->visible = 0;
+		}
+	}
+}
+
+static int32_t dvbChannel_update(void)
 {
 	uint32_t old_count;
-	list_element_t	*service_element;
-	struct list_head		*pos;
-	struct list_head		*n;
+	list_element_t		*service_element;
+	struct list_head	*pos;
+	struct list_head	*n;
 
 	if(list_empty(&g_dvb_channels.orderNoneHead)) {
 		dvbChannel_readOrderConfig();
 	} else {
-		dvbChannel_clearServices();
+		dvbChannel_invalidateServices();
 	}
 
-	old_count = dvbChannel_getCount();
+	old_count = g_dvb_channels.totalCount;
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 
-		if(curService == NULL) {
+		if((curService == NULL) || !dvb_hasMedia(curService)) {
 			continue;
 		}
 		p_srvIdx = dvbChannel_findServiceLimit(&curService->common, old_count);
 		if(p_srvIdx) {
 			p_srvIdx->service = curService;
 		} else {
-/*			if( dvb_hasMedia(curService) &&
-				(appControlInfo.offairInfo.dvbShowScrambled || (dvb_getScrambled(curService) == 0))
-			)*/
-
-			if(dvb_hasMedia(curService)) {
-				dvbChannel_addService(curService);
-			}
+			dvbChannel_addService(curService);
 		}
 	}
 
-	//clear from elements with no service pointer
+	//remove elements without service pointer
 	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->service == NULL) {
@@ -385,6 +439,7 @@ int32_t dvbChannel_update(void)
 		}
 	}
 
+	dvbChannel_sortOrderRecheck();
 	dvbChannel_writeOrderConfig();
 
 	return 0;
@@ -438,44 +493,35 @@ int32_t dvbChannel_sort(serviceSort_t sortType)
 		return 0;
 	}
 
+	dvbChannel_sortOrderEmpty();
 	g_dvb_channels.sortOrderType = sortType;
 	if(sortType == serviceSortNone) {
 		struct list_head *pos;
 
-		INIT_LIST_HEAD(&g_dvb_channels.orderSortHead);
 		list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 			service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+
 			list_add_tail(&(srvIdx->orderSort), &g_dvb_channels.orderSortHead);
 		}
 	} else {
 		service_index_t *sortingBuf[MAX_DVB_CHANNELS_SORT];
 		struct list_head *pos;
-		struct list_head *n;
 		uint32_t i = 0;
-		uint32_t count = dvbChannel_getCount();
+		uint32_t count;
 
-		if(count > MAX_DVB_CHANNELS_SORT) {
-			count = MAX_DVB_CHANNELS_SORT;
-			eprintf("%s()[%d]: Too much channels, sort only first %d!\n", __func__, __LINE__, count);
+		if(g_dvb_channels.totalCount > ARRAY_SIZE(sortingBuf)) {
+			eprintf("%s()[%d]: Too much channels %d, sort only first %d!\n",
+					__func__, __LINE__, g_dvb_channels.totalCount, ARRAY_SIZE(sortingBuf));
 		}
 		list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-			if(i >= count) {
+			if(i >= ARRAY_SIZE(sortingBuf)) {
 				break;
 			}
+
 			sortingBuf[i] = list_entry(pos, service_index_t, orderNone);
 			i++;
 		}
-
-		if(count > i) {
-			count = i;
-		}
-		//empty orderSort list
-		list_for_each_safe(pos, n, &g_dvb_channels.orderSortHead) {
-			list_del_init(pos);
-		}
-		if(!list_empty(&g_dvb_channels.orderSortHead)) {
-			eprintf("%s()[%d]: Something wrong!!!!!!\n", __func__, __LINE__);
-		}
+		count = i;
 
 		qsort_r(sortingBuf, count, sizeof(sortingBuf[0]), serviceIdx_cmp, &g_dvb_channels.sortOrderType);
 
@@ -483,6 +529,7 @@ int32_t dvbChannel_sort(serviceSort_t sortType)
 			list_add_tail(&(sortingBuf[i]->orderSort), &g_dvb_channels.orderSortHead);
 		}
 	}
+	dvbChannel_sortOrderRecheck();
 
 	return 0;
 }

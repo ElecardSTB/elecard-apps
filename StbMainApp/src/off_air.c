@@ -1982,10 +1982,8 @@ static void offair_addDVBChannelsToMenu()
 		interfaceMenuEntry_t *entry;
 		char *serviceName;
 		int32_t radio;
-		int32_t scrambled;
 
-		scrambled = dvb_getScrambled(service);
-		if((appControlInfo.offairInfo.dvbShowScrambled == 0) && scrambled) {
+		if(!srv->visible) {
 			continue;
 		}
 		radio = service->service_descriptor.service_type == 2;
@@ -1993,7 +1991,7 @@ static void offair_addDVBChannelsToMenu()
 
 		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
 		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, i),
-								scrambled ? thumbnail_billed : ( radio ? thumbnail_radio : thumbnail_channels));
+								dvb_getScrambled(service) ? thumbnail_billed : (radio ? thumbnail_radio : thumbnail_channels));
 
 		entry = menu_getLastEntry(channelMenu);
 		if(entry) {
@@ -2178,6 +2176,10 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 
 		list_for_each(pos, dvbChannel_getSortList()) {
 			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderSort);
+
+			if(!srvIdx2->visible) {
+				continue;
+			}
 			if(srvIdx2 && srvIdx2->first_event) {
 				pEpg->highlightedEvent = srvIdx2->first_event;
 				break;

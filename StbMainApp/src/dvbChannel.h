@@ -47,35 +47,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ********************/
 
 typedef struct {
-    EIT_common_t	common;
-    EIT_service_t	*service;
-    uint16_t		audio_track;
-    /* First EPG event which fit to current timeline.
-    Updated on each call to offair_initEPGRecordMenu. */
-    list_element_t	*first_event;
+	EIT_common_t	common;
+	EIT_service_t	*service;
+	uint16_t		audio_track;
+	/* First EPG event which fit to current timeline.
+	Updated on each call to offair_initEPGRecordMenu. */
+	list_element_t	*first_event;
+	uint16_t		visible;
 
-    //lists
-    struct list_head	orderNone;
-    struct list_head	orderSort;
+	//lists
+	struct list_head	orderNone;
+	struct list_head	orderSort;
 } service_index_t;
 
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
-service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
-service_index_t *dvbChannel_add(void);
+
 struct list_head *dvbChannel_getSortList(void);
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);
-int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track);
-int32_t dvbChannel_addService(EIT_service_t *service);
-int32_t dvbChannel_remove(service_index_t *srvIdx);
-int32_t dvbChannel_readOrderConfig(void);
 int32_t dvbChannel_writeOrderConfig(void);
-int32_t dvbChannel_update(void);
 int32_t dvbChannel_sort(serviceSort_t sortType);
 int32_t dvbChannel_initServices(void);
-int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
+//int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
 
 int32_t dvbChannel_hasSchedule( uint32_t channelNumber );
 
@@ -83,7 +78,7 @@ EIT_service_t *dvbChannel_getService(uint32_t id);
 int32_t dvbChannel_getServiceId(EIT_common_t *header);
 int32_t dvbChannel_getIndex(EIT_service_t *service);
 int32_t dvbChannel_getCount(void);
-int32_t dvbChannel_clearServices(void);
+//int32_t dvbChannel_invalidateServicess(void);
 int32_t dvbChannel_hasAnyEPG(void);
 
 #endif // ENABLE_DVB

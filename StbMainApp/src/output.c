@@ -2737,7 +2737,7 @@ static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		case interfaceCommandGreen:
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
-			dvbChannel_clearServices();
+			dvbChannel_sort(serviceSortNone);
 			offair_fillDVBTMenu();
 			ret = 0;
 			break;
