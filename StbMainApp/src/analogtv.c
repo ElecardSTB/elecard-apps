@@ -835,9 +835,17 @@ int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size)
 		buf[0] = 0;
 		return -1;
 	}
-	snprintf(buf, size, "%s\n%u %s %s",
-		analogtv_channelParam[index].customCaption,
-		analogtv_channelParam[index].frequency/1000000, _T("MHZ"), analogtv_channelParam[index].sysEncode);
+	sprintf(buf,"\"%s\"\n", analogtv_channelParam[index].customCaption);
+	buf += strlen(buf);
+
+	sprintf(buf, "   %s: %u MHz\n", _T("DVB_FREQUENCY"), analogtv_channelParam[index].frequency / 1000000);
+	buf += strlen(buf);
+
+	sprintf(buf, "   %s\n", analogtv_channelParam[index].sysEncode);
+	buf += strlen(buf);
+
+	sprintf(buf, "   audio:%s", analogtv_channelParam[index].audio);
+	buf += strlen(buf);
 	return 0;
 }
 

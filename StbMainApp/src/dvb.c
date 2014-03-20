@@ -3303,8 +3303,7 @@ int dvb_getServiceID(EIT_service_t *service)
 
 int dvb_getScrambled(EIT_service_t *service)
 {
-	if(service != NULL)
-	{
+	if(service != NULL) {
 		return service->service_descriptor.free_CA_mode;
 	}
 	return -1;
@@ -3567,7 +3566,15 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 
 	typeName = table_IntStrLookup(fe_typeName, service->media.type, NULL);
 	if(typeName) {
-		sprintf(buf, "%s:\n", typeName);
+		uint8_t generation = 0;
+		if(service->media.type == serviceMediaDVBT) {
+			generation = service->media.dvb_t.generation;
+		}
+		if(generation <= 1) {
+			sprintf(buf, "%s:\n", typeName);
+		} else {
+			sprintf(buf, "%s%d:\n", typeName, generation);
+		}
 		buf += strlen(buf);
 	}
 	sprintf(buf,"  %s: %u MHz\n", _T("DVB_FREQUENCY"),
@@ -3576,10 +3583,14 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 
 	switch(service->media.type) {
 		case serviceMediaDVBT:
-			//TODO: show plp id for dvb-t2
+			if(service->media.dvb_t.generation == 2) {
+				sprintf(buf,"  plp id: %d\n", service->media.dvb_t.plp_id);
+				buf += strlen(buf);
+			}
 			break;
 		case serviceMediaDVBC:
 			sprintf(buf,"  %s: %u KBd\n", _T("DVB_SYMBOL_RATE"), service->media.dvb_c.symbol_rate / 1000);
+			buf += strlen(buf);
 			modName = table_IntStrLookup(fe_modulationName, service->media.dvb_c.modulation, NULL);
 			if(modName) {
 				sprintf(buf, "  %s: %s\n", _T("DVB_MODULATION"), modName);
