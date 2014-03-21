@@ -538,7 +538,7 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 #endif
 
 int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys);
-int dvb_setFrontendType(int adapter, fe_delivery_system_t type);
+int dvb_setFrontendType(int adapter, fe_delivery_system_t type, int frontend_fd);
 int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
 /** Function return if there has teletext in playing program
