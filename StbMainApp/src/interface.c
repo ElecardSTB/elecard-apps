@@ -1923,6 +1923,34 @@ static void interface_updateClientArea(void)
 	interfaceInfo.clientHeight = interfaceInfo.screenHeight - interfaceInfo.marginSize*2;
 }
 
+int getPngSize (const char *filename, int *w, int *h) 
+{
+	FILE * f;
+	int width, height;
+	if (!filename || !strlen(filename) || !helperFileExists(filename)) return -1;
+
+	f = fopen(filename, "rb");
+	if (!f) return -1;
+
+	// Skip PNG file signature
+	fseek(f, 8, SEEK_SET);
+
+	// First chunk: IHDR image header
+	// Skip Chunk Length
+	fseek(f, 4, SEEK_CUR);
+	// Skip Chunk Type
+	fseek(f, 4, SEEK_CUR);
+
+	fread((char*)&width, 4, 1, f);
+	fread((char*)&height, 4, 1, f);
+
+	*w = width;
+	*h = height;
+
+	fclose (f);
+	return 0;
+}
+
 static void interface_displayLogo(void)
 {
 #ifdef SHOW_LOGO_TEXT
@@ -1988,13 +2016,6 @@ static void interface_displayLogo(void)
 
 #ifdef ENABLE_FUSION
 
-// todo : detect image size
-#define FUSION_LOGO1_W 328
-#define FUSION_LOGO1_H 60
-
-#define FUSION_LOGO2_W 200
-#define FUSION_LOGO2_H 134
-
 	// top left
 	pthread_mutex_lock(&FusionObject.mutexLogo);
 	for (int i=0; i<FusionObject.logoCount; i++){
@@ -2002,26 +2023,23 @@ static void interface_displayLogo(void)
 		int left=0, top=0;
 		int w=0, h=0;
 		sprintf (logoPath, "/tmp/fusion_logo_%d.png", i);
+		if (getPngSize(logoPath, &w, &h) != 0) continue;
 		switch (FusionObject.logos[i].position)
 		{
 			case FUSION_TOP_LEFT:
 				left = 100;
 				top = 100;
-				w = FUSION_LOGO1_W;
-				h = FUSION_LOGO1_H;
 				break;
 			case FUSION_TOP_RIGHT:
-				left = interfaceInfo.screenWidth - FUSION_LOGO2_W - 100;
+				left = interfaceInfo.screenWidth - w - 100;
 				top = 70;
-				w = FUSION_LOGO2_W;
-				h = FUSION_LOGO2_H;
 				break;
 			case FUSION_BOTTOM_LEFT:
 				left = 100;
 				top = interfaceInfo.screenHeight - 200;
 				break;
 			case FUSION_BOTTOM_RIGHT:
-				left = interfaceInfo.screenWidth - FUSION_LOGO2_W - 100;
+				left = interfaceInfo.screenWidth - w - 100;
 				top = interfaceInfo.screenHeight - 200;
 				break;
 		}
@@ -2035,12 +2053,12 @@ static void interface_displayLogo(void)
 
 	int fh;
 	pthread_mutex_lock(&FusionObject.mutexCreep);
+//	eprintf ("%s(%d): draw creepline %s.\n", __FILE__, __LINE__, FusionObject.creepline);
 	pgfx_font->GetHeight(pgfx_font, &fh);
 	interface_drawTextWW(pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
 		50, interfaceInfo.screenHeight - 80, 
 		interfaceInfo.screenWidth + 100, fh + 10, 
 		FusionObject.creepline, ALIGN_LEFT);
-	
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 #endif
 }

@@ -153,6 +153,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef STSDK
 static int helper_confirmFirmwareUpdate(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #endif
+#ifdef ENABLE_FUSION
+int fusion_getCreepAndLogo ();
+int fusion_checkResponse (char * curlStream, cJSON ** ppRoot);
+#endif
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -1798,75 +1802,152 @@ static void setupFramebuffers(void)
 
 #ifdef ENABLE_FUSION
 #define FUSION_STUB "fusion://stub"
+#define FUSION_MIN_USLEEP 600
 static int gStatus = 0;
 
 interfaceFusionObject_t FusionObject;
 
 void * fusion_threadCreepline(void * param)
 {
+	int alreadySlept;
+	int timeToUsleep;
 	char tmpLine[1024];
-	int j=0, i=0, k=0;
-	int symbols = 0;
+	int j, i, k;
+	int symbols;
 	char initialCreep[FUSION_MAX_CREEPLEN];
 	char spaces[FUSION_SPACES];
 
-	memset(spaces, 0, FUSION_SPACES);
-	memset(initialCreep, 0, FUSION_MAX_CREEPLEN);
 
-	memset(spaces, ' ', FUSION_SPACES-1);
-	sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
+	fusion_readConfig();
 
-	while (j < FusionObject.repeats){
-		i = 0;
-		sprintf (FusionObject.creepline, initialCreep);
+	while (1){
+		fusion_getCreepAndLogo();
+		interface_displayMenu(1);
 
-		while (strlen(FusionObject.creepline) > 0){
-			pthread_mutex_lock(&FusionObject.mutexCreep);
-			if (FusionObject.creepline[0] == ' ' ||
-			    FusionObject.creepline[0] == ',' ||
-			    FusionObject.creepline[0] == '!' ||
-			    FusionObject.creepline[0] == '.' ||
-			    FusionObject.creepline[0] == '-'
-			)
+		memset(spaces, 0, FUSION_SPACES);
+		memset(initialCreep, 0, FUSION_MAX_CREEPLEN);
+
+		memset(spaces, ' ', FUSION_SPACES-1);
+		sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
+
+		j = 0;
+		symbols = 0;
+		alreadySlept = 0;
+		while (j < FusionObject.repeats){
+			i = 0;
+			sprintf (FusionObject.creepline, initialCreep);
+
+			while (strlen(FusionObject.creepline) > 0)
 			{
-				i ++;
-			}
-			else {
-				i += 2;
-			}
-			sprintf (tmpLine, "%s", initialCreep + i);
-
-			for (k=0, symbols = 0; k<min(FUSION_SYMBOLS_FITS, strlen(tmpLine)); k++){
-				if (tmpLine[0] == ' ' ||
-					tmpLine[0] == ',' ||
-					tmpLine[0] == '!' ||
-					tmpLine[0] == '.' ||
-					tmpLine[0] == '-')
+				pthread_mutex_lock(&FusionObject.mutexCreep);
+				if (FusionObject.creepline[0] == ' ' ||
+					FusionObject.creepline[0] == ',' ||
+					FusionObject.creepline[0] == '!' ||
+					FusionObject.creepline[0] == '.' ||
+					FusionObject.creepline[0] == '-'
+				)
 				{
-					symbols++;
+					i ++;
 				}
-				else symbols += 2;
-			}
-			tmpLine[symbols] = '\0';
-			sprintf (FusionObject.creepline, "%s", tmpLine);
-			pthread_mutex_unlock(&FusionObject.mutexCreep);
+				else if (FusionObject.creepline[0] >= 'A' && FusionObject.creepline[0] <= 'Z' ||
+						 FusionObject.creepline[0] >= 'a' && FusionObject.creepline[0] <= 'z' ||
+						 FusionObject.creepline[0] >= '0' && FusionObject.creepline[0] <= '9')
+				{
+					i ++;
+				}
+				else {
+					i += 2;
+				}
+				sprintf (tmpLine, "%s", initialCreep + i);
 
-			interface_displayMenu(1);
-			usleep(600);
+				for (k=0, symbols = 0; k<min(FUSION_SYMBOLS_FITS, strlen(tmpLine)); k++){
+					if (tmpLine[0] == ' ' ||
+						tmpLine[0] == ',' ||
+						tmpLine[0] == '!' ||
+						tmpLine[0] == '.' ||
+						tmpLine[0] == '-')
+					{
+						symbols++;
+					}
+					else if (tmpLine[0] >= 'A' && tmpLine[0] <= 'Z' ||
+							 tmpLine[0] >= 'a' && tmpLine[0] <= 'z' ||
+							 tmpLine[0] >= '0' && tmpLine[0] <= '9')
+					{
+						symbols++;
+					} else {
+						symbols += 2;
+					}
+				}
+				tmpLine[symbols] = '\0';
+				sprintf (FusionObject.creepline, "%s", tmpLine);
+
+				pthread_mutex_unlock(&FusionObject.mutexCreep);
+
+				interface_displayMenu(1);
+
+				usleep(FUSION_MIN_USLEEP);
+				alreadySlept += FUSION_MIN_USLEEP;
+			}
+			usleep (1000* 3);	// for test (FusionObject.pause * 10000);
+			alreadySlept += FusionObject.pause * 1000;
+			j++;
 		}
-		sleep (FusionObject.pause);
-		j++;
-	}
+		FusionObject.creepline[0] = '\0';
+
+		timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
+		//eprintf ("%s(%d): Sleep %d msec.\n", __FUNCTION__, __LINE__, timeToUsleep);
+		if (timeToUsleep <= 0) continue;
+		usleep(timeToUsleep);
+	} // while
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
 }
 
+#define FUSION_DEFAULT_CHECKTIME     (300)
+#define FUSION_DEFAULT_SERVER_PATH   "http://public.tv/api"
+#define FUSION_CFGDIR         "/var/etc/elecard/StbMainApp"
+#define FUSION_HWCONFIG       FUSION_CFGDIR"/fusion.hwconf"
+
+int fusion_readConfig()
+{
+	char * ptr;
+	char line [512];
+	FILE * f;
+
+	FusionObject.checktime = FUSION_DEFAULT_CHECKTIME;
+	sprintf (FusionObject.server, "%s", FUSION_DEFAULT_SERVER_PATH);
+
+	f = fopen(FUSION_HWCONFIG, "rt");
+	if (!f) return -1;
+
+	while (!feof(f)){
+		fgets(line, 256, f);
+		if (feof(f)){
+			break;
+		}
+		line[strlen(line)-1] = '\0';
+		ptr = NULL;
+		if ((ptr = strcasestr((const char*)line, (const char*)"SERVER ")) != NULL){
+			ptr += 7;
+			sprintf (FusionObject.server, "%s", ptr);
+			eprintf (" %s: server = %s\n",   __FUNCTION__, FusionObject.server);
+		}else if ((ptr = strcasestr((const char*) line, (const char*)"CHECKTIME ")) != NULL){
+			ptr += 10;
+			FusionObject.checktime = atoi(ptr);
+			eprintf (" %s: checktime = %d\n",   __FUNCTION__, FusionObject.checktime);
+		}
+	}
+	fclose (f);
+	return 0;
+}
 void fusion_startup()
 {
 	sprintf (appControlInfo.mediaInfo.filename, "%s", FUSION_STUB);
 
 	appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
 	appControlInfo.mediaInfo.bHttp = 1;
+
+	memset(&FusionObject, 0, sizeof(interfaceFusionObject_t));
 
 	int result = media_startPlayback();
 	if (result == 0){
@@ -1878,16 +1959,8 @@ void fusion_startup()
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
-	
-	fusion_getCreepAndLogo();
-	eprintf ("%s(%d): fusion_getCreepAndLogo OK.\n", __FUNCTION__, __LINE__);
 
-	interface_displayMenu(1);
-
-	pthread_t handle; 
-	eprintf ("%s(%d): pthread_create fusion_threadCreepline...\n", __FUNCTION__, __LINE__);
-	pthread_create(&handle, NULL, fusion_threadCreepline, (void*)NULL);
-	pthread_detach(handle);
+	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
 
 	interface_displayMenu(1);
 
@@ -1926,12 +1999,10 @@ int fusion_getSecret ()
 	return 0;
 }
 
-
 int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 {
 	char playlistBuffer[FUSION_STREAM_SIZE];
 	char cmd[PATH_MAX];
-	char result[128];
 	FILE * f;
 	
 	if (!url || !strlen(url)) return -1;
@@ -1978,27 +2049,70 @@ int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
 	return 0;
 }
 
+int fusion_getRequestDate(char * dateString)
+{
+	cJSON * root;
+	cJSON * jsonServerDate;
+	char request[FUSION_URL_LEN];
+	char * ptr;
+
+	// use fake date to get server time
+	sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
+
+	if (fusion_downloadPlaylist(request, &root) != 0) {
+		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
+		return -1;
+	}
+
+	jsonServerDate = cJSON_GetObjectItem(root, "date");
+	if (!jsonServerDate || !jsonServerDate->valuestring) {
+		eprintf ("%s(%d): No date\n", __FUNCTION__, __LINE__);
+		cJSON_Delete(root);
+		return -1;
+	}
+	// "2014-03-18 10:48:39"
+	if ((ptr = strchr(jsonServerDate->valuestring, ' ')) != NULL){
+		snprintf (dateString, (int)(ptr - jsonServerDate->valuestring)+1, jsonServerDate->valuestring);
+	}
+	else {
+		eprintf ("%s(%d): Incorrect date\n", __FUNCTION__, __LINE__);
+		cJSON_Delete(root);
+		return -1;
+	}
+
+	cJSON_Delete(root);
+	return 0;
+}
+
 int fusion_getCreepAndLogo ()
 {
 	cJSON * root;
 	char request[FUSION_URL_LEN];
 	unsigned int i;
+	char dateString[256];
 
 	fusion_getSecret();
-	sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FUSION_DEFAULT_SERVER_PATH, FusionObject.secret); // todo : FusionObject.server
+	/*if (fusion_getRequestDate(dateString) == -1){
+		eprintf ("%s(%d): WARNING! fusion_getRequestDate rets error.\n",   __FILE__, __LINE__);
+		return -1;
+	}
+	sprintf (request, "%s/?s=%s&c=playlist_full&date=%s", FusionObject.server, FusionObject.secret, dateString);
+	* */
+	sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
-		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets FUSION_ERR_JUSTWAIT.\n",   __FILE__, __LINE__);
+		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
 		return -1;
 	}
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
 	if (jsonLogo){
+		pthread_mutex_lock(&FusionObject.mutexLogo);
+
 		FusionObject.logoCount = cJSON_GetArraySize(jsonLogo);
 		if (FusionObject.logoCount > FUSION_MAX_LOGOS){
 			FusionObject.logoCount = FUSION_MAX_LOGOS;
 		}
-		pthread_mutex_lock(&FusionObject.mutexLogo);
 		for (i=0; i<FusionObject.logoCount; i++){
 			cJSON * jsonItem = cJSON_GetArrayItem(jsonLogo, i);
 			if (!jsonItem || !jsonItem->string || !jsonItem->valuestring) continue;
@@ -2030,11 +2144,11 @@ int fusion_getCreepAndLogo ()
 			sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, logoPath);
 			system(cmd);
 		}
-		//if (FusionObject.logoCount > 0) sleep(8);
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 	}
 
-	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
+	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
+	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep-line");
 	if (jsonCreep){
 		cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, 0);
 		if (jsonItem){
@@ -2062,6 +2176,11 @@ int fusion_getCreepAndLogo ()
 
 void fusion_cleanup()
 {
+	if (FusionObject.threadCreepHandle){
+		pthread_cancel(FusionObject.threadCreepHandle);
+		pthread_join(FusionObject.threadCreepHandle, NULL);
+	}
+
 	pthread_mutex_destroy(&FusionObject.mutexCreep);
 	pthread_mutex_destroy(&FusionObject.mutexLogo);
 }

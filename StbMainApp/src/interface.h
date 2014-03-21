@@ -944,7 +944,8 @@ typedef struct {
 } fusion_logo_t;
 
 typedef struct _interfaceFusionObject_t {
-	unsigned char secret[32];
+	unsigned char secret[64];
+	char server[512];
 
 	unsigned char creepline[FUSION_MAX_CREEPLEN];
 	int pause;
@@ -954,6 +955,9 @@ typedef struct _interfaceFusionObject_t {
 	fusion_logo_t logos[FUSION_MAX_LOGOS];
 	int logoCount;
 	pthread_mutex_t mutexLogo;
+
+	pthread_t threadCreepHandle;
+	int checktime;
 
 } interfaceFusionObject_t;
 #endif
