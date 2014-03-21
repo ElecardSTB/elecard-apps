@@ -548,10 +548,9 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	   18: MP4  640x360  H.264
 	*/
 
-	int selected_fmt = sizeof(supported_formats)/sizeof(supported_formats[0])-1;
+	int selected_fmt = sizeof(supported_formats) / sizeof(supported_formats[0]) - 1;
 	int fmt;
-	ssize_t url_len;
-	char *fmt_url, *next_url, *fmt_str, *sig;
+	char *fmt_url, *next_url, *fmt_str, *saved_str;
 	int i;
 
 	// Trim everything except url_encoded_fmt_stream_map
@@ -567,81 +566,108 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 		goto getinfo_failed;
 	}
 
-	sig = NULL;
+	saved_str = NULL;
 	fmt_url = NULL;
 	str = buffer;
 	do {
 		next_url = strchr(str, ',');
-		if (next_url) {
-			next_url[0]=0;
+		if(next_url) {
+			next_url[0] = 0;
 			next_url++;
 		}
 
 		fmt_str = strstr(str, "itag=");
-		if (fmt_str)
-		{
-			fmt_str+=5;
-			fmt = strtol(fmt_str,NULL,10);
-			for (i=0;supported_formats[i]!=0;i++)
-				if (fmt == supported_formats[i])
+		if(fmt_str) {
+			fmt_str += 5;
+			fmt = strtol(fmt_str, NULL, 10);
+			for(i = 0; supported_formats[i] != 0; i++) {
+				if(fmt == supported_formats[i]) {
 					break;
-			if (i<selected_fmt) {
-				char *encoded_url = strstr(str, "url=");
-				if (encoded_url) {
-					sig = strstr(str, "sig=");
-					if (sig)
-						sig+=4;
-					fmt_url=encoded_url+4;
-					selected_fmt = i;
 				}
 			}
-			if (selected_fmt == 0 && fmt_url)
+			if(i < selected_fmt) {
+				char *encoded_url = strstr(str, "url=");
+				if(encoded_url) {
+
+					fmt_url = encoded_url + 4;
+					selected_fmt = i;
+					saved_str = str;
+				}
+			}
+			if(selected_fmt == 0 && fmt_url) {
 				break;
+			}
 		}
 		str = next_url;
 	} while(str);
 
-	if (!fmt_url || !sig) {
+	if(!fmt_url) {
 		eprintf("%s: no supported format found\n", __FUNCTION__);
 		goto getinfo_failed;
 	}
 
-	str = strchr( fmt_url, '&');
-	if (str) *str = 0;
-	str = strchr( sig, '&');
-	if (str) *str = 0;
+	str = strchr(fmt_url, '&');
+	if(str) {
+		*str = 0;
+	}
 
 	//eprintf("%s: encoded url: %s\n", __FUNCTION__, fmt_url);
-	if (utf8_urltomb(fmt_url, strlen(fmt_url)+1, url, sizeof(url)-1) < 0) {
+	if(utf8_urltomb(fmt_url, strlen(fmt_url) + 1, url, sizeof(url) - 1) < 0) {
 		eprintf("%s: Failed to decode '%s'\n", __FUNCTION__, fmt_url);
 		goto getinfo_failed;
 	}
-	url_len = strlen(url);
-	snprintf(url+url_len, sizeof(url)-url_len, "&signature=%s", sig);
+
+	//previous extracting signature method
+	if(strstr(url, "signature=") == NULL) {
+		ssize_t url_len;
+		char *sig;
+
+#define SIGNATURE_PREFIX	"sig="
+#define SIGNATURE_END		"&"
+// #define SIGNATURE_PREFIX	"signature%3D"
+// #define SIGNATURE_END		"%26"
+
+		eprintf("%s: trying to search signature (old method)\n", __func__);
+		if(saved_str == NULL) {
+			eprintf("%s: Error! Nowhere to seek signature.\n", __func__);
+			goto getinfo_failed;
+		}
+		sig = strstr(saved_str, SIGNATURE_PREFIX);
+		if(sig) {
+			sig += sizeof(SIGNATURE_PREFIX) - 1;
+
+			str = strstr(sig, SIGNATURE_END);
+			if(str) {
+				*str = 0;
+			}
+
+			url_len = strlen(url);
+			snprintf(url + url_len, sizeof(url) - url_len, "&signature=%s", sig);
+		}
+	}
 
 	eprintf("Youtube: Playing (format %2d) '%s'\n", supported_formats[selected_fmt], url );
 	{
-	char *descr     = NULL;
-	char *thumbnail = NULL;
-	char temp[MENU_ENTRY_INFO_LENGTH];
-	if (videoIndex != CHANNEL_CUSTOM)
-	{
-		youtubeInfo.index = videoIndex;
-		int menuIndex = videoIndex+1+(youtubeInfo.search_offset > 0);
-		if (interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, menuIndex, temp, sizeof(temp) ) == 0)
-			descr = temp;
-		interface_setSelectedItem(_M &YoutubeMenu, menuIndex);
-		thumbnail = youtubeInfo.videos[videoIndex].thumbnail[0] ? youtubeInfo.videos[videoIndex].thumbnail : NULL;
-		appControlInfo.playbackInfo.channel = videoIndex+1;
-		appControlInfo.playbackInfo.playlistMode = playlistModeYoutube;
-	} else
-	{
-		youtubeInfo.index = 0;
-		descr     = appControlInfo.playbackInfo.description;
-		thumbnail = appControlInfo.playbackInfo.thumbnail;
-	}
-	appControlInfo.playbackInfo.streamSource = streamSourceYoutube;
-	media_playURL(screenMain, url, descr, thumbnail != NULL ? thumbnail : resource_thumbnails[thumbnail_youtube] );
+		char *descr     = NULL;
+		char *thumbnail = NULL;
+		char temp[MENU_ENTRY_INFO_LENGTH];
+		if(videoIndex != CHANNEL_CUSTOM) {
+			youtubeInfo.index = videoIndex;
+			int menuIndex = videoIndex+1+(youtubeInfo.search_offset > 0);
+			if(interface_getMenuEntryInfo( (interfaceMenu_t*)&YoutubeMenu, menuIndex, temp, sizeof(temp) ) == 0) {
+				descr = temp;
+			}
+			interface_setSelectedItem(_M &YoutubeMenu, menuIndex);
+			thumbnail = youtubeInfo.videos[videoIndex].thumbnail[0] ? youtubeInfo.videos[videoIndex].thumbnail : NULL;
+			appControlInfo.playbackInfo.channel = videoIndex+1;
+			appControlInfo.playbackInfo.playlistMode = playlistModeYoutube;
+		} else {
+			youtubeInfo.index = 0;
+			descr     = appControlInfo.playbackInfo.description;
+			thumbnail = appControlInfo.playbackInfo.thumbnail;
+		}
+		appControlInfo.playbackInfo.streamSource = streamSourceYoutube;
+		media_playURL(screenMain, url, descr, thumbnail != NULL ? thumbnail : resource_thumbnails[thumbnail_youtube] );
 	}
 	return 0;
 
