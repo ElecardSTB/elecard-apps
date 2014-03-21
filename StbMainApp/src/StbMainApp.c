@@ -1811,7 +1811,7 @@ void * fusion_threadCreepline(void * param)
 {
 	int alreadySlept;
 	int timeToUsleep;
-	char tmpLine[1024];
+	char tmpLine[FUSION_MAX_CREEPLEN];
 	int j, i, k;
 	int symbols;
 	char initialCreep[FUSION_MAX_CREEPLEN];
@@ -1827,6 +1827,12 @@ void * fusion_threadCreepline(void * param)
 		memset(spaces, 0, FUSION_SPACES);
 		memset(initialCreep, 0, FUSION_MAX_CREEPLEN);
 
+		for (k=0; k<FUSION_MAX_CREEPLEN; k++){
+			if (FusionObject.creepline[k] == '\n' || FusionObject.creepline[k] == '\r') {
+				FusionObject.creepline[k] = ' ';
+			}
+		}
+
 		memset(spaces, ' ', FUSION_SPACES-1);
 		sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
 
@@ -1835,7 +1841,7 @@ void * fusion_threadCreepline(void * param)
 		alreadySlept = 0;
 		while (j < FusionObject.repeats){
 			i = 0;
-			sprintf (FusionObject.creepline, initialCreep);
+			snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, initialCreep);
 
 			while (strlen(FusionObject.creepline) > 0)
 			{
@@ -1879,7 +1885,7 @@ void * fusion_threadCreepline(void * param)
 					}
 				}
 				tmpLine[symbols] = '\0';
-				sprintf (FusionObject.creepline, "%s", tmpLine);
+				snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, "%s", tmpLine);
 
 				pthread_mutex_unlock(&FusionObject.mutexCreep);
 
@@ -2001,11 +2007,13 @@ int fusion_getSecret ()
 
 int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 {
-	char playlistBuffer[FUSION_STREAM_SIZE];
+	char * playlistBuffer = NULL;
 	char cmd[PATH_MAX];
 	FILE * f;
+	int ret;
 	
 	if (!url || !strlen(url)) return -1;
+	playlistBuffer = (char *)malloc(FUSION_STREAM_SIZE);
 	memset(playlistBuffer, 0, FUSION_STREAM_SIZE);
 
 	sprintf (cmd, "wget \"%s\" -O "FUSION_PLAYLIST_FILE" 2>/dev/null", url);
@@ -2017,6 +2025,7 @@ int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 	f = fopen(FUSION_PLAYLIST_FILE, "rt");
 	if (!f) {
 		eprintf ("%s(%d): WARNING! Couldn't open playlist dump file %s.\n",   __FUNCTION__, __LINE__, FUSION_PLAYLIST_FILE);
+		free(playlistBuffer);
 		return -1;
 	}
 
@@ -2032,9 +2041,12 @@ int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 	
 	if (strlen(playlistBuffer) == 0) {
 		eprintf (" %s: ERROR! empty response.\n",   __FUNCTION__);
+		free(playlistBuffer);
 		return -1;
 	}
-	return fusion_checkResponse(playlistBuffer, ppRoot);
+	ret = fusion_checkResponse(playlistBuffer, ppRoot);
+	free(playlistBuffer);
+	return ret;
 }
 
 int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
@@ -2164,12 +2176,11 @@ int fusion_getCreepAndLogo ()
 				else {
 					FusionObject.repeats = atoi(jsonRepeats->valuestring);
 				}
-				sprintf (FusionObject.creepline, "%s", jsonText->valuestring);
+				snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, "%s", jsonText->valuestring);
 				eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
 			}
 		}
 	}
-
 	cJSON_Delete(root);
 	return 0;
 }

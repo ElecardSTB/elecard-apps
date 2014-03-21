@@ -909,11 +909,11 @@ typedef struct
 
 #ifdef ENABLE_FUSION
 
-#define FUSION_STREAM_SIZE    (1024*1024)
+#define FUSION_STREAM_SIZE    (16*1024*1024)
 #define FUSION_URL_LEN        (512)
 
 #define FUSION_MAX_LOGOS             (4)
-#define FUSION_MAX_CREEPLEN           (1024)
+#define FUSION_MAX_CREEPLEN           (2*1024)
 
 #define FUSION_SPACES        250
 #define FUSION_SYMBOLS_FITS  250
