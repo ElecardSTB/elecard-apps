@@ -1932,20 +1932,22 @@ int getPngSize (const char *filename, int *w, int *h)
 	f = fopen(filename, "rb");
 	if (!f) return -1;
 
-	// Skip PNG file signature
-	fseek(f, 8, SEEK_SET);
+	// Skip PNG file signature, IHDR image header (Chunk Length + Chunk Type)
+	fseek(f, 16, SEEK_SET);
 
-	// First chunk: IHDR image header
-	// Skip Chunk Length
-	fseek(f, 4, SEEK_CUR);
-	// Skip Chunk Type
-	fseek(f, 4, SEEK_CUR);
+	fseek(f, 16, SEEK_SET);
+	fread((unsigned char*)&width, 4, 1, f);
+	fread((unsigned char*)&height, 4, 1, f);
 
-	fread((char*)&width, 4, 1, f);
-	fread((char*)&height, 4, 1, f);
+	*w = (((width >>  0) & 0xff) << 24)
+	     | (((width >>  8) & 0xff) << 16)
+	     | (((width >> 16) & 0xff) <<  8)
+	     | (((width >> 24) & 0xff) <<  0);
 
-	*w = width;
-	*h = height;
+	*h = (((height >>  0) & 0xff) << 24)
+	     | (((height >>  8) & 0xff) << 16)
+	     | (((height >> 16) & 0xff) <<  8)
+	     | (((height >> 24) & 0xff) <<  0);
 
 	fclose (f);
 	return 0;
