@@ -940,6 +940,7 @@ typedef enum {
 
 typedef struct {
 	char url[PATH_MAX];
+	char filepath[PATH_MAX];
 	fusion_position_t position;
 } fusion_logo_t;
 
@@ -948,6 +949,7 @@ typedef struct _interfaceFusionObject_t {
 	char server[512];
 
 	unsigned char creepline[FUSION_MAX_CREEPLEN];
+	unsigned char creepToShow[FUSION_MAX_CREEPLEN];
 	int pause;
 	int repeats;
 	pthread_mutex_t mutexCreep;

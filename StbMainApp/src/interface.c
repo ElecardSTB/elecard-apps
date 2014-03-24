@@ -1927,10 +1927,16 @@ int getPngSize (const char *filename, int *w, int *h)
 {
 	FILE * f;
 	int width, height;
-	if (!filename || !strlen(filename) || !helperFileExists(filename)) return -1;
+	if (!filename || !strlen(filename)) {
+		eprintf ("%s(%d): ERROR! Invalid arg. filename = %s\n", __FUNCTION__, __LINE__, filename);
+		return -1;
+	}
 
 	f = fopen(filename, "rb");
-	if (!f) return -1;
+	if (!f) {
+		eprintf ("%s(%d): ERROR! Couldn't open file = %s\n", __FUNCTION__, __LINE__, filename);
+		return -1;
+	}
 
 	// Skip PNG file signature, IHDR image header (Chunk Length + Chunk Type)
 	fseek(f, 16, SEEK_SET);
@@ -2021,11 +2027,12 @@ static void interface_displayLogo(void)
 	// top left
 	pthread_mutex_lock(&FusionObject.mutexLogo);
 	for (int i=0; i<FusionObject.logoCount; i++){
-		char logoPath[PATH_MAX];
 		int left=0, top=0;
 		int w=0, h=0;
-		sprintf (logoPath, "/tmp/fusion_logo_%d.png", i);
-		if (getPngSize(logoPath, &w, &h) != 0) continue;
+		if (getPngSize(FusionObject.logos[i].filepath, &w, &h) != 0) {
+			eprintf ("%s(%d): Warning! Couldn't get logo size (%s)\n", __FILE__, __LINE__, FusionObject.logos[i].filepath);
+			continue;
+		}
 		switch (FusionObject.logos[i].position)
 		{
 			case FUSION_TOP_LEFT:
@@ -2046,7 +2053,7 @@ static void interface_displayLogo(void)
 				break;
 		}
 		interface_drawImage(DRAWING_SURFACE, 
-			logoPath,
+			FusionObject.logos[i].filepath,
 			left, top,
 			w, h, 0, 0, DSBLIT_BLEND_ALPHACHANNEL,
 			interfaceAlignLeft | interfaceAlignTop, 0, 0);
@@ -2055,12 +2062,17 @@ static void interface_displayLogo(void)
 
 	int fh;
 	pthread_mutex_lock(&FusionObject.mutexCreep);
-//	eprintf ("%s(%d): draw creepline %s.\n", __FILE__, __LINE__, FusionObject.creepline);
 	pgfx_font->GetHeight(pgfx_font, &fh);
+
+	interface_drawTextWW(pgfx_font, 0, 0, 0, 255, 
+		50 + 2, interfaceInfo.screenHeight - 80 + 2, 
+		interfaceInfo.screenWidth + 100, fh + 10, 
+		FusionObject.creepToShow, ALIGN_LEFT);
+
 	interface_drawTextWW(pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
 		50, interfaceInfo.screenHeight - 80, 
 		interfaceInfo.screenWidth + 100, fh + 10, 
-		FusionObject.creepline, ALIGN_LEFT);
+		FusionObject.creepToShow, ALIGN_LEFT);
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 #endif
 }

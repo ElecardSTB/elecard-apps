@@ -1802,10 +1802,44 @@ static void setupFramebuffers(void)
 
 #ifdef ENABLE_FUSION
 #define FUSION_STUB "fusion://stub"
-#define FUSION_MIN_USLEEP 600
+#define FUSION_MIN_USLEEP 40
 static int gStatus = 0;
 
 interfaceFusionObject_t FusionObject;
+
+void fusion_ms2timespec(int ms, struct timespec * ts)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    ts->tv_sec = tv.tv_sec + ms / 1000;
+    ts->tv_nsec = tv.tv_usec * 1000 + (ms % 1000) * 1000000;
+    if (ts->tv_nsec >= 1000000000)
+    {
+        ts->tv_sec++;
+        ts->tv_nsec -= 1000000000;
+    }
+}
+
+void fusion_wait (unsigned int timeout_ms)
+{
+	struct timespec ts;
+	pthread_cond_t condition;
+	pthread_mutex_t mutex;
+
+	pthread_cond_init(&condition, NULL);
+	pthread_mutex_init(&mutex, NULL);
+
+	pthread_mutex_lock(&mutex);
+
+	fusion_ms2timespec(timeout_ms, &ts);
+	pthread_cond_timedwait(&condition, &mutex, &ts);
+	pthread_mutex_unlock(&mutex);
+
+	pthread_cond_destroy(&condition);
+	pthread_mutex_destroy(&mutex);
+	return;
+}
 
 void * fusion_threadCreepline(void * param)
 {
@@ -1885,25 +1919,34 @@ void * fusion_threadCreepline(void * param)
 					}
 				}
 				tmpLine[symbols] = '\0';
+
 				snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, "%s", tmpLine);
+				snprintf (FusionObject.creepToShow, FUSION_MAX_CREEPLEN, "%s", tmpLine);
 
 				pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 				interface_displayMenu(1);
 
-				usleep(FUSION_MIN_USLEEP);
+				fusion_wait(FUSION_MIN_USLEEP);
 				alreadySlept += FUSION_MIN_USLEEP;
 			}
-			usleep (1000* 3);	// for test (FusionObject.pause * 10000);
+
+			timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
+//			eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
+			if (timeToUsleep <= 0) break;
+
+			fusion_wait (1000* FusionObject.pause);
 			alreadySlept += FusionObject.pause * 1000;
 			j++;
 		}
 		FusionObject.creepline[0] = '\0';
+		FusionObject.creepToShow[0] = '\0';
 
 		timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
-		//eprintf ("%s(%d): Sleep %d msec.\n", __FUNCTION__, __LINE__, timeToUsleep);
+		eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
 		if (timeToUsleep <= 0) continue;
-		usleep(timeToUsleep);
+		eprintf ("%s(%d): Sleep %d msec.\n", __FUNCTION__, __LINE__,timeToUsleep);
+		fusion_wait(timeToUsleep);
 	} // while
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
@@ -1962,6 +2005,8 @@ void fusion_startup()
 	else {
 		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
 	}
+
+	fusion_getUsbRoot();	// todo: make a waiting cycle till usb is not connected
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
@@ -2096,6 +2141,57 @@ int fusion_getRequestDate(char * dateString)
 	return 0;
 }
 
+static char fusion_usbRoot[PATH_MAX] = {0};
+
+int32_t fusion_checkDirectory(const char *path)
+{
+	DIR *d;
+
+	d = opendir(path);
+	if (d == NULL)
+		return 0;
+	closedir(d);
+	return 1;
+}
+
+int fusion_getUsbRoot()
+{
+	int hasDrives = 0;
+	DIR *usbDir = opendir("/mnt/");
+	if (usbDir != NULL) {
+		struct dirent *first_item = NULL;
+		struct dirent *item = readdir(usbDir);
+		while (item) {
+			if(strncmp(item->d_name, "sd", 2) == 0) {
+				hasDrives++;
+				if(!first_item)
+					first_item = item;
+			}
+			item = readdir(usbDir);
+		}
+		if (hasDrives == 1) {
+			sprintf(fusion_usbRoot, "/mnt/%s/", first_item->d_name);
+			eprintf("%s: Found %s\n", __FUNCTION__, fusion_usbRoot);
+			closedir(usbDir);
+			return 0;
+		}
+		closedir(usbDir);
+
+		char fusionFolder[PATH_MAX];
+		sprintf (fusionFolder, "%s/fusion/", fusion_usbRoot);
+
+		if (fusion_checkDirectory(fusionFolder)) {
+			char command[PATH_MAX];
+			sprintf (command, "mkdir %s", fusionFolder);
+			system(command);
+		}
+	}
+	else {
+		eprintf("%s: opendir /mnt/ failed\n", __FUNCTION__);
+	}
+	return -1;
+}
+
 int fusion_getCreepAndLogo ()
 {
 	cJSON * root;
@@ -2144,16 +2240,22 @@ int fusion_getCreepAndLogo ()
 			else continue;
 
 			sprintf (FusionObject.logos[i].url, "%s", jsonItem->valuestring);
-			eprintf ("%s(%d): logo[%d] = %s, position = %d\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].url, FusionObject.logos[i].position);
 
-			char logoPath[PATH_MAX];
+			int len = strlen(FusionObject.logos[i].filepath);
+			if (len && (FusionObject.logos[i].filepath[len-5] == '_')){
+				sprintf (FusionObject.logos[i].filepath, "%s/fusion/logo_%d.png", fusion_usbRoot, i);
+			}
+			else {
+				sprintf (FusionObject.logos[i].filepath, "%s/fusion/logo_%d_.png", fusion_usbRoot, i);
+			}
+			eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
+				i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
+
 			char cmd[128];
-			sprintf (logoPath, "/tmp/fusion_logo_%d.png", i);
-
-			
-			eprintf ("%s(%d): \n", __FUNCTION__, __LINE__);
 			//sprintf (cmd, "wget \"%s\" -O %s 2>/dev/null", url, logoPath);
-			sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, logoPath);
+			sprintf (cmd, "rm -f \"%s\"", FusionObject.logos[i].filepath);
+			system(cmd);
+			sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, FusionObject.logos[i].filepath);
 			system(cmd);
 		}
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
