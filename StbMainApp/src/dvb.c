@@ -139,6 +139,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ZERO_SCAN_MESAGE()	//scan_messages[0] = 0
 #define SCAN_MESSAGE(...)	//sprintf(&scan_messages[strlen(scan_messages)], __VA_ARGS__)
 
+#define TUNER_C_BAND_START			 3000000 /*kHZ*/
+#define TUNER_C_BAND_END			 4200000 /*kHZ*/
+#define TUNER_KU_LOW_BAND_START		10700000 /*kHZ*/
+#define TUNER_KU_LOW_BAND_END		11700000 /*kHZ*/
+#define TUNER_KU_HIGH_BAND_START	11700001 /*kHZ*/
+#define TUNER_KU_HIGH_BAND_END		12750000 /*kHZ*/
+
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
@@ -1615,12 +1622,35 @@ static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat 
 			eprintf("   C: Symbol rate %u, modulation %u invertion %u\n",
 				symbol_rate, modulation, inversion);
 		} else if((type == SYS_DVBS) && (media == NULL || media->type == serviceMediaDVBS)) {
+			uint32_t inversion = 0;
+			fe_modulation modulation = QPSK;
+			uint32_t polarization = (media != NULL) ? media->dvb_s.polarization : appControlInfo.dvbsInfo.polarization;
 			uint32_t symbol_rate = (media != NULL) ? media->dvb_s.symbol_rate : appControlInfo.dvbsInfo.symbolRate * KHZ;
+			uint32_t freqLO;
+			uint32_t tone = SEC_TONE_OFF;
+
+			if((TUNER_C_BAND_START <= frequency) && (frequency <= TUNER_C_BAND_END)) {
+				freqLO = 5150000;
+				tone = SEC_TONE_OFF;
+			} else if((TUNER_KU_LOW_BAND_START <= frequency) && (frequency <= TUNER_KU_LOW_BAND_END)) {
+				freqLO = 9750000;
+				tone = SEC_TONE_OFF;
+			} else if((TUNER_KU_HIGH_BAND_START <= frequency) && (frequency <= TUNER_KU_HIGH_BAND_END)) {
+				freqLO = 10600000;
+				tone = SEC_TONE_ON;
+			} else {
+				printf("%s()[%d]: !!!!!!\n", __func__, __LINE__);
+			}
+			//north america: freqLO = 11250000
+			frequency -= freqLO;
 
 			dtv[0].cmd = DTV_FREQUENCY; 		dtv[0].u.data = frequency;
-			dtv[1].cmd = DTV_SYMBOL_RATE; 		dtv[1].u.data = symbol_rate;
-			dtv[2].cmd = DTV_INNER_FEC; 		dtv[2].u.data = FEC_NONE;
-			dtv[3].cmd = DTV_TUNE;
+			dtv[1].cmd = DTV_INVERSION; 		dtv[1].u.data = inversion;
+			dtv[2].cmd = DTV_MODULATION; 		dtv[2].u.data = modulation;
+			dtv[3].cmd = DTV_SYMBOL_RATE; 		dtv[3].u.data = symbol_rate;
+			dtv[4].cmd = DTV_VOLTAGE; 			dtv[4].u.data = polarization;
+			dtv[5].cmd = DTV_TONE; 				dtv[5].u.data = tone;
+			dtv[6].cmd = DTV_TUNE;
 
 			cmdseq.num = 4;
 			eprintf("   S: Symbol rate %u\n", symbol_rate);
