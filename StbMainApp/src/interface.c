@@ -2065,12 +2065,12 @@ static void interface_displayLogo(void)
 
 	pthread_mutex_lock(&FusionObject.mutexCreep);
 	interface_drawTextWW(pgfx_font, 0, 0, 0, 255, 
-		50 + 2, interfaceInfo.screenHeight - 80 + 2, 
+		2, interfaceInfo.screenHeight - 80 + 2,
 		interfaceInfo.screenWidth + 100, fh + 10, 
 		FusionObject.creepToShow, ALIGN_LEFT);
 
 	interface_drawTextWW(pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
-		50, interfaceInfo.screenHeight - 80, 
+		0, interfaceInfo.screenHeight - 80,
 		interfaceInfo.screenWidth + 100, fh + 10, 
 		FusionObject.creepToShow, ALIGN_LEFT);
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
