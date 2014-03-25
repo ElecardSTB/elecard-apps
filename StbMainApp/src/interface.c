@@ -2061,9 +2061,9 @@ static void interface_displayLogo(void)
 	pthread_mutex_unlock(&FusionObject.mutexLogo);
 
 	int fh;
-	pthread_mutex_lock(&FusionObject.mutexCreep);
 	pgfx_font->GetHeight(pgfx_font, &fh);
 
+	pthread_mutex_lock(&FusionObject.mutexCreep);
 	interface_drawTextWW(pgfx_font, 0, 0, 0, 255, 
 		50 + 2, interfaceInfo.screenHeight - 80 + 2, 
 		interfaceInfo.screenWidth + 100, fh + 10, 
