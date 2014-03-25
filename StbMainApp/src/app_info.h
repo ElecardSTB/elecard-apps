@@ -51,7 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <directfb.h>
 #include <directfb_strings.h>
-#include <linux/dvb/frontend.h>
+#include "frontend.h"
 #include <limits.h>
 #include <time.h>
 #include <curl/curl.h>

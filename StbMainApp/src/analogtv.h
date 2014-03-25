@@ -1,7 +1,3 @@
-
-#if !defined(__ANALOGTV_H)
-#define __ANALOGTV_H
-
 /*
  analogtv.h
 
@@ -31,9 +27,11 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 /** @file analogtv.h Analog TV playback backend
  */
+
+#if !defined(__ANALOGTV_H__)
+#define __ANALOGTV_H__
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
@@ -114,7 +112,7 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
 
-const char * analogtv_getServiceName(uint32_t index);
+const char *analogtv_getServiceName(uint32_t index);
 int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size);
 
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
@@ -131,7 +129,16 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 
 int32_t analogtv_fillFoundServList(void);
 int32_t analogtv_updateFoundServiceFile(void);
+#else /* ENABLE_ANALOGTV */
+
+int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg) { return 0; }
+//const char *analogtv_getServiceName(uint32_t index) { return NULL; }
+uint32_t analogtv_getChannelCount(void) { return 0; }
+void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex) { return ; }
+int32_t analogtv_updateName(uint32_t chanIndex, char* str) { return 0; }
+int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size) { buf[0] = 0; return -1; }
+int menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index) { return 0; }
 
 #endif /* ENABLE_ANALOGTV */
 
-#endif /* __ANALOGTV_H      Do not add any thing below this line */
+#endif /* __ANALOGTV_H__      Do not add any thing below this line */

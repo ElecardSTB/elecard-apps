@@ -921,8 +921,10 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 			if(appControlInfo.playbackInfo.streamSource == streamSourceDVB) {
 				offair_startVideo(which);
 			} else if(appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV) {
+#ifdef ENABLE_ANALOGTV
 				interfaceMenu_t *channelMenu = _M &DVBTMenu;
 				analogtv_activateChannel(channelMenu, (void *)appControlInfo.tvInfo.id);
+#endif
 			}
 		}
 	} else if(button == interfacePlayControlStop) {
@@ -1020,7 +1022,7 @@ static void *offair_multiviewStopThread(void* pArg)
 
 static int offair_multiviewPlay(interfaceMenu_t *pMenu, void *pArg)
 {
-	uint32_t	f1 = 0
+	uint32_t	f1 = 0;
 	uint32_t	f;
 	int32_t		mvCount, i;
 	int32_t		payload[4];
@@ -1361,7 +1363,9 @@ void offair_displayPlayControl(void)
 			strcpy(buffer, dvb_getServiceName(current_service()));
 			break;
 		  case streamSourceAnalogTV:
+#ifdef ENABLE_ANALOGTV
 			snprintf(buffer, sizeof(buffer), "%s", analogtv_getServiceName(appControlInfo.tvInfo.id));
+#endif
 			break;
 		  default:
 			snprintf(buffer, sizeof(buffer), "unknown");
@@ -3118,7 +3122,7 @@ int32_t offair_updateChannelStatus(void)
 			break;
 		  case streamSourceAnalogTV:
 			hasChannel = 1;
-
+#ifdef ENABLE_ANALOGTV
 			snprintf(buf, sizeof(buf), "%s: %s", _T("SELECTED_CHANNEL"), analogtv_getServiceName(appControlInfo.tvInfo.id));
 
 			interface_changeMenuEntryInfo(dvbtEntry, buf, sizeof(buf));
@@ -3126,6 +3130,7 @@ int32_t offair_updateChannelStatus(void)
 			interface_changeMenuEntryFunc(dvbtEntry, analogtv_activateChannel);
 			interface_changeMenuEntryThumbnail(dvbtEntry, thumbnail_selected);
 			interface_changeMenuEntrySelectable(dvbtEntry, 1);
+#endif
 //			selectedMenuItem = dvbChannel_getCount() + appControlInfo.tvInfo.id + 3; //shift on 3 becouse there are 3 disabled entry(DVB, ANALOGTV and start if f)
 		  default:
 			break;
@@ -3755,12 +3760,13 @@ static int offair_updateEPG(void* pArg)
 
 int  offair_tunerPresent(void)
 {
+#if (defined STSDK)
 	if(st_getBoardId() == eSTB850) {
 		return 1; //we always have analog tuner for stb850.
-	} else {
-		return (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
-				appControlInfo.tunerInfo[1].status != tunerNotPresent);
 	}
+#endif
+	return (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
+			appControlInfo.tunerInfo[1].status != tunerNotPresent);
 }
 
 void offair_buildDVBTMenu(interfaceMenu_t *pParent)

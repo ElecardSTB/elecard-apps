@@ -445,9 +445,11 @@ static int32_t dvbChannel_update(void)
 	return 0;
 }
 
-int32_t serviceIdx_cmp(const void *e1, const void *e2, void *arg)
+//int32_t serviceIdx_cmp(const void *e1, const void *e2, void *arg)
+int32_t serviceIdx_cmp(const void *e1, const void *e2)
 {
-	serviceSort_t sortOrderType = *((serviceSort_t *)arg);
+//	serviceSort_t sortOrderType = *((serviceSort_t *)arg);
+	serviceSort_t sortOrderType = g_dvb_channels.sortOrderType;
 	service_index_t *srvIndx1 = *(service_index_t **)e1;
 	service_index_t *srvIndx2 = *(service_index_t **)e2;
 	EIT_service_t *s1;
@@ -523,7 +525,8 @@ int32_t dvbChannel_sort(serviceSort_t sortType)
 		}
 		count = i;
 
-		qsort_r(sortingBuf, count, sizeof(sortingBuf[0]), serviceIdx_cmp, &g_dvb_channels.sortOrderType);
+//		qsort_r(sortingBuf, count, sizeof(sortingBuf[0]), serviceIdx_cmp, &g_dvb_channels.sortOrderType);
+		qsort(sortingBuf, count, sizeof(sortingBuf[0]), serviceIdx_cmp);
 
 		for(i = 0; i < count; i++) {
 			list_add_tail(&(sortingBuf[i]->orderSort), &g_dvb_channels.orderSortHead);

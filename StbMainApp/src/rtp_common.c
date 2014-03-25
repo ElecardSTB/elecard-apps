@@ -52,7 +52,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sys/ioctl.h>
 #include <linux/dvb/dmx.h>
-#include <linux/dvb/frontend.h>
 
 void rtp_common_get_pids(pStreamsPIDs streamPIDs, int *vFormat, int *vPID, int *aFormat, int *aPID, int *pPID, struct list_head *audio)
 {

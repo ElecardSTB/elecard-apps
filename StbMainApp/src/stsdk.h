@@ -40,9 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "dvb.h"
 #include "output.h"
 
-#ifdef ENABLE_DVB
-#include <linux/dvb/frontend.h>
-#endif
 #ifdef STSDK
 #include <linux/board_id.h>
 #include <elcd-rpc.h>

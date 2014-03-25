@@ -68,10 +68,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <poll.h>
 
 #include <linux/dvb/dmx.h>
-#include <linux/dvb/frontend.h>
+#include "frontend.h"
 
+#if (defined ENABLE_USE_DVB_APPS)
 #include <libucsi/atsc/section.h>
 #include <libucsi/atsc/descriptor.h>
+#endif
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -709,6 +711,7 @@ static void set_bit (unsigned char *bitfield, int bit)
 	bitfield[bit/8] |= 1 << (bit % 8);
 }
 
+#if (defined ENABLE_USE_DVB_APPS)
 static char *atsc_getText(struct atsc_text *atext, int len)
 {
 	struct atsc_text_string *cur_string;
@@ -891,6 +894,7 @@ static int32_t parse_atsc_section(list_element_t **head, uint32_t media_id, uint
 
 	return 0;
 }
+#endif //#if (defined ENABLE_USE_DVB_APPS)
 
 
 /**
@@ -1097,11 +1101,13 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 				mysem_release(dvb_semaphore);
 				can_count_sections = 0;
 				break;
+#if (defined ENABLE_USE_DVB_APPS)
 			case stag_atsc_terrestrial_virtual_channel:
 			case stag_atsc_cable_virtual_channel:
 				mysem_get(dvb_semaphore);
 				parse_atsc_section(services, MEDIA_ID, s->buf, ((s->buf[1] & 0x0f) << 8) | s->buf[2], s->pid);
 				mysem_release(dvb_semaphore);
+#endif
 			default:
 				dprintf("%s: Unknown 0x%04x for service 0x%04x", __FUNCTION__, s->pid, table_id_ext);
 		};
@@ -1263,10 +1269,15 @@ static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enab
 	dvb_filterAdd(&eit_filter);
 
 	if((dvb_getType(tuner) == SYS_ATSC) || (dvb_getType(tuner) == SYS_DVBC_ANNEX_B)) {
+#if (defined ENABLE_USE_DVB_APPS)
 		dvb_filterSetup(&tvct_filter, tuner, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, &dvb_services); //Terrestrial Virtual Channel Table (TVCT)
 		dvb_filterAdd(&tvct_filter);
 		dvb_filterSetup(&cvct_filter, tuner, 0x1ffb, stag_atsc_cable_virtual_channel, 5, &dvb_services); //Cable Virtual Channel Table (CVCT)
 		dvb_filterAdd(&cvct_filter);
+#else
+		(void)tvct_filter;
+		(void)cvct_filter;
+#endif
 	} else {
 		dvb_filterSetup(&sdt_filter, tuner, 0x11, 0x42, 5, &dvb_services); /* SDT actual */
 		dvb_filterAdd(&sdt_filter);
@@ -1321,11 +1332,10 @@ int dvb_isCurrentDelSys_dvbt2(tunerFormat tuner)
 
 void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 {
-	int adapter = dvb_getAdapter(tuner);
 	struct section_buf eit_filter;
 	int counter = 0;
 
-	if(!dvb_isLinuxAdapter(adapter)) {
+	if(!dvb_isLinuxAdapter(dvb_getAdapter(tuner))) {
 		dvb_filtersUnlock();
 	}
 
@@ -1347,9 +1357,7 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency )
 
 void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out_list )
 {
-	int adapter = dvb_getAdapter(tuner);
-
-	if(!dvb_isLinuxAdapter(adapter)) {
+	if(!dvb_isLinuxAdapter(dvb_getAdapter(tuner))) {
 		eprintf("%s[%d]: unsupported\n", __FUNCTION__, tuner);
 		return;
 	}
@@ -2199,6 +2207,7 @@ service_scan_end:
 	return ret;
 }
 
+#ifdef STSDK
 static int32_t dvb_frequencyScanOne(tunerFormat tuner, __u32 frequency, EIT_media_config_t *media,
 						dvb_displayFunctionDef* pFunction, dvb_cancelFunctionDef* pCancelFunction, uint32_t enableNit)
 {
@@ -2255,6 +2264,7 @@ static int32_t dvb_frequencyScanOne(tunerFormat tuner, __u32 frequency, EIT_medi
 	}*/
 	return 0;
 }
+#endif
 
 static int32_t dvb_isFrequencyesEqual(tunerFormat tuner, uint32_t freq1, uint32_t freq2)
 {
