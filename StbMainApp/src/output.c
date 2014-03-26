@@ -3036,7 +3036,7 @@ static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
 	}
 	appControlInfo.atscInfo.modulation = mod_to_delSys[curAtscModulation].key;
 
-	dvb_setFrontendType(dvb_getAdapter(appControlInfo.dvbInfo.tuner), mod_to_delSys[curAtscModulation].value, NULL);
+	dvb_setFrontendType(dvb_getAdapter(appControlInfo.dvbInfo.tuner), mod_to_delSys[curAtscModulation].value, -1);
 
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
