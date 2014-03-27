@@ -148,8 +148,7 @@ typedef struct __dvb_param {
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-extern table_IntStr_t fe_typeName[];
-extern table_IntStr_t fe_modulationName[];
+extern const table_IntStr_t fe_modulationName[];
 extern list_element_t *dvb_services;
 
 /******************************************************************
@@ -182,7 +181,7 @@ static inline fe_delivery_system_t dvb_getType(tunerFormat tuner)
 	return appControlInfo.tunerInfo[tuner].type;
 }
 
-const char *dvb_getTypeName(tunerFormat tuner);
+const char *dvb_getTunerTypeName(tunerFormat tuner);
 
 int dvb_toggleType(tunerFormat tuner);
 

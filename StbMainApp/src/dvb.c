@@ -1,4 +1,3 @@
-
 /*
  dvb.c
 
@@ -32,7 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
-
 #include "dvb.h"
 #include "off_air.h"
 
@@ -76,7 +74,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
-
 #define fatal   eprintf
 #define info    dprintf
 #define verbose(...)
@@ -145,6 +142,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define TUNER_KU_LOW_BAND_END		11700000 /*kHZ*/
 #define TUNER_KU_HIGH_BAND_START	11700001 /*kHZ*/
 #define TUNER_KU_HIGH_BAND_END		12750000 /*kHZ*/
+
+#define SET_DTV_PRPERTY(prop, id, _cmd, val) \
+		{ \
+			prop[id].cmd = _cmd; \
+			prop[id].u.data = val; \
+			id++; \
+ 		}
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -259,15 +263,31 @@ struct dvb_paramState {
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-table_IntStr_t fe_typeName[] = {
-	{serviceMediaDVBT,	"DVB-T"},
-	{serviceMediaDVBC,	"DVB-C"},
-	{serviceMediaDVBS,	"DVB-S"},
-	{serviceMediaATSC,	"ATSC"},
-	TABLE_INT_STR_END_VALUE,
+static const table_IntStr_t delivery_system_desc[] = {
+	{SYS_UNDEFINED,		"SYS_UNDEFINED"},
+	{SYS_DVBC_ANNEX_A,	"SYS_DVBC_ANNEX_A"},//DVB-C
+	{SYS_DVBC_ANNEX_B,	"SYS_DVBC_ANNEX_B"},
+	{SYS_DVBT,			"SYS_DVBT"},
+	{SYS_DSS,			"SYS_DSS"},
+	{SYS_DVBS,			"SYS_DVBS"},
+	{SYS_DVBS2,			"SYS_DVBS2"},
+	{SYS_DVBH,			"SYS_DVBH"},
+	{SYS_ISDBT,			"SYS_ISDBT"},
+	{SYS_ISDBS,			"SYS_ISDBS"},
+	{SYS_ISDBC,			"SYS_ISDBC"},
+	{SYS_ATSC,			"SYS_ATSC"},
+	{SYS_ATSCMH,		"SYS_ATSCMH"},
+	{SYS_DMBTH,			"SYS_DMBTH"},
+	{SYS_CMMB,			"SYS_CMMB"},
+	{SYS_DAB,			"SYS_DAB"},
+	{SYS_DVBT2,			"SYS_DVBT2"},
+	{SYS_TURBO,			"SYS_TURBO"},
+	{SYS_DVBC_ANNEX_C,	"SYS_DVBC_ANNEX_C"},
+
+	TABLE_INT_STR_END_VALUE
 };
 
-table_IntStr_t fe_modulationName[] = {
+const table_IntStr_t fe_modulationName[] = {
 	{QPSK,		"QPSK"},
 	{QAM_16,	"QAM_16"},
 	{QAM_32,	"QAM_32"},
@@ -282,20 +302,9 @@ table_IntStr_t fe_modulationName[] = {
 	{APSK_32,	"APSK_32"},
 	{DQPSK,		"DQPSK"},
 	{QAM_4_NR,	"QAM_4_NR"},
+
 	TABLE_INT_STR_END_VALUE,
 };
-
-table_IntInt_t type_to_delsys[] = {
-	{FE_OFDM,	SYS_DVBT},
-	{FE_OFDM,	SYS_DVBT2},
-	{FE_QAM,	SYS_DVBC_ANNEX_AC},
-	{FE_QPSK,	SYS_DVBS},
-	{FE_ATSC,	SYS_ATSC},
-	{FE_ATSC,	SYS_DVBC_ANNEX_B},
-
-	TABLE_INT_INT_END_VALUE,
-};
-
 
 list_element_t *dvb_services = NULL;
 
@@ -312,12 +321,6 @@ static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
 
 static struct dvb_instance dvbInstances[ADAPTER_COUNT];
 static __u32 currentFrequency[ADAPTER_COUNT];
-static char * fe_typeNames[] = {
-	"DVB-S",
-	"DVB-C",
-	"DVB-T",
-	"ATSC"
-};
 
 static pmysem_t dvb_semaphore;
 static pmysem_t dvb_fe_semaphore;
@@ -338,6 +341,7 @@ static int dvb_hasMediaNB(EIT_service_t *service);
 static int dvb_openFrontend(int adapter, int flags);
 static int dvb_getFrontendInfo(int adapter, int flags, struct dvb_frontend_info *fe_info);
 static fe_delivery_system_t dvb_getDelSysFromService(EIT_service_t *service);
+static int dvb_diseqcSend(tunerFormat tuner, int frontend_fd, const uint8_t *tx, size_t tx_len);
 
 #ifdef STSDK
 static inline int dvb_isLinuxAdapter(int adapter)
@@ -353,8 +357,6 @@ static inline uint8_t diseqc_data_lo(int satellite_position, int is_vertical, ui
 {
 	return (satellite_position & 0x03) << 2 | (is_vertical ? 0 : 1) << 1 | (f_khz > 11700000);
 }
-
-static int dvb_diseqcSend (tunerFormat tuner, int frontend_fd, const uint8_t *tx, size_t tx_len);
 
 static inline int isSubtitle( PID_info_t* stream)
 {
@@ -975,7 +977,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 			media.type = serviceMediaNone;
 	}
 
-	dprintf("%s: media type %s, freq %u\n", __FUNCTION__, dvb_getTypeName(appControlInfo.dvbInfo.tuner), media.frequency);
+	dprintf("%s: media type %s, freq %u\n", __FUNCTION__, dvb_getTunerTypeName(appControlInfo.dvbInfo.tuner), media.frequency);
 
 	table_id = s->buf[0];
 
@@ -1394,9 +1396,7 @@ void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out
 
 int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_media_config_t *media)
 {
-	if(appControlInfo.tunerInfo[tuner].type != SYS_DVBS ||
-		appControlInfo.dvbsInfo.diseqc.type == 0)
-	{
+	if((dvb_getType(tuner) != SYS_DVBS) || (appControlInfo.dvbsInfo.diseqc.type == 0)) {
 		return 0;
 	}
 	if (appControlInfo.dvbsInfo.diseqc.uncommited) {
@@ -1487,6 +1487,17 @@ int dvb_initFrontend(tunerFormat tuner)
 			appControlInfo.tunerInfo[tuner].delSys[1] = SYS_DVBT;
 			appControlInfo.tunerInfo[tuner].delSys[2] = SYS_DVBT2;
 		} else {
+			const table_IntInt_t type_to_delsys[] = {
+				{FE_OFDM,	SYS_DVBT},
+//				{FE_OFDM,	SYS_DVBT2},
+				{FE_QAM,	SYS_DVBC_ANNEX_AC},
+				{FE_QPSK,	SYS_DVBS},
+				{FE_ATSC,	SYS_ATSC},
+//				{FE_ATSC,	SYS_DVBC_ANNEX_B},
+
+				TABLE_INT_INT_END_VALUE,
+			};
+
 			appControlInfo.tunerInfo[tuner].delSysCount = 1;
 			appControlInfo.tunerInfo[tuner].delSys[0] = table_IntIntLookup(type_to_delsys, info.type, SYS_DVBT);
 		}
@@ -1512,15 +1523,14 @@ int dvb_initFrontend(tunerFormat tuner)
 #endif
 	}
 
-//	appControlInfo.tunerInfo[tuner].type = table_IntIntLookup(type_to_delsys, info.type, SYS_UNDEFINED);
 	appControlInfo.tunerInfo[tuner].type = current_sys;
+	appControlInfo.tunerInfo[tuner].status = tunerInactive;
 	dvbInstances[dvb_getAdapter(tuner)].fe_type = current_sys;
 
-	appControlInfo.tunerInfo[tuner].status = tunerInactive;
-	eprintf("%s[%d]: %s (%s) supported types: ", __FUNCTION__, dvb_getAdapter(tuner),
-		info.name, fe_typeNames[info.type]);
+	eprintf("%s(): Tuner number %d, Model=%s, FineStepSize=%u, Supported types:\n\t",
+				__func__, dvb_getAdapter(tuner), info.name, info.frequency_stepsize);
 	for(i = 0; i < appControlInfo.tunerInfo[tuner].delSysCount; i++) {
-		printf("%u ", appControlInfo.tunerInfo[tuner].delSys[i]);
+		table_IntStrLookup(delivery_system_desc, appControlInfo.tunerInfo[tuner].delSys[i], "unknown ");
 	}
 	printf("\n");
 
@@ -1532,57 +1542,54 @@ static uint32_t dvb_getBandwidthHz(fe_bandwidth_t bw)
 {
 	switch(bw) {
 	  case BANDWIDTH_8_MHZ:
-	    return 8000000;
+		return 8000000;
 	  case BANDWIDTH_7_MHZ:
-	    return 7000000;
+		return 7000000;
 	  case BANDWIDTH_6_MHZ:
-	    return 6000000;
+		return 6000000;
 	  case BANDWIDTH_5_MHZ:
-	    return 5000000;
+		return 5000000;
 	  case BANDWIDTH_10_MHZ:
-	    return 10000000;
+		return 10000000;
 	  case BANDWIDTH_1_712_MHZ:
-	    return 1712000;
+		return 1712000;
 	  default:
-	    return 0;//AUTO
+		break;
 	}
+	return 0;//AUTO
 }
 
-#define SET_DTV_PRPERTY(prop, id, _cmd, val) \
-		{ \
-			prop[id].cmd = _cmd; \
-			prop[id].u.data = val; \
-			id++; \
- 		}
-
-static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat tuner, int frontend_fd,
-                            int wait_for_lock, EIT_media_config_t *media, dvb_cancelFunctionDef* pFunction)
+static int32_t dvb_setParam(fe_delivery_system_t delSys, __u32 frequency, tunerFormat tuner, int32_t frontend_fd,
+								int32_t wait_for_lock, EIT_media_config_t *media, dvb_cancelFunctionDef* pFunction)
 {
 	if(dvb_isLinuxTuner(tuner)) {
 		uint8_t needTune = 0;
 		uint32_t propCount = 0;
-
-		fe_delivery_system_t currentType = dvbParamState.delSys;//appControlInfo.tunerInfo[tuner].type;
-
-		if((type != currentType) && (dvb_setFrontendType(dvb_getAdapter(tuner), type, frontend_fd) != 0)) {
-			eprintf("%s[%d]: Watch failed to set frontend type for current service\n", __FUNCTION__, dvb_getAdapter(tuner));
-			return -1;
-		}
-		if(appControlInfo.dvbCommonInfo.streamerInput)
-			return 0;
-
-		eprintf("%s[%d]: Current frequency %u, new frequency %u\n", __FUNCTION__, tuner, currentFrequency[tuner], frequency);
-
+		int32_t hasLock = 0;
 		struct dtv_property dtv[16];//check if it enough
 		struct dtv_properties cmdseq;
 
+		if(dvbParamState.delSys != delSys) {
+			if(dvb_setFrontendType(dvb_getAdapter(tuner), delSys, frontend_fd) != 0) {
+				eprintf("%s[%d]: Failed to set frontend delSys for current service\n", __FUNCTION__, dvb_getAdapter(tuner));
+				return -1;
+			}
+			dvbParamState.delSys = delSys;
+		}
+		if(appControlInfo.dvbCommonInfo.streamerInput) {
+			return 0;
+		}
+
+		eprintf("%s[%d]: Current frequency %u, new frequency %u\n", __FUNCTION__, tuner, currentFrequency[tuner], frequency);
 		if(media && media->type == serviceMediaNone) {
 			media = NULL;
 		}
-		if(frequency != dvbParamState.frequency) {
+		if(dvbParamState.frequency != frequency) {
 			needTune = 1;
+			dvbParamState.frequency = frequency;
 		}
-		if(((type == SYS_DVBT) || (type == SYS_DVBT2)) && (media == NULL || media->type == serviceMediaDVBT)) {
+
+		if(((delSys == SYS_DVBT) || (delSys == SYS_DVBT2)) && (media == NULL || media->type == serviceMediaDVBT)) {
 			fe_bandwidth_t bandwidth = (media != NULL) ? media->dvb_t.bandwidth : appControlInfo.dvbtInfo.bandwidth;
 			uint32_t bandwidthHz = dvb_getBandwidthHz(bandwidth);
 			uint32_t inversion = appControlInfo.dvbtInfo.fe.inversion;
@@ -1617,7 +1624,7 @@ static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat 
 			dvbParamState.dvbtInfo.bandwidth = bandwidth;
 
 			eprintf("   T: bandwidth %u, invertion %u\n", bandwidthHz, inversion);
-		} else if((type == SYS_DVBC_ANNEX_AC) && (media == NULL || media->type == serviceMediaDVBC)) {
+		} else if((delSys == SYS_DVBC_ANNEX_AC) && (media == NULL || media->type == serviceMediaDVBC)) {
 			uint32_t modulation;
 			uint32_t symbol_rate;
 			uint32_t inversion = appControlInfo.dvbcInfo.fe.inversion;
@@ -1640,7 +1647,7 @@ static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat 
 
 			eprintf("   C: Symbol rate %u, modulation %u invertion %u\n",
 				symbol_rate, modulation, inversion);
-		} else if((type == SYS_DVBS) && (media == NULL || media->type == serviceMediaDVBS)) {
+		} else if((delSys == SYS_DVBS) && (media == NULL || media->type == serviceMediaDVBS)) {
 			uint32_t inversion = 0;
 			fe_modulation_t modulation = QPSK;
 			uint32_t polarization = (media != NULL) ? media->dvb_s.polarization : appControlInfo.dvbsInfo.polarization;
@@ -1682,7 +1689,7 @@ static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat 
 			dvbParamState.dvbsInfo.symbolRate = symbol_rate;
 
 			eprintf("   S: Symbol rate %u\n", symbol_rate);
-		} else if(((type == SYS_ATSC) || (type == SYS_DVBC_ANNEX_B)) /*&& (media == NULL || media->type == serviceMediaATSC)*/) {
+		} else if(((delSys == SYS_ATSC) || (delSys == SYS_DVBC_ANNEX_B)) /*&& (media == NULL || media->type == serviceMediaATSC)*/) {
 			uint32_t modulation = media ? media->atsc.modulation : appControlInfo.atscInfo.modulation;
 			if(modulation == 0) {
 				modulation = VSB_8;
@@ -1693,8 +1700,8 @@ static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat 
 
 			dvbParamState.atscInfo.modulation = modulation;
 		} else {
-			eprintf("%s[%d]: ERROR: Unsupported frontend type=%s (media %d).\n", __FUNCTION__, tuner,
-				fe_typeNames[table_IntIntLookupR(type_to_delsys, type, FE_QPSK)], media ? (int)media->type : -1);
+			eprintf("%s[%d]: ERROR: Unsupported frontend delSys=%s (media %d).\n", __FUNCTION__, tuner,
+				table_IntStrLookup(delivery_system_desc, delSys, "unknown"), media ? (int)media->type : -1);
 			return -1;
 		}
 
@@ -1707,67 +1714,62 @@ static int dvb_setParam(fe_delivery_system_t type, __u32 frequency, tunerFormat 
 			ioctl_or_abort(tuner, frontend_fd, FE_SET_PROPERTY, &cmdseq);
 		}
 
-		dvbParamState.frequency = frequency;
+		if(appControlInfo.dvbCommonInfo.adapterSpeed < 0) {
+			wait_for_lock = 0;
+		}
+		if(wait_for_lock) {
+			fe_status_t s;
+			int32_t hasSignal = 0;
+			int32_t timeout = (appControlInfo.dvbCommonInfo.adapterSpeed + 1);
+			uint32_t ber = BER_THRESHOLD;
 
-		if (!wait_for_lock || appControlInfo.dvbCommonInfo.adapterSpeed < 0) {
-			currentFrequency[tuner] = frequency;
-			return 0;
+#ifdef STBTI
+			timeout *= 10;
+#endif
+			do {
+				ioctl_or_abort(tuner, frontend_fd, FE_READ_BER, &ber);
+				// If ber is not -1, then wait a bit more 
+				if(ber == 0xffffffff) {
+					dprintf("%s[%d]: All clear...\n", __FUNCTION__, tuner);
+					BREAKABLE_SLEEP(100000);
+				} else {
+					eprintf("%s[%d]: Something is out there... (ber %u)\n", __FUNCTION__, tuner, ber);
+					BREAKABLE_SLEEP(500000);
+				}
+
+				ioctl_or_abort(tuner, frontend_fd, FE_READ_STATUS, &s);
+				if(s & FE_HAS_LOCK) {
+					if(!hasLock) {
+						dprintf("%s[%d]: L\n", __FUNCTION__, tuner);
+					} else {
+						break;
+					}
+					hasLock = 1;
+					// locked, give adapter even more time... 
+					//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
+				} else if (s & FE_HAS_SIGNAL) {
+					if (hasSignal == 0) {
+						eprintf("%s[%d]: Has signal\n", __FUNCTION__, tuner);
+						timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
+						hasSignal = 1;
+					}
+					dprintf("%s[%d]: S (%d)\n", __FUNCTION__, tuner, timeout);
+					// found something above the noise level, increase timeout time 
+					//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
+				} else {
+					dprintf("%s[%d]: N (%d)\n", __FUNCTION__, tuner, timeout);
+					// there's no and never was any signal, reach timeout faster 
+					if(hasSignal == 0) {
+						eprintf("%s[%d]: Skip\n", __FUNCTION__, tuner);
+						--timeout;
+					}
+				}
+			} while(--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
+			dprintf("%s[%d]: %u timeout %d, ber %u\n", __FUNCTION__, tuner, frequency, timeout, ber);
 		}
 
-		fe_status_t s;
-		int hasSignal = 0;
-		int hasLock   = 0;
-		__u32 ber = BER_THRESHOLD;
-#ifdef STBTI
-		int timeout = (appControlInfo.dvbCommonInfo.adapterSpeed+1)*10;
-#else
-		int timeout = (appControlInfo.dvbCommonInfo.adapterSpeed+1);
-#endif
-		do {
-			ioctl_or_abort(tuner, frontend_fd, FE_READ_BER, &ber);
-			// If ber is not -1, then wait a bit more 
-			if (ber == 0xffffffff) {
-				dprintf("%s[%d]: All clear...\n", __FUNCTION__, tuner);
-				BREAKABLE_SLEEP(100000);
-			} else
-			{
-				eprintf("%s[%d]: Something is out there... (ber %u)\n", __FUNCTION__, tuner, ber);
-				BREAKABLE_SLEEP(500000);
-			}
-
-			ioctl_or_abort(tuner, frontend_fd, FE_READ_STATUS, &s);
-			if (s & FE_HAS_LOCK) {
-				if (!hasLock)
-					dprintf("%s[%d]: L\n", __FUNCTION__, tuner);
-				else
-					break;
-				hasLock = 1;
-				// locked, give adapter even more time... 
-				//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
-			} else
-			if (s & FE_HAS_SIGNAL) {
-				if (hasSignal == 0) {
-					eprintf("%s[%d]: Has signal\n", __FUNCTION__, tuner);
-					timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
-					hasSignal = 1;
-				}
-				dprintf("%s[%d]: S (%d)\n", __FUNCTION__, tuner, timeout);
-				// found something above the noise level, increase timeout time 
-				//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
-			} else
-			{
-				dprintf("%s[%d]: N (%d)\n", __FUNCTION__, tuner, timeout);
-				// there's no and never was any signal, reach timeout faster 
-				if (hasSignal == 0)
-				{
-					eprintf("%s[%d]: Skip\n", __FUNCTION__, tuner);
-					--timeout;
-				}
-			}
-		} while (--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
-		dprintf("%s[%d]: %u timeout %d, ber %u\n", __FUNCTION__, tuner, frequency, timeout, ber);
 		currentFrequency[tuner] = frequency;
-		eprintf("%s[%d]: Frequency set, lock: %d\n", __FUNCTION__, tuner, hasLock);
+		eprintf("%s[%d]: Frequency set: hasLock=%d, wait_for_lock=%d\n", __FUNCTION__, tuner, hasLock, wait_for_lock);
 		return hasLock;
 	} else {
 		uint32_t	freqKHz = st_frequency(tuner, frequency);
@@ -1941,12 +1943,25 @@ int dvb_readServicesFromDump(char* filename)
 	return res;
 }
 
-const char *dvb_getTypeName(tunerFormat tuner)
+const char *dvb_getTunerTypeName(tunerFormat tuner)
 {
-	if ((appControlInfo.tunerInfo[tuner].type == SYS_DVBT) ||
-		(appControlInfo.tunerInfo[tuner].type == SYS_DVBT2))
+	const table_IntStr_t fe_typeNameHuman[] = {
+		{SYS_DVBS,			"DVB-S"},
+		{SYS_DVBC_ANNEX_AC,	"DVB-C"},
+		{SYS_DVBT,			"DVB-T"},
+		{SYS_DVBT2,			"DVB-T2"},
+		{SYS_ATSC,			"ATSC"},
+		{SYS_DVBC_ANNEX_B,	"ATSC"},
+
+		TABLE_INT_STR_END_VALUE,
+	};
+	fe_delivery_system_t curDelSys = dvb_getType(tuner);
+
+	if(((curDelSys == SYS_DVBT) || (curDelSys == SYS_DVBT2)) &&
+		dvb_checkDelSysSupport(tuner, SYS_DVBT2) && dvb_checkDelSysSupport(tuner, SYS_DVBT)) {
 		return "DVB-T/T2";
-	return fe_typeNames[table_IntIntLookupR(type_to_delsys, appControlInfo.tunerInfo[tuner].type, FE_QPSK)];
+	}
+	return table_IntStrLookup(fe_typeNameHuman, curDelSys, "DVB");
 }
 
 int dvb_setFrontendType(int adapter, fe_delivery_system_t type, int frontend_fd)
@@ -1981,7 +1996,6 @@ int dvb_setFrontendType(int adapter, fe_delivery_system_t type, int frontend_fd)
 	}
 	appControlInfo.tunerInfo[tuner].type = type;
 	dvbInstances[adapter].fe_type = type;
-	dvbParamState.delSys = type;
 
 	return 0;
 #else
@@ -2079,18 +2093,16 @@ static int dvb_openFrontend(int adapter, int flags)
 	return frontend_fd;
 }
 
-int dvb_getFrontendInfo(int adapter, int flags, struct dvb_frontend_info *fe_info)
+int32_t dvb_getFrontendInfo(int32_t adapter, int32_t flags, struct dvb_frontend_info *fe_info)
 {
-	int frontend_fd = dvb_openFrontend(adapter, flags);
+	int32_t err;
+	int32_t frontend_fd = dvb_openFrontend(adapter, flags);
 	if (frontend_fd < 0) {
-		eprintf("%s[%d]: failed to open frontend\n", __FUNCTION__, adapter);
+		eprintf("%s[%d]: failed to open frontend\n", __func__, adapter);
 		return -1;
 	}
-	int err;
 	ioctl_loop(adapter, err, frontend_fd, FE_GET_INFO, fe_info);
 
-	eprintf("%s[%d]: DVB Model=%s, Type=%s, FineStepSize=%u\n", __FUNCTION__,
-		adapter, fe_info->name, fe_typeNames[fe_info->type], fe_info->frequency_stepsize);
 	return frontend_fd;
 }
 
@@ -2313,7 +2325,7 @@ static int32_t dvb_frequencyScanOne(tunerFormat tuner, __u32 frequency, EIT_medi
 	float		freqMHz = (float)freqKHz / (float)KHZ;
 	int32_t		tuneSuccess = 0;
 
-	tuneSuccess = dvb_setParam(appControlInfo.tunerInfo[tuner].type, frequency, tuner, frontend_fd, 1, NULL, NULL);
+	tuneSuccess = dvb_setParam(dvb_getType(tuner), frequency, tuner, frontend_fd, 1, NULL, NULL);
 	if(tuneSuccess) {
 		eprintf("%s(): tuner=%d, scanning %.3f MHz\n", __FUNCTION__, tuner, freqMHz);
 
@@ -3627,6 +3639,14 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 	int32_t	type;
 	const char	*typeName;
 	const char	*modName;
+	const table_IntStr_t service_typeName[] = {
+		{serviceMediaDVBT,	"DVB-T"},
+		{serviceMediaDVBC,	"DVB-C"},
+		{serviceMediaDVBS,	"DVB-S"},
+		{serviceMediaATSC,	"ATSC"},
+
+		TABLE_INT_STR_END_VALUE,
+	};
 
 	if(service == NULL) {
 		dprintf("%s: service is NULL\n", __FUNCTION__);
@@ -3639,7 +3659,7 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 		_T("DVB_PROVIDER"), service->service_descriptor.service_provider_name);
 	buf += strlen(buf);
 
-	typeName = table_IntStrLookup(fe_typeName, service->media.type, NULL);
+	typeName = table_IntStrLookup(service_typeName, service->media.type, NULL);
 	if(typeName) {
 		sprintf(buf, "%s:\n", typeName);
 		buf += strlen(buf);

@@ -2961,7 +2961,7 @@ static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 		uint32_t *symbolRate = getDvbSymbolRate();
 		if (!symbolRate) {
 			eprintf("%s: failed to get symbolRate for tuner %d %s\n", __FUNCTION__,
-				appControlInfo.dvbInfo.tuner, dvb_getTypeName(appControlInfo.dvbInfo.tuner));
+				appControlInfo.dvbInfo.tuner, dvb_getTunerTypeName(appControlInfo.dvbInfo.tuner));
 			goto set_range_failed;
 		}
 		*symbolRate = val;
@@ -2971,7 +2971,7 @@ static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 	fe = getDvbRange(appControlInfo.dvbInfo.tuner);
 	if (!fe) {
 		eprintf("%s: failed to get freuquency range for tuner %d %s\n", __FUNCTION__,
-			appControlInfo.dvbInfo.tuner, dvb_getTypeName(appControlInfo.dvbInfo.tuner));
+			appControlInfo.dvbInfo.tuner, dvb_getTunerTypeName(appControlInfo.dvbInfo.tuner));
 		goto set_range_failed;
 	}
 
@@ -2986,7 +2986,7 @@ static int output_setDvbRange(interfaceMenu_t *pMenu, char *value, void* pArg)
 		getDvbLimits(appControlInfo.dvbInfo.tuner, &min, &max);
 		if (val < min || val > max) {
 			eprintf("%s: invalid frequency %u: must be %u-%u for tuner %d type %s\n", __FUNCTION__,
-				val, min, max, appControlInfo.dvbInfo.tuner, dvb_getTypeName(appControlInfo.dvbInfo.tuner));
+				val, min, max, appControlInfo.dvbInfo.tuner, dvb_getTunerTypeName(appControlInfo.dvbInfo.tuner));
 			interface_showMessageBox(_T("ERR_INCORRECT_FREQUENCY"), thumbnail_warning, 0);
 			return -1;
 		}
@@ -3075,7 +3075,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	stb810_dvbfeInfo *fe = getDvbRange(tuner);
 	fe_delivery_system_t tunerType = dvb_getType(tuner);
 
-	dprintf("%s: tuner %d (%d) - %s (%d)\n", __func__, tuner, appControlInfo.tunerInfo[tuner].adapter, dvb_getTypeName(tuner), appControlInfo.tunerInfo[tuner].type);
+	dprintf("%s: tuner %d (%d) - %s (%d)\n", __func__, tuner, appControlInfo.tunerInfo[tuner].adapter, dvb_getTunerTypeName(tuner), appControlInfo.tunerInfo[tuner].type);
 
 	// assert (dvbMenu == _M &DVBSubMenu);
 	interface_clearMenuEntries(dvbMenu);
@@ -3117,7 +3117,7 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 #endif
 
 	if(appControlInfo.tunerInfo[tuner].delSysCount > 1) {
-		snprintf(buf, sizeof(buf), "%s: %s", _T("DVB_MODE"), dvb_getTypeName(tuner));
+		snprintf(buf, sizeof(buf), "%s: %s", _T("DVB_MODE"), dvb_getTunerTypeName(tuner));
 		interface_addMenuEntry(dvbMenu, buf, output_toggleDvbType, NULL, thumbnail_scan);
 	}
 
