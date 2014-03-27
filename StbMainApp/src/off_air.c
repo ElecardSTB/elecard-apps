@@ -1608,7 +1608,7 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
 #endif
 
-	offair_startDvbVideo(which, &param,audio_type, video_type);
+	offair_startDvbVideo(which, &param, audio_type, video_type);
 }
 
 static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type)
