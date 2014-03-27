@@ -2060,19 +2060,12 @@ static void interface_displayLogo(void)
 	}
 	pthread_mutex_unlock(&FusionObject.mutexLogo);
 
-	int fh;
-	pgfx_font->GetHeight(pgfx_font, &fh);
-
 	pthread_mutex_lock(&FusionObject.mutexCreep);
-	interface_drawTextWW(pgfx_font, 0, 0, 0, 255, 
+	gfx_drawText(DRAWING_SURFACE, pgfx_font,
+		INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
+		INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
 		2, interfaceInfo.screenHeight - 80 + 2,
-		interfaceInfo.screenWidth + 100, fh + 10, 
-		FusionObject.creepToShow, ALIGN_LEFT);
-
-	interface_drawTextWW(pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
-		0, interfaceInfo.screenHeight - 80,
-		interfaceInfo.screenWidth + 100, fh + 10, 
-		FusionObject.creepToShow, ALIGN_LEFT);
+		FusionObject.creepToShow, 0, 1);
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 #endif
 }
