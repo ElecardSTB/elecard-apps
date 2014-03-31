@@ -726,7 +726,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	char cmd[32];
 	int buttons;
 
-	dprintf("%s: in %d\n", __FUNCTION__, channelNumber);
+	dprintf("%s: in %d\n", __FUNCTION__, id);
 
 	if(appControlInfo.tvInfo.active != 0) {
 		//interface_playControlSelect(interfacePlayControlStop);
