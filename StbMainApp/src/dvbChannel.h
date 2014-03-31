@@ -46,6 +46,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED DATA    *
 ********************/
 
+
+typedef struct {
+	struct list_head	orderNoneHead;
+	struct list_head	orderSortHead;
+
+
+    uint32_t viewedCount;
+    uint32_t		totalCount;
+    serviceSort_t	sortOrderType;
+
+//	uint32_t		initialized;
+} dvb_channels_t;
+
 typedef struct {
 	EIT_common_t	common;
 	EIT_service_t	*service;
@@ -64,6 +77,8 @@ typedef struct {
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
+int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track);
+service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
 
 struct list_head *dvbChannel_getSortList(void);
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);

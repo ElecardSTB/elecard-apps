@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "debug.h"
 #include "off_air.h"
+#include "bouquet.h"
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -44,28 +45,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
-typedef struct {
-	struct list_head	orderNoneHead;
-	struct list_head	orderSortHead;
-
-	uint32_t		viewedCount;
-	uint32_t		totalCount;
-	serviceSort_t	sortOrderType;
-
-//	uint32_t		initialized;
-} dvb_channels_t;
 
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
 #ifdef ENABLE_DVB
-static dvb_channels_t g_dvb_channels = {
-	.orderNoneHead	= LIST_HEAD_INIT(g_dvb_channels.orderNoneHead),
-	.orderSortHead	= LIST_HEAD_INIT(g_dvb_channels.orderSortHead),
+dvb_channels_t g_dvb_channels = {
+    .orderNoneHead	= LIST_HEAD_INIT(g_dvb_channels.orderNoneHead),
+    .orderSortHead	= LIST_HEAD_INIT(g_dvb_channels.orderSortHead),
 
-	.viewedCount	= 0,
-	.totalCount		= 0,
-	.sortOrderType	= serviceSortNone,
+    .viewedCount	= 0,
+    .totalCount		= 0,
+    .sortOrderType	= serviceSortNone,
 //	.initialized	= 0,
 };
 #endif // ENABLE_DVB
@@ -86,8 +77,9 @@ static int32_t dvbChannel_isServiceEnabled(EIT_service_t *service)
 	return 0;
 }
 
-static service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount)
+service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount)
 {
+     printf("%s[%d]\n",__func__, __LINE__);
 	struct list_head *pos;
 	uint32_t i = 0;
 
@@ -243,7 +235,7 @@ service_index_t *dvbChannel_add(void)
 	return new;
 }
 
-static int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
+int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
@@ -408,37 +400,49 @@ static int32_t dvbChannel_update(void)
 	list_element_t		*service_element;
 	struct list_head	*pos;
 	struct list_head	*n;
+    uint16_t compare_list = 0;
 
-	if(list_empty(&g_dvb_channels.orderNoneHead)) {
-		dvbChannel_readOrderConfig();
-	} else {
-		dvbChannel_invalidateServices();
-	}
+    load_bouquets(); // in g_dvb_channels
+    // bouquets list compare with dvb_services
+    if ( !bouquets_compare(&dvb_services) ){
+        free_services(&dvb_services);
+        load_lamedb(&dvb_services);
+		
+    }
+    //  dvbChannel_getAudioTrack(); // from offair
 
 	old_count = g_dvb_channels.totalCount;
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 
-		if((curService == NULL) || !dvb_hasMedia(curService)) {
+        if((curService == NULL)) {
 			continue;
 		}
 		p_srvIdx = dvbChannel_findServiceLimit(&curService->common, old_count);
 		if(p_srvIdx) {
 			p_srvIdx->service = curService;
 		} else {
-			dvbChannel_addService(curService);
+			free_element(service_element);
+			/*
+			if( dvb_hasMedia(curService) &&
+				(appControlInfo.offairInfo.dvbShowScrambled || (dvb_getScrambled(curService) == 0))
+			)
+			if(dvb_hasMedia(curService)) {
+				dvbChannel_addService(curService);
+			}
+            */
 		}
 	}
 
 	//remove elements without service pointer
-	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
+    /*list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->service == NULL) {
 			dvbChannel_remove(srvIdx);
 		}
 	}
-
+*/
 	dvbChannel_sortOrderRecheck();
 	dvbChannel_writeOrderConfig();
 

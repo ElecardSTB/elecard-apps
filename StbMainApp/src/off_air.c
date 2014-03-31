@@ -1865,9 +1865,11 @@ int offair_startPvrVideo( int which )
 
 int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 {
+
 	int channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	char desc[BUFFER_SIZE];
 	int buttons;
+    printf("'%s[%d] = %d\n",__func__, __LINE__,channelNumber);
 	EIT_service_t *service = dvbChannel_getService(channelNumber);
 
 	dprintf("%s: channelNumber = %d\n", __FUNCTION__, channelNumber);
@@ -1877,7 +1879,22 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		return -1;
 	}
 
+	if(appControlInfo.dvbInfo.active != 0) {
+		//interface_playControlSelect(interfacePlayControlStop);
+		// force showState to NOT be triggered
+		interfacePlayControl.activeButton = interfacePlayControlStop;
+		offair_stopVideo(screenMain, 0);
+	}
+
 	if(!dvb_hasMedia(service)) {
+		dvb_scanForBouquet( service->media.dvb_c.frequency, appControlInfo.dvbInfo.tuner, service);
+		elcdRpcType_t type;
+		cJSON *result = NULL;
+		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
+		cJSON_Delete(result);
+    }
+
+    if(!dvb_hasMedia(service)) {
 		eprintf("%s: Scrambled or media-less service ignored %d\n", __FUNCTION__, channelNumber);
 		return -1;
 	}
@@ -1897,12 +1914,6 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		return 0;
 	}
 #endif
-	if(appControlInfo.dvbInfo.active != 0) {
-		//interface_playControlSelect(interfacePlayControlStop);
-		// force showState to NOT be triggered
-		interfacePlayControl.activeButton = interfacePlayControlStop;
-		offair_stopVideo(screenMain, 0);
-	}
 
 	int previousChannel = appControlInfo.dvbInfo.channel;
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
@@ -2048,7 +2059,7 @@ int offair_startNextChannel(int direction, void* pArg)
 	direction = direction == 0 ? 1 : -1;
 	for(
 		i = (appControlInfo.dvbInfo.channel + dvbChannel_getCount() + direction ) % dvbChannel_getCount();
-		i != appControlInfo.dvbInfo.channel && (!can_play(i) || !dvb_hasMedia(dvbChannel_getService(i)));
+        i != appControlInfo.dvbInfo.channel && (!can_play(i));
 		i = (i + direction + dvbChannel_getCount()) % dvbChannel_getCount() );
 
 	dprintf("%s: i = %d, ch = %d, total = %d\n", __FUNCTION__, i, appControlInfo.dvbInfo.channel, dvbChannel_getCount());

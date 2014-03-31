@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "output.h"
 
+#include "playlist_editor.h"
 #include "debug.h"
 #include "dvbChannel.h"
 #include "l10n.h"
@@ -454,6 +455,7 @@ static inline void output_redrawMenu(interfaceMenu_t *pMenu)
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
 *******************************************************************/
 
+interfaceListMenu_t InterfacePlaylistEditor;
 #ifdef ENABLE_DVB
 static interfaceListMenu_t DVBSubMenu;
 static interfaceListMenu_t DiSEqCMenu;
@@ -6178,6 +6180,7 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
 
+	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
 	return 0;
 }
 
@@ -6395,6 +6398,9 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
+
+	createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, NULL, _M &InterfaceMenu,
+		interfaceListMenuIconThumbnail, enterPlaylistEditorMenu, NULL, NULL);
 
 	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterPlaybackMenu, NULL, NULL);
