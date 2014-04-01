@@ -60,7 +60,14 @@ typedef struct {
 } dvb_channels_t;
 
 typedef struct {
+    uint8_t serviceType;
+    uint16_t network_id;
+    uint16_t channel_number;
+} bouquet_data_t;
+
+typedef struct {
 	EIT_common_t	common;
+    bouquet_data_t  bouquet_data;
 	EIT_service_t	*service;
 	uint16_t		audio_track;
 	/* First EPG event which fit to current timeline.
@@ -78,6 +85,7 @@ typedef struct {
 *********************************/
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track);
+int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data);
 service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
 
 struct list_head *dvbChannel_getSortList(void);

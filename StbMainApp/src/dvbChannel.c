@@ -248,6 +248,19 @@ int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track)
 	return 0;
 }
 
+int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data)
+{
+    service_index_t *new = dvbChannel_add();
+    if(new) {
+        new->common = *common;
+        new->bouquet_data = *bouquet_data;
+    } else {
+        eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
+        return -1;
+    }
+    return 0;
+}
+
 static int32_t dvbChannel_addService(EIT_service_t *service)
 {
 	service_index_t *new = dvbChannel_add();
@@ -397,9 +410,6 @@ static int32_t dvbChannel_update(void)
 {
 	uint32_t old_count;
 	list_element_t		*service_element;
-	struct list_head	*pos;
-	struct list_head	*n;
-    uint16_t compare_list = 0;
 
     load_bouquets(); // in g_dvb_channels
     // bouquets list compare with dvb_services
@@ -421,6 +431,11 @@ static int32_t dvbChannel_update(void)
 		p_srvIdx = dvbChannel_findServiceLimit(&curService->common, old_count);
 		if(p_srvIdx) {
 			p_srvIdx->service = curService;
+            p_srvIdx->service->original_network_id = p_srvIdx->bouquet_data.network_id;
+            p_srvIdx->service->service_descriptor.service_type = p_srvIdx->bouquet_data.serviceType;
+            p_srvIdx->service->lcn.visible_service_flag = 1;
+            p_srvIdx->service->lcn.logical_channel_number = p_srvIdx->bouquet_data.channel_number;
+            p_srvIdx->service->flags |= serviceFlagHasLCN;
 		} else {
 			free_element(service_element);
 			/*

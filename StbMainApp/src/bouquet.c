@@ -5,6 +5,7 @@
 #include "debug.h"
 #include "off_air.h"
 
+#ifdef ENABLE_DVB
 #define BOUGET_NAME                     "bouquets"
 #define BOUGET_SERVICES_FILENAME_TV     CONFIG_DIR "/" BOUGET_NAME ".tv"
 #define BOUGET_SERVICES_FILENAME_RADIO  CONFIG_DIR "/" BOUGET_NAME ".radio"
@@ -113,6 +114,17 @@ void get_bouquets_list(char *bouquet_file)
     char buf[BUFFER_SIZE];
     char path[BOUGET_NAME_SIZE * 2];
     FILE* fd;
+    uint32_t count;
+    uint32_t type;
+    uint32_t flags;
+    uint32_t serviceType;
+    uint32_t service_id;
+    uint32_t transport_stream_id;
+    uint32_t network_id;
+    uint32_t name_space;
+    uint32_t index_8;
+    uint32_t index_9;
+    uint32_t index_10;
 
     sprintf(path, "%s/%s",CONFIG_DIR, bouquet_file);
     fd = fopen(path, "r");
@@ -120,25 +132,30 @@ void get_bouquets_list(char *bouquet_file)
         eprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
         return;
     }
+    count = 0;
     while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
-        uint32_t type;
-        uint32_t flag;
-        uint32_t serviceType;
-        uint32_t transport_stream_id;
-        uint32_t service_id;
-        uint32_t network_id;
-        uint32_t name_space;
-        uint32_t index_8;
-        uint32_t index_9;
-        uint32_t index_10;
-
-        if ( sscanf(buf, "#SERVICE %x:%x:%x:%x:%x:%x:%x:%x:%x:%x:\n", &type, &flag, &serviceType, &service_id, &transport_stream_id, &network_id, &name_space, &index_8, &index_9, &index_10) != 10)
+        if ( sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
+                                                                            &flags,
+                                                                            &serviceType,
+                                                                            &service_id,
+                                                                            &transport_stream_id,
+                                                                            &network_id,
+                                                                            &name_space,
+                                                                            &index_8,
+                                                                            &index_9,
+                                                                            &index_10) != 10) {
             continue;
-        EIT_common_t common;
-        common.media_id = network_id;
+        }
+        bouquet_data_t bouquet_data;
+        EIT_common_t	common;
+        bouquet_data.serviceType = serviceType;
+        bouquet_data.network_id = network_id;
+        bouquet_data.channel_number = count;
+        count++;
         common.service_id = service_id;
         common.transport_stream_id = transport_stream_id;
-        dvbChannel_addCommon(&common, 0);
+        common.media_id = network_id;
+        dvbChannel_addBouquetData(&common, &bouquet_data);
     }
     fclose(fd);
 }
@@ -314,3 +331,5 @@ void load_lamedb(list_element_t **services)
     free_elements(&head_ts_list);
     fclose(fd);
 }
+
+#endif // ENABLE_DVB
