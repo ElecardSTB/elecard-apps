@@ -58,11 +58,12 @@ list_element_t *head_services_list = NULL;
 list_element_t *bouquet_name_tv;
 list_element_t *bouquet_name_radio;
 
-list_element_t *list_getElement(int count, list_element_t **head){
+list_element_t *list_getElement(int count, list_element_t **head)
+{
 	list_element_t *cur_element;
 	int cur_count = 0;
 
-	for(cur_element = *head; cur_element != NULL; cur_element = cur_element->next){
+    for(cur_element = *head; cur_element != NULL; cur_element = cur_element->next) {
 		cur_count++;
 		if (cur_count == count)
 			return cur_element;
@@ -70,7 +71,8 @@ list_element_t *list_getElement(int count, list_element_t **head){
 	return NULL;
 }
 
-void get_bouquets_file_name(list_element_t **bouquet_name,char *bouquet_file){
+void get_bouquets_file_name(list_element_t **bouquet_name,char *bouquet_file)
+{
 	char buf[BUFFER_SIZE];
     FILE* fd;
     list_element_t *cur_element;
@@ -83,7 +85,7 @@ void get_bouquets_file_name(list_element_t **bouquet_name,char *bouquet_file){
         return;
     }
     // check head file name
-    while ( fgets(buf, BUFFER_SIZE, fd) != NULL ){
+    while ( fgets(buf, BUFFER_SIZE, fd) != NULL ) {
         if ( strncasecmp(buf, "#SERVICE", 8) !=0 )
             continue;
 
@@ -108,52 +110,38 @@ void get_bouquets_file_name(list_element_t **bouquet_name,char *bouquet_file){
 }
 
 
-void get_bouquets_list(char *bouquet_file){
+void get_bouquets_list(char *bouquet_file)
+{
     char buf[BUFFER_SIZE];
+    char path[BOUGET_NAME_SIZE * 2];
     FILE* fd;
 
-    char path[BOUGET_NAME_SIZE * 2];
     sprintf(path, "%s/%s",CONFIG_DIR, bouquet_file);
-
-
     fd = fopen(path, "r");
     if(fd == NULL) {
-        dprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
+        eprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
         return;
     }
-    /*
-     #NAME Blizoo
-     #SERVICE 1:0:1:1:1:C8:FFFF0000:0:0:0:
-     ---      1 2 3 4 5 6   7       8 9 10
-     */
     while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
-        printf("%s[%d]\n",__func__,__LINE__);
-        uint32_t index_1 = 0;
-        uint32_t index_2 = 0;
-        uint32_t index_3 = 0;
-        uint32_t service_id = 0; //4
-        uint32_t media_id = 0;
-        uint32_t transport_stream_id = 0; //5
-        uint32_t network_id = 0;    //6
-        uint32_t index_8 = 0;
-        uint32_t index_9 = 0;
-        uint32_t index_10 = 0;
+        uint32_t type;
+        uint32_t flag;
+        uint32_t serviceType;
+        uint32_t transport_stream_id;
+        uint32_t service_id;
+        uint32_t network_id;
+        uint32_t name_space;
+        uint32_t index_8;
+        uint32_t index_9;
+        uint32_t index_10;
 
-      if ( sscanf(buf, "#SERVICE %x:%x:%x:%x:%x:%x:%x:%x:%x:%x:\n",&index_1, &index_2, &index_3, &service_id, &transport_stream_id, &network_id, &media_id, &index_8, &index_9, &index_10) != 10)
-          continue;
-         //   printf("#SERVICE %x:%x:%x:%x:%x:%x:%x:%x:%x:%x:\n",index_1, index_2, index_3, service_id, transport_stream_id, network_id, media_id, index_8, index_9, index_10);
-              EIT_common_t common;
-
-              common.media_id = network_id;
-              common.service_id = service_id;
-              common.transport_stream_id = transport_stream_id;
-              dvbChannel_addCommon(&common, 0);
-              /*
-               *get add servise/// not done
-               *
-               */
-
-      }
+        if ( sscanf(buf, "#SERVICE %x:%x:%x:%x:%x:%x:%x:%x:%x:%x:\n", &type, &flag, &serviceType, &service_id, &transport_stream_id, &network_id, &name_space, &index_8, &index_9, &index_10) != 10)
+            continue;
+        EIT_common_t common;
+        common.media_id = network_id;
+        common.service_id = service_id;
+        common.transport_stream_id = transport_stream_id;
+        dvbChannel_addCommon(&common, 0);
+    }
     fclose(fd);
 }
 
@@ -324,7 +312,8 @@ int bouquets_compare(list_element_t **services){
     return true;
 }
 
-void load_bouquets() {
+void load_bouquets()
+{
     get_bouquets_file_name(&bouquet_name_tv, BOUGET_SERVICES_FILENAME_TV);
     get_bouquets_file_name(&bouquet_name_radio, BOUGET_SERVICES_FILENAME_RADIO);
     list_element_t *NameElement;
