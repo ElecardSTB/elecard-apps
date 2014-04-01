@@ -55,40 +55,60 @@ list_element_t *full_bouquet_list = NULL;
 list_element_t *head_ts_list = NULL;
 list_element_t *head_services_list = NULL;
 
-char bouquet_name_tv[BOUGET_NAME_SIZE];
-//int number_of_bouquets_tv = 0;
-char bouquet_name_radio[BOUGET_NAME_SIZE];
-//int number_of_bouquets_radio = 0;
+list_element_t *bouquet_name_tv;
+list_element_t *bouquet_name_radio;
 
+list_element_t *list_getElement(int count, list_element_t **head){
+	list_element_t *cur_element;
+	int cur_count = 0;
 
-void get_bouquets_file_name(char *bouquet_name,char *bouquet_file){
-    char buf[BUFFER_SIZE];
+	for(cur_element = *head; cur_element != NULL; cur_element = cur_element->next){
+		cur_count++;
+		if (cur_count == count)
+			return cur_element;
+	}
+	return NULL;
+}
+
+void get_bouquets_file_name(list_element_t **bouquet_name,char *bouquet_file){
+	char buf[BUFFER_SIZE];
     FILE* fd;
-    memset(bouquet_name,'\0',sizeof(bouquet_name));
+    list_element_t *cur_element;
+	char *element_data;
+	free_elements(&*bouquet_name);
 
     fd = fopen(bouquet_file, "r");
     if(fd == NULL) {
-        dprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
+		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
         return;
     }
     // check head file name
     while ( fgets(buf, BUFFER_SIZE, fd) != NULL ){
         if ( strncasecmp(buf, "#SERVICE", 8) !=0 )
             continue;
-    char * ptr;
+
+        if (*bouquet_name == NULL) {
+            cur_element = *bouquet_name = allocate_element(BOUGET_NAME_SIZE);
+        } else {
+            cur_element = append_new_element(*bouquet_name, BOUGET_NAME_SIZE);
+        }
+        if (!cur_element)
+            break;
+
+        element_data = (char *)cur_element->data;
+
+		char * ptr;
         int    ch = '"';
         ptr = strchr( buf, ch ) + 1;
-        sscanf(ptr,"%s \n",bouquet_name); //get bouquet_name type: name" (with ")
-        bouquet_name[strlen(bouquet_name) - 1] = '\0'; //get bouquet_name type: name
-        dprintf("Get bouquet file name: %s\n", bouquet_name);
-        break;
+        sscanf(ptr,"%s \n",element_data); //get bouquet_name type: name" (with ")
+        element_data[strlen(element_data) - 1] = '\0'; //get bouquet_name type: name
+        dprintf("Get bouquet file name: %s\n", element_data);
     }
-        fclose(fd);
+    fclose(fd);
 }
 
 
 void get_bouquets_list(char *bouquet_file){
-    printf("%s[%d]\n",__func__,__LINE__);
     char buf[BUFFER_SIZE];
     FILE* fd;
 
@@ -168,9 +188,6 @@ void get_transponder_data(){
 
     uint32_t old_count;
     old_count = dvbChannel_getCount();
-
-
-
 
     struct list_head *pos;
 
@@ -284,12 +301,8 @@ int bouquets_compare(list_element_t **services){
     list_element_t	*service_element;
     old_count = dvbChannel_getCount();
 
-    printf("%d = %d \n", old_count, dvb_getNumber_Services());
-
-
-    if ( old_count !=  dvb_getNumber_Services() )
+    if ( old_count !=  dvb_getCountOfServices() )
         return false;
-
 
     for(service_element = *services; service_element != NULL; service_element = service_element->next) {
         EIT_service_t *curService = (EIT_service_t *)service_element->data;
@@ -312,11 +325,12 @@ int bouquets_compare(list_element_t **services){
 }
 
 void load_bouquets() {
-    get_bouquets_file_name(bouquet_name_tv, BOUGET_SERVICES_FILENAME_TV);
-    get_bouquets_file_name(bouquet_name_radio, BOUGET_SERVICES_FILENAME_RADIO);
-    get_bouquets_list(bouquet_name_tv);
- //   get_bouquets_list(bouquet_name_radio);
-  //  load_lamedb();
+    get_bouquets_file_name(&bouquet_name_tv, BOUGET_SERVICES_FILENAME_TV);
+    get_bouquets_file_name(&bouquet_name_radio, BOUGET_SERVICES_FILENAME_RADIO);
+    list_element_t *NameElement;
+    NameElement = list_getElement(1, &bouquet_name_tv); //get first element TV
+    if (NameElement != NULL)
+        get_bouquets_list((char *)NameElement->data);
 }
 
 void get_bouquet(int n, char *name) {

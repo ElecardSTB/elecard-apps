@@ -3151,7 +3151,7 @@ int dvb_getNumberOfServices(void)
 	return serviceCount;
 }
 
-int dvb_getNumber_Services(void)
+int dvb_getCountOfServices(void)
 {
     list_element_t *service_element;
     int serviceCount = 0;

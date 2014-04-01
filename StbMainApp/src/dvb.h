@@ -536,8 +536,8 @@ static inline int dvb_isLinuxTuner(tunerFormat tuner)
 // not linux tuners has on boards with STSDK only
 #define dvb_isLinuxTuner(tuner) 1
 #endif
-int dvb_getNumber_Services(void);
 
+int dvb_getCountOfServices(void);
 void dvb_scanForBouquet(long frequency, tunerFormat tuner, EIT_service_t *service);
 int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys);
 int dvb_setFrontendType(int adapter, fe_delivery_system_t type);
