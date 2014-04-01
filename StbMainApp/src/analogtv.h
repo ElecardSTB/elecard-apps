@@ -129,16 +129,19 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 
 int32_t analogtv_fillFoundServList(void);
 int32_t analogtv_updateFoundServiceFile(void);
+
+int32_t analogtv_hasTuner(void);
 #else /* ENABLE_ANALOGTV */
 
-int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg) { return 0; }
+static inline int32_t analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg) { return 0; }
 //const char *analogtv_getServiceName(uint32_t index) { return NULL; }
-uint32_t analogtv_getChannelCount(void) { return 0; }
-void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex) { return ; }
-int32_t analogtv_updateName(uint32_t chanIndex, char* str) { return 0; }
-int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size) { buf[0] = 0; return -1; }
-int menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index) { return 0; }
+static inline uint32_t analogtv_getChannelCount(void) { return 0; }
+static inline void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex) { return ; }
+static inline int32_t analogtv_updateName(uint32_t chanIndex, char* str) { return 0; }
+static inline int32_t analogtv_getServiceDescription(uint32_t index, char *buf, size_t size) { buf[0] = 0; return -1; }
+static inline int32_t menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index) { return 0; }
 
+static inline int32_t analogtv_hasTuner(void) { return 0; }
 #endif /* ENABLE_ANALOGTV */
 
 #endif /* __ANALOGTV_H__      Do not add any thing below this line */

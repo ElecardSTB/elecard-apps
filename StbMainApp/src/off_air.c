@@ -294,10 +294,10 @@ static inline int can_play(int channel)
 ********************************************************************************/
 
 #ifdef ENABLE_DVB
-tunerFormat offair_getTuner(void)
+uint32_t offair_getTuner(void)
 {
 	offair_stopVideo(screenMain, 1);
-	return appControlInfo.dvbInfo.tuner;
+	return appControlInfo.dvbInfo.adapter;
 }
 
 static long offair_getFrequency(void *pArg)
@@ -315,7 +315,7 @@ void offair_setFrequency(long value, void *pArg)
 
 }
 
-static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
+static void offair_buildInstallSlider(int numChannels, uint32_t adapter)
 {
 	char channelEntry[256];
 	char installationString[2048];
@@ -323,9 +323,9 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 	__u32 low_freq, high_freq, freq_step;
 	int i=0;
 
-	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, & freq_step);
+	dvbfe_getTuner_freqs(adapter, &low_freq, &high_freq, & freq_step);
 
-	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvb_getType(tuner) == SYS_DVBS ? _T("MHZ") : _T("KHZ"), numChannels);
+	sprintf(installationString, _T("FOUND_CHANNELS"), dvb.scan.frequency, dvbfe_getType(adapter) == SYS_DVBS ? _T("MHZ") : _T("KHZ"), numChannels);
 	// in this moment semaphore is busy
 	for ( i = numChannels-1; i > numChannels-4; i-- )
 	{
@@ -360,7 +360,7 @@ static void offair_buildInstallSlider(int numChannels, tunerFormat tuner)
 	interface_sliderShow(1, 1);
 }
 
-static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerFormat tuner, int frequencyIndex, int frequencyCount)
+static int offair_updateDisplay(uint32_t frequency, int channelCount, uint32_t adapter, int frequencyIndex, int frequencyCount)
 {
 //	interfaceCommand_t cmd;
 
@@ -370,7 +370,7 @@ static int offair_updateDisplay(uint32_t frequency, int channelCount, tunerForma
 	dvb.scan.frequency = frequency/1000;
 	dvb.scan.nit.index = frequencyIndex;
 	dvb.scan.nit.count = frequencyCount;
-	offair_buildInstallSlider(channelCount, tuner);
+	offair_buildInstallSlider(channelCount, adapter);
 	//interface_displayMenu(1);
 
 /*	while ((cmd = helperGetEvent(0)) != interfaceCommandNone)
@@ -411,7 +411,7 @@ int offair_sliderCallback(int id, interfaceCustomSlider_t *info, void *pArg)
 	uint32_t ber, uncorrected_blocks;
 	fe_status_t status;
 
-	status = dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
+	status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
 
 	if (id < 0 || info == NULL)
 	{
@@ -474,7 +474,7 @@ static int offair_infoTimerEvent(void *pArg)
 	{
 		if (appControlInfo.dvbInfo.showInfo)
 		{
-			/*status = dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
+			/*status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
 
 			sprintf(buf, _T("DVB_SIGNAL_INFO"),
 				signal&0xFF, ber, uncorrected_blocks, _T(status == 1 ? "LOCKED" : "NO_LOCK") );*/
@@ -556,36 +556,30 @@ int offair_wizardStart(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, uint32_t frequency)
+static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, uint32_t frequency)
 {
-	int ok = 0;
 	appControlInfo.dvbtInfo.plp_id = 0;
 
 	do {
-		dprintf("%s[%u]: scan plp %u\n", __FUNCTION__, tuner, appControlInfo.dvbtInfo.plp_id);
+		dprintf("%s(): Adapter=%u scan plp %u\n", __FUNCTION__, adapter, appControlInfo.dvbtInfo.plp_id);
 
 		interfaceCommand_t cmd = helperGetEvent(1);
 		if (cmd == interfaceCommandRed) {
 			return -1;
 		}
 		
-		if(dvb_frequencyScan(tuner, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
-			ok = 1;
-		}
-		if(ok) {
+		if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
 			interface_refreshMenu(pMenu);
 			output_showDVBMenu(pMenu, NULL);
 			offair_fillDVBTMenu();
 #ifdef ENABLE_PVR
 			pvr_updateSettings();
 #endif
-		}
-
-		if(ok == 0) {
+		} else {
 			break;
 		}
 		appControlInfo.dvbtInfo.plp_id++;
-	} while((dvb_isCurrentDelSys_dvbt2(tuner) == 1) && (appControlInfo.dvbtInfo.plp_id <= 3));
+	} while((dvbfe_isCurrentDelSys_dvbt2(adapter) == 1) && (appControlInfo.dvbtInfo.plp_id <= 3));
 
 	return 0;
 }
@@ -593,14 +587,14 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, tunerFormat tuner, u
 
 int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {	
-	tunerFormat tuner;
+	uint32_t adapter;
 	uint32_t low_freq, high_freq, freq_step, frequency;
 	int32_t which = GET_NUMBER(pArg);
 	char buf[256];
 	int res = 0;
 	
-	tuner = offair_getTuner();
-	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
+	adapter = offair_getTuner();
+	dvbfe_getTuner_freqs(adapter, &low_freq, &high_freq, &freq_step);
 
 	for(frequency = low_freq; frequency <= high_freq; frequency += freq_step) {
 		dprintf( "%s: [ %u < %u < %u ]\n", __FUNCTION__, low_freq, frequency, high_freq);
@@ -612,7 +606,7 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		interface_hideMessageBox();
 		offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-		res = offair_scanFrequency(pMenu, tuner, frequency);
+		res = offair_scanFrequency(pMenu, adapter, frequency);
 		if(res < 0){
 			interface_hideMessageBox();
 			interface_sliderShow(0, 0);
@@ -626,15 +620,15 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	}
 	return -1;
 
-	/*tunerFormat tuner;
+/*	uint32_t adapter;
 
-	tuner = offair_getTuner();
+	adapter = offair_getTuner();
 	__u32 low_freq, high_freq, freq_step;
 	char buf[256];
 
-	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
-	offair_updateDisplay(low_freq, 0, tuner, 0, 0);
-	dvb_serviceScan(tuner, offair_updateDisplay);*/
+	dvbfe_getTuner_freqs(adapter, &low_freq, &high_freq, &freq_step);
+	offair_updateDisplay(low_freq, 0, adapter, 0, 0);
+	dvb_serviceScan(adapter, offair_updateDisplay);*/
 	
 	/* Re-build any channel related menus */
 	/*memset(&DVBTChannelMenu[0], 0, sizeof(interfaceListMenu_t));
@@ -715,15 +709,15 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 	__u32 low_freq  =  MIN_FREQUENCY_KHZ*KHZ;
 	__u32 high_freq =  MAX_FREQUENCY_KHZ*KHZ;
 	__u32 freq_step = FREQUENCY_STEP_KHZ*KHZ;
-	tunerFormat tuner = offair_getTuner();
-	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
+	uint32_t adapter = offair_getTuner();
+	dvbfe_getTuner_freqs(adapter, &low_freq, &high_freq, &freq_step);
 	if (dvb.scan.frequency*KHZ < low_freq || dvb.scan.frequency*KHZ > high_freq)
 		dvb.scan.frequency = low_freq/KHZ;
 
 	sprintf(buf, "%s [%u;%u] (%s)", _T("ENTER_FREQUENCY"),
-		low_freq / KHZ, high_freq / KHZ, dvb_getType(tuner) == SYS_DVBS ? _T("MHZ") : _T("KHZ"));
+		low_freq / KHZ, high_freq / KHZ, dvbfe_getType(adapter) == SYS_DVBS ? _T("MHZ") : _T("KHZ"));
 	const char *mask = "\\d{6}";
-	if (dvb_getType(tuner) == SYS_DVBS)
+	if (dvbfe_getType(adapter) == SYS_DVBS)
 		mask = appControlInfo.dvbsInfo.band == dvbsBandK ? "\\d{5}" : "\\d{4}";
 	interface_getText(pMenu, buf, mask, offair_getUserFrequency, offair_getLastFrequency, inputModeDirect, pArg);
 	return 0;
@@ -731,7 +725,7 @@ int offair_frequencyScan(interfaceMenu_t *pMenu, void* pArg)
 
 static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	tunerFormat tuner;
+	uint32_t adapter;
 	int32_t which = GET_NUMBER(pArg);
 	uint32_t low_freq = MIN_FREQUENCY_KHZ*KHZ, high_freq = MAX_FREQUENCY_KHZ*KHZ, frequency, freq_step;
 	char buf[256];
@@ -742,8 +736,8 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	}
 
 	frequency  = strtoul(value, NULL, 10)*KHZ;
-	tuner = offair_getTuner();
-	dvb_getTuner_freqs(tuner, &low_freq, &high_freq, &freq_step);
+	adapter = offair_getTuner();
+	dvbfe_getTuner_freqs(adapter, &low_freq, &high_freq, &freq_step);
 
 	dprintf( "%s: [ %u < %u < %u ]\n", __FUNCTION__, low_freq, frequency, high_freq);
 	if(frequency < low_freq || frequency > high_freq) {
@@ -754,7 +748,7 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	interface_hideMessageBox();
 	offair_updateDisplay(frequency, dvb_getNumberOfServices(), which, 0, 1);
 
-	res = offair_scanFrequency(pMenu, tuner, frequency);
+	res = offair_scanFrequency(pMenu, adapter, frequency);
 	if(res < 0){
 		interface_hideMessageBox();
 		interface_sliderShow(0, 0);
@@ -815,8 +809,7 @@ void offair_stopVideo(int which, int reset)
 
 		dprintf("%s: Stop video \n", __FUNCTION__);
 		teletext_stop();
-		dvb_stopDVB(dvb_getAdapter(appControlInfo.dvbInfo.tuner), reset);
-		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
+		dvb_stopDVB(appControlInfo.dvbInfo.adapter, reset);
 		appControlInfo.dvbInfo.active = 0;
 
 		offair_setStateCheckTimer(which, 0);
@@ -853,14 +846,14 @@ static int32_t offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 		case interfaceCommandOk:
 		case interfaceCommandGreen:
 			if(srvIdx->audio_track != selected) {
-				if (dvb_getAudioType(service, selected) !=
-				    dvb_getAudioType(service, srvIdx->audio_track))
+				if(dvb_getAudioType(service, selected) !=
+					dvb_getAudioType(service, srvIdx->audio_track))
 				{
 					offair_stopVideo(which, 0);
 					srvIdx->audio_track = selected;
 					offair_startVideo(which);
 				} else {
-					dvb_changeAudioPid(appControlInfo.dvbInfo.tuner, dvb_getAudioPid(service, selected));
+					dvb_changeAudioPid(appControlInfo.dvbInfo.adapter, dvb_getAudioPid(service, selected));
 					srvIdx->audio_track = selected;
 				}
 
@@ -1024,6 +1017,7 @@ static int offair_multiviewPlay(interfaceMenu_t *pMenu, void *pArg)
 {
 	uint32_t	f1 = 0;
 	uint32_t	f;
+	uint32_t	adapter;
 	int32_t		mvCount, i;
 	int32_t		payload[4];
 	int32_t		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
@@ -1039,8 +1033,8 @@ static int offair_multiviewPlay(interfaceMenu_t *pMenu, void *pArg)
 		eprintf("%s: Can't determine frequency of channel %d\n", __FUNCTION__, channelNumber);
 		return -1;
 	}
-	int tuner = offair_findCapableTuner(curService);
-	if(tuner < 0) {
+
+	if(offair_findCapableTuner(curService, &adapter) != 0) {
 		eprintf("%s: Failed to find tuner matching type %d\n", __FUNCTION__, curService->media.type);
 		return -1;
 	}
@@ -1076,7 +1070,7 @@ static int offair_multiviewPlay(interfaceMenu_t *pMenu, void *pArg)
 	appControlInfo.multiviewInfo.selected = 0;
 	appControlInfo.multiviewInfo.count = mvCount;
 
-	param.adapter = dvb_getAdapter(tuner);
+	param.adapter = adapter;
 	param.directory = NULL;
 	file = fopen(OFFAIR_MULTIVIEW_INFOFILE, "w");
 	fprintf(file, "%d %d %d %d %d %d %d %d",
@@ -1306,7 +1300,7 @@ void offair_displayPlayControl(void)
 			{0x00, 0xFF, 0x00, 0xFF},
 		};
 
-		dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
+		dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
 
 		signal &= SIGNAL_MASK;
 
@@ -1560,12 +1554,15 @@ void offair_startVideo(int which)
 		return;
 	}
 	service = srvIdx->service;
-	appControlInfo.dvbInfo.tuner = offair_findCapableTuner(service);
+	if(offair_findCapableTuner(service, &appControlInfo.dvbInfo.adapter) != 0) {
+		eprintf("%s: Failed to find tuner matching type %d\n", __FUNCTION__, service->media.type);
+		return;
+	}
 
 	DvbParam_t param;
 	param.frequency = 0;
 	param.mode = DvbMode_Watch;
-	param.adapter = dvb_getAdapter(appControlInfo.dvbInfo.tuner);
+	param.adapter = appControlInfo.dvbInfo.adapter;
 	param.media = &service->media;
 	param.param.liveParam.channelIndex = dvb_getServiceIndex(service);
 	param.param.liveParam.audioIndex = srvIdx->audio_track;
@@ -1580,7 +1577,7 @@ void offair_startVideo(int which)
 				dvb_getServiceName(service),
 				service->media.frequency,
 				service->media.type);
-		dvb_frequencyScan(appControlInfo.dvbInfo.tuner, service->media.frequency,
+		dvb_frequencyScan(appControlInfo.dvbInfo.adapter, service->media.frequency,
 							&service->media, NULL, 1, NULL);
 		offair_updateChannelStatus();
 
@@ -1611,28 +1608,28 @@ void offair_startVideo(int which)
 	offair_startDvbVideo(which, &param, audio_type, video_type);
 }
 
-static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type)
+static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, int video_type)
 {
 	char filename[256];
 	char qualifier[64];
 
 	gfx_stopVideoProviders(which);
 
-	dprintf("%s: Start video on tuner %d (%d)\n", __FUNCTION__, appControlInfo.dvbInfo.tuner, dvb_getAdapter(appControlInfo.dvbInfo.tuner));
+	dprintf("%s: Start video on adapter %d\n", __FUNCTION__, pParam->adapter);
 
-	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
+	if(dvbfe_isLinuxAdapter(pParam->adapter)) {
 #ifdef STBTI
-		sprintf(filename, "ln -s /dev/dvb/adapter%d/dvr0 %s", appControlInfo.dvbInfo.tuner, OFFAIR_MULTIVIEW_FILENAME);
+		sprintf(filename, "ln -s /dev/dvb/adapter%d/dvr0 %s", pParam->adapter, OFFAIR_MULTIVIEW_FILENAME);
 		system(filename);
 		strcpy(filename, OFFAIR_MULTIVIEW_FILENAME);
 #else
 #ifdef ENABLE_MULTI_VIEW
-		if(param->mode == DvbMode_Multi) {
+		if(pParam->mode == DvbMode_Multi) {
 			sprintf(filename, OFFAIR_MULTIVIEW_INFOFILE);
 		} else
 #endif // ENABLE_MULTI_VIEW
 		{
-			sprintf(filename, "/dev/dvb/adapter%d/demux0", appControlInfo.dvbInfo.tuner);
+			sprintf(filename, "/dev/dvb/adapter%d/demux0", pParam->adapter);
 		}
 #endif // !STBTI
 #ifdef STB6x8x
@@ -1647,46 +1644,21 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 #endif // STB6x8x
 
 		dprintf("%s: dvb_startDVB\n", __FUNCTION__);
-		dvb_startDVB(param);
-	}
+		dvb_startDVB(pParam);
+	} else {
 #ifdef STSDK
-	else {
-		cJSON *params = cJSON_CreateObject();
-		if(!params) {
-			eprintf("%s: out of memory\n", __FUNCTION__);
-			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
-			return;
-		}
-		dvb_diseqcSetup(appControlInfo.dvbInfo.tuner, -1, current_service()->media.frequency, &current_service()->media);
+		dvbfe_setParam(pParam->adapter, 1, pParam->media, NULL);
 
-		st_setTuneParams(appControlInfo.dvbInfo.tuner, params, &current_service()->media);
-		cJSON_AddItemToObject( params, "frequency",
-			cJSON_CreateNumber(st_frequency(appControlInfo.dvbInfo.tuner, current_service()->media.frequency)) );
-		cJSON *result = NULL;
-		elcdRpcType_t type = elcdRpcInvalid;
-		eprintf("%s: tuning %d to %6u\n", __FUNCTION__,
-			st_getTunerIndex(appControlInfo.dvbInfo.tuner),
-			st_frequency(appControlInfo.dvbInfo.tuner, current_service()->media.frequency));
-		st_rpcSync( elcmd_dvbtune, params, &type, &result );
-		cJSON_Delete(params);
-		cJSON_Delete(result);
-		if(type != elcdRpcResult) {
-			eprintf("%s: tune failed\n", __FUNCTION__);
-			interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
-			return;
-		}
-	}
-	// Always use 0 index for Linux tuners
-	sprintf(filename, "dvb://%d@%d", current_service()->common.service_id, st_getTunerIndex(appControlInfo.dvbInfo.tuner));
-	qualifier[0]=0;
+		// Always use 0 index for Linux tuners
+		sprintf(filename, "dvb://%d@%d", current_service()->common.service_id, pParam->adapter);
+		qualifier[0] = 0;
 #endif // STSDK
-	appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerDVBMain;
+	}
 
 	if(gfx_startVideoProvider(filename, which, 0, qualifier) != 0) {
 		eprintf("offair: Failed to start video provider '%s'\n", filename);
 		interface_showMessageBox(_T("ERR_VIDEO_PROVIDER"), thumbnail_error, 0);
-		dvb_stopDVB(dvb_getAdapter(appControlInfo.dvbInfo.tuner), 1);
-		appControlInfo.tunerInfo[appControlInfo.dvbInfo.tuner].status = tunerInactive;
+		dvb_stopDVB(pParam->adapter, 1);
 		return;
 	}
 #ifdef STSDK
@@ -1710,14 +1682,13 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 	appControlInfo.dvbInfo.savedSignalStatus = signalStatusNoStatus;
 	appControlInfo.dvbInfo.reportedSignalStatus = 0;
 
-	if(dvb_isLinuxTuner(appControlInfo.dvbInfo.tuner)) {
+	if(dvbfe_isLinuxAdapter(pParam->adapter)) {
 		offair_setStateCheckTimer(which, 1);
 		offair_setInfoUpdateTimer(which, 1);
 	}
 
 #ifdef ENABLE_MULTI_VIEW
-	if( param->mode == DvbMode_Multi )
-	{
+	if(pParam->mode == DvbMode_Multi) {
 		dprintf("%s: multiview mode\n", __FUNCTION__);
 		interface_playControlSetup(NULL, appControlInfo.multiviewInfo.pArg[0], 0, NULL, thumbnail_channels);
 		interface_playControlSetDisplayFunction(offair_displayMultiviewControl);
@@ -1732,7 +1703,7 @@ static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, i
 	interface_playControlSelect(interfacePlayControlPlay);
 	interface_displayMenu(1);
 
-	teletext_start(param);
+	teletext_start(pParam);
 
 	dprintf("%s: done\n", __FUNCTION__);
 }
@@ -1882,7 +1853,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		return -1;
 	}
 
-	if(offair_findCapableTuner(service) < 0) {
+	if(offair_findCapableTuner(service, NULL) != 0) {
 		eprintf("%s: no tuner found to handle media type %d\n", __FUNCTION__, service->media.type);
 		interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 3000);
 		return -1;
@@ -3168,7 +3139,7 @@ void offair_fillDVBTMenu(void)
 	}
 
 #ifndef HIDE_EXTRA_FUNCTIONS
-	switch ( dvb_getType(0) )  // Assumes same type FEs
+	switch ( dvbfe_getType(0) )  // Assumes same type FEs
 	{
 	case SYS_DVBT:
 	case SYS_DVBT2:
@@ -3183,7 +3154,7 @@ void offair_fillDVBTMenu(void)
 	//case SYS_ATSC:
 	//case SYS_DVBC_ANNEX_B:
 	default:
-		eprintf("offair: unsupported FE type %d\n", dvb_getType(0));
+		eprintf("offair: unsupported FE type %d\n", dvbfe_getType(0));
 		sprintf(buf,"%s: %s", _T("DVB_MODE"), _T("NOT_AVAILABLE_SHORT") );
 		break;
 	}
@@ -3522,7 +3493,7 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 
 	dprintf("%s: Check signal %d!\n", __FUNCTION__, appControlInfo.dvbInfo.reportedSignalStatus);
 
-	status = dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
+	status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
 
 	ccerrors = phStbSystemManager_GetErrorsStatistics(phStbRpc_MainTMErrorId_DemuxerContinuityCounterMismatch, 1);
 
@@ -3686,7 +3657,7 @@ static int  offair_updatePSI(void* pArg)
 	//if (appControlInfo.dvbInfo.scanPSI)
 	{
 		dprintf("%s: *** updating PSI [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
-		dvb_scanForPSI( appControlInfo.dvbInfo.tuner, current_service()->media.frequency, &running_program_map );
+		dvb_scanForPSI( appControlInfo.dvbInfo.adapter, current_service()->media.frequency, &running_program_map );
 		dprintf("%s: *** PSI updated ***\n", __FUNCTION__ );
 
 		dprintf("%s: active %d, channel %d/%d\n", __FUNCTION__, appControlInfo.dvbInfo.active, my_channel, appControlInfo.dvbInfo.channel);
@@ -3736,7 +3707,7 @@ static int offair_updateEPG(void* pArg)
 		dprintf("%s: scan for epg\n", __FUNCTION__);
 
 		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
-		dvb_scanForEPG( appControlInfo.dvbInfo.tuner, current_service()->media.frequency );
+		dvb_scanForEPG( appControlInfo.dvbInfo.adapter, current_service()->media.frequency );
 		dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
 
 		dprintf("%s: if active\n", __FUNCTION__);
@@ -3765,8 +3736,7 @@ int  offair_tunerPresent(void)
 		return 1; //we always have analog tuner for stb850.
 	}
 #endif
-	return (appControlInfo.tunerInfo[0].status != tunerNotPresent ||
-			appControlInfo.tunerInfo[1].status != tunerNotPresent);
+	return dvbfe_hasTuner(0) || dvbfe_hasTuner(1);
 }
 
 void offair_buildDVBTMenu(interfaceMenu_t *pParent)
@@ -4227,9 +4197,10 @@ static int offair_updateStatsEvent(void *pArg)
 }
 #endif // ENABLE_STATS
 
-int offair_findCapableTuner(EIT_service_t *service)
+int32_t offair_findCapableTuner(EIT_service_t *service, uint32_t *adapter)
 {
 	fe_delivery_system_t type = 0;
+	uint32_t adap;
 	switch (service->media.type) {
 		case serviceMediaDVBT: type = SYS_DVBT; break;
 		case serviceMediaDVBC: type = SYS_DVBC_ANNEX_AC; break;
@@ -4237,9 +4208,12 @@ int offair_findCapableTuner(EIT_service_t *service)
 		case serviceMediaATSC: type = SYS_ATSC; break;
 		default: return -1;
 	}
-	for(tunerFormat tuner = inputTuner0; tuner < inputTuners; tuner++) {
-		if(dvb_checkDelSysSupport(tuner, type)) {
-			return tuner;
+	for(adap = 0; adap < MAX_ADAPTER_SUPPORTED; adap++) {
+		if(dvbfe_checkDelSysSupport(adap, type)) {
+			if(adapter) {
+				*adapter = adap;
+			}
+			return 0;
 		}
 	}
 	return -1;
@@ -4264,7 +4238,7 @@ static int wizard_infoTimerEvent(void *pArg)
 	return 0;
 }
 
-static int wizard_checkAbort(uint32_t frequency, int channelCount, tunerFormat tuner, int frequencyNumber, int frequencyMax)
+static int wizard_checkAbort(uint32_t frequency, int channelCount, uint32_t adapter, int frequencyNumber, int frequencyMax)
 {
 	interfaceCommand_t cmd;
 
@@ -4359,8 +4333,8 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			wizardSettings->frequencyIndex = pMenu->selectedItem;
 
 			wizard_infoTimerEvent(NULL);
-			dvb_frequencyScan(appControlInfo.dvbInfo.tuner, (unsigned long)pMenu->menuEntry[pMenu->selectedItem].pArg, NULL,
-								wizard_checkAbort, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
+			dvb_frequencyScan(appControlInfo.dvbInfo.adapter, (unsigned long)pMenu->menuEntry[pMenu->selectedItem].pArg, NULL,
+								wizard_checkAbort, -1, (dvbfe_cancelFunctionDef*)wizard_checkAbort);
 			wizard_cleanup(-1);
 		} else if (cmd->command == interfaceCommandUp ||
 			cmd->command == interfaceCommandDown)
@@ -4469,7 +4443,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 						minfreq = wizardSettings->frequency[wizardSettings->frequencyIndex];
 						minindex = wizardSettings->frequencyIndex;
 					}
-					if((res = dvb_frequencyScan(appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, -2, (dvb_cancelFunctionDef*)wizard_checkAbort)) == 1)
+					if((res = dvb_frequencyScan(appControlInfo.dvbInfo.adapter, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, -2, (dvbfe_cancelFunctionDef*)wizard_checkAbort)) == 1)
 					{
 						//dprintf("%s: found smth on %lu\n", __FUNCTION__, wizardSettings->frequency[wizardSettings->frequencyIndex]);
 						minfreq = wizardSettings->frequency[wizardSettings->frequencyIndex];
@@ -4481,7 +4455,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 						//dprintf("%s: scan abort\n", __FUNCTION__);
 						break;
 					}
-					if (wizard_checkAbort(wizardSettings->frequency[wizardSettings->frequencyIndex], 0, appControlInfo.dvbInfo.tuner, wizardSettings->frequencyIndex, wizardSettings->frequencyCount) == -1)
+					if (wizard_checkAbort(wizardSettings->frequency[wizardSettings->frequencyIndex], 0, appControlInfo.dvbInfo.adapter, wizardSettings->frequencyIndex, wizardSettings->frequencyCount) == -1)
 					{
 						//dprintf("%s: user abort\n", __FUNCTION__);
 						break;
@@ -4502,7 +4476,7 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 					interface_displayMenu(1);
 
 					/* Stay in infinite loop until user takes action */
-					res = dvb_frequencyScan(appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, wizard_checkAbort, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
+					res = dvb_frequencyScan(appControlInfo.dvbInfo.adapter, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, wizard_checkAbort, -1, (dvbfe_cancelFunctionDef*)wizard_checkAbort);
 
 					//dprintf("%s: done monitoring!\n", __FUNCTION__);
 
@@ -4520,12 +4494,12 @@ static int wizard_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 						{
 							//dprintf("%s: scan %lu\n", __FUNCTION__, wizardSettings->frequency[wizardSettings->frequencyIndex]);
 							interface_displayMenu(1);
-							res = dvb_frequencyScan(appControlInfo.dvbInfo.tuner, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, 0, (dvb_cancelFunctionDef*)wizard_checkAbort);
+							res = dvb_frequencyScan(appControlInfo.dvbInfo.adapter, wizardSettings->frequency[wizardSettings->frequencyIndex], NULL, NULL, 0, (dvbfe_cancelFunctionDef*)wizard_checkAbort);
 							if(res == -1) {
 								//dprintf("%s: scan abort\n", __FUNCTION__);
 								break;
 							}
-							if (wizard_checkAbort(wizardSettings->frequency[wizardSettings->frequencyIndex], dvb_getNumberOfServices(), appControlInfo.dvbInfo.tuner, wizardSettings->frequencyIndex, wizardSettings->frequencyCount) == -1)
+							if (wizard_checkAbort(wizardSettings->frequency[wizardSettings->frequencyIndex], dvb_getNumberOfServices(), appControlInfo.dvbInfo.adapter, wizardSettings->frequencyIndex, wizardSettings->frequencyCount) == -1)
 							{
 								//dprintf("%s: user abort service scan\n", __FUNCTION__);
 								break;
@@ -4753,7 +4727,7 @@ static void wizard_displayCallback(interfaceMenu_t *pMenu)
 					rating = 5;
 					lastUpdate = time(NULL);
 
-					status = dvb_getSignalInfo(appControlInfo.dvbInfo.tuner, &snr, &signal, &ber, &uncorrected_blocks);
+					status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
 
 					if (status == 0)
 					{
@@ -4917,7 +4891,7 @@ static int wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbac
 
 	interfaceInfo.enableClock = 0;
 	appControlInfo.playbackInfo.streamSource = streamSourceNone;
-	appControlInfo.dvbInfo.tuner = offair_getTuner();
+	appControlInfo.dvbInfo.adapter = offair_getTuner();
 	wizardHelperMenu.baseMenu.selectedItem = 0;
 
 	wizardSettings = dmalloc(sizeof(wizardSettings_t));
@@ -4986,8 +4960,8 @@ static int wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbac
 
 	if((monitor_only_frequency > 0) && (monitor_only_frequency != (unsigned long)-1)) {
 		wizard_infoTimerEvent(NULL);
-		dvb_frequencyScan(appControlInfo.dvbInfo.tuner,
-			monitor_only_frequency, NULL, wizard_checkAbort, -1, (dvb_cancelFunctionDef*)wizard_checkAbort);
+		dvb_frequencyScan(appControlInfo.dvbInfo.adapter,
+			monitor_only_frequency, NULL, wizard_checkAbort, -1, (dvbfe_cancelFunctionDef*)wizard_checkAbort);
 		wizard_cleanup(-1);
 	}
 

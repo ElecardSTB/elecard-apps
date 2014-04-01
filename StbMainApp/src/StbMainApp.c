@@ -2303,12 +2303,10 @@ void initialize(int argc, char *argv[])
 {
 
 	tzset();
-
 	//dprintf("%s: wait framebuffer\n", __FUNCTION__);
 
 	/* Wait for the framebuffer to be installed */
-	while ( !helperFileExists(FB_DEVICE) )
-	{
+	while(!helperFileExists(FB_DEVICE)) {
 		sleep(1);
 	}
 
@@ -2325,6 +2323,9 @@ void initialize(int argc, char *argv[])
 	Stb225initIR();
 	setupFramebuffers();
 #endif
+#ifdef STSDK
+	st_init();
+#endif
 
 #ifdef ENABLE_DVB
 	dvb_init();
@@ -2334,9 +2335,6 @@ void initialize(int argc, char *argv[])
 #ifdef ENABLE_GSTREAMER
 	gst_init (&argc, &argv);
 	gstreamer_init();
-#endif
-#ifdef STSDK
-	st_init();
 #endif
 	gfx_init(argc, argv);
 

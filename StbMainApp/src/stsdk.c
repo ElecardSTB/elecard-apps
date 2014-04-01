@@ -154,66 +154,20 @@ int st_init(void)
 
 #ifdef RPC_DUMP
 	st_rpc_fd = open(RPC_DUMP, O_CREAT|O_WRONLY);
-	if (st_rpc_fd < 0)
+	if(st_rpc_fd < 0) {
 		exit(110);
+	}
 #endif
 
-	if( (res = client_create(&pool.socket, ELCD_SOCKET_FILE, NULL, NULL, NULL, NULL)) != 0 )
-	{
+	if((res = client_create(&pool.socket, ELCD_SOCKET_FILE, NULL, NULL, NULL, NULL)) != 0) {
 		eprintf("%s: failed to connect elcd socket\n", __FUNCTION__);
 		return res;
 	}
 
-	res = pthread_create( &pool.thread, NULL, st_poolThread, NULL );
-	if (res != 0)
+	res = pthread_create(&pool.thread, NULL, st_poolThread, NULL);
+	if(res != 0) {
 		eprintf("%s: (!) failed to create pool thread: %s\n", __FUNCTION__, strerror(res));
-
-#ifdef ENABLE_DVB
-	elcdRpcType_t type = elcdRpcInvalid;
-	cJSON *result = NULL;
-	if ( st_rpcSync(elcmd_dvbtuners, NULL, &type, &result ) != 0 || type != elcdRpcResult || result == NULL )
-	{
-		cJSON_Delete(result);
-		return -1;
 	}
-
-	if (result->type == cJSON_Array)
-	{
-		tunerFormat tuner;
-		fe_delivery_system_t type;
-		for (tuner = inputTuner0; tuner < inputTuners && appControlInfo.tunerInfo[tuner].status != tunerNotPresent; tuner++);
-		dprintf("%s: tuner %d\n", __func__, tuner);
-
-		for (int i = 0; i<TUNER_MAX_NUMBER && tuner < inputTuners; i++)
-		{
-			cJSON *t = cJSON_GetArrayItem( result, i );
-			if (!t)
-				break;
-			if (t->type == cJSON_String)
-			{
-				if(strcasecmp( t->valuestring, "DVB-T" ) == 0) {
-					type = SYS_DVBT;
-				} else if(strcasecmp( t->valuestring, "DVB-S" ) == 0) {
-					type = SYS_DVBS;
-				} else if(strcasecmp( t->valuestring, "DVB-C" ) == 0) {
-					type = SYS_DVBC_ANNEX_AC;
-				} else {
-					continue;
-				}
-				appControlInfo.tunerInfo[tuner].type = type;
-				if(!dvb_checkDelSysSupport(tuner, type)) {
-					appControlInfo.tunerInfo[tuner].delSys[appControlInfo.tunerInfo[tuner].delSysCount++] = type;
-				}
-
-				appControlInfo.tunerInfo[tuner].status = tunerInactive;
-				appControlInfo.tunerInfo[tuner].adapter = ADAPTER_COUNT+i;
-
-				tuner++;
-			}
-		}
-	}
-	cJSON_Delete(result);
-#endif
 
 	return res;
 }
@@ -520,11 +474,10 @@ const char *getModulationName(fe_modulation_t modulation)
 }
 
 #ifdef ENABLE_DVB
-void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media)
+void st_setTuneParams(uint32_t adapter, cJSON *params, EIT_media_config_t *media)
 {
-	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
-	switch (appControlInfo.tunerInfo[tuner].type)
-	{
+	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(adapter));
+	switch(dvbfe_getType(adapter)) {
 		case SYS_DVBT:
 		case SYS_DVBT2:
 			cJSON_AddItemToObject(params, "stream",
@@ -567,13 +520,13 @@ void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *medi
 	}
 }
 
-void st_sendDiseqc(tunerFormat tuner, const uint8_t *cmd, size_t len)
+void st_sendDiseqc(uint32_t adapter, const uint8_t *cmd, size_t len)
 {
 	cJSON *a = cJSON_CreateArray();
 	for (size_t i = 0; i < len; i++)
 		cJSON_AddItemToArray(a, cJSON_CreateNumber(cmd[i]));
 	cJSON *params = cJSON_CreateObject();
-	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(st_getTunerIndex(tuner)) );
+	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(adapter));
 	cJSON_AddItemToObject(params, "cmd", a);
 	cJSON *result = NULL;
 	elcdRpcType_t type = elcdRpcInvalid;

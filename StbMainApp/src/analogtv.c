@@ -856,4 +856,14 @@ const char * analogtv_getServiceName(uint32_t index)
 	return analogtv_channelParam[index].customCaption;
 }
 
+int32_t analogtv_hasTuner(void)
+{
+#ifdef STSDK
+	if(st_getBoardId() == eSTB850) {
+		return 1;
+	}
+#endif
+	return 0;
+}
+
 #endif /* ENABLE_ANALOGTV */

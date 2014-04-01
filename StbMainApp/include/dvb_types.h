@@ -38,32 +38,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
-
 #include "defines.h"
 
 /***********************************************
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define TS_PACKET_SIZE (188)
-
-#define FILESIZE_THRESHOLD (1024*1024*1024)
-
-#define BER_THRESHOLD (30000)
+#define TS_PACKET_SIZE			(188)
+#define FILESIZE_THRESHOLD		(1024*1024*1024)
+#define BER_THRESHOLD			(30000)
+#define MAX_ADAPTER_SUPPORTED	2
 
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
-
-/** @ingroup dvb_types
- * Possible input tuners
- */
-typedef enum
-{
-	inputTuner0 = 0,
-	inputTuner1,
-	inputTuners
-} tunerFormat;
 
 /** @ingroup dvb_types
  * The modes in which DVB can operate

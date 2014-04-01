@@ -171,7 +171,7 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent);
 *   Any tuner activity is stopped on this function call
 *   @retval int Current selected tuner
 */
-tunerFormat offair_getTuner(void);
+uint32_t offair_getTuner(void);
 
 /**
 *   @brief Function used to perform a channel change
@@ -244,8 +244,8 @@ static inline int service_thumbnail(const EIT_service_t *service)
 	return service_isRadio(service) ? thumbnail_radio : thumbnail_channels;
 }
 
-// Returns -1 if no tuner supporting service media type is found, tunerFormat otherwise
-int offair_findCapableTuner(EIT_service_t *service);
+// Returns -1 if no tuner supporting service media type is found, otherwise set adapter
+int32_t offair_findCapableTuner(EIT_service_t *service, uint32_t *adapter);
 
 int  offair_getCurrentServiceIndex(int which);
 

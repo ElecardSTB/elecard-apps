@@ -109,20 +109,8 @@ int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg);
 void st_cancelAsync(int index, int execute);
 
 #ifdef ENABLE_DVB
-static inline uint32_t st_frequency(tunerFormat tuner, uint32_t frequency)
-{
-	return (dvb_getType(tuner) == SYS_DVBS) ? frequency : (frequency / KHZ);
-}
-
-static inline int32_t st_getTunerIndex(tunerFormat tuner)
-{
-	return appControlInfo.tunerInfo[tuner].adapter >= ADAPTER_COUNT ?
-	       appControlInfo.tunerInfo[tuner].adapter  - ADAPTER_COUNT :
-	       appControlInfo.tunerInfo[tuner].adapter;
-}
-
-void st_setTuneParams(tunerFormat tuner, cJSON *params, EIT_media_config_t *media);
-void st_sendDiseqc(tunerFormat tuner, const uint8_t *cmd, size_t len);
+void st_setTuneParams(uint32_t adapter, cJSON *params, EIT_media_config_t *media);
+void st_sendDiseqc(uint32_t adapter, const uint8_t *cmd, size_t len);
 #endif
 
 /** Changes hdmi output mode. Reinitialize framebuffer if resolution is changed.
