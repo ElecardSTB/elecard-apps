@@ -7,8 +7,6 @@
 
 
 void load_bouquets();
-void get_transponder_data();
-void get_servises_data();
 void  bouquet_dump(char *filename);
 list_element_t *get_bouquet_list();
 void load_lamedb(list_element_t **);

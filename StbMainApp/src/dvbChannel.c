@@ -79,7 +79,6 @@ static int32_t dvbChannel_isServiceEnabled(EIT_service_t *service)
 
 service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount)
 {
-     printf("%s[%d]\n",__func__, __LINE__);
 	struct list_head *pos;
 	uint32_t i = 0;
 
