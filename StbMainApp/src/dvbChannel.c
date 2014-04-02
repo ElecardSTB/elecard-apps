@@ -410,7 +410,8 @@ static int32_t dvbChannel_update(void)
 {
 	uint32_t old_count;
 	list_element_t		*service_element;
-
+    struct list_head    *pos;
+    struct list_head    *n;
     load_bouquets(); // in g_dvb_channels
     // bouquets list compare with dvb_services
     if ( !bouquets_compare(&dvb_services) ){
@@ -419,9 +420,9 @@ static int32_t dvbChannel_update(void)
 		
     }
     //  dvbChannel_getAudioTrack(); // from offair
-
 	old_count = g_dvb_channels.totalCount;
-	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+	service_element = dvb_services;
+    while (service_element != NULL) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 
@@ -437,29 +438,20 @@ static int32_t dvbChannel_update(void)
             p_srvIdx->service->lcn.logical_channel_number = p_srvIdx->bouquet_data.channel_number;
             p_srvIdx->service->flags |= serviceFlagHasLCN;
 		} else {
-			free_element(service_element);
-			/*
-			if( dvb_hasMedia(curService) &&
-				(appControlInfo.offairInfo.dvbShowScrambled || (dvb_getScrambled(curService) == 0))
-			)
-			if(dvb_hasMedia(curService)) {
-				dvbChannel_addService(curService);
-			}
-            */
-		}
-	}
-
-	//remove elements without service pointer
-    /*list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
+            service_element = remove_element(&dvb_services, service_element);
+            continue;
+        }
+        service_element = service_element->next;
+    }
+    //remove elements without service pointer
+    list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->service == NULL) {
 			dvbChannel_remove(srvIdx);
 		}
 	}
-*/
 	dvbChannel_sortOrderRecheck();
 	dvbChannel_writeOrderConfig();
-
 	return 0;
 }
 
