@@ -166,7 +166,6 @@ struct dvb_instance {
 #endif
 	struct dmx_pes_filter_params filtera;
 	struct dmx_pes_filter_params filterp;
-	struct dvb_frontend_parameters adapter;
 
 #ifdef ENABLE_PVR
 #define ENABLE_DVB_PVR // = ENABLE_DVB && LINUX_DVB_API_DEMUX && ENABLE_PVR
@@ -397,9 +396,26 @@ static int32_t dvb_lockSectionPipeId(void)
 	uint32_t i;
 
 	if(!init) {
-		for(i = 0; i < ARRAY_SIZE(g_dvb_pipe); i++) {
-			dvb_sectionPipeStop(i);
+		elcdRpcType_t type;
+		cJSON *result = NULL;
+		cJSON *params;
+
+		params = cJSON_CreateObject();
+		if(params) {
+			cJSON_AddStringToObject(params, "uri", "all");
+			st_rpcSync(elcmd_TSsectionStreamOff, params, &type, &result);
+			if(result && (result->valuestring != NULL) &&
+				(strcmp(result->valuestring, "ok") == 0)) {
+				//nothing
+			}
+
+			cJSON_Delete(result);
+			cJSON_Delete(params);
+		} else {
+			eprintf("%s(): Error in creating params\n", __func__);
 		}
+
+		memset(g_dvb_pipe, 0, sizeof(g_dvb_pipe));
 		init = 1;
 	}
 
@@ -1307,13 +1323,28 @@ static int32_t dvb_frequencyScanOne(uint32_t adapter, uint32_t frequency, EIT_me
 		dvbfe_fillMediaConfig(adapter, frequency, &local_media);
 		media = &local_media;
 	}
-	if(dvbfe_setParam(adapter, 1, media, pCancelFunction) != 0) {
-		eprintf("%s(): adapter=%d, failed to set frequency to %.3f MHz\n", __func__, adapter, freqMHz);
-		return -1;
-	}
 
-	eprintf("%s(): adapter=%d, scanning %.3f MHz\n", __func__, adapter, freqMHz);
-	dvb_scanForServices(frequency, adapter, enableNit);
+	media->dvb_t.plp_id = 0;
+	do {
+		if(dvbfe_setParam(adapter, 1, media, pCancelFunction) != 0) {
+			eprintf("%s(): adapter=%d, failed to set frequency to %.3f MHz\n", __func__, adapter, freqMHz);
+			return -1;
+		}
+
+		if(dvbfe_isCurrentDelSys_dvbt2(adapter)) {
+			printf("%s:%s()[%d]: is dvb-t2=%d, plp_id=%d\n", __FILE__, __func__, __LINE__, dvbfe_isCurrentDelSys_dvbt2(adapter), media->dvb_t.plp_id);
+			appControlInfo.dvbtInfo.plp_id = media->dvb_t.plp_id;
+			if(media->dvb_t.plp_id == 0) {
+				media->dvb_t.generation = 2;
+			}
+		}
+		eprintf("%s(): adapter=%d, scanning %.3f MHz\n", __func__, adapter, freqMHz);
+		dvb_scanForServices(frequency, adapter, enableNit);
+
+		media->dvb_t.plp_id++;
+
+	} while((dvbfe_isCurrentDelSys_dvbt2(adapter) == 1) && (media->dvb_t.plp_id <= 3));
+
 
 	return 0;
 }
@@ -2784,18 +2815,20 @@ int dvb_startDVB(DvbParam_t *pParam)
 		return -1;
 	}
 
-	if(!appControlInfo.dvbCommonInfo.streamerInput && (dvb->mode != DvbMode_Play)) {
-		if(dvbfe_open(pParam->adapter) < 0) {
-			PERROR("%s[%d]: failed to open frontend", __FUNCTION__, pParam->adapter);
+	if(dvb->mode != DvbMode_Play) {
+		if(!appControlInfo.dvbCommonInfo.streamerInput) {
+			if(dvbfe_open(pParam->adapter) < 0) {
+				PERROR("%s[%d]: failed to open frontend", __FUNCTION__, pParam->adapter);
 #ifndef ENABLE_DVB_PVR
-			return -1;
+				return -1;
 #endif
+			}
 		}
-	}
 
-	if((dvb->mode != DvbMode_Play) && (dvbfe_setParam(pParam->adapter, 0, pParam->media, NULL) != 0)) {
-		eprintf("%s(): Failed to set adapter%d params\n", __FUNCTION__, pParam->adapter);
-		return -1;
+		if(dvbfe_setParam(pParam->adapter, 0, pParam->media, NULL) != 0) {
+			eprintf("%s(): Failed to set adapter%d params\n", __FUNCTION__, pParam->adapter);
+			return -1;
+		}
 	}
 
 #ifdef LINUX_DVB_API_DEMUX

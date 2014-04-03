@@ -53,7 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	do { \
 		err = ioctl(fd, request, ##__VA_ARGS__); \
 		if(err < 0) { \
-			dprintf("%s[%d]: ioctl " #request " failed", __func__, adapter); \
+			dprintf("%s[%d]: ioctl " #request " failed\n", __func__, adapter); \
 		} \
 	} while(err < 0)
 
@@ -61,7 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	do { \
 		int32_t ret = ioctl(fd, request, ##__VA_ARGS__); \
 		if(ret < 0) { \
-			eprintf("%s[%d]: ioctl " #request " failed", __func__, adapter); \
+			eprintf("%s[%d]: ioctl " #request " failed\n", __func__, adapter); \
 			return ret; \
 		} \
 	} while(0)
@@ -106,6 +106,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************/
 typedef struct {
 	fe_delivery_system_t	curDelSys;
+	uint32_t				forceSetDelSys;
+
 	uint32_t				frequency;
 	union {
 		stb810_dvbtInfo		dvbtInfo;
@@ -116,9 +118,9 @@ typedef struct {
 
 	fe_status_t				fe_status;
 	uint32_t				ber;
+	uint32_t				uncorrected_blocks;
 	uint16_t				signal_strength;
 	uint16_t				snr;
-	uint32_t				uncorrected_blocks;
 } dvbfe_adapterState_t;
 
 typedef enum {
@@ -214,7 +216,7 @@ int32_t dvbfe_hasTuner(uint32_t adapter)
 int32_t dvbfe_isLinuxAdapter(uint32_t adapter)
 {
 	if((adapter < MAX_ADAPTER_SUPPORTED) && (g_adapterInfo[adapter].driverType == eTunerDriver_linuxDVBapi)) {
-		return 0;
+		return 1;
 	}
 	return 0;
 }
@@ -270,6 +272,26 @@ static fe_delivery_system_t dvbfe_getDelSysFromMedia(EIT_media_config_t *media)
 	}
 //	printf("%s[%d]: typeBefore=%d, typeAfter=%d!!!\n", __FILE__, __LINE__, typeBefore, typeAfter);
 	return typeAfter;
+}
+
+
+int32_t dvbfe_isCurrentDelSys_dvbt2(uint32_t adapter)
+{
+	if(!dvbfe_checkDelSysSupport(adapter, SYS_DVBT2)) {
+		return 0;
+	}
+
+	if(g_adapterInfo[adapter].fd >= 0) {
+		struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
+		struct dtv_properties cmdseq = { .num = 1, .props = &p, };
+		if(ioctl(g_adapterInfo[adapter].fd, FE_GET_PROPERTY, &cmdseq) == 0) {
+			g_adapterInfo[adapter].state.curDelSys = p.u.data;
+			if(p.u.data == SYS_DVBT2) {
+				return 1;
+			}
+		}
+	}
+	return 0;
 }
 
 int32_t dvbfe_fillMediaConfig(uint32_t adapter, uint32_t frequency, EIT_media_config_t *media)
@@ -333,22 +355,6 @@ int32_t dvbfe_checkDelSysSupport(uint32_t adapter, fe_delivery_system_t delSys)
 	int32_t i;
 	for(i = 0; i < g_adapterInfo[adapter].supportedDelSysCount; i++) {
 		if(g_adapterInfo[adapter].supportedDelSys[i] == delSys) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-int32_t dvbfe_isCurrentDelSys_dvbt2(uint32_t adapter)
-{
-	if(!dvbfe_checkDelSysSupport(adapter, SYS_DVBT2)) {
-		return 0;
-	}
-
-	if(g_adapterInfo[adapter].fd >= 0) {
-		struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
-		struct dtv_properties cmdseq = { .num = 1, .props = &p, };
-		if(ioctl(g_adapterInfo[adapter].fd, FE_GET_PROPERTY, &cmdseq) >= 0 && p.u.data == SYS_DVBT2) {
 			return 1;
 		}
 	}
@@ -567,10 +573,9 @@ static int32_t dvbfe_scanLinuxDVBTuner(uint32_t adapter)
 	appControlInfo.dvbApiVersion = dvbfe_prop[0].u.data;
 	current_sys = dvbfe_prop[1].u.data;
 
-	eprintf("DVB API Version %d.%d, Current v5 delivery system: %d\n",
-		appControlInfo.dvbApiVersion / 256,
-		appControlInfo.dvbApiVersion % 256,
-		current_sys);
+	eprintf("DVB API Version %d.%d, Current tuner %d delSys: %s\n",
+		appControlInfo.dvbApiVersion / 256, appControlInfo.dvbApiVersion % 256,
+		adapter, table_IntStrLookup(delivery_system_desc, current_sys, "unknown"));
 
 	if (appControlInfo.dvbApiVersion < 0x505) {
 		if(strstr(info.name, "CXD2820R") ||
@@ -621,10 +626,10 @@ static int32_t dvbfe_scanLinuxDVBTuner(uint32_t adapter)
 	g_adapterInfo[adapter].driverType = eTunerDriver_linuxDVBapi;
 //	dvbInstances[adapter].fe_type = current_sys;
 
-	eprintf("%s(): Adapter=%d tuner, Model=%s, FineStepSize=%u, Supported types:\n\t",
-				__func__, adapter, info.name, info.frequency_stepsize);
+	eprintf("%s(): Adapter=%d tuner, Model=%s, FineStepSize=%u. Supported types (%d):\n\t",
+				__func__, adapter, info.name, info.frequency_stepsize, g_adapterInfo[adapter].supportedDelSysCount);
 	for(i = 0; i < g_adapterInfo[adapter].supportedDelSysCount; i++) {
-		table_IntStrLookup(delivery_system_desc, g_adapterInfo[adapter].supportedDelSys[i], "unknown ");
+		printf("%s ", table_IntStrLookup(delivery_system_desc, g_adapterInfo[adapter].supportedDelSys[i], "unknown"));
 	}
 	printf("\n");
 
@@ -854,7 +859,6 @@ static int32_t dvbfe_setParamSTAPISDK(uint32_t adapter, fe_delivery_system_t del
 int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 						EIT_media_config_t *media, dvbfe_cancelFunctionDef* pFunction)
 {
-	int32_t hasLock = 0;
 	uint8_t needTune = 0;
 	fe_delivery_system_t delSys;
 	uint32_t frequency;
@@ -866,12 +870,12 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 	delSys = dvbfe_getDelSysFromMedia(media);
 	frequency = media->frequency;
 
-	if(g_adapterInfo[adapter].state.curDelSys != delSys) {
+	if(g_adapterInfo[adapter].state.forceSetDelSys || (g_adapterInfo[adapter].state.curDelSys != delSys)) {
 		if(dvbfe_setFrontendType(adapter, delSys) != 0) {
 			eprintf("%s[%d]: Failed to set frontend delSys for current service\n", __func__, adapter);
 			return -1;
 		}
-		g_adapterInfo[adapter].state.curDelSys = delSys;
+		g_adapterInfo[adapter].state.forceSetDelSys = 0;
 		needTune = 1;
 	}
 	if(g_adapterInfo[adapter].state.frequency != frequency) {
@@ -921,15 +925,14 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 	if(needTune) {
 		int32_t ret = -1;
 
-		eprintf("%s(): Retune adapter=%d tuner: cur_frequency=%uHz, new_frequency=%uHz\n", __func__, adapter, g_adapterInfo[adapter].state.frequency, frequency);
+		eprintf("%s(): Tune adapter=%d tuner, frequency=%uHz\n", __func__, adapter, frequency);
 		switch(g_adapterInfo[adapter].driverType) {
 			case eTunerDriver_linuxDVBapi:
 				ret = dvbfe_setParamLinuxDVBapi(adapter, delSys, frequency, media);
 				break;
 			case eTunerDriver_STAPISDK:
 				ret = dvbfe_setParamSTAPISDK(adapter, delSys, frequency, media);
-				eprintf("%s(): ret=%d\n", __func__, ret);
-				return ret;
+				wait_for_lock = 0;
 				break;
 			default:
 				break;
@@ -937,65 +940,68 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 		if(ret != 0) {
 			eprintf("%s(): Tuner %d not tuned on %u\n", __func__, adapter, frequency);
 		}
-	}
 
-
-	if(appControlInfo.dvbCommonInfo.adapterSpeed < 0) {
-		wait_for_lock = 0;
-	}
-	if(wait_for_lock) {
-		fe_status_t s;
-		int32_t hasSignal = 0;
-		int32_t timeout = (appControlInfo.dvbCommonInfo.adapterSpeed + 1);
-		uint32_t ber = BER_THRESHOLD;
+		if(appControlInfo.dvbCommonInfo.adapterSpeed < 0) {
+			wait_for_lock = 0;
+		}
+		if(wait_for_lock) {
+			int32_t hasLock = 0;
+			fe_status_t s;
+			int32_t hasSignal = 0;
+			int32_t timeout = (appControlInfo.dvbCommonInfo.adapterSpeed + 1);
+			uint32_t ber = BER_THRESHOLD;
 
 #ifdef STBTI
-		timeout *= 10;
+			timeout *= 10;
 #endif
-		do {
-			ioctl_or_abort(adapter, g_adapterInfo[adapter].fd, FE_READ_BER, &ber);
-			// If ber is not -1, then wait a bit more 
-			if(ber == 0xffffffff) {
-				dprintf("%s[%d]: All clear...\n", __func__, adapter);
-				BREAKABLE_SLEEP(100000);
-			} else {
-				eprintf("%s[%d]: Something is out there... (ber %u)\n", __func__, adapter, ber);
-				BREAKABLE_SLEEP(500000);
-			}
-
-			ioctl_or_abort(adapter, g_adapterInfo[adapter].fd, FE_READ_STATUS, &s);
-			if(s & FE_HAS_LOCK) {
-				if(!hasLock) {
-					dprintf("%s[%d]: L\n", __func__, adapter);
+			do {
+				ioctl_or_abort(adapter, g_adapterInfo[adapter].fd, FE_READ_BER, &ber);
+				// If ber is not -1, then wait a bit more 
+				if(ber == 0xffffffff) {
+					dprintf("%s[%d]: All clear...\n", __func__, adapter);
+					BREAKABLE_SLEEP(100000);
 				} else {
-					break;
+					eprintf("%s[%d]: Something is out there... (ber %u)\n", __func__, adapter, ber);
+					BREAKABLE_SLEEP(500000);
 				}
-				hasLock = 1;
-				// locked, give adapter even more time... 
-				//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
-			} else if (s & FE_HAS_SIGNAL) {
-				if (hasSignal == 0) {
-					eprintf("%s[%d]: Has signal\n", __func__, adapter);
-					timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
-					hasSignal = 1;
+
+				ioctl_or_abort(adapter, g_adapterInfo[adapter].fd, FE_READ_STATUS, &s);printf("%s:%s()[%d]: s=%d!!!\n", __FILE__, __func__, __LINE__, s);
+				if(s & FE_HAS_LOCK) {
+					if(!hasLock) {
+						dprintf("%s[%d]: L\n", __func__, adapter);
+					} else {
+						break;
+					}
+					hasLock = 1;
+					// locked, give adapter even more time... 
+					usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
+				} else if(s & FE_HAS_SIGNAL) {
+					if(hasSignal == 0) {
+						eprintf("%s[%d]: Has signal\n", __func__, adapter);
+						timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
+						hasSignal = 1;
+					}
+					dprintf("%s[%d]: S (%d)\n", __func__, adapter, timeout);
+					// found something above the noise level, increase timeout time 
+					usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
+				} else {
+					dprintf("%s[%d]: N (%d)\n", __func__, adapter, timeout);
+					// there's no and never was any signal, reach timeout faster 
+					if(hasSignal == 0) {
+						eprintf("%s[%d]: Skip\n", __func__, adapter);
+						--timeout;
+					}
 				}
-				dprintf("%s[%d]: S (%d)\n", __func__, adapter, timeout);
-				// found something above the noise level, increase timeout time 
-				//usleep (appControlInfo.dvbCommonInfo.adapterSpeed*10000);
-			} else {
-				dprintf("%s[%d]: N (%d)\n", __func__, adapter, timeout);
-				// there's no and never was any signal, reach timeout faster 
-				if(hasSignal == 0) {
-					eprintf("%s[%d]: Skip\n", __func__, adapter);
-					--timeout;
-				}
-			}
-		} while(--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
-		dprintf("%s[%d]: %u timeout %d, ber %u\n", __func__, adapter, frequency, timeout, ber);
+			} while(--timeout > 0 && (!ber || ber >= BER_THRESHOLD));
+			dprintf("%s[%d]: %u timeout %d, ber %u\n", __func__, adapter, frequency, timeout, ber);
+
+			eprintf("%s(): Frequency set: adapter=%d, hasLock=%d, wait_for_lock=%d\n", __func__, adapter, hasLock, wait_for_lock);
+			return !hasLock;
+		}
 	}
 
-	eprintf("%s[%d]: Frequency set: hasLock=%d, wait_for_lock=%d\n", __func__, adapter, hasLock, wait_for_lock);
-	return !hasLock;
+	eprintf("%s(): g_adapterInfo[%d].fd=%d\n", __func__, adapter, g_adapterInfo[adapter].fd);
+	return 0;
 }
 
 int32_t dvbfe_checkFrequency(fe_delivery_system_t type, uint32_t frequency, uint32_t adapter,
@@ -1067,7 +1073,7 @@ int32_t dvbfe_checkFrequency(fe_delivery_system_t type, uint32_t frequency, uint
 static void *dvbfe_tracker_Thread(void *pArg)
 {
 	int err;
-	uint32_t adapter = *((uint32_t *)pArg);
+	uint32_t adapter = (uint32_t)pArg;
 
 	for(;;) {
 		sleep(TRACK_INTERVAL); // two sec.
@@ -1100,7 +1106,7 @@ int32_t dvbfe_trackerStart(uint32_t adapter)
 				pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 				pthread_attr_setschedparam (&attr, &param);
 
-				ret = pthread_create(&(g_adapterInfo[adapter].fe_tracker_Thread), &attr, dvbfe_tracker_Thread, &adapter);
+				ret = pthread_create(&(g_adapterInfo[adapter].fe_tracker_Thread), &attr, dvbfe_tracker_Thread, (void *)adapter);
 				pthread_attr_destroy(&attr);
 				if(ret != 0) {
 					eprintf("%s[%d]: pthread_create (fe track) err=%d\n", __FUNCTION__, adapter, ret);
@@ -1172,7 +1178,33 @@ int32_t dvbfe_getSignalInfo(uint32_t adapter, uint16_t *snr, uint16_t *signal, u
 #endif
 			}
 		}
-		case eTunerDriver_STAPISDK:
+		case eTunerDriver_STAPISDK: {
+#if (defined STSDK)
+			elcdRpcType_t type;
+			cJSON *res = NULL;
+			cJSON *param = cJSON_CreateObject();
+			cJSON_AddItemToObject(param, "tuner", cJSON_CreateNumber(adapter));
+
+			st_rpcSyncTimeout(elcmd_getDvbTunerStatus, param, 1, &type, &res);
+			if((type != elcdRpcResult) || !res) {
+				eprintf("%s(): failed call rpc %s\n", __func__, rpc_getCmdName(elcmd_getDvbTunerStatus));
+				return 0;
+			}
+			cJSON_Delete(param);
+
+			if(res->type == cJSON_Object) {
+				*signal = objGetInt(res, "RFLevel", 0);
+				if(dvbfe_getType(adapter) == SYS_DVBS) {//use fake signal strength based on snr, coz RFLevel allways 0
+					*signal = objGetInt(res, "signalQuality", 0) * 0xffff / 20;//Let 20dB as 100%
+				}
+				*ber = objGetInt(res, "bitErrorRate", 0);
+				*snr = objGetInt(res, "signalQuality", 0);
+				*uncorrected_blocks = 0;
+				ret = (objGetInt(res, "state", 0) == 5) ? 1 : 0;//has lock
+			}
+			cJSON_Delete(res);
+#endif //#if (defined STSDK)
+		}
 		case eTunerDriver_streamerInput:
 		default:
 			break;
@@ -1234,6 +1266,7 @@ int32_t dvbfe_open(uint32_t adapter)
 	switch(g_adapterInfo[adapter].driverType) {
 		case eTunerDriver_linuxDVBapi:
 			if(g_adapterInfo[adapter].fd < 0) {
+				g_adapterInfo[adapter].state.forceSetDelSys = 1;
 				g_adapterInfo[adapter].fd = dvbfe_openLinuxDVBtuner(adapter);
 				if(g_adapterInfo[adapter].fd < 0) {
 					return -1;
@@ -1267,6 +1300,7 @@ int32_t dvbfe_close(uint32_t adapter)
 		default:
 			break;
 	}
+
 	return 0;
 }
 
