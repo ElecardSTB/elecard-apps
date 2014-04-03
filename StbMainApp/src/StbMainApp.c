@@ -1802,7 +1802,7 @@ static void setupFramebuffers(void)
 
 #ifdef ENABLE_FUSION
 #define FUSION_STUB "fusion://stub"
-#define FUSION_MIN_USLEEP 40
+#define FUSION_MIN_USLEEP 30
 static int gStatus = 0;
 
 interfaceFusionObject_t FusionObject;
@@ -1861,7 +1861,10 @@ void * fusion_threadCreepline(void * param)
 	memset(spaces, ' ', FUSION_SPACES);
 
 	while (1){
-		fusion_getCreepAndLogo();
+		if (fusion_getCreepAndLogo() != 0){
+			fusion_wait(1000*300);
+			continue;
+		}
 		interface_displayMenu(1);
 
 		for (k=0; k<FUSION_MAX_CREEPLEN; k++){
@@ -1880,8 +1883,11 @@ void * fusion_threadCreepline(void * param)
 			sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
 			while (i < (strlen(FusionObject.creepline) + FUSION_SPACES))
 			{
+				char * ptr = (char*)(initialCreep + indeces[i]);
 				pthread_mutex_lock(&FusionObject.mutexCreep);
-				snprintf (FusionObject.creepToShow, FUSION_MAX_CREEPLEN, "%s", (initialCreep + indeces[i]));
+				if (ptr[0] > 128) ptr ++;
+				snprintf (FusionObject.creepToShow, FUSION_MAX_CREEPLEN, "%s", ptr);
+
 				pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 				i++;
@@ -1969,8 +1975,6 @@ void fusion_startup()
 		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
 	}
 
-	fusion_getUsbRoot();	// todo: make a waiting cycle till usb is not connected
-
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
 
@@ -2040,7 +2044,7 @@ int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 	fread(playlistBuffer, FUSION_STREAM_SIZE, 1, f);
 	fclose(f);
 
-#ifdef FUSION_TEST
+#if 1
 	char cuttedStream[256];
 	snprintf (cuttedStream, 256, "%s", playlistBuffer);
 	eprintf ("ans: %s ...\n", cuttedStream);
@@ -2077,7 +2081,8 @@ int fusion_getRequestDate(char * dateString)
 	char * ptr;
 
 	// use fake date to get server time
-	sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
+	sprintf (request, "%s/?date=2000-01-01", FusionObject.server);
+	//sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
@@ -2104,8 +2109,6 @@ int fusion_getRequestDate(char * dateString)
 	return 0;
 }
 
-static char fusion_usbRoot[PATH_MAX] = {0};
-
 int32_t fusion_checkDirectory(const char *path)
 {
 	DIR *d;
@@ -2115,44 +2118,6 @@ int32_t fusion_checkDirectory(const char *path)
 		return 0;
 	closedir(d);
 	return 1;
-}
-
-int fusion_getUsbRoot()
-{
-	int hasDrives = 0;
-	DIR *usbDir = opendir("/mnt/");
-	if (usbDir != NULL) {
-		struct dirent *first_item = NULL;
-		struct dirent *item = readdir(usbDir);
-		while (item) {
-			if(strncmp(item->d_name, "sd", 2) == 0) {
-				hasDrives++;
-				if(!first_item)
-					first_item = item;
-			}
-			item = readdir(usbDir);
-		}
-		if (hasDrives == 1) {
-			sprintf(fusion_usbRoot, "/mnt/%s/", first_item->d_name);
-			eprintf("%s: Found %s\n", __FUNCTION__, fusion_usbRoot);
-			closedir(usbDir);
-			return 0;
-		}
-		closedir(usbDir);
-
-		char fusionFolder[PATH_MAX];
-		sprintf (fusionFolder, "%s/fusion/", fusion_usbRoot);
-
-		if (fusion_checkDirectory(fusionFolder)) {
-			char command[PATH_MAX];
-			sprintf (command, "mkdir %s", fusionFolder);
-			system(command);
-		}
-	}
-	else {
-		eprintf("%s: opendir /mnt/ failed\n", __FUNCTION__);
-	}
-	return -1;
 }
 
 long fusion_getRemoteFileSize(char * url)
@@ -2175,9 +2140,7 @@ long fusion_getRemoteFileSize(char * url)
 	}
 	curl_easy_cleanup(curl);
 
-#ifdef FUSION_TEST
 	eprintf ("%s: RemoteFileSize = %ld for %s...\n", __FUNCTION__, (long)remoteFileSize, url);
-#endif
 	return (long)remoteFileSize;
 }
 
@@ -2188,15 +2151,18 @@ int fusion_getCreepAndLogo ()
 	unsigned int i;
 	char dateString[256];
 
+	if (!fusion_checkDirectory("/tmp/fusion")) {
+		system("mkdir /tmp/fusion");
+	}
+
 	fusion_getSecret();
-	/*if (fusion_getRequestDate(dateString) == -1){
+	if (fusion_getRequestDate(dateString) == -1){
 		eprintf ("%s(%d): WARNING! fusion_getRequestDate rets error.\n",   __FILE__, __LINE__);
 		return -1;
 	}
 	sprintf (request, "%s/?s=%s&c=playlist_full&date=%s", FusionObject.server, FusionObject.secret, dateString);
-	* */
-	sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
 
+	//sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
 		return -1;
@@ -2240,7 +2206,7 @@ int fusion_getCreepAndLogo ()
 			if ((ptr != NULL) && (logoFileSize > 0)) {
 				ptr += 7;
 				while ((ptrSlash = strchr(ptr, '/')) != NULL) ptrSlash[0] = '_';
-				sprintf (FusionObject.logos[i].filepath, "%s/fusion/logo_%d_%s", fusion_usbRoot, logoFileSize, ptr);
+				sprintf (FusionObject.logos[i].filepath, "/tmp/fusion/logo_%d_%s", logoFileSize, ptr);
 			}
 			else {
 				eprintf ("%s(%d): WARNING! Incorrect logo url\n", __FUNCTION__, __LINE__); 

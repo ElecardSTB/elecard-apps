@@ -2064,7 +2064,7 @@ static void interface_displayLogo(void)
 	gfx_drawText(DRAWING_SURFACE, pgfx_font,
 		INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
 		INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-		2, interfaceInfo.screenHeight - 80 + 2,
+		0, interfaceInfo.screenHeight - 80,
 		FusionObject.creepToShow, 0, 1);
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 #endif
