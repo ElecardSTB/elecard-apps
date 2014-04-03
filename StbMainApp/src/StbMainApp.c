@@ -1845,85 +1845,47 @@ void * fusion_threadCreepline(void * param)
 {
 	int alreadySlept;
 	int timeToUsleep;
-	char tmpLine[FUSION_MAX_CREEPLEN];
+	char tmpLine[FUSION_MAX_CREEPLEN*2];
 	int j, i, k;
-	int symbols;
-	char initialCreep[FUSION_MAX_CREEPLEN];
-	char spaces[FUSION_SPACES];
 
+	char initialCreep[FUSION_MAX_CREEPLEN*2];
+	char spaces[FUSION_SPACES];
+	int indeces[FUSION_MAX_CREEPLEN + FUSION_SPACES];
 
 	fusion_readConfig();
+
+	indeces[0] = 0;
+	for (k=1; k<FUSION_SPACES; k++){
+		indeces[k] = indeces[k-1] + 1;
+	}
+	memset(spaces, ' ', FUSION_SPACES);
 
 	while (1){
 		fusion_getCreepAndLogo();
 		interface_displayMenu(1);
 
-		memset(spaces, 0, FUSION_SPACES);
-		memset(initialCreep, 0, FUSION_MAX_CREEPLEN);
-
 		for (k=0; k<FUSION_MAX_CREEPLEN; k++){
 			if (FusionObject.creepline[k] == '\n' || FusionObject.creepline[k] == '\r') {
 				FusionObject.creepline[k] = ' ';
 			}
+			if (k && FusionObject.creepline[k] < 128) indeces[k+FUSION_SPACES] = indeces[k+FUSION_SPACES-1] + 1;
+			else indeces[k+FUSION_SPACES] = indeces[k+FUSION_SPACES-1] + 2;
 		}
 
-		memset(spaces, ' ', FUSION_SPACES-1);
-		sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
-
 		j = 0;
-		symbols = 0;
 		alreadySlept = 0;
 		while (j < FusionObject.repeats){
 			i = 0;
-			snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, initialCreep);
 
-			while (strlen(FusionObject.creepline) > 0)
+			sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
+			while (i < (strlen(FusionObject.creepline) + FUSION_SPACES))
 			{
 				pthread_mutex_lock(&FusionObject.mutexCreep);
-				if (FusionObject.creepline[0] == ' ' ||
-					FusionObject.creepline[0] == ',' ||
-					FusionObject.creepline[0] == '!' ||
-					FusionObject.creepline[0] == '.' ||
-					FusionObject.creepline[0] == '-'
-				)
-				{
-					i ++;
-				}
-				else if (FusionObject.creepline[0] >= 'A' && FusionObject.creepline[0] <= 'Z' ||
-						 FusionObject.creepline[0] >= 'a' && FusionObject.creepline[0] <= 'z' ||
-						 FusionObject.creepline[0] >= '0' && FusionObject.creepline[0] <= '9')
-				{
-					i ++;
-				}
-				else {
-					i += 2;
-				}
-				sprintf (tmpLine, "%s", initialCreep + i);
-
-				for (k=0, symbols = 0; k<min(FUSION_SYMBOLS_FITS, strlen(tmpLine)); k++){
-					if (tmpLine[0] == ' ' ||
-						tmpLine[0] == ',' ||
-						tmpLine[0] == '!' ||
-						tmpLine[0] == '.' ||
-						tmpLine[0] == '-')
-					{
-						symbols++;
-					}
-					else if (tmpLine[0] >= 'A' && tmpLine[0] <= 'Z' ||
-							 tmpLine[0] >= 'a' && tmpLine[0] <= 'z' ||
-							 tmpLine[0] >= '0' && tmpLine[0] <= '9')
-					{
-						symbols++;
-					} else {
-						symbols += 2;
-					}
-				}
-				tmpLine[symbols] = '\0';
-
-				snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, "%s", tmpLine);
-				snprintf (FusionObject.creepToShow, FUSION_MAX_CREEPLEN, "%s", tmpLine);
-
+				snprintf (FusionObject.creepToShow, FUSION_MAX_CREEPLEN, "%s", (initialCreep + indeces[i]));
 				pthread_mutex_unlock(&FusionObject.mutexCreep);
+
+				i++;
+				//eprintf("%s(%d): creepToShow = %s\n", __FUNCTION__, __LINE__, FusionObject.creepToShow);
 
 				interface_displayMenu(1);
 
@@ -1932,7 +1894,6 @@ void * fusion_threadCreepline(void * param)
 			}
 
 			timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
-//			eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
 			if (timeToUsleep <= 0) break;
 
 			fusion_wait (1000* FusionObject.pause);
@@ -1940,7 +1901,9 @@ void * fusion_threadCreepline(void * param)
 			j++;
 		}
 		FusionObject.creepline[0] = '\0';
+		pthread_mutex_lock(&FusionObject.mutexCreep);
 		FusionObject.creepToShow[0] = '\0';
+		pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 		timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
 		eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
@@ -2192,6 +2155,32 @@ int fusion_getUsbRoot()
 	return -1;
 }
 
+long fusion_getRemoteFileSize(char * url)
+{
+	CURL *curl;
+	CURLcode res;
+	double remoteFileSize = 0;
+	if (!url || strlen(url) == 0) return 0;
+
+	curl = curl_easy_init();
+	if (!curl) return 0;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+
+	curl_easy_perform(curl);
+	res = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &remoteFileSize);
+	if (res != 0) {
+		remoteFileSize = 0.0;
+	}
+	curl_easy_cleanup(curl);
+
+#ifdef FUSION_TEST
+	eprintf ("%s: RemoteFileSize = %ld for %s...\n", __FUNCTION__, (long)remoteFileSize, url);
+#endif
+	return (long)remoteFileSize;
+}
+
 int fusion_getCreepAndLogo ()
 {
 	cJSON * root;
@@ -2240,13 +2229,22 @@ int fusion_getCreepAndLogo ()
 			else continue;
 
 			sprintf (FusionObject.logos[i].url, "%s", jsonItem->valuestring);
+			eprintf ("%s(%d): logo[%d] = %s\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].url);
 
-			int len = strlen(FusionObject.logos[i].filepath);
-			if (len && (FusionObject.logos[i].filepath[len-5] == '_')){
-				sprintf (FusionObject.logos[i].filepath, "%s/fusion/logo_%d.png", fusion_usbRoot, i);
+			long logoFileSize = fusion_getRemoteFileSize(FusionObject.logos[i].url);
+
+			char tmpStr[PATH_MAX];
+			char * ptr, *ptrSlash;
+			sprintf (tmpStr, "%s", FusionObject.logos[i].url);
+			ptr = strstr(tmpStr, "http:");
+			if ((ptr != NULL) && (logoFileSize > 0)) {
+				ptr += 7;
+				while ((ptrSlash = strchr(ptr, '/')) != NULL) ptrSlash[0] = '_';
+				sprintf (FusionObject.logos[i].filepath, "%s/fusion/logo_%d_%s", fusion_usbRoot, logoFileSize, ptr);
 			}
 			else {
-				sprintf (FusionObject.logos[i].filepath, "%s/fusion/logo_%d_.png", fusion_usbRoot, i);
+				eprintf ("%s(%d): WARNING! Incorrect logo url\n", __FUNCTION__, __LINE__); 
+				FusionObject.logos[i].filepath[0] = '\0';
 			}
 			eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
 				i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
