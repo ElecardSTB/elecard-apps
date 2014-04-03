@@ -1943,17 +1943,21 @@ static void offair_addDVBChannelsToMenu()
 		EIT_service_t *service = srv->service;
 		interfaceMenuEntry_t *entry;
 		char *serviceName;
-		int32_t radio;
+		int32_t isRadio = 0;
 
 		if(!srv->visible) {
 			continue;
 		}
-		radio = service->service_descriptor.service_type == 2;
+		if(	(service->service_descriptor.service_type == 2) ||
+			(dvb_hasMediaType(service, mediaTypeAudio) && !dvb_hasMediaType(service, mediaTypeVideo)))
+		{
+			isRadio = 1;
+		}
 		serviceName = dvb_getServiceName(service);
 
 		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
 		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, i),
-								dvb_getScrambled(service) ? thumbnail_billed : (radio ? thumbnail_radio : thumbnail_channels));
+								dvb_getScrambled(service) ? thumbnail_billed : (isRadio ? thumbnail_radio : thumbnail_channels));
 
 		entry = menu_getLastEntry(channelMenu);
 		if(entry) {
