@@ -1960,6 +1960,8 @@ int fusion_readConfig()
 }
 void fusion_startup()
 {
+	fusion_setMoscowDateTime();
+
 	sprintf (appControlInfo.mediaInfo.filename, "%s", FUSION_STUB);
 
 	appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
@@ -2073,39 +2075,57 @@ int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
 	return 0;
 }
 
-int fusion_getRequestDate(char * dateString)
+int fusion_setMoscowDateTime()
 {
-	cJSON * root;
-	cJSON * jsonServerDate;
-	char request[FUSION_URL_LEN];
-	char * ptr;
+	char setDateString[64];
+	char dateString[64];
+	char utcBuffer [64];
+	memset(utcBuffer, 0, 64);
 
-	// use fake date to get server time
-	sprintf (request, "%s/?date=2000-01-01", FusionObject.server);
-	//sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
+	if (fusion_getUtc(utcBuffer) != 0) {
+		eprintf ("%s(%d): WARNING! Couldn't get UTC datetime.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	// format UTC: 2014-04-04 11:43:48
+	sprintf (setDateString, "date -u -s \"%s\"", utcBuffer);
+	eprintf ("%s: Command: %s\n", __FUNCTION__, setDateString);
+	system(setDateString);
 
-	if (fusion_downloadPlaylist(request, &root) != 0) {
-		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
+	// set timezone
+	system("rm /var/etc/localtime && ln -s /usr/share/zoneinfo/Russia/Moscow /var/etc/localtime");
+
+	return 0;
+}
+
+
+int fusion_getUtc (char * utcBuffer)
+{
+	FILE * f;
+	char request[256];
+
+	if (!utcBuffer) {
+		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 
-	jsonServerDate = cJSON_GetObjectItem(root, "date");
-	if (!jsonServerDate || !jsonServerDate->valuestring) {
-		eprintf ("%s(%d): No date\n", __FUNCTION__, __LINE__);
-		cJSON_Delete(root);
-		return -1;
-	}
-	// "2014-03-18 10:48:39"
-	if ((ptr = strchr(jsonServerDate->valuestring, ' ')) != NULL){
-		snprintf (dateString, (int)(ptr - jsonServerDate->valuestring)+1, jsonServerDate->valuestring);
-	}
-	else {
-		eprintf ("%s(%d): Incorrect date\n", __FUNCTION__, __LINE__);
-		cJSON_Delete(root);
-		return -1;
-	}
+	sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt");  // 2>/dev/null
+	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
+	system (request);
 
-	cJSON_Delete(root);
+	f = fopen("/tmp/utc.txt", "rt");
+	if (!f) {
+		eprintf ("%s(%d): ERROR! Couldn't open /tmp/utc.txt.\n",   __FUNCTION__, __LINE__);
+		return -1;
+	}
+	fread(utcBuffer, 64, 1, f);
+	fclose(f);
+
+	eprintf ("ans: %s\n", utcBuffer);
+
+	if (!strlen(utcBuffer) || !strchr(utcBuffer, ' ')) {
+		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
+		return -1;
+	}
 	return 0;
 }
 
@@ -2150,19 +2170,25 @@ int fusion_getCreepAndLogo ()
 	char request[FUSION_URL_LEN];
 	unsigned int i;
 	char dateString[256];
+	char utcBuffer [64];
+	memset(utcBuffer, 0, 64);
 
 	if (!fusion_checkDirectory("/tmp/fusion")) {
 		system("mkdir /tmp/fusion");
 	}
 
 	fusion_getSecret();
-	if (fusion_getRequestDate(dateString) == -1){
-		eprintf ("%s(%d): WARNING! fusion_getRequestDate rets error.\n",   __FILE__, __LINE__);
+	if (fusion_getUtc(utcBuffer) == -1){
+		eprintf ("%s(%d): WARNING! fusion_getUtc rets error.\n",   __FILE__, __LINE__);
 		return -1;
 	}
+	else {
+		// eg. 2014-04-03 09:31:26
+		snprintf (dateString, 11, "%s", utcBuffer);
+	}
+
 	sprintf (request, "%s/?s=%s&c=playlist_full&date=%s", FusionObject.server, FusionObject.secret, dateString);
 
-	//sprintf (request, "%s/?s=%s&c=playlist_full&date=2000-01-01", FusionObject.server, FusionObject.secret);
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
 		return -1;
