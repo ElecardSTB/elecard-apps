@@ -7,8 +7,6 @@
 #include "dvb.h"
 #include "off_air.h"
 
-//extern dvb_channels_t g_dvb_channels;
-
 void getDVBList(){
 
 }
@@ -23,18 +21,40 @@ void addList(){
 
 void createPlaylist(interfaceMenu_t  *interfaceMenu)
 {
+    interfaceMenu_t *channelMenu = interfaceMenu;
+    struct list_head *pos;
+    char channelEntry[MENU_ENTRY_INFO_LENGTH];
+    int32_t i = 0;
     interface_clearMenuEntries(interfaceMenu);
 
-    int32_t i = 0;
-    for (i = 0; i < 15; i++){
-        interface_addMenuEntry(interfaceMenu, "channelEntry", NULL,NULL, thumbnail_channels);
+    //offair_updateChannelStatus();
+    //	interface_addMenuEntryDisabled(channelMenu, "DVB", 0);
+
+    list_for_each(pos, dvbChannel_getSortList()) {
+        service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+        EIT_service_t *service = srv->service;
+        interfaceMenuEntry_t *entry;
+        char *serviceName;
+        int32_t radio;
+
+        if(!srv->visible) {
+            continue;
+        }
+        radio = service->service_descriptor.service_type == 2;
+        serviceName = dvb_getServiceName(service);
+
+        snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
+        interface_addMenuEntry(channelMenu, channelEntry,  NULL, NULL, dvb_getScrambled(service) ? thumbnail_billed : (radio ? thumbnail_radio : thumbnail_channels));
+
+        entry = menu_getLastEntry(channelMenu);
+        if(entry) {
+            interface_setMenuEntryLabel(entry, "DVB");
+        }
+        if(appControlInfo.dvbInfo.channel == i) {
+            interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
+        }
+        i++;
     }
-
-
-
- //   interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, i),
-  //                          scrambled ? thumbnail_billed : ( radio ? thumbnail_radio : thumbnail_channels));
-
 }
 
 
