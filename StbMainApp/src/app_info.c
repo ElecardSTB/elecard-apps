@@ -893,8 +893,6 @@ int saveProxySettings(void)
 
 void appInfo_init(void)
 {
-	uint32_t i;
-
 	appControlInfo.pictureInfo.skinTone           = 0;
 	appControlInfo.pictureInfo.greenStretch       = 0;
 	appControlInfo.pictureInfo.blueStretch        = 0;
@@ -955,16 +953,6 @@ void appInfo_init(void)
 	appControlInfo.commandInfo.outputFile         = 0;
 
 #ifdef ENABLE_DVB
-	for(i = 0; i < ARRAY_SIZE(appControlInfo.tunerInfo); i++) {
-		memset(appControlInfo.tunerInfo[i].delSys, 0, sizeof(appControlInfo.tunerInfo[0].delSys));
-		appControlInfo.tunerInfo[i].delSysCount       = 0;
-		appControlInfo.tunerInfo[i].fe_status         = 0;
-		appControlInfo.tunerInfo[i].ber               = 0;
-		appControlInfo.tunerInfo[i].signal_strength   = 0;
-		appControlInfo.tunerInfo[i].snr               = 0;
-		appControlInfo.tunerInfo[i].uncorrected_blocks= 0;
-	}
-
 	appControlInfo.dvbCommonInfo.adapterSpeed     = 4;
 	appControlInfo.dvbCommonInfo.extendedScan     = 0;
 	appControlInfo.dvbCommonInfo.networkScan      = 1;
@@ -1016,7 +1004,7 @@ void appInfo_init(void)
 	appControlInfo.dvbsInfo.polarization          = 1;
 
 	appControlInfo.dvbInfo.active     = 0;
-	appControlInfo.dvbInfo.tuner      = 0;
+	appControlInfo.dvbInfo.adapter    = 0;
 	appControlInfo.dvbInfo.scrambled  = 0;
 	appControlInfo.dvbInfo.channel    = CHANNEL_CUSTOM;
 	appControlInfo.dvbInfo.showInfo   = 0;

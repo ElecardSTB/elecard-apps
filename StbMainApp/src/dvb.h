@@ -64,14 +64,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
-#define ADAPTER_COUNT      (2)
-
-#define MIN_FREQUENCY_KHZ  (  40000)
-#define MAX_FREQUENCY_KHZ  ( 860000)
-#define FREQUENCY_STEP_KHZ (   8000)
-#define KHZ                (   1000)
-#define MHZ                (1000000)
-
 #define SCALE_FACTOR       (10000)
 
 #ifdef STBPNX
@@ -98,9 +90,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED TYPEDEFS                            *
 ************************************************/
 
-typedef int dvb_displayFunctionDef(uint32_t, int, tunerFormat, int, int);
-
-typedef int dvb_cancelFunctionDef(void);
+typedef int dvb_displayFunctionDef(uint32_t, int, uint32_t, int, int);
 
 typedef struct dvb_filePosition {
 	int index;
@@ -129,27 +119,24 @@ typedef struct __dvb_multiParam {
 /** @ingroup dvb_instance
  * DVB watch settings used to initialize tuner for specified frequency and PID filters
  */
-typedef struct __dvb_param {
-	DvbMode_t mode;
-	int adapter;
-	char *directory;
-	union 
-	{
-		DvbLiveParam_t liveParam;
-		DvbPlayParam_t playParam;
+typedef struct {
+	DvbMode_t	mode;
+	uint32_t	adapter;
+	char		*directory;
+	union {
+		DvbLiveParam_t	liveParam;
+		DvbPlayParam_t	playParam;
 #ifdef ENABLE_MULTI_VIEW
-		DvbMultiParam_t multiParam;
+		DvbMultiParam_t	multiParam;
 #endif
 	} param;
-	EIT_media_config_t *media;
+	EIT_media_config_t	*media;
 	__u32 frequency;
 } DvbParam_t;
 
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-extern table_IntStr_t fe_typeName[];
-extern table_IntStr_t fe_modulationName[];
 extern list_element_t *dvb_services;
 
 /******************************************************************
@@ -170,34 +157,6 @@ void dvb_init(void);
  */
 void dvb_terminate(void);
 
-/**  @ingroup dvb
- *   @brief Returns the fe_type of the FrontEnd device
- *
- *   @param[in]  tuner               Tuner to use
- *
- *   @return fe_type or -1 if failed
- */
-static inline fe_delivery_system_t dvb_getType(tunerFormat tuner)
-{
-	return appControlInfo.tunerInfo[tuner].type;
-}
-
-const char *dvb_getTypeName(tunerFormat tuner);
-
-int dvb_toggleType(tunerFormat tuner);
-
-/**  @ingroup dvb
- *   @brief For the given tuner returns the Frontend's freq. limits
- *
- *   @param[out] low_freq  Initial search frequency
- *   @param[out] high_freq Final search frequency
- *   @param[out] freq_step Frequency step size
- *   @param[in]  tuner     Tuner to use
- *
- *   @return fe_type or -1 if failed
- */
-int dvb_getTuner_freqs(tunerFormat tuner, __u32 * low_freq, __u32 * high_freq, __u32 * freq_step);
-
 /**  @ingroup dvb_instance
  *   @brief Function used to start DVB decoding of a given channel
  *
@@ -216,7 +175,7 @@ int dvb_startDVB(DvbParam_t *pParam);
  *
  *   @sa dvb_startDVB()
  */
-void dvb_stopDVB(int adapter, int force);
+void dvb_stopDVB(uint32_t adapter, int force);
 
 /**  @ingroup dvb_instance
  *   @brief Change audio PID of currently running channel
@@ -226,21 +185,7 @@ void dvb_stopDVB(int adapter, int force);
  *
  *   @return 0 on success
  */
-int dvb_changeAudioPid(tunerFormat tuner, uint16_t aPID);
-
-/**  @ingroup dvb_instance
- *   @brief Get signal info from specified tuner
- *
- *   @param[in]  tuner     Tuner to be used
- *   @param[out] snr
- *   @param[out] signal
- *   @param[out] ber
- *   @param[out] uncorrected_blocks
- *
- *   @return 0 on success
- */
-int dvb_getSignalInfo(tunerFormat tuner,
-                      uint16_t *snr, uint16_t *signal, uint32_t *ber, uint32_t *uncorrected_blocks);
+int dvb_changeAudioPid(uint32_t adapter, uint16_t aPID);
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
@@ -251,7 +196,7 @@ int dvb_getSignalInfo(tunerFormat tuner,
  *
  *   @return 0 on success
  */
-int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction);
+int dvb_serviceScan(uint32_t adapter, dvb_displayFunctionDef* pFunction);
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
@@ -266,11 +211,11 @@ int dvb_serviceScan( tunerFormat tuner, dvb_displayFunctionDef* pFunction);
  *
  *   @return 0 on success
  */
-int dvb_frequencyScan(	tunerFormat tuner, __u32 frequency,
+int dvb_frequencyScan(	uint32_t adapter, __u32 frequency,
 						EIT_media_config_t *media, 
 						dvb_displayFunctionDef* pFunction,
 						int save_service_list,
-						dvb_cancelFunctionDef* pCancelFunction);
+						dvbfe_cancelFunctionDef* pCancelFunction);
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
@@ -279,7 +224,7 @@ int dvb_frequencyScan(	tunerFormat tuner, __u32 frequency,
  *   @param[in]  tuner             Tuner to use
  *   @param[in]  frequency         Frequency to scan
  */
-void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency );
+void dvb_scanForEPG(uint32_t adapter, uint32_t frequency );
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
@@ -288,7 +233,10 @@ void dvb_scanForEPG( tunerFormat tuner, uint32_t frequency );
  *   @param[in]  frequency         Frequency to scan
  *   @param[out] out_list          Service list to store PAT+PMT data
  */
-void dvb_scanForPSI( tunerFormat tuner, uint32_t frequency, list_element_t **out_list );
+void dvb_scanForPSI(uint32_t adapter, uint32_t frequency, list_element_t **out_list );
+
+int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service);
+int32_t dvb_getCountOfServices(void);
 
 /**  @ingroup dvb_service
  *   @brief Function used to return the number of available DVB channels
@@ -512,8 +460,6 @@ void dvb_getPvrPosition(int which, DvbFilePosition_t *pPosition);
 int dvb_getPvrRate(int which);
 #endif // LINUX_DVB_API_DEMUX
 
-int dvb_diseqcSetup(tunerFormat tuner, int frontend_fd, uint32_t frequency, EIT_media_config_t *media);
-
 uint16_t dvb_getNextSubtitle(EIT_service_t *service, uint16_t subtitle_pid);
 list_element_t* dvb_getNextSubtitleStream(EIT_service_t *service, list_element_t *subtitle);
 uint16_t dvb_getStreamPid(PID_info_t *stream)
@@ -521,33 +467,12 @@ uint16_t dvb_getStreamPid(PID_info_t *stream)
 	return stream->elementary_PID;
 }
 
-static inline int dvb_getAdapter(tunerFormat tuner)
-{
-	return appControlInfo.tunerInfo[tuner].adapter;
-}
-
-#ifdef STSDK
-static inline int dvb_isLinuxTuner(tunerFormat tuner)
-{
-	int32_t adapter = dvb_getAdapter(tuner);
-	return (adapter >= 0) && (adapter < ADAPTER_COUNT);
-}
-#else
-// not linux tuners has on boards with STSDK only
-#define dvb_isLinuxTuner(tuner) 1
-#endif
-
-int dvb_getCountOfServices(void);
-void dvb_scanForBouquet(long frequency, tunerFormat tuner, EIT_service_t *service);
-int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys);
-int dvb_setFrontendType(int adapter, fe_delivery_system_t type);
-int32_t dvb_isCurrentDelSys_dvbt2(tunerFormat tuner);
 
 /** Function return if there has teletext in playing program
  *   @param[out]  dvr_fd     DVR file descriptor
  *   @return 1 if has teletext
  */
-int32_t dvb_getTeletextFD(int adapter, int32_t *dvr_fd);
+int32_t dvb_getTeletextFD(uint32_t adapter, int32_t *dvr_fd);
 
 /** @} */
 

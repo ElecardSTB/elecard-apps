@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "defines.h"
 #include "dvb_types.h"
+#include "dvb-fe.h"
 
 #ifdef ENABLE_PVR
 #include <StbPvr.h>
@@ -51,7 +52,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <directfb.h>
 #include <directfb_strings.h>
-#include "frontend.h"
 #include <limits.h>
 #include <time.h>
 #include <curl/curl.h>
@@ -227,18 +227,7 @@ typedef enum
 #endif
 
 #ifdef ENABLE_DVB
-/* Possible input tuners */
-typedef enum
-{
-	tunerNotPresent = 0,
-	tunerInactive,
-	tunerDVBMain,
-	tunerDVBPvr,
-	tunerStatusGaurd
-} stb810_tunerStatus;
-
-typedef enum
-{
+typedef enum {
 	signalStatusNoStatus = 0,
 	signalStatusNoSignal,
 	signalStatusBadSignal,
@@ -250,59 +239,39 @@ typedef enum
 	signalStatusNoProblems
 } stb810_signalStatus;
 
-/* DVB tuner information */
-typedef struct
-{
-	stb810_tunerStatus   status;
-	fe_status_t          fe_status;
-	fe_delivery_system_t type;
-	// Tuner info is always numbered from zero.
-	// adapter field is used to describe the real port/adapter number
-	// On ST if this index is greater than ADAPTER_COUNT, then it is a ST tuner
-	int                  adapter;
-	fe_delivery_system_t delSys[8];
-	uint8_t				 delSysCount;
-	uint32_t             ber;
-	uint16_t             signal_strength;
-	uint16_t             snr;
-	uint32_t             uncorrected_blocks;
-} stb810_tunerInfo;
 
-/** DVB T input/display information
+/** DVB input/display information
  */
-typedef struct
-{
-	int                  active;
-	tunerFormat          tuner; // points to tunerInfo
-	int                  channel;
-	int                  previousChannel;
-	int                  scrambled;
-	int                  showInfo;
-	int                  scanPSI;
-	stb810_signalStatus  lastSignalStatus;
-	stb810_signalStatus  savedSignalStatus;
-	int                  reportedSignalStatus;
+typedef struct {
+	int32_t				active;
+	uint32_t			adapter;
+	int32_t				channel;
+	int32_t				previousChannel;
+	int32_t				scrambled;
+	int32_t				showInfo;
+	int32_t				scanPSI;
+	stb810_signalStatus	lastSignalStatus;
+	stb810_signalStatus	savedSignalStatus;
+	int32_t				reportedSignalStatus;
 } stb810_dvbInfo;
 
-typedef struct
-{
+typedef struct {
 	char		channelConfigFile[256];
 	char		channelNamesFile[256];
-	uint32_t lowFrequency;
-	uint32_t highFrequency;
-	uint32_t delSys;
-	uint32_t audioMode;
+	uint32_t	lowFrequency;
+	uint32_t	highFrequency;
+	uint32_t	delSys;
+	uint32_t	audioMode;
 	uint32_t	active;
 	uint32_t	id;
 } stb810_tvInfo;
 
-typedef struct __stb810_dvbCommonInfo
-{
-	char                 channelConfigFile[256];
-	int                  streamerInput;
-	int                  adapterSpeed;
-	int                  extendedScan;
-	int                  networkScan;
+typedef struct {
+	char		channelConfigFile[256];
+	uint32_t	streamerInput;
+	uint32_t	extendedScan;
+	uint32_t	networkScan;
+	int32_t		adapterSpeed;
 } stb810_dvbCommonInfo;
 #endif
 
@@ -527,66 +496,6 @@ typedef struct __stb810_commandInfo
 	int                  outputFile;
 } stb810_commandInfo;
 
-typedef struct __stb810_dvbfeInfo
-{
-	uint32_t             lowFrequency;
-	uint32_t             highFrequency;
-	uint32_t             frequencyStep;
-	int                  inversion;
-} stb810_dvbfeInfo;
-
-typedef struct __stb810_dvbtInfo
-{
-	stb810_dvbfeInfo     fe;
-	fe_bandwidth_t       bandwidth;
-	uint8_t              plp_id;
-	uint8_t              generation;
-} stb810_dvbtInfo;
-
-typedef struct __stb810_dvbcInfo
-{
-	stb810_dvbfeInfo     fe;
-	fe_modulation_t      modulation;
-	uint32_t             symbolRate;
-} stb810_dvbcInfo;
-
-typedef struct __stb810_atscInfo
-{
-	stb810_dvbfeInfo     fe;
-	fe_modulation_t      modulation;
-} stb810_atscInfo;
-
-typedef enum {
-	dvbsBandK = 0,
-	dvbsBandC,
-} stb810_dvbsBand_t;
-
-typedef enum {
-	diseqcSwitchNone = 0,
-	diseqcSwitchSimple,
-	diseqcSwitchMulti,
-	diseqcSwitchTypeCount,
-} diseqcSwitchType_t;
-
-#define DISEQC_SWITCH_NAMES { "NONE", "Simple", "Multi" }
-
-typedef struct {
-	diseqcSwitchType_t type;
-	uint8_t port;       // 0..3
-	uint8_t uncommited; // 0 - off, 1..16
-} stb810_diseqcInfo_t;
-
-typedef struct __stb810_dvbsInfo
-{
-	// NB: DVB-S treat this values as MHz
-	stb810_dvbfeInfo     c_band;
-	stb810_dvbfeInfo     k_band;
-	uint32_t             symbolRate;
-	fe_sec_voltage_t     polarization;
-	stb810_dvbsBand_t    band;
-	stb810_diseqcInfo_t  diseqc;
-} stb810_dvbsInfo;
-
 typedef enum __serviceSort_t
 {
 	serviceSortNone = 0,
@@ -712,7 +621,6 @@ typedef struct __stb810_controlInfo
 {
 #ifdef ENABLE_DVB
 	int						dvbApiVersion;
-	stb810_tunerInfo		tunerInfo[inputTuners];
 	stb810_dvbInfo			dvbInfo;
 	stb810_dvbtInfo			dvbtInfo;
 	stb810_dvbcInfo			dvbcInfo;

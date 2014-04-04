@@ -1153,7 +1153,7 @@ void pvr_recordNow(void)
 		}
 
         cJSON_AddItemToObject(param, "method", cJSON_CreateString("recstart"));
-		snprintf(url, sizeof(url), "dvb://%d@%d", channel, st_getTunerIndex(appControlInfo.dvbInfo.tuner));
+		snprintf(url, sizeof(url), "dvb://%d@%d", channel, appControlInfo.dvbInfo.adapter);
         cJSON_AddItemToObject(value, "url", cJSON_CreateString(url));
         cJSON_AddItemToObject(value, "filename", cJSON_CreateString(appControlInfo.pvrInfo.directory));
         cJSON_AddItemToObject(param, "params", value);
