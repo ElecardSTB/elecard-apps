@@ -6,14 +6,19 @@
 #include "off_air.h"
 
 #ifdef ENABLE_DVB
+#define BOUGET_CONFIG_DIR               "/var/etc/elecard/StbMainApp/bouquet"
 #define BOUGET_NAME                     "bouquets"
-#define BOUGET_SERVICES_FILENAME_TV     CONFIG_DIR "/" BOUGET_NAME ".tv"
-#define BOUGET_SERVICES_FILENAME_RADIO  CONFIG_DIR "/" BOUGET_NAME ".radio"
-#define BOUGET_LAMEDB_FILENAME          CONFIG_DIR "/" "lamedb"
+#define BOUGET_SERVICES_FILENAME_TV     BOUGET_CONFIG_DIR "/" BOUGET_NAME ".tv"
+#define BOUGET_SERVICES_FILENAME_RADIO  BOUGET_CONFIG_DIR "/" BOUGET_NAME ".radio"
+#define BOUGET_LAMEDB_FILENAME          BOUGET_CONFIG_DIR "/" "lamedb"
 
 #define BOUGET_NAME_SIZE                64
 #define CHANNEL_BUFFER_NAME             64
 #define MAX_TEXT	512
+
+#define GARB_DIR					"/var/etc/garb"
+#define GARB_CONFIG_JSON			GARB_DIR "/config.json"
+#define GARB_CONFIG			GARB_DIR "/config"
 
 typedef enum
 {
@@ -126,7 +131,7 @@ void get_bouquets_list(char *bouquet_file)
     uint32_t index_9;
     uint32_t index_10;
 
-    sprintf(path, "%s/%s",CONFIG_DIR, bouquet_file);
+    sprintf(path, "%s/%s",BOUGET_CONFIG_DIR, bouquet_file);
     fd = fopen(path, "r");
     if(fd == NULL) {
         eprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
@@ -330,6 +335,64 @@ void load_lamedb(list_element_t **services)
 
     free_elements(&head_ts_list);
     fclose(fd);
+}
+int32_t getParam(const char *path, const char *param, const char *defaultValue, char *output)
+{
+    char buf[MENU_ENTRY_INFO_LENGTH];
+    FILE *fd;
+    int32_t found = 0;
+    int32_t plen, vlen;
+
+    fd = fopen(path, "r");
+    if(fd != NULL) {
+        while(fgets(buf, sizeof(buf), fd) != NULL) {
+            plen = strlen(param);
+            vlen = strlen(buf)-1;
+            if(strncmp(buf, param, plen) == 0 && buf[plen] == '=') {
+                while(buf[vlen] == '\r' || buf[vlen] == '\n' || buf[vlen] == ' ') {
+                    buf[vlen] = 0;
+                    vlen--;
+                }
+                if(vlen-plen > 0) {
+                    if(output != NULL) {
+                        strcpy(output, &buf[plen+1]);
+                    }
+                    found = 1;
+                }
+                break;
+            }
+        }
+        fclose(fd);
+    }
+
+    if(!found && defaultValue && output) {
+        strcpy(output, defaultValue);
+    }
+    return found;
+}
+
+
+void bouquet_downloadFileFromServer(char *shortname, char *fullname){
+    int ret = 0;
+    char serverName[16];
+    char serverDir[256];
+    char loginName[32];
+    char cmd[1024];
+    getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
+    getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
+    getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
+    snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../channels/%s %s", loginName, serverName, serverDir, shortname, fullname);
+    printf("cmd: %s\n",cmd);
+    ret = system(cmd);
+}
+
+void bouquet_downloadFileWithServices(char *filename){
+    printf("%s[%d]\n", __func__, __LINE__);
+//    struct stat sb;
+  //  if(stat(filename, &sb) != 0) {
+  //      printf("%s[%d]\n", __func__, __LINE__);
+        bouquet_downloadFileFromServer("bouquet", filename);
+  //  }
 }
 
 #endif // ENABLE_DVB

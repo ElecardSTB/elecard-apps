@@ -1311,12 +1311,7 @@ static void dvb_scanForServices(long frequency, tunerFormat tuner, uint32_t enab
 void dvb_scanForBouquet_t(long frequency, tunerFormat tuner, EIT_service_t *service)
 {
     struct section_buf pat_filter;
-
     dvb_filtersUnlock();
-    /**
-     *  filter timeouts > min repetition rates specified in ETR211
-     */
-
     do {
         if (service != NULL &&
             service->flags & serviceFlagHasPAT &&
@@ -1342,15 +1337,14 @@ void dvb_scanForBouquet_t(long frequency, tunerFormat tuner, EIT_service_t *serv
     dvb_filtersLock();
     dvb_filtersFlush();
     dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
-    //dvb_filterServices(&dvb_services);
 }
 
 void dvb_scanForBouquet(long frequency, tunerFormat tuner, EIT_service_t *service)
 {
-        uint32_t	freqKHz = st_frequency(tuner, frequency);
-        float		freqMHz = (float)freqKHz / (float)KHZ;
-        int32_t		frontend_fd = -1;
-        int32_t		tuneSuccess = 0;
+    uint32_t	freqKHz = st_frequency(tuner, frequency);
+    float		freqMHz = (float)freqKHz / (float)KHZ;
+    int32_t		frontend_fd = -1;
+    int32_t		tuneSuccess = 0;
 
     if(dvb_isLinuxTuner(tuner)) {
         if((frontend_fd = dvb_openFrontend(dvb_getAdapter(tuner), O_RDWR)) < 0) {
@@ -1375,8 +1369,6 @@ void dvb_scanForBouquet(long frequency, tunerFormat tuner, EIT_service_t *servic
     }
     dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 }
-
-
 
 int dvb_checkDelSysSupport(tunerFormat tuner, fe_delivery_system_t delSys)
 {

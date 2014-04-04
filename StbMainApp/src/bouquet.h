@@ -6,8 +6,10 @@
 #include "dvbChannel.h"
 
 #ifdef ENABLE_DVB
+#define BOUQUET_FULL_LIST	"/var/etc/elecard/StbMainApp/"
 
 void load_bouquets();
+void bouquet_downloadFileWithServices(char *filename);
 void  bouquet_dump(char *filename);
 list_element_t *get_bouquet_list();
 void load_lamedb(list_element_t **);

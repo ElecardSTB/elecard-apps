@@ -412,6 +412,7 @@ static int32_t dvbChannel_update(void)
 	list_element_t		*service_element;
     struct list_head    *pos;
     struct list_head    *n;
+    bouquet_downloadFileWithServices(BOUQUET_FULL_LIST);
     load_bouquets(); // in g_dvb_channels
     // bouquets list compare with dvb_services
     if ( !bouquets_compare(&dvb_services) ){

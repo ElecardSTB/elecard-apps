@@ -1887,11 +1887,17 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	}
 
 	if(!dvb_hasMedia(service)) {
+#if (defined STSDK)
+        if(dvb_getType(appControlInfo.dvbInfo.tuner) == 3)
+            dvb_toggleType(offair_getTuner());
+
+		appControlInfo.dvbInfo.tuner = 0;
 		dvb_scanForBouquet( service->media.dvb_c.frequency, appControlInfo.dvbInfo.tuner, service);
 		elcdRpcType_t type;
 		cJSON *result = NULL;
 		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
 		cJSON_Delete(result);
+#endif //#if (defined STSDK)
     }
 
     if(!dvb_hasMedia(service)) {
