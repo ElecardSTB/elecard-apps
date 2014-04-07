@@ -1802,7 +1802,7 @@ static void setupFramebuffers(void)
 
 #ifdef ENABLE_FUSION
 #define FUSION_STUB "fusion://stub"
-#define FUSION_MIN_USLEEP 30
+#define FUSION_MIN_USLEEP 40
 static int gStatus = 0;
 
 interfaceFusionObject_t FusionObject;
@@ -1865,7 +1865,7 @@ void * fusion_threadCreepline(void * param)
 			fusion_wait(1000*300);
 			continue;
 		}
-		interface_displayMenu(1);
+		interface_displayMenu(1);	// TODO : check if causes hanging
 
 		for (k=0; k<FUSION_MAX_CREEPLEN; k++){
 			if (FusionObject.creepline[k] == '\n' || FusionObject.creepline[k] == '\r') {
@@ -1893,7 +1893,7 @@ void * fusion_threadCreepline(void * param)
 				i++;
 				//eprintf("%s(%d): creepToShow = %s\n", __FUNCTION__, __LINE__, FusionObject.creepToShow);
 
-				interface_displayMenu(1);
+				//interface_displayMenu(1);
 
 				fusion_wait(FUSION_MIN_USLEEP);
 				alreadySlept += FUSION_MIN_USLEEP;
@@ -1912,10 +1912,10 @@ void * fusion_threadCreepline(void * param)
 		pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 		timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
-		eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
+		//eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
 		if (timeToUsleep <= 0) continue;
 		eprintf ("%s(%d): Sleep %d msec.\n", __FUNCTION__, __LINE__,timeToUsleep);
-		fusion_wait(timeToUsleep);
+		//fusion_wait(timeToUsleep);
 	} // while
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
@@ -1958,6 +1958,22 @@ int fusion_readConfig()
 	fclose (f);
 	return 0;
 }
+
+int fusion_refreshEvent(void *pArg)
+{
+	int needUpdate = 0;
+
+	pthread_mutex_lock(&FusionObject.mutexCreep);
+	needUpdate = (strlen(FusionObject.creepToShow) > 0);
+	pthread_mutex_unlock(&FusionObject.mutexCreep);
+
+	if (needUpdate){
+		interface_displayMenu(1);
+	}
+	interface_addEvent(fusion_refreshEvent, (void*)NULL, 10, 1);
+	return 0;
+}
+
 void fusion_startup()
 {
 	fusion_setMoscowDateTime();
@@ -1980,9 +1996,9 @@ void fusion_startup()
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
 
-	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
+	interface_addEvent(fusion_refreshEvent, (void*)NULL, 10, 1);
 
-	interface_displayMenu(1);
+	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
 
 	return;
 }
