@@ -3725,7 +3725,7 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 	mysem_create(&epg_semaphore);
 	mysem_create(&offair_semaphore);
 
-	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, offair_icons, pParent,
+	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, NULL, pParent,
 		interfaceListMenuIconThumbnail, offair_enterDVBTMenu, NULL, NULL);
 
 	interface_setCustomKeysCallback(_M &DVBTMenu, offair_keyCallback);
@@ -4014,48 +4014,6 @@ static int offair_getUserLCN(interfaceMenu_t *pMenu, char *value, void* pArg)
 }
 #endif
 
-static char* offair_getChannelCaption(int dummy, void* pArg)
-{
-	(void)dummy;
-	char * ptr = strstr(DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, ". ");
-	if (ptr) {
-		ptr += 2;
-		return ptr;
-	}
-	return NULL;
-}
-
-static int offair_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* pArg)
-{
-	if(pStr == NULL) {
-		return -1;
-	}
-
-	if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {
-		EIT_service_t *service;
-		int channelNumber;
-
-		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
-		service = dvbChannel_getService(channelNumber);
-		if(service == NULL) {
-			return -1;
-		}
-
-		snprintf((char *)service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", pStr);
-
-		// todo : save new caption to config file
-	} else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount() + 3)) {
-		uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - dvbChannel_getCount() - 3;
-		analogtv_updateName(selectedItem, pStr);
-	}
-
-#warning "Wrong printing number for analog TV!"
-	snprintf(DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, 
-			  MENU_ENTRY_INFO_LENGTH, "%02d. %s", DVBTMenu.baseMenu.selectedItem - 2, pStr);
-
-	return 0;
-}
-
 static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	EIT_service_t *service;
@@ -4089,16 +4047,6 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			playlist_addUrl(URL, dvb_getServiceName(service));
 			return 0;
 #endif // DVB_FAVORITES
-		case interfaceCommandBlue:
-			if(DVBTMenu.baseMenu.selectedItem >= 1){
-				interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", offair_saveChannelCaption, offair_getChannelCaption, inputModeABC, pArg);
-			}
-			return 0;
-			/*
-			snprintf(offair_lcn_buf, sizeof(offair_lcn_buf),"%d",channelNumber);
-			offair_changeLCN(pMenu, pArg);
-			return 0;
-			* */
 		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			if(menu_entryIsAnalogTv(pMenu, pMenu->selectedItem)) {
