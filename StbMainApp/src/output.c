@@ -456,8 +456,8 @@ static inline void output_redrawMenu(interfaceMenu_t *pMenu)
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
 *******************************************************************/
 
-interfaceListMenu_t InterfacePlaylistEditor;
 #ifdef ENABLE_DVB
+interfaceListMenu_t InterfacePlaylistEditor;
 static interfaceListMenu_t DVBSubMenu;
 static interfaceListMenu_t DiSEqCMenu;
 
@@ -6151,6 +6151,17 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
+char *getSelectedNamePlaylistEditor(){
+	return &InterfacePlaylistEditor.baseMenu.menuEntry[InterfacePlaylistEditor.baseMenu.selectedItem].info;
+}
+
+int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
+{
+	if (!memcmp(interfaceMenu, &InterfacePlaylistEditor.baseMenu, sizeof(interfaceListMenu_t)))
+		return true;
+	return false;
+}
+
 int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
@@ -6394,7 +6405,8 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
 
-	createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, NULL, _M &InterfaceMenu,
+	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, 0, statusbar_f4_rename};
+	createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfaceMenu,
 		interfaceListMenuIconThumbnail, enterPlaylistEditorMenu, NULL, NULL);
 
 	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, _M &OutputMenu,

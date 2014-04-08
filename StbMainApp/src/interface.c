@@ -3362,8 +3362,21 @@ static void interface_enterChannelList()
 
 void interface_processCommand(pinterfaceCommandEvent_t cmd)
 {
-	interfaceCommandEvent_t mycmd;
 	dprintf("%s: in %d\n", __FUNCTION__, cmd->command);
+	if (get_statusLockPlaylist()){
+		switch (cmd->command) {
+			case interfaceCommandUp:
+			case interfaceCommandDown:
+			case interfaceCommandEnter:
+			case interfaceCommandOk:
+			case interfaceCommandPageUp:
+			case interfaceCommandPageDown:
+				break;
+			default:
+				return;
+		}
+	}
+	interfaceCommandEvent_t mycmd;
 
 #ifdef ENABLE_VIDIMAX
 	if (appControlInfo.vidimaxInfo.active){
@@ -3667,6 +3680,51 @@ static int interface_triggerChange(void *pArg)
 }
 */
 
+static char* interface_getChannelCaption(int dummy, void* pArg)
+{
+	(void)dummy;
+	char *selectedName;
+	selectedName = getSelectedNamePlaylistEditor();
+	char * ptr = strstr(getSelectedNamePlaylistEditor(), ". ");
+	if (ptr) {
+		ptr += 2;
+		return ptr;
+	}
+	return NULL;
+}
+
+static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* pArg)
+{
+	if(pStr == NULL) {
+		return -1;
+	}
+	snprintf(pMenu->menuEntry[pMenu->selectedItem].info, MENU_ENTRY_INFO_LENGTH, "%s. %s", offair_getChannelNumberPrefix(pMenu->selectedItem), pStr);
+/*
+    if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {
+        EIT_service_t *service;
+        int channelNumber;
+
+        channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
+        service = dvbChannel_getService(channelNumber);
+        if(service == NULL) {
+            return -1;
+        }
+
+        snprintf((char *)service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", pStr);
+
+/*        // todo : save new caption to config file
+    } else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount() + 3)) {
+        uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - dvbChannel_getCount() - 3;
+        analogtv_updateName(selectedItem, pStr);
+    }
+
+#warning "Wrong printing number for analog TV!"
+    snprintf(DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info,
+              MENU_ENTRY_INFO_LENGTH, "%02d. %s", DVBTMenu.baseMenu.selectedItem - 2, pStr);
+*/
+	return 0;
+}
+
 int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd)
 {
 	int n;
@@ -3678,6 +3736,12 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 	dprintf("%s: in\n", __FUNCTION__);
 
 	//interface_removeEvent(interface_triggerChange, NULL);
+	if ( cmd->command == interfaceCommandBlue) {
+		if (enablePlayListEditorMenu(pMenu) && !get_statusLockPlaylist()){
+			interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
+		}
+		return 0;
+	}
 
 	if ( pMenu->pCustomKeysCallback != NULL )// && pMenu->selectedItem >=0 )
 	{
@@ -3690,9 +3754,14 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 	{
 // 		dprintf("%s: up\n", __FUNCTION__);
 		n = pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail ?
-			(pMenu->selectedItem-pListMenu->infoAreaWidth + pMenu->menuEntryCount) % pMenu->menuEntryCount : 
+			(pMenu->selectedItem-pListMenu->infoAreaWidth + pMenu->menuEntryCount) % pMenu->menuEntryCount :
 			 pMenu->selectedItem-1;
-		while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 )
+		if (get_statusLockPlaylist()) {
+			if ( n < 0)
+				return 1;
+			interface_switchMenuEntryCustom(pMenu, n + 1,  n);
+		}
+		while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 && (!enablePlayListEditorMenu(pMenu)) )
 		{
 			n--;
 		};
@@ -3707,7 +3776,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		{
 			//dprintf("%s: loop\n", __FUNCTION__);
 			n = pMenu->menuEntryCount-1;
-			while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 )
+			while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 && (!enablePlayListEditorMenu(pMenu)) )
 			{
 				//dprintf("%s: loop n=%d\n", __FUNCTION__, n);
 				n--;
@@ -3745,9 +3814,14 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 			{
 				n = pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail ?
 					(pMenu->selectedItem + pListMenu->infoAreaWidth) % pMenu->menuEntryCount : pMenu->selectedItem+1;
+				if (get_statusLockPlaylist()) {
+					if ( n >= pMenu->menuEntryCount)
+						return 1;
+					interface_switchMenuEntryCustom(pMenu, n - 1,  n);
+				}
 			}
 
-			while ( n < pMenu->menuEntryCount && pMenu->menuEntry[n].isSelectable == 0 )
+			while ( n < pMenu->menuEntryCount && pMenu->menuEntry[n].isSelectable == 0 && (!enablePlayListEditorMenu(pMenu)))
 			{
 				n++;
 			};
@@ -3765,7 +3839,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 			{
 				//dprintf("%s: zero\n", __FUNCTION__);
 				n = 0;
-				while ( n < pMenu->menuEntryCount && pMenu->menuEntry[n].isSelectable == 0 )
+				while ( n < pMenu->menuEntryCount && pMenu->menuEntry[n].isSelectable == 0 && (!enablePlayListEditorMenu(pMenu)))
 				{
 					n++;
 				};
@@ -3870,6 +3944,23 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		}
 	} else if ( cmd->command == interfaceCommandRight )
 	{
+		if (enablePlayListEditorMenu(pMenu)) {
+			n = pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail ?
+				(pMenu->selectedItem + pListMenu->infoAreaWidth) % pMenu->menuEntryCount : pMenu->selectedItem;
+			if (n >= 0 && n < pMenu->menuEntryCount) {
+				if (strncasecmp(pMenu->menuEntry[n].label, "VISIBLE", 7) == 0){
+					interface_changeMenuEntryLabel(&pMenu->menuEntry[n], "INVISIBLE",  10);
+					interface_changeMenuEntryThumbnail(&pMenu->menuEntry[n], thumbnail_not_selected);
+					interface_changeMenuEntrySelectable(&pMenu->menuEntry[n], 0);
+				} else {
+					interface_changeMenuEntryLabel(&pMenu->menuEntry[n], "VISIBLE",  8);
+					interface_changeMenuEntryThumbnail(&pMenu->menuEntry[n], thumbnail_channels);
+					interface_changeMenuEntrySelectable(&pMenu->menuEntry[n], 1);
+				}
+			}
+			interface_displayMenu(1);
+			return 1;
+		}
 		//dprintf("%s: right\n", __FUNCTION__);
 		if ( pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail )
 		{
@@ -4111,6 +4202,13 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		//dprintf("%s: up\n", __FUNCTION__);
 
 		interface_listMenuGetItemInfo(pListMenu,&itemHeight,&maxVisibleItems);
+        if (enablePlayListEditorMenu(pMenu) && get_statusLockPlaylist()){
+            cmd->command = interfaceCommandUp;
+            int i;
+            for (i = 0; i< 10; i++)
+                interface_MenuDefaultProcessCommand(&pListMenu->baseMenu, cmd);
+            return 0;
+        }
 #ifndef MENU_HAS_NO_BACK_BUTTON
 		if (pListMenu->baseMenu.selectedItem == MENU_ITEM_BACK && 
 		    pListMenu->baseMenu.pParentMenu != NULL &&
@@ -4165,6 +4263,13 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 	} else if ( cmd->command == interfaceCommandPageDown )
 	{
 		interface_listMenuGetItemInfo(pListMenu,&itemHeight,&maxVisibleItems);
+		if (enablePlayListEditorMenu(pMenu) && get_statusLockPlaylist()){
+			cmd->command = interfaceCommandDown;
+			int i;
+			for (i = 0; i< 10; i++)
+				interface_MenuDefaultProcessCommand(&pListMenu->baseMenu, cmd);
+			return 0;
+		}
 		//dprintf("%s: down\n", __FUNCTION__);
 #ifndef MENU_HAS_NO_BACK_BUTTON
 		if ( pListMenu->baseMenu.selectedItem == MENU_ITEM_MAIN && 
@@ -5263,6 +5368,25 @@ int  interface_setMenuCapacity(interfaceMenu_t *pMenu, int newCapacity)
 #endif
 }
 
+void interface_switchMenuEntryCustom(interfaceMenu_t *pMenu, int source, int receiver)
+{
+	char ch = '.';
+	char *ptr;
+	interfaceMenuEntry_t cur;
+	memcpy(&cur, &pMenu->menuEntry[source], sizeof(interfaceMenuEntry_t));
+	memcpy(&pMenu->menuEntry[source], &pMenu->menuEntry[receiver], sizeof(interfaceMenuEntry_t));
+	memcpy(&pMenu->menuEntry[receiver], &cur, sizeof(interfaceMenuEntry_t));
+
+	ptr = strchr(pMenu->menuEntry[source].info, ch);
+
+	snprintf(pMenu->menuEntry[source].info, MENU_ENTRY_INFO_LENGTH, "%s%s", offair_getChannelNumberPrefix(source), ptr);
+	ptr = strchr(pMenu->menuEntry[receiver].info, ch);
+	snprintf(pMenu->menuEntry[receiver].info, MENU_ENTRY_INFO_LENGTH, "%s%s", offair_getChannelNumberPrefix(receiver), ptr);
+
+	pMenu->menuEntry[receiver].pArg = pMenu->menuEntry[source].pArg;
+	pMenu->menuEntry[source].pArg = cur.pArg;
+}
+
 int interface_addMenuEntryCustom(interfaceMenu_t *pMenu, 
 							interfaceMenuEntryType_t type, 
 							const void *data, 
@@ -5342,6 +5466,12 @@ int  interface_changeMenuEntryInfo(interfaceMenuEntry_t *pMenuEntry, char *data,
 	if (pMenuEntry->infoReplacedChar != 0 &&
 	    pMenuEntry->infoReplacedCharPos < (int)dataSize)
 		data[pMenuEntry->infoReplacedCharPos] = pMenuEntry->infoReplacedChar;
+	return 0;
+}
+
+int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *data, size_t dataSize)
+{
+	snprintf (pMenuEntry->label, dataSize, data);
 	return 0;
 }
 

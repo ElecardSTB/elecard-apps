@@ -7,6 +7,8 @@
 #include "dvb.h"
 #include "off_air.h"
 
+static int channelNumber = -1;
+
 void getDVBList(){
 
 }
@@ -18,14 +20,81 @@ void saveList(){
 void addList(){
 
 }
+int lockChannel()
+{
+    return 1;
+}
+int unlockChannel()
+{
+    return 0;
+}
+static int color_save = -1;
+
+void setColor(int color) {
+    color_save = color;
+}
+
+int getColor() {
+    return color_save;
+}
+
+void set_lockColor(){
+    setColor(interfaceInfo.highlightColor);
+
+    interfaceInfo.highlightColor++;
+    if (interface_colors[interfaceInfo.highlightColor].A==0)
+        interfaceInfo.highlightColor = 0;
+}
+void set_unLockColor(){
+    interfaceInfo.highlightColor = getColor();
+    setColor(-1);
+    if (interface_colors[interfaceInfo.highlightColor].A==0)
+        interfaceInfo.highlightColor = 0;
+}
+
+int getChannelEditor(){
+    printf("channelNumber = %d\n",channelNumber);
+    return channelNumber;
+}
+int get_statusLockPlaylist()
+{
+    if (channelNumber == -1)
+        return false;
+    return true;
+}
+
+static int swapMenu;
+
+int playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
+{
+    if (channelNumber == -1) {
+        swapMenu = CHANNEL_INFO_GET_CHANNEL(pArg);
+        channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
+
+        set_lockColor();
+        //return output_saveAndRedraw(saveAppSettings(), pMenu);
+    } else {
+
+        channelNumber = -1;
+        set_unLockColor();
+        printf("\n\nsritch %d -> %d\n\n\n",swapMenu, CHANNEL_INFO_GET_CHANNEL(pArg));
+     //   interface_switchMenuEntryCustom(pMenu, swapMenu,  CHANNEL_INFO_GET_CHANNEL(pArg));
+       // interface_switchMenu(pMenu,swapMenu);
+        swapMenu = -1;
+    }
+    interface_displayMenu(1);
+    return 0;
+}
 
 void createPlaylist(interfaceMenu_t  *interfaceMenu)
 {
+    if (!(interfaceMenu && !interfaceMenu->menuEntryCount))
+        return;
     interfaceMenu_t *channelMenu = interfaceMenu;
     struct list_head *pos;
     char channelEntry[MENU_ENTRY_INFO_LENGTH];
     int32_t i = 0;
-    interface_clearMenuEntries(interfaceMenu);
+    interface_clearMenuEntries(channelMenu);
 
     //offair_updateChannelStatus();
     //	interface_addMenuEntryDisabled(channelMenu, "DVB", 0);
@@ -44,11 +113,11 @@ void createPlaylist(interfaceMenu_t  *interfaceMenu)
         serviceName = dvb_getServiceName(service);
 
         snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
-        interface_addMenuEntry(channelMenu, channelEntry,  NULL, NULL, dvb_getScrambled(service) ? thumbnail_billed : (radio ? thumbnail_radio : thumbnail_channels));
+        interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), dvb_getScrambled(service) ? thumbnail_billed : (radio ? thumbnail_radio : thumbnail_channels));
 
         entry = menu_getLastEntry(channelMenu);
         if(entry) {
-            interface_setMenuEntryLabel(entry, "DVB");
+            interface_setMenuEntryLabel(entry, "VISIBLE");
         }
         if(appControlInfo.dvbInfo.channel == i) {
             interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
