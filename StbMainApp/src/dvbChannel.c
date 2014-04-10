@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES                                *
 ************************************************/
 #include "dvbChannel.h"
+#include "playlist_editor.h"
 
 #include "debug.h"
 #include "off_air.h"
@@ -95,6 +96,23 @@ service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t sear
 	return NULL;
 }
 
+int dvbChannel_findNumberService(service_index_t *srv_id)
+{
+	struct list_head *pos;
+	uint32_t i = 0;
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		if (srv == NULL)
+			break;
+		if ( srv == srv_id ){
+			return i;
+		}
+		i++;
+	}
+	return -1;
+}
+
 int32_t dvbChannel_getServiceId(EIT_common_t *header)
 {
 	struct list_head *pos;
@@ -154,6 +172,22 @@ service_index_t *dvbChannel_getServiceIndex(uint32_t id)
 	return NULL;
 }
 
+service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id)
+{
+	struct list_head *pos;
+	uint32_t i = 0;
+
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		
+		if(i == id) {
+			return srv;
+		}
+		i++;
+	}
+	return NULL;
+}
+
 EIT_service_t *dvbChannel_getService(uint32_t id)
 {
 	service_index_t *srv = dvbChannel_getServiceIndex(id);
@@ -171,13 +205,15 @@ int32_t dvbChannel_hasSchedule(uint32_t serviceNumber)
 
 int32_t dvbChannel_swapServices(uint32_t first, uint32_t second)
 {
+	if (first == second)
+		return 0;
 	service_index_t *srvIdx_first;
 	service_index_t *srvIdx_second;
 	struct list_head *srvIdx_beforeFirst;
 	struct list_head *srvIdx_beforeSecond;
 
-	srvIdx_first = dvbChannel_getServiceIndex(first);
-	srvIdx_second = dvbChannel_getServiceIndex(second);
+	srvIdx_first = dvbChannel_getServiceIndexnoVisible(first);
+	srvIdx_second = dvbChannel_getServiceIndexnoVisible(second);
 
 	if(!srvIdx_first || !srvIdx_second) {
 		return -1;
@@ -406,8 +442,27 @@ static void dvbChannel_sortOrderRecheck(void)
 	}
 }
 
+static void dvbChannel_sortOrderRecheck_2(void)
+{
+	struct list_head	*pos;
+	g_dvb_channels.viewedCount = 0;
+	list_for_each(pos, &g_dvb_channels.orderSortHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
+		if(dvbChannel_isServiceEnabled(srvIdx->service)) {
+			if (srvIdx->visible == 1)
+			g_dvb_channels.viewedCount++;
+		} else {
+			srvIdx->visible = 0;
+		}
+	}
+}
+
 static int32_t dvbChannel_update(void)
 {
+	if ( push_playlist() ) {
+		dvbChannel_sortOrderRecheck_2();
+		return 0;
+	}
 	uint32_t old_count;
 	list_element_t		*service_element;
     struct list_head    *pos;
@@ -563,7 +618,7 @@ int32_t dvbChannel_initServices(void)
 
 struct list_head *dvbChannel_getSortList(void)
 {
-	return &g_dvb_channels.orderSortHead;
+    return &g_dvb_channels.orderSortHead;
 }
 
 #endif // ENABLE_DVB

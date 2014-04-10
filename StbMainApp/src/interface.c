@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #include "interface.h"
+#include "playlist_editor.h"
 
 #include "debug.h"
 #include "app_info.h"
@@ -3698,6 +3699,7 @@ static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void
 	if(pStr == NULL) {
 		return -1;
 	}
+    playList_saveName(pMenu->selectedItem, pMenu->menuEntry[pMenu->selectedItem].info, pStr);
 	snprintf(pMenu->menuEntry[pMenu->selectedItem].info, MENU_ENTRY_INFO_LENGTH, "%s. %s", offair_getChannelNumberPrefix(pMenu->selectedItem), pStr);
 /*
     if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {
@@ -3712,7 +3714,7 @@ static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void
 
         snprintf((char *)service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", pStr);
 
-/*        // todo : save new caption to config file
+        // todo : save new caption to config file
     } else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount() + 3)) {
         uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - dvbChannel_getCount() - 3;
         analogtv_updateName(selectedItem, pStr);
@@ -3742,6 +3744,11 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		}
 		return 0;
 	}
+	if ( cmd->command == interfaceCommandGreen) {
+		playlist_editor_setupdate();
+		offair_fillDVBTMenu();
+		return 0;
+	}
 
 	if ( pMenu->pCustomKeysCallback != NULL )// && pMenu->selectedItem >=0 )
 	{
@@ -3760,6 +3767,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 			if ( n < 0)
 				return 1;
 			interface_switchMenuEntryCustom(pMenu, n + 1,  n);
+			playlist_switchElementwithNext(n);
 		}
 		while ( n >= 0 && pMenu->menuEntry[n].isSelectable == 0 && (!enablePlayListEditorMenu(pMenu)) )
 		{
@@ -3818,6 +3826,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 					if ( n >= pMenu->menuEntryCount)
 						return 1;
 					interface_switchMenuEntryCustom(pMenu, n - 1,  n);
+					playlist_switchElementwithNext(n - 1);
 				}
 			}
 
@@ -3952,10 +3961,12 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 					interface_changeMenuEntryLabel(&pMenu->menuEntry[n], "INVISIBLE",  10);
 					interface_changeMenuEntryThumbnail(&pMenu->menuEntry[n], thumbnail_not_selected);
 					interface_changeMenuEntrySelectable(&pMenu->menuEntry[n], 0);
+					playList_saveVisible(n, 1, 0);
 				} else {
 					interface_changeMenuEntryLabel(&pMenu->menuEntry[n], "VISIBLE",  8);
 					interface_changeMenuEntryThumbnail(&pMenu->menuEntry[n], thumbnail_channels);
 					interface_changeMenuEntrySelectable(&pMenu->menuEntry[n], 1);
+					playList_saveVisible(n, 0, 1);
 				}
 			}
 			interface_displayMenu(1);
