@@ -1935,7 +1935,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		offair_stopVideo(screenMain, 0);
 	}
 
-	if (appControlInfo.dvbInfo.previousChannel != previousChannel)
+	if (appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel)
  			appControlInfo.dvbInfo.previousChannel = appControlInfo.dvbInfo.channel;
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
