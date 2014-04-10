@@ -1926,7 +1926,7 @@ static void offair_addDVBChannelsToMenu()
 // 	for(int i = 0; i < dvbChannel_getCount(); ++i) {
 // 		EIT_service_t *service = dvbChannel_getService(i);
 	list_for_each(pos, dvbChannel_getSortList()) {
-		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
 		EIT_service_t *service = srv->service;
 		interfaceMenuEntry_t *entry;
 		char *serviceName;
@@ -2129,7 +2129,7 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 		struct list_head *pos;
 
 		list_for_each(pos, dvbChannel_getSortList()) {
-			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderSort);
+			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderNone);
 
 			if(!srvIdx2->visible) {
 				continue;

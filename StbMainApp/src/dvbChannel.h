@@ -49,8 +49,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 typedef struct {
 	struct list_head	orderNoneHead;
-	struct list_head	orderSortHead;
-
 
     uint32_t		viewedCount;
     uint32_t		totalCount;
@@ -77,7 +75,6 @@ typedef struct {
 
 	//lists
 	struct list_head	orderNone;
-	struct list_head	orderSort;
 } service_index_t;
 
 /********************************
@@ -85,8 +82,8 @@ typedef struct {
 *********************************/
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
-int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track);
-int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data);
+int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track, uint16_t visible);
+int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible);
 service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
 int dvbChannel_findNumberService(service_index_t *srv_id);
 

@@ -160,7 +160,7 @@ void get_bouquets_list(char *bouquet_file)
         common.service_id = service_id;
         common.transport_stream_id = transport_stream_id;
         common.media_id = network_id;
-        dvbChannel_addBouquetData(&common, &bouquet_data);
+        dvbChannel_addBouquetData(&common, &bouquet_data, 1);
     }
     fclose(fd);
 }
@@ -370,7 +370,12 @@ int32_t getParam(const char *path, const char *param, const char *defaultValue, 
     }
     return found;
 }
-
+int bouquet_file(){
+    struct stat sb;
+    if(stat(BOUGET_SERVICES_FILENAME_TV, &sb) == 0 || stat(BOUGET_SERVICES_FILENAME_RADIO, &sb) == 0)
+        return true;
+    return false;
+}
 
 void bouquet_downloadFileFromServer(char *shortname, char *fullname){
     int ret = 0;

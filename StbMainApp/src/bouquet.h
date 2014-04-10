@@ -9,6 +9,7 @@
 #define BOUQUET_FULL_LIST	"/var/etc/elecard/StbMainApp/"
 
 void load_bouquets();
+int bouquet_file();
 void bouquet_downloadFileWithServices(char *filename);
 void  bouquet_dump(char *filename);
 list_element_t *get_bouquet_list();

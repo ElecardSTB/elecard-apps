@@ -4,7 +4,7 @@
 
 int enterPlaylistEditorMenu(interfaceMenu_t *pMenu, void* pArg);
 void playList_saveName(int ,char* , char*);
-void playList_saveVisible(int num, int prev_num, int new_num);
+void playList_saveVisible(interfaceMenu_t *pMenu, int num, int new_num);
 int push_playlist();
 void playlist_editor_setupdate();
 int getChannelEditor();

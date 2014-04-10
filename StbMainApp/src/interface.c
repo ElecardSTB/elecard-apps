@@ -3958,15 +3958,9 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 				(pMenu->selectedItem + pListMenu->infoAreaWidth) % pMenu->menuEntryCount : pMenu->selectedItem;
 			if (n >= 0 && n < pMenu->menuEntryCount) {
 				if (strncasecmp(pMenu->menuEntry[n].label, "VISIBLE", 7) == 0){
-					interface_changeMenuEntryLabel(&pMenu->menuEntry[n], "INVISIBLE",  10);
-					interface_changeMenuEntryThumbnail(&pMenu->menuEntry[n], thumbnail_not_selected);
-					interface_changeMenuEntrySelectable(&pMenu->menuEntry[n], 0);
-					playList_saveVisible(n, 1, 0);
+					playList_saveVisible(pMenu, n, 0);
 				} else {
-					interface_changeMenuEntryLabel(&pMenu->menuEntry[n], "VISIBLE",  8);
-					interface_changeMenuEntryThumbnail(&pMenu->menuEntry[n], thumbnail_channels);
-					interface_changeMenuEntrySelectable(&pMenu->menuEntry[n], 1);
-					playList_saveVisible(n, 0, 1);
+					playList_saveVisible(pMenu, n, 1);
 				}
 			}
 			interface_displayMenu(1);

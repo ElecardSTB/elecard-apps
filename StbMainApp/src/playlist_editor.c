@@ -22,14 +22,15 @@ list_element_t *playListEditor = NULL;
 static int update_list = false;
 
 static void load_dvb_channels() {
-    if (playListEditor != NULL)
-        free_elements(&playListEditor);
+    if (playListEditor != NULL) {
+        playlist_editor_cleanup();
+	}
 
     extern dvb_channels_t g_dvb_channels;
     struct list_head *pos;
 
-    list_for_each(pos, &g_dvb_channels.orderSortHead) {
-        service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
+    list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+        service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 
         if(srvIdx == NULL)
             continue;
@@ -97,13 +98,10 @@ void set_unLockColor(){
         interfaceInfo.highlightColor = 0;
 }
 void playlist_editor_cleanup(){
-
-    free_services(&playListEditor);
-
+    free_elements(&playListEditor);
 }
 
 int getChannelEditor(){
-    printf("channelNumber = %d\n",channelNumber);
     return channelNumber;
 }
 int get_statusLockPlaylist()
@@ -134,7 +132,7 @@ void playlist_editor_setupdate(){
     update_list = true;
 }
 
-void playList_saveVisible(int num, int prev_num, int new_num)
+void playList_saveVisible(interfaceMenu_t *pMenu, int num, int new_num)
 {
     int i = 0;
     list_element_t *cur_element;
@@ -143,8 +141,11 @@ void playList_saveVisible(int num, int prev_num, int new_num)
         element = (playListEditor_t*)cur_element->data;
         if(element == NULL)
             continue;
-        if (num == i && element->visible == prev_num){
+        if (num == i){
             element->visible = new_num;
+			interface_changeMenuEntryLabel(&pMenu->menuEntry[num], element->visible ? "VISIBLE" : "INVISIBLE",  element->visible ? 8 : 10);
+			interface_changeMenuEntryThumbnail(&pMenu->menuEntry[num], element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+			interface_changeMenuEntrySelectable(&pMenu->menuEntry[num], element->visible);
             return;
         }
         i++;
@@ -371,15 +372,18 @@ void createPlaylist(interfaceMenu_t  *interfaceMenu)
             continue;
 
         snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->name);
-        interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels));
+        interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
 
         interfaceMenuEntry_t *entry;
         entry = menu_getLastEntry(channelMenu);
         if(entry) {
-            if (element->visible)
+            if (element->visible) {
                 interface_setMenuEntryLabel(entry, "VISIBLE");
-            else
+            	interface_changeMenuEntrySelectable(entry, 1);
+			} else {
                 interface_setMenuEntryLabel(entry, "INVISIBLE");
+				interface_changeMenuEntrySelectable(entry, 0);
+			}
         }
 
         if(appControlInfo.dvbInfo.channel == i) {
