@@ -884,6 +884,8 @@ install_common: $(DATA_DIR) $(DEFAULTS_DIR)
 	$(Q)install -m0644 languages/*.lng $(DATA_DIR)/languages
 	@echo 'INSTALL sounds -> $(DATA_DIR)/sounds'
 	$(Q)install -m0644 sounds/*.wav $(DATA_DIR)/sounds || true
+	@echo 'INSTALL parentcontrol.hash -> $(DEFAULTS_DIR)'
+	$(Q)install -m0644 parentcontrol.hash $(DEFAULTS_DIR)
 
 DIRECTORIES += $(DATA_DIR) $(DEFAULTS_DIR) $(INSTALL_BIN_DIR) $(LIB_DIR)
 $(DIRECTORIES):

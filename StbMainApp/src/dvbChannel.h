@@ -50,6 +50,7 @@ typedef struct {
 	EIT_common_t	common;
 	EIT_service_t	*service;
 	uint16_t		audio_track;
+	uint16_t		parent_control;
 	/* First EPG event which fit to current timeline.
 	Updated on each call to offair_initEPGRecordMenu. */
 	list_element_t	*first_event;
