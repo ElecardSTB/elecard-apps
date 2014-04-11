@@ -113,6 +113,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define INFO_TIMER_PERIOD (100)
 
+#define PARENT_CONTROL_FILE "/var/etc/elecard/StbMainApp/parentcontrol.hash"
+#define PARENT_CONTROL_DEFAULT_FILE "/etc/defaults/elecard/StbMainApp/parentcontrol.hash"
+
 /*********************
 * EXPORTED TYPEDEFS  *
 **********************/

@@ -6153,7 +6153,8 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
-char *getSelectedNamePlaylistEditor(){
+char *getSelectedNamePlaylistEditor()
+{
 	return &InterfacePlaylistEditor.baseMenu.menuEntry[InterfacePlaylistEditor.baseMenu.selectedItem].info;
 }
 
@@ -6162,6 +6163,69 @@ int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
 	if (!memcmp(interfaceMenu, &InterfacePlaylistEditor.baseMenu, sizeof(interfaceListMenu_t)))
 		return true;
 	return false;
+}
+
+static int output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	unsigned char out[16];
+	char out_hex[32];
+	if((value == NULL) || (strlen(value) < 4)) {
+		return -1;
+	}
+
+	md5((unsigned char*)value, strlen(value), out);
+	for (int i=0;i<16;i++) {
+		sprintf(&out_hex[i*2], "%02hhx", out[i]);
+	}
+	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "w");
+	if(pass_file == NULL) {
+		return 0;
+	}
+	fwrite(out_hex, 32, 1, pass_file);
+	fclose(pass_file);
+
+	return 0;
+}
+
+static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if(value == NULL) {
+		return 0;
+	}
+	unsigned char out[16];
+	char out_hex[32];
+	char pass[32];
+	md5((unsigned char*)value, strlen(value), out);
+	for (int i=0;i<16;i++) {
+		sprintf(&out_hex[i*2], "%02hhx", out[i]);
+	}
+	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
+	if(pass_file == NULL) {
+		unsigned char cmd[256];
+		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
+		if(pass_file == NULL) {
+			return 0;
+		}
+// 		snprintf(cmd, sizeof(cmd), "cp %s %s", PARENT_CONTROL_DEFAULT_FILE, PARENT_CONTROL_FILE);
+// 		system(cmd);
+	}
+	fread(pass, 32, 1, pass_file);
+	fclose(pass_file);
+
+	if(strncmp(out_hex, pass, 32) == 0) {
+		const char *mask = "\\d{6}";
+		interface_getText(pMenu, _T("ENTER_NEW_PASSWORD"), mask, output_saveParentControlPass, NULL, inputModeDirect, &pArg);
+		return 1;
+	}
+
+	return 0;
+}
+
+static int output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
+{
+	const char *mask = "\\d{6}";
+	interface_getText(pMenu, _T("ENTER_CURRENT_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
+	return 0;
 }
 
 int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
@@ -6199,6 +6263,9 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
 	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
+
+	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
+
 	return 0;
 }
 

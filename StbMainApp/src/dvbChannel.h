@@ -68,6 +68,7 @@ typedef struct {
     bouquet_data_t  bouquet_data;
 	EIT_service_t	*service;
 	uint16_t		audio_track;
+	uint16_t		parent_control;
 	/* First EPG event which fit to current timeline.
 	Updated on each call to offair_initEPGRecordMenu. */
 	list_element_t	*first_event;
@@ -82,7 +83,7 @@ typedef struct {
 *********************************/
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
-int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track, uint16_t visible);
+//int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track, uint16_t visible, uint16_t parent_control);
 int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible);
 service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
 int dvbChannel_findNumberService(service_index_t *srv_id);

@@ -268,13 +268,14 @@ service_index_t *dvbChannel_add(void)
 	return new;
 }
 
-int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track, uint16_t visible)
+int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track, uint16_t visible, uint16_t parent_control)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->common = *common;
 		new->audio_track = audio_track;
 		new->visible = visible;
+		new->parent_control = parent_control;
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -395,10 +396,11 @@ static int32_t dvbChannel_readOrderConfig(void)
 		uint16_t transport_stream_id = 0;
 		uint16_t audio_track = 0;
 		uint16_t visible = 0;
+		uint16_t parent_control = 0;
 		int i;
 
-		if ( sscanf(buf, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu visible %hu\n",
-			&i, &media_id, &service_id, &transport_stream_id, &audio_track, &visible) >= 5)
+		if ( sscanf(buf, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu visible %hu parent_control %hu\n",
+			&i, &media_id, &service_id, &transport_stream_id, &audio_track, &visible, &parent_control) >= 7)
 		{
 			EIT_common_t common;
 
@@ -410,7 +412,7 @@ static int32_t dvbChannel_readOrderConfig(void)
 			common.service_id = service_id;
 			common.transport_stream_id = transport_stream_id;
 
-			dvbChannel_addCommon(&common, audio_track, visible);
+			dvbChannel_addCommon(&common, audio_track, visible, parent_control);
 		}
 	}
 	fclose(fd);
@@ -439,12 +441,13 @@ int32_t dvbChannel_writeOrderConfig(void)
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->common.media_id || srvIdx->common.service_id || srvIdx->common.transport_stream_id) {
-			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu visible %hu\n", i,
+			fprintf(f, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu visible %hu parent_control %hu\n", i,
 				srvIdx->common.media_id,
 				srvIdx->common.service_id,
 				srvIdx->common.transport_stream_id,
 				srvIdx->audio_track,
-				srvIdx->visible);
+				srvIdx->visible,
+				srvIdx->parent_control);
 			i++;
 		}
 	}

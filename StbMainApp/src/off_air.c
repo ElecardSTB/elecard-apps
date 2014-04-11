@@ -60,6 +60,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "teletext.h"
 #include "stsdk.h"
 #include "analogtv.h"
+#include "md5.h"
 
 #ifdef STBPNX
 #include <phStbRpc_Common.h>
@@ -174,6 +175,13 @@ typedef struct {
 } offair_multiviewInstance_t;
 #endif
 
+typedef struct {
+	int which;
+	DvbParam_t pParam;
+	int audio_type;
+	int video_type;
+} offair_confDvbStart_t;
+
 #endif /* ENABLE_DVB */
 
 /******************************************************************
@@ -225,6 +233,7 @@ int  offair_setChannel(int channel, void* pArg);
 static int  offair_infoTimerEvent(void *pArg);
 static int  offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type);
+static void offair_checkParentControl(int which, DvbParam_t *param, int audio_type, int video_type);
 static int  offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg);
 static void offair_sortEvents(list_element_t **event_list);
 static int  offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void* pArg);
@@ -1070,7 +1079,7 @@ static int offair_multiviewPlay(interfaceMenu_t *pMenu, void *pArg)
 	appControlInfo.dvbInfo.showInfo = 0;
 	offair_setInfoUpdateTimer(screenMain, 0);
 
-	offair_startDvbVideo(screenMain, &param, 0,payload[0]);
+	offair_checkParentControl(screenMain, &param, 0,payload[0]);
 	return 0;
 }
 
@@ -1464,8 +1473,9 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		case interfaceCommand0:
 			if (interfaceChannelControl.length)
 				return 1;
-			if (appControlInfo.dvbInfo.previousChannel)
+			if (appControlInfo.dvbInfo.previousChannel) {
 				offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+			}
 			return 0;
 #ifdef ENABLE_PVR
 		case interfaceCommandRecord:
@@ -1587,7 +1597,70 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updateStatsEvent, SET_NUMBER(which), STATS_UPDATE_INTERVAL, 1);
 #endif
 
-	offair_startDvbVideo(which, &param, audio_type, video_type);
+	offair_checkParentControl(which, &param, audio_type, video_type);
+}
+
+static int offair_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	unsigned char out[16];
+	char out_hex[32];
+	char pass[32];
+	offair_confDvbStart_t *start = (offair_confDvbStart_t *)pArg;
+	if(value == NULL) {
+		if (appControlInfo.dvbInfo.previousChannel && appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel) {
+			offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+		}
+		return 0;
+	}
+
+	md5((unsigned char *)value, strlen(value), out);
+	for (int i=0;i<16;i++) {
+		sprintf(&out_hex[i*2], "%02hhx", out[i]);
+	}
+	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
+	if(pass_file == NULL) {
+		char cmd[256];
+		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
+		if(pass_file == NULL) {
+			return 0;
+		}
+		snprintf(cmd, sizeof(cmd), "cp %s %s", PARENT_CONTROL_DEFAULT_FILE, PARENT_CONTROL_FILE);
+		system(cmd);
+	}
+	fread(pass, 32, 1, pass_file);
+	fclose(pass_file);
+
+	if(strncmp(out_hex, pass, 32) == 0) {
+		offair_startDvbVideo(start->which, &start->pParam, start->audio_type, start->video_type);
+		
+		interface_showMenu(0, 1);
+	}
+	else {
+		if (appControlInfo.dvbInfo.previousChannel && appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel) {
+			offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+		}
+	}
+
+	return 0;
+}
+
+static void offair_checkParentControl(int which, DvbParam_t *pParam, int audio_type, int video_type)
+{
+	interfaceMenu_t* pMenu = _M &DVBTMenu;
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+
+	if(srvIdx->parent_control == 1) {
+		const char *mask = "\\d{6}";
+		offair_confDvbStart_t start;
+		start.which = which;
+		start.pParam = *pParam;
+		start.audio_type = audio_type;
+		start.video_type = video_type;
+		interface_getText(pMenu, _T("ENTER_PASSWORD"), mask, offair_checkParentControlPass, NULL, inputModeDirect, &start);
+	}
+	else {
+		offair_startDvbVideo(which, pParam, audio_type, video_type);
+	}
 }
 
 static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, int video_type)
@@ -1844,7 +1917,8 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif
 
-	int previousChannel = appControlInfo.dvbInfo.channel;
+	if (appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel)
+ 			appControlInfo.dvbInfo.previousChannel = appControlInfo.dvbInfo.channel;
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
 	appControlInfo.mediaInfo.bHttp = 0;
@@ -1879,8 +1953,8 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	if ( appControlInfo.dvbInfo.active != 0 )
 	{
 		interface_showMenu(0, 1);
-		if (appControlInfo.dvbInfo.previousChannel != previousChannel)
-			appControlInfo.dvbInfo.previousChannel  = previousChannel;
+// 		if (appControlInfo.dvbInfo.previousChannel != previousChannel)
+// 			appControlInfo.dvbInfo.previousChannel  = previousChannel;
 	}
 
 	//interface_menuActionShowMenu(pMenu, (void*)&DVBTMenu);
@@ -3967,7 +4041,7 @@ parsing_done:
 	interface_playControlSetProcessCommand(offair_playControlProcessCommand);
 	interface_playControlSetChannelCallbacks(offair_startNextChannel, appControlInfo.playbackInfo.playlistMode == playlistModeFavorites ? playlist_setChannel : offair_setChannel);
 
-	offair_startDvbVideo(which, &param, at, vt);
+	offair_checkParentControl(which, &param, at, vt);
 
 	playlist_setLastUrl(URL);
 
