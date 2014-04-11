@@ -103,6 +103,7 @@ int32_t dvbChannel_getIndex(EIT_service_t *service);
 int32_t dvbChannel_getCount(void);
 //int32_t dvbChannel_invalidateServicess(void);
 int32_t dvbChannel_hasAnyEPG(void);
+int32_t dvbChannel_applyUpdates(void);
 
 #endif // ENABLE_DVB
 #endif // DVBCHANNEL_H

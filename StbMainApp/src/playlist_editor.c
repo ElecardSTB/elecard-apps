@@ -6,13 +6,15 @@
 #include "list.h"
 #include "dvb.h"
 #include "off_air.h"
-
+#include "l10n.h"
+#include "md5.h"
 
 typedef struct _playListEditor_t
 {
     int visible;
     int radio;
     int scrambled;
+    int parent_control;
     char name[MENU_ENTRY_INFO_LENGTH];
     service_index_t *service_index;
 } playListEditor_t;
@@ -49,6 +51,7 @@ static void load_dvb_channels() {
         element = (playListEditor_t *)cur_element->data;
         element->service_index = srvIdx;
         element->visible = srvIdx->visible;
+	element->parent_control = srvIdx->parent_control;
         element->radio = srvIdx->service->service_descriptor.service_type == 2;
         element->scrambled = dvb_getScrambled(srvIdx->service);
         snprintf(element->name, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
@@ -132,7 +135,7 @@ void playlist_editor_setupdate(){
     update_list = true;
 }
 
-void playList_saveVisible(interfaceMenuEntry_t *pMenuEntry, int count, int visible)
+void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count)
 {
     int i = 0;
     list_element_t *cur_element;
@@ -142,11 +145,24 @@ void playList_saveVisible(interfaceMenuEntry_t *pMenuEntry, int count, int visib
         if(element == NULL)
             continue;
         if (count == i){
-            element->visible = visible;
-			interface_changeMenuEntryLabel(pMenuEntry, element->visible ? "VISIBLE" : "INVISIBLE",  element->visible ? 8 : 10);
-			interface_changeMenuEntryThumbnail(pMenuEntry, element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-			interface_changeMenuEntrySelectable(pMenuEntry, element->visible);
-            return;
+		char desc[20];
+		if(element->visible) {
+			if(element->parent_control) {
+				element->parent_control = false;
+				element->visible = false;
+				snprintf(desc, sizeof(desc), "INVISIBLE");
+			} else {
+				element->parent_control = true;
+				snprintf(desc, sizeof(desc), "PARENT");
+			}
+		} else {
+			element->visible = true;
+			snprintf(desc, sizeof(desc), "VISIBLE");
+		}
+		interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+		interface_changeMenuEntryThumbnail(pMenuEntry, element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+		interface_changeMenuEntrySelectable(pMenuEntry, element->visible);
+		return;
         }
         i++;
     }
@@ -164,7 +180,8 @@ int push_playlist()
         playListEditor_t *curElement = (playListEditor_t *)service_element->data;
         if (curElement->service_index != NULL) {
             curElement->service_index->visible = curElement->visible;
-            snprintf(curElement->service_index->service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", curElement->name);
+	    curElement->service_index->parent_control = curElement->parent_control;
+            snprintf((char*)curElement->service_index->service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", curElement->name);
         }
         first = dvbChannel_findNumberService(curElement->service_index);
         if ( i > first)
@@ -176,6 +193,68 @@ int push_playlist()
         service_element = service_element->next;
     }
     return true;
+}
+
+int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	unsigned char out[16];
+	char out_hex[32];
+	char pass[32];
+	if(value == NULL) {
+		return 0;
+	}
+
+	md5((unsigned char *)value, strlen(value), out);
+	for (int i=0;i<16;i++) {
+		sprintf(&out_hex[i*2], "%02hhx", out[i]);
+	}
+	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
+	if(pass_file == NULL) {
+		char cmd[256];
+		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
+		if(pass_file == NULL) {
+			return 0;
+		}
+		snprintf(cmd, sizeof(cmd), "cp %s %s", PARENT_CONTROL_DEFAULT_FILE, PARENT_CONTROL_FILE);
+		system(cmd);
+	}
+	fread(pass, 32, 1, pass_file);
+	fclose(pass_file);
+
+	if(strncmp(out_hex, pass, 32) == 0) {
+		push_playlist();
+		dvbChannel_applyUpdates();
+	}
+	else {
+		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
+		return 1;
+	}
+
+	return 0;
+}
+
+int check_playlist()
+{
+	if (playListEditor == NULL || update_list == false)
+		return false;
+	extern interfaceListMenu_t InterfacePlaylistEditor;
+
+	list_element_t		*service_element = playListEditor;
+	while (service_element != NULL) {
+		playListEditor_t *curElement = (playListEditor_t *)service_element->data;
+		if (curElement->service_index != NULL) {
+			if((!curElement->parent_control) && (curElement->service_index->parent_control)) {
+				const char *mask = "\\d{6}";
+				interface_getText((interfaceMenu_t*)&InterfacePlaylistEditor, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, NULL);
+				return true;
+			}
+		}
+		service_element = service_element->next;
+	}
+
+	push_playlist();
+	dvbChannel_applyUpdates();
+	return true;
 }
 
 /*
@@ -375,13 +454,10 @@ void createPlaylist(interfaceMenu_t  *interfaceMenu)
         interfaceMenuEntry_t *entry;
         entry = menu_getLastEntry(channelMenu);
         if(entry) {
-            if (element->visible) {
-                interface_setMenuEntryLabel(entry, "VISIBLE");
-            	interface_changeMenuEntrySelectable(entry, 1);
-			} else {
-                interface_setMenuEntryLabel(entry, "INVISIBLE");
-				interface_changeMenuEntrySelectable(entry, 0);
-			}
+	    char desc[20];
+	    snprintf(desc, sizeof(desc), "%s", element->parent_control ? "PARENT" : (element->visible ? "VISIBLE" : "INVISIBLE"));
+	    interface_setMenuEntryLabel(entry, desc);
+	    interface_changeMenuEntrySelectable(entry, element->visible);
         }
 
         if(appControlInfo.dvbInfo.channel == i) {

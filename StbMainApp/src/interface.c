@@ -3957,11 +3957,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 			n = pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail ?
 				(pMenu->selectedItem + pListMenu->infoAreaWidth) % pMenu->menuEntryCount : pMenu->selectedItem;
 			if (n >= 0 && n < pMenu->menuEntryCount) {
-				if (strncasecmp(pMenu->menuEntry[n].label, "VISIBLE", 7) == 0){
-					playList_saveVisible(&pMenu->menuEntry[n], n, 0);
-				} else {
-					playList_saveVisible(&pMenu->menuEntry[n], n, 1);
-				}
+				playList_nextChannelState(&pMenu->menuEntry[n], n);
 			}
 			interface_displayMenu(1);
 			return 1;

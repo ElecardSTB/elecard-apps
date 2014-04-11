@@ -515,12 +515,17 @@ static void dvbChannel_sortOrderRecheck_2(void)
 	}
 }
 
+int32_t dvbChannel_applyUpdates(void)
+{
+	dvbChannel_sortOrderRecheck_2();
+	dvbChannel_writeOrderConfig();
+	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+	return 0;
+}
+
 static int32_t dvbChannel_update(void)
 {
-	if (push_playlist()) {
-		dvbChannel_sortOrderRecheck_2();
-		dvbChannel_writeOrderConfig();
-        dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+	if (check_playlist()) {
 		return 0;
 	}
 	playlist_editor_cleanup();

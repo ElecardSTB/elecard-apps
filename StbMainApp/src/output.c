@@ -458,7 +458,7 @@ static inline void output_redrawMenu(interfaceMenu_t *pMenu)
 *******************************************************************/
 
 #ifdef ENABLE_DVB
-static interfaceListMenu_t InterfacePlaylistEditor;
+interfaceListMenu_t InterfacePlaylistEditor;
 static interfaceListMenu_t InterfacePlaylist_t;
 static interfaceListMenu_t DVBSubMenu;
 static interfaceListMenu_t DiSEqCMenu;
@@ -6201,13 +6201,10 @@ static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 	}
 	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
 	if(pass_file == NULL) {
-		unsigned char cmd[256];
 		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
 		if(pass_file == NULL) {
 			return 0;
 		}
-// 		snprintf(cmd, sizeof(cmd), "cp %s %s", PARENT_CONTROL_DEFAULT_FILE, PARENT_CONTROL_FILE);
-// 		system(cmd);
 	}
 	fread(pass, 32, 1, pass_file);
 	fclose(pass_file);
@@ -6263,17 +6260,16 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
 	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
-
-	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
-
 	return 0;
 }
 
 int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
-    interface_clearMenuEntries(interfaceMenu);
-    interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
-    return 0;
+	interface_clearMenuEntries(interfaceMenu);
+
+	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
+	return 0;
 }
 
 int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
