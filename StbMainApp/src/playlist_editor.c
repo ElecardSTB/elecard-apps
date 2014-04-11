@@ -132,7 +132,7 @@ void playlist_editor_setupdate(){
     update_list = true;
 }
 
-void playList_saveVisible(interfaceMenu_t *pMenu, int num, int new_num)
+void playList_saveVisible(interfaceMenuEntry_t *pMenuEntry, int count, int visible)
 {
     int i = 0;
     list_element_t *cur_element;
@@ -141,11 +141,11 @@ void playList_saveVisible(interfaceMenu_t *pMenu, int num, int new_num)
         element = (playListEditor_t*)cur_element->data;
         if(element == NULL)
             continue;
-        if (num == i){
-            element->visible = new_num;
-			interface_changeMenuEntryLabel(&pMenu->menuEntry[num], element->visible ? "VISIBLE" : "INVISIBLE",  element->visible ? 8 : 10);
-			interface_changeMenuEntryThumbnail(&pMenu->menuEntry[num], element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-			interface_changeMenuEntrySelectable(&pMenu->menuEntry[num], element->visible);
+        if (count == i){
+            element->visible = visible;
+			interface_changeMenuEntryLabel(pMenuEntry, element->visible ? "VISIBLE" : "INVISIBLE",  element->visible ? 8 : 10);
+			interface_changeMenuEntryThumbnail(pMenuEntry, element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+			interface_changeMenuEntrySelectable(pMenuEntry, element->visible);
             return;
         }
         i++;
@@ -166,9 +166,7 @@ int push_playlist()
             curElement->service_index->visible = curElement->visible;
             snprintf(curElement->service_index->service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", curElement->name);
         }
-        printf("name %s  ",curElement->name);
         first = dvbChannel_findNumberService(curElement->service_index);
-        //printf("SWAP %d _ %d\n",first, i);
         if ( i > first)
             dvbChannel_swapServices(first, i);
         else
@@ -392,7 +390,6 @@ void createPlaylist(interfaceMenu_t  *interfaceMenu)
         i++;
     }
 }
-
 
 int enterPlaylistEditorMenu(interfaceMenu_t *interfaceMenu, void* pArg)
 {

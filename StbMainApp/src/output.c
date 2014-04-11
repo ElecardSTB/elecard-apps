@@ -287,6 +287,7 @@ static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterGraphicsModeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterPlaylistMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterWANMenu (interfaceMenu_t *wanMenu, void* pArg);
 static int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface);
@@ -457,7 +458,8 @@ static inline void output_redrawMenu(interfaceMenu_t *pMenu)
 *******************************************************************/
 
 #ifdef ENABLE_DVB
-interfaceListMenu_t InterfacePlaylistEditor;
+static interfaceListMenu_t InterfacePlaylistEditor;
+static interfaceListMenu_t InterfacePlaylist_t;
 static interfaceListMenu_t DVBSubMenu;
 static interfaceListMenu_t DiSEqCMenu;
 
@@ -6197,9 +6199,13 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
 	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
 #endif
-
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
 	return 0;
+}
+
+int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
+{
+    interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
+    return 0;
 }
 
 int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
@@ -6299,6 +6305,9 @@ void output_fillOutputMenu(void)
 
 	str = _T("INTERFACE");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InterfaceMenu, settings_interface);
+
+    str = _T("PLAYLIST_T");
+    interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InterfacePlaylist_t, settings_interface);
 
 	str = _T("PLAYBACK");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &PlaybackMenu, thumbnail_loading);
@@ -6404,6 +6413,9 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
+
+    createListMenu(&InterfacePlaylist_t, _T("PLAYLIST_T"), settings_interface, NULL, _M &InterfaceMenu,
+        interfaceListMenuIconThumbnail, output_enterPlaylistMenu, NULL, NULL);
 
 	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, 0, statusbar_f4_rename};
 	createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfaceMenu,

@@ -326,6 +326,58 @@ static int32_t dvbChannel_remove(service_index_t *srvIdx)
 
 	return 0;
 }
+static int32_t dvbChannel_readOrderConfig_afterLamedb(void)
+{
+    char buf[BUFFER_SIZE];
+    FILE* fd;
+
+    fd = fopen(OFFAIR_SERVICES_FILENAME, "r");
+    if(fd == NULL) {
+        dprintf("%s: Failed to open '%s'\n", __FUNCTION__, OFFAIR_SERVICES_FILENAME);
+        return -1;
+    }
+    int i = 0;
+    int num = 0;
+    int old_count = g_dvb_channels.totalCount;
+
+    while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
+        uint32_t media_id = 0;
+        uint16_t service_id = 0;
+        uint16_t transport_stream_id = 0;
+        uint16_t audio_track = 0;
+        uint16_t visible = 0;
+
+        if ( sscanf(buf, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu visible %hu\n",
+            &num, &media_id, &service_id, &transport_stream_id, &audio_track, &visible) >= 5)
+        {
+            EIT_common_t common;
+
+            common.media_id = media_id;
+            common.service_id = service_id;
+            common.transport_stream_id = transport_stream_id;
+
+            int first;
+            service_index_t *p_srvIdx;
+            p_srvIdx = dvbChannel_findServiceLimit(&common, old_count);
+            if (p_srvIdx != NULL) {
+
+                p_srvIdx->visible = visible;
+                first = dvbChannel_findNumberService(p_srvIdx);
+
+                if ( i > first)
+                    dvbChannel_swapServices(first, i);
+                else
+                    dvbChannel_swapServices(i, first);
+
+                i++;
+            }
+        }
+    }
+    fclose(fd);
+    dprintf("%s: imported %d services\n", __FUNCTION__, dvbChannel_getCount());
+
+    return 0;
+}
 
 static int32_t dvbChannel_readOrderConfig(void)
 {
@@ -465,6 +517,7 @@ static int32_t dvbChannel_update(void)
 	if (push_playlist()) {
 		dvbChannel_sortOrderRecheck_2();
 		dvbChannel_writeOrderConfig();
+        dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 		return 0;
 	}
 	playlist_editor_cleanup();
@@ -481,6 +534,7 @@ static int32_t dvbChannel_update(void)
 			free_services(&dvb_services);
 			load_lamedb(&dvb_services);
 		}
+        dvbChannel_readOrderConfig_afterLamedb();
     } else {
 		if(list_empty(&g_dvb_channels.orderNoneHead)) {
 			dvbChannel_readOrderConfig();

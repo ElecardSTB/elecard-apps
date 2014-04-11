@@ -352,6 +352,7 @@ PLAYCONTROL_SHOW_TIMEOUT=Play Control Show Timeout
 PLAYCONTROL_SHOW_ON_START=Show Play Control on Playback Start
 PLAYING=Now
 PLAYLIST=Favorites
+PLAYLIST_T=Playlist
 PLAYLIST_EDITOR=Playlist editor
 PLEASE_WAIT=Please wait...
 POWER_OFF_CONFIRM=Are You Shure You Want to Shutdown?
