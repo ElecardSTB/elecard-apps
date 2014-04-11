@@ -2029,7 +2029,7 @@ static void interface_displayLogo(void)
 	for (int i=0; i<FusionObject.logoCount; i++){
 		int left=0, top=0;
 		int w=0, h=0;
-		if (getPngSize(FusionObject.logos[i].filepath, &w, &h) != 0) {
+		if (!strlen(FusionObject.logos[i].filepath) || getPngSize(FusionObject.logos[i].filepath, &w, &h) != 0) {
 			eprintf ("%s(%d): Warning! Couldn't get logo size (%s)\n", __FILE__, __LINE__, FusionObject.logos[i].filepath);
 			continue;
 		}

@@ -909,7 +909,7 @@ typedef struct
 
 #ifdef ENABLE_FUSION
 
-#define FUSION_STREAM_SIZE    (16*1024*1024)
+#define FUSION_STREAM_SIZE    (4*1024*1024)
 #define FUSION_URL_LEN        (512)
 
 #define FUSION_MAX_LOGOS             (4)
@@ -948,8 +948,8 @@ typedef struct _interfaceFusionObject_t {
 	unsigned char secret[64];
 	char server[512];
 
-	unsigned char creepline[FUSION_MAX_CREEPLEN];
-	unsigned char creepToShow[FUSION_MAX_CREEPLEN];
+	char creepline[FUSION_MAX_CREEPLEN];
+	char creepToShow[FUSION_MAX_CREEPLEN];
 	int pause;
 	int repeats;
 	pthread_mutex_t mutexCreep;

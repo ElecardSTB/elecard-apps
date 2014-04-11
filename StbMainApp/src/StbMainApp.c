@@ -156,6 +156,10 @@ static int helper_confirmFirmwareUpdate(interfaceMenu_t *pMenu, pinterfaceComman
 #ifdef ENABLE_FUSION
 int fusion_getCreepAndLogo ();
 int fusion_checkResponse (char * curlStream, cJSON ** ppRoot);
+int fusion_readConfig();
+long fusion_getRemoteFileSize(char * url);
+int fusion_getSecret ();
+int fusion_setMoscowDateTime();
 #endif
 
 /******************************************************************
@@ -1845,7 +1849,6 @@ void * fusion_threadCreepline(void * param)
 {
 	int alreadySlept;
 	int timeToUsleep;
-	char tmpLine[FUSION_MAX_CREEPLEN*2];
 	int j, i, k;
 
 	char initialCreep[FUSION_MAX_CREEPLEN*2];
@@ -1984,6 +1987,8 @@ void fusion_startup()
 	appControlInfo.mediaInfo.bHttp = 1;
 
 	memset(&FusionObject, 0, sizeof(interfaceFusionObject_t));
+
+	fusion_getSecret();
 
 	int result = media_startPlayback();
 	if (result == 0){
@@ -2172,7 +2177,7 @@ long fusion_getRemoteFileSize(char * url)
 	curl_easy_perform(curl);
 	res = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &remoteFileSize);
 	if (res != 0) {
-		remoteFileSize = 0.0;
+		remoteFileSize = -1;
 	}
 	curl_easy_cleanup(curl);
 
@@ -2185,25 +2190,20 @@ int fusion_getCreepAndLogo ()
 	cJSON * root;
 	char request[FUSION_URL_LEN];
 	unsigned int i;
-	char dateString[256];
-	char utcBuffer [64];
-	memset(utcBuffer, 0, 64);
+	time_t now;
+	struct tm nowDate;
 
 	if (!fusion_checkDirectory("/tmp/fusion")) {
 		system("mkdir /tmp/fusion");
 	}
 
-	fusion_getSecret();
-	if (fusion_getUtc(utcBuffer) == -1){
-		eprintf ("%s(%d): WARNING! fusion_getUtc rets error.\n",   __FILE__, __LINE__);
-		return -1;
-	}
-	else {
-		// eg. 2014-04-03 09:31:26
-		snprintf (dateString, 11, "%s", utcBuffer);
-	}
-
-	sprintf (request, "%s/?s=%s&c=playlist_full&date=%s", FusionObject.server, FusionObject.secret, dateString);
+	time (&now);
+	nowDate = *localtime (&now);
+	nowDate.tm_year += 1900;
+	nowDate.tm_mon += 1;
+	sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", 
+	         FusionObject.server, FusionObject.secret, 
+	         nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday);
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
@@ -2241,6 +2241,10 @@ int fusion_getCreepAndLogo ()
 
 			long logoFileSize = fusion_getRemoteFileSize(FusionObject.logos[i].url);
 
+			if (logoFileSize == -1){	// failed to get remote size
+				FusionObject.logos[i].filepath[0] = '0';
+				continue;
+			}
 			char tmpStr[PATH_MAX];
 			char * ptr, *ptrSlash;
 			sprintf (tmpStr, "%s", FusionObject.logos[i].url);
@@ -2256,13 +2260,24 @@ int fusion_getCreepAndLogo ()
 			}
 			eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
 				i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
-
-			char cmd[128];
-			//sprintf (cmd, "wget \"%s\" -O %s 2>/dev/null", url, logoPath);
-			sprintf (cmd, "rm -f \"%s\"", FusionObject.logos[i].filepath);
-			system(cmd);
-			sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, FusionObject.logos[i].filepath);
-			system(cmd);
+			
+			// get local file size and compare
+			// dont donwload if we have logo on flash
+			long int localFileSize = 0;
+			FILE * f = fopen(FusionObject.logos[i].filepath, "rb");
+			if (f) {
+				fseek(f, 0, SEEK_END);
+				localFileSize = ftell(f);
+				fclose(f);
+			}
+			if (localFileSize != logoFileSize){
+				char cmd[128];
+				//sprintf (cmd, "wget \"%s\" -O %s 2>/dev/null", url, logoPath);
+				sprintf (cmd, "rm -f \"%s\"", FusionObject.logos[i].filepath);
+				system(cmd);
+				sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, FusionObject.logos[i].filepath);
+				system(cmd);
+			}
 		}
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 	}
