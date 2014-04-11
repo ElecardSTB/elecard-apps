@@ -6271,6 +6271,7 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 
 int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
+    interface_clearMenuEntries(interfaceMenu);
     interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
     return 0;
 }
@@ -6481,11 +6482,11 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
 
-    createListMenu(&InterfacePlaylist_t, _T("PLAYLIST_T"), settings_interface, NULL, _M &InterfaceMenu,
+    createListMenu(&InterfacePlaylist_t, _T("PLAYLIST_T"), settings_interface, NULL, _M &OutputMenu,
         interfaceListMenuIconThumbnail, output_enterPlaylistMenu, NULL, NULL);
 
 	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, 0, statusbar_f4_rename};
-	createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfaceMenu,
+    createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylist_t,
 		interfaceListMenuIconThumbnail, enterPlaylistEditorMenu, NULL, NULL);
 
 	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, _M &OutputMenu,
