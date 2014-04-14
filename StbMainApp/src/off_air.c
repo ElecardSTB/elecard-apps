@@ -839,16 +839,16 @@ static int32_t offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
 		case interfaceCommandGreen:
-			if(srvIdx->audio_track != selected) {
+			if(srvIdx->data.audio_track != selected) {
 				if(dvb_getAudioType(service, selected) !=
-					dvb_getAudioType(service, srvIdx->audio_track))
+					dvb_getAudioType(service, srvIdx->data.audio_track))
 				{
 					offair_stopVideo(which, 0);
-					srvIdx->audio_track = selected;
+					srvIdx->data.audio_track = selected;
 					offair_startVideo(which);
 				} else {
 					dvb_changeAudioPid(appControlInfo.dvbInfo.adapter, dvb_getAudioPid(service, selected));
-					srvIdx->audio_track = selected;
+					srvIdx->data.audio_track = selected;
 				}
 
 				dvbChannel_writeOrderConfig();
@@ -871,7 +871,7 @@ static int32_t offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 		}
 	} else {
 		srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
-		selected = srvIdx ? srvIdx->audio_track : 0;
+		selected = srvIdx ? srvIdx->data.audio_track : 0;
 	}
 
 	buf[0] = 0;
@@ -1533,7 +1533,7 @@ static int offair_audioChanged(void* pArg)
 		if(srvIdx == NULL) {
 			return -1;
 		}
-		srvIdx->audio_track = selected;
+		srvIdx->data.audio_track = selected;
 
 		dvbChannel_writeOrderConfig();
 	}
@@ -1560,7 +1560,7 @@ void offair_startVideo(int which)
 	param.adapter = appControlInfo.dvbInfo.adapter;
 	param.media = &service->media;
 	param.param.liveParam.channelIndex = dvb_getServiceIndex(service);
-	param.param.liveParam.audioIndex = srvIdx->audio_track;
+	param.param.liveParam.audioIndex = srvIdx->data.audio_track;
 	param.directory = NULL;
 
 	if(!dvb_hasMedia(service)) {
@@ -1584,7 +1584,7 @@ void offair_startVideo(int which)
 		interface_hideMessageBox();
     }
 
-	int audio_type = dvb_getAudioType(service, srvIdx->audio_track);
+	int audio_type = dvb_getAudioType(service, srvIdx->data.audio_track);
 	int video_type = dvb_getVideoType(service);
 
 #ifdef ENABLE_DVB_DIAG
@@ -1649,7 +1649,7 @@ static void offair_checkParentControl(int which, DvbParam_t *pParam, int audio_t
 	interfaceMenu_t* pMenu = _M &DVBTMenu;
 	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
 
-	if(srvIdx->parent_control == 1) {
+	if(srvIdx->data.parent_control == 1) {
 		const char *mask = "\\d{6}";
 		offair_confDvbStart_t start;
 		start.which = which;
@@ -1720,9 +1720,9 @@ static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, 
 	}
 #ifdef STSDK
 	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
-	if(srvIdx && srvIdx->audio_track) {
-		eprintf("%s: set audio %u\n", __func__, srvIdx->audio_track);
-		gfx_setVideoProviderAudioStream(which, srvIdx->audio_track);
+	if(srvIdx && srvIdx->data.audio_track) {
+		eprintf("%s: set audio %u\n", __func__, srvIdx->data.audio_track);
+		gfx_setVideoProviderAudioStream(which, srvIdx->data.audio_track);
 	}
 #endif
 
@@ -2006,7 +2006,7 @@ static void offair_addDVBChannelsToMenu()
 		char *serviceName;
 		int32_t isRadio = 0;
 
-		if(!srv->visible) {
+		if(!srv->data.visible) {
 			continue;
 		}
 		if(	(service->service_descriptor.service_type == 2) ||
@@ -2205,7 +2205,7 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 		list_for_each(pos, dvbChannel_getSortList()) {
 			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderNone);
 
-			if(!srvIdx2->visible) {
+			if(!srvIdx2->data.visible) {
 				continue;
 			}
 			if(srvIdx2 && srvIdx2->first_event) {

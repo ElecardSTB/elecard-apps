@@ -64,15 +64,21 @@ typedef struct {
 } bouquet_data_t;
 
 typedef struct {
+	uint16_t audio_track;
+	uint16_t visible;
+	uint16_t parent_control;
+	char	 channelsName[MENU_ENTRY_INFO_LENGTH];
+} service_index_data_t;
+
+typedef struct {
 	EIT_common_t	common;
     bouquet_data_t  bouquet_data;
+	service_index_data_t data;
 	EIT_service_t	*service;
-	uint16_t		audio_track;
-	uint16_t		parent_control;
+
 	/* First EPG event which fit to current timeline.
 	Updated on each call to offair_initEPGRecordMenu. */
 	list_element_t	*first_event;
-	uint16_t		visible;
 
 	//lists
 	struct list_head	orderNone;
@@ -83,9 +89,9 @@ typedef struct {
 *********************************/
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
-//int32_t dvbChannel_addCommon(EIT_common_t *common, uint16_t audio_track, uint16_t visible, uint16_t parent_control);
+int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data);
 int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible);
-service_index_t *dvbChannel_findServiceLimit(EIT_common_t *header, uint32_t searchCount);
+service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header);
 int dvbChannel_findNumberService(service_index_t *srv_id);
 
 struct list_head *dvbChannel_getSortList(void);

@@ -11,12 +11,10 @@
 
 typedef struct _playListEditor_t
 {
-    int visible;
     int radio;
     int scrambled;
-    int parent_control;
-    char name[MENU_ENTRY_INFO_LENGTH];
     service_index_t *service_index;
+	service_index_data_t data;
 } playListEditor_t;
 
 static int channelNumber = -1;
@@ -50,11 +48,11 @@ static void load_dvb_channels() {
 
         element = (playListEditor_t *)cur_element->data;
         element->service_index = srvIdx;
-        element->visible = srvIdx->visible;
-	element->parent_control = srvIdx->parent_control;
+		element->data.visible = srvIdx->data.visible;
+		element->data.parent_control = srvIdx->data.parent_control;
         element->radio = srvIdx->service->service_descriptor.service_type == 2;
         element->scrambled = dvb_getScrambled(srvIdx->service);
-        snprintf(element->name, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
+		snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
     }
 }
 
@@ -123,8 +121,8 @@ void playList_saveName(int num, char *prev_name, char *new_name)
         element = (playListEditor_t*)cur_element->data;
         if(element == NULL)
             continue;
-        if (num == i && strncasecmp(element->name, prev_name, strlen(prev_name))){
-            snprintf(element->name, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
+		if (num == i && strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))){
+			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
             return;
         }
         i++;
@@ -146,22 +144,22 @@ void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count)
             continue;
         if (count == i){
 		char desc[20];
-		if(element->visible) {
-			if(element->parent_control) {
-				element->parent_control = false;
-				element->visible = false;
+		if(element->data.visible) {
+			if(element->data.parent_control) {
+				element->data.parent_control = false;
+				element->data.visible = false;
 				snprintf(desc, sizeof(desc), "INVISIBLE");
 			} else {
-				element->parent_control = true;
+				element->data.parent_control = true;
 				snprintf(desc, sizeof(desc), "PARENT");
 			}
 		} else {
-			element->visible = true;
+			element->data.visible = true;
 			snprintf(desc, sizeof(desc), "VISIBLE");
 		}
 		interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
-		interface_changeMenuEntryThumbnail(pMenuEntry, element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-		interface_changeMenuEntrySelectable(pMenuEntry, element->visible);
+		interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+		interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
 		return;
         }
         i++;
@@ -179,9 +177,9 @@ int push_playlist()
     while (service_element != NULL) {
         playListEditor_t *curElement = (playListEditor_t *)service_element->data;
         if (curElement->service_index != NULL) {
-            curElement->service_index->visible = curElement->visible;
-	    curElement->service_index->parent_control = curElement->parent_control;
-            snprintf((char*)curElement->service_index->service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", curElement->name);
+			curElement->service_index->data.visible        = curElement->data.visible;
+			curElement->service_index->data.parent_control = curElement->data.parent_control;
+			snprintf((char*)curElement->service_index->service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
         }
         first = dvbChannel_findNumberService(curElement->service_index);
         if ( i > first)
@@ -243,7 +241,7 @@ int check_playlist()
 	while (service_element != NULL) {
 		playListEditor_t *curElement = (playListEditor_t *)service_element->data;
 		if (curElement->service_index != NULL) {
-			if((!curElement->parent_control) && (curElement->service_index->parent_control)) {
+			if((!curElement->data.parent_control) && (curElement->service_index->data.parent_control)) {
 				const char *mask = "\\d{6}";
 				interface_getText((interfaceMenu_t*)&InterfacePlaylistEditor, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, NULL);
 				return true;
@@ -448,16 +446,17 @@ void createPlaylist(interfaceMenu_t  *interfaceMenu)
         if(element == NULL)
             continue;
 
-        snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->name);
-        interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->data.channelsName);
+		interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->data.visible ?
+								   (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
 
         interfaceMenuEntry_t *entry;
         entry = menu_getLastEntry(channelMenu);
         if(entry) {
 	    char desc[20];
-	    snprintf(desc, sizeof(desc), "%s", element->parent_control ? "PARENT" : (element->visible ? "VISIBLE" : "INVISIBLE"));
+		snprintf(desc, sizeof(desc), "%s", element->data.parent_control ? "PARENT" : (element->data.visible ? "VISIBLE" : "INVISIBLE"));
 	    interface_setMenuEntryLabel(entry, desc);
-	    interface_changeMenuEntrySelectable(entry, element->visible);
+		interface_changeMenuEntrySelectable(entry, element->data.visible);
         }
 
         if(appControlInfo.dvbInfo.channel == i) {

@@ -167,17 +167,15 @@ void get_bouquets_list(char *bouquet_file)
 
 int bouquets_compare(list_element_t **services)
 {
-    uint32_t old_count;
-    list_element_t	*service_element;
-    old_count = dvbChannel_getCount();
+	list_element_t	*service_element;
 
-    if (old_count != (uint32_t)dvb_getCountOfServices())
+	if (dvbChannel_getCount() != (uint32_t)dvb_getCountOfServices())
         return false;
 
     for(service_element = *services; service_element != NULL; service_element = service_element->next) {
         EIT_service_t *curService = (EIT_service_t *)service_element->data;
-        if (dvbChannel_findServiceLimit(&curService->common, old_count) == NULL)
-            return false;
+		if (dvbChannel_findServiceCommon(&curService->common) == NULL)
+			return false;
     }
     return true;
 }
