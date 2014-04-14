@@ -1473,8 +1473,9 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		case interfaceCommand0:
 			if (interfaceChannelControl.length)
 				return 1;
-			if (appControlInfo.dvbInfo.previousChannel) {
-				offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+			if (appControlInfo.offairInfo.previousChannel &&
+				appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel()) {
+				offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
 			}
 			return 0;
 #ifdef ENABLE_PVR
@@ -1610,8 +1611,8 @@ static int offair_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 	char pass[32];
 	offair_confDvbStart_t *start = (offair_confDvbStart_t *)pArg;
 	if(value == NULL) {
-		if (appControlInfo.dvbInfo.previousChannel && appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel) {
-			offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+		if ((appControlInfo.offairInfo.previousChannel) && (appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel())) {
+			offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
 		}
 		return 0;
 	}
@@ -1639,8 +1640,8 @@ static int offair_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 		interface_showMenu(0, 1);
 	}
 	else {
-		if (appControlInfo.dvbInfo.previousChannel && appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel) {
-			offair_channelChange(interfaceInfo.currentMenu, SET_NUMBER(appControlInfo.dvbInfo.previousChannel));
+		if ((appControlInfo.offairInfo.previousChannel) && (appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel())) {
+			offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
 		}
 	}
 
@@ -1894,6 +1895,24 @@ int offair_startPvrVideo( int which )
 }
 #endif // ENABLE_PVR
 
+int  offair_setPreviousChannel(int previousChannel)
+{
+	if (appControlInfo.offairInfo.previousChannel != previousChannel && previousChannel) {
+		appControlInfo.offairInfo.previousChannel  = previousChannel;
+		return saveAppSettings();
+	}
+	return 0;
+}
+
+int offair_getCurrentChannel(void)
+{
+#ifdef ENABLE_ANALOGTV
+	if (appControlInfo.tvInfo.active)
+		return dvbChannel_getCount() + appControlInfo.tvInfo.id;
+#endif
+	return appControlInfo.dvbInfo.channel;
+}
+
 int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 {
 	int channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
@@ -1935,8 +1954,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		offair_stopVideo(screenMain, 0);
 	}
 
-	if (appControlInfo.dvbInfo.previousChannel != appControlInfo.dvbInfo.channel)
- 			appControlInfo.dvbInfo.previousChannel = appControlInfo.dvbInfo.channel;
+	appControlInfo.offairInfo.previousChannel = offair_getCurrentChannel();
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
 	appControlInfo.mediaInfo.bHttp = 0;
@@ -2055,7 +2073,7 @@ int offair_setChannel(int channel, void* pArg)
 	if(channel <= 0) {
 		return 1;
 	}
-	channel--;
+// 	channel--;
 
 	if((channel < dvbChannel_getCount()) && (dvbChannel_getService(channel) != NULL)) {
 		printf("%s: offair_channelChange...\n", __FUNCTION__);
@@ -3374,7 +3392,7 @@ void offair_clearServiceList(int permanent)
 #endif
 	offair_stopVideo(screenMain, 1);
 	appControlInfo.dvbInfo.channel = 0;
-	appControlInfo.dvbInfo.previousChannel = 0;
+	appControlInfo.offairInfo.previousChannel = 0;
 	dvb_clearServiceList(permanent);
 #if (defined ENABLE_PVR) && (defined STBPNX)
 	pvr_purgeDVBRecords();

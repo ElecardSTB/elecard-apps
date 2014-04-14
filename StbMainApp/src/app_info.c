@@ -1013,6 +1013,7 @@ void appInfo_init(void)
 	appControlInfo.offairInfo.sorting             = serviceSortNone;
 	appControlInfo.offairInfo.serviceList[0]      = 0;
 	appControlInfo.offairInfo.tunerDebug          = 0;
+	appControlInfo.offairInfo.previousChannel     = 0;
 #endif
 #ifdef ENABLE_PVR
 	appControlInfo.pvrInfo.directory[0]           = 0;

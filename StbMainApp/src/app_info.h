@@ -246,7 +246,6 @@ typedef struct {
 	int32_t				active;
 	uint32_t			adapter;
 	int32_t				channel;
-	int32_t				previousChannel;
 	int32_t				scrambled;
 	int32_t				showInfo;
 	int32_t				scanPSI;
@@ -523,6 +522,10 @@ typedef struct __stb810_offairInfo
 	int                  tunerDebug;
 	char                 profileLocation[128]; /**< Profile location file name */
 	int                  wizardFinished;
+	int                  previousChannel; // previously watched channel
+	                                      // 0 means not defined
+	                                      // < offair_channelCount DVB channel
+	                                      // >=offair_channelCount ANalog channel
 #ifdef ENABLE_DVB_DIAG
 	int                  diagnosticsMode;
 #endif

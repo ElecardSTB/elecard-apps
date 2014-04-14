@@ -300,4 +300,8 @@ int  offair_startPvrVideo(int which);
 
 void offair_activateChannelMenu(void);
 
+int  offair_getCurrentChannel(void);
+
+int  offair_setPreviousChannel(int previousChannel);
+
 #endif /* __OFF_AIR_H      Do not add any thing below this line */

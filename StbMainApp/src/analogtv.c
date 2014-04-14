@@ -136,6 +136,8 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 	mysem_get(analogtv_semaphore);
 	analogtv_channelCount = 0;
 	mysem_release(analogtv_semaphore);
+	appControlInfo.offairInfo.previousChannel = 0;
+	saveAppSettings();
 
 	remove(ANALOGTV_CONFIG_JSON);
 	if (permanent > 0) remove(appControlInfo.tvInfo.channelConfigFile);
@@ -730,6 +732,15 @@ int32_t analogtv_setNextAudioMode()
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	switch(cmd->command) {
+		case interfaceCommand0:
+			if (interfaceChannelControl.length)
+				return 1;
+			if (appControlInfo.offairInfo.previousChannel &&
+				appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel())
+			{
+				offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
+			}
+			return 0;
 		case interfaceCommandGreen:
 			if(services_edit_able) {
 				analogtv_fillFullServList();
@@ -773,6 +784,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 
 	dprintf("%s: in %d\n", __FUNCTION__, id);
 
+	int previousChannel = offair_getCurrentChannel();
 	if(appControlInfo.tvInfo.active != 0) {
 		//interface_playControlSelect(interfacePlayControlStop);
 		// force showState to NOT be triggered
@@ -810,6 +822,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 
 	if(appControlInfo.tvInfo.active != 0) {
 		interface_showMenu(0, 1);
+		offair_setPreviousChannel(previousChannel);
 	}
 
 	//interface_menuActionShowMenu(pMenu, (void*)&DVBTMenu);

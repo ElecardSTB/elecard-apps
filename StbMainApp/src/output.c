@@ -6185,7 +6185,7 @@ static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 	}
 	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
 	if(pass_file == NULL) {
-		unsigned char cmd[256];
+// 		unsigned char cmd[256];
 		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
 		if(pass_file == NULL) {
 			return 0;
