@@ -106,8 +106,8 @@ analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
 static uint32_t		analogtv_channelCount = 0;
 
 static interfaceListMenu_t AnalogTVChannelMenu;
-static short_chinfo full_service_list[MAX_SERVICE_COUNT];
-static full_chinfo found_service_list[MAX_SERVICE_COUNT];
+static short_chinfo *full_service_list = NULL;//[MAX_SERVICE_COUNT];
+static full_chinfo *found_service_list = NULL;//[MAX_SERVICE_COUNT];
 static uint32_t found_service_count = 0;
 static uint32_t full_service_count = 0;
 char channel_names_file_full[256];
@@ -343,7 +343,7 @@ int32_t analogtv_updateName(uint32_t chanIndex, char* str)
 int32_t analogtv_updateFoundServiceFile(void)
 {
 	FILE *file = fopen(channel_names_file_full, "w");
-	if(file) {
+	if((file) && (found_service_list)) {
 		uint32_t i;
 		for(i = 0; i < found_service_count; i++) {
 			fprintf(file ,"%d %d %s\n", found_service_list[i].freq/1000000, found_service_list[i].id, found_service_list[i].name);
@@ -357,6 +357,11 @@ static int32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 {
 	uint32_t i;
 	uint8_t in_list = 0;
+	
+	if(full_service_list == NULL) {
+		dprintf("%s(): Incorrect data in channel list\n", __func__);
+		return -1;
+	}
 
 	//rename service and update menu list
 	analogtv_updateName(appControlInfo.tvInfo.id, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name);
@@ -379,12 +384,21 @@ static int32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)
 		strncpy(found_service_list[i].name, full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name, sizeof(found_service_list[i].name));
 	}
 	else {		//if this channel not exist in list, then add it to list
-		found_service_list[found_service_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
-		strncpy(	found_service_list[found_service_count].name, 
+		full_chinfo found_service_list_temp[MAX_SERVICE_COUNT];
+		if(found_service_list != NULL) {
+			memcpy(found_service_list_temp, found_service_list, found_service_count*sizeof(full_chinfo));
+			free(found_service_list);
+		}
+
+		found_service_list_temp[found_service_count].id = full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].id;
+		strncpy(	found_service_list_temp[found_service_count].name, 
 			full_service_list[AnalogTVChannelMenu.baseMenu.selectedItem].name,
-			sizeof(found_service_list[found_service_count].name));
-		found_service_list[found_service_count].freq = analogtv_channelParam[appControlInfo.tvInfo.id].frequency;
+			sizeof(found_service_list_temp[found_service_count].name));
+		found_service_list_temp[found_service_count].freq = analogtv_channelParam[appControlInfo.tvInfo.id].frequency;
 		found_service_count++;
+
+		found_service_list = malloc(found_service_count*sizeof(full_chinfo));
+		memcpy(found_service_list, found_service_list_temp, found_service_count*sizeof(full_chinfo));
 	}
 
 	//save renaming channel list to file
@@ -398,18 +412,26 @@ static int32_t analogtv_fillFullServList()
 	FILE *file;
 	char chname[50];
 	uint32_t chid;
+	
+	if(full_service_list != NULL) {
+		free(full_service_list);
+	}
 
 	//read full channel list from file
 	file = fopen(TV_STATION_FULL_LIST, "r");
 	full_service_count = 0;
+	short_chinfo full_service_list_temp[MAX_SERVICE_COUNT];
+
 	if (file!=NULL) {
 		while(!feof(file)) {
-		      if(fscanf(file, "%d;", &chid) == 0) {
+		      if(fscanf(file, "%d ", &chid) > 0) {
 			      fgets(chname, sizeof(chname), file);
-			      chname[strlen(chname)-2] = '\0';
+			      if(chname[strlen(chname)-1] == '\n') {
+				      chname[strlen(chname)-2] = '\0';
+			      }
 
-			      strncpy(full_service_list[full_service_count].name, chname, sizeof(full_service_list[full_service_count].name));
-			      full_service_list[full_service_count].id = chid;
+			      strncpy(full_service_list_temp[full_service_count].name, chname, sizeof(full_service_list_temp[full_service_count].name));
+			      full_service_list_temp[full_service_count].id = chid;
 
 			      full_service_count++;
 			      if (full_service_count > MAX_SERVICE_COUNT) {
@@ -419,6 +441,8 @@ static int32_t analogtv_fillFullServList()
 		      }
 		}
 		fclose(file);
+		full_service_list = malloc(full_service_count*sizeof(short_chinfo));
+		memcpy(full_service_list, full_service_list_temp, full_service_count*sizeof(short_chinfo));
 	}
 
 	return 0;
@@ -430,12 +454,21 @@ int32_t analogtv_fillFoundServList()
 	//read already renaming channels from file
 	file = fopen(channel_names_file_full, "r");
 	found_service_count = 0;
+	full_chinfo found_service_list_temp[MAX_SERVICE_COUNT];
+
+	if(found_service_list != NULL) {
+		free(found_service_list);
+	}
+
 	if (file!=NULL) {
 		while(!feof(file)) {
-		      if(fscanf(file, "%d %d ", &found_service_list[found_service_count].freq, &found_service_list[found_service_count].id) == 0) {
-			      found_service_list[found_service_count].freq *= 1000000;
-			      fgets(found_service_list[found_service_count].name, sizeof(found_service_list[found_service_count].name), file);
-			      found_service_list[found_service_count].name[strlen(found_service_list[found_service_count].name)-1] = '\0';
+		      if(fscanf(file, "%d %d ", &found_service_list_temp[found_service_count].freq, &found_service_list_temp[found_service_count].id) > 0) {
+			      found_service_list_temp[found_service_count].freq *= 1000000;
+			      fgets(found_service_list_temp[found_service_count].name, sizeof(found_service_list_temp[found_service_count].name), file);
+			      if(found_service_list_temp[found_service_count].name[strlen(found_service_list_temp[found_service_count].name)-1] == '\n') {
+				      found_service_list_temp[found_service_count].name[strlen(found_service_list_temp[found_service_count].name)-1] = '\0';
+			      }
+
 			      found_service_count++;
 			      if (found_service_count > MAX_SERVICE_COUNT) {
 				      found_service_count = MAX_SERVICE_COUNT;
@@ -444,6 +477,8 @@ int32_t analogtv_fillFoundServList()
 		      }
 		}
 		fclose(file);
+		found_service_list = malloc(found_service_count*sizeof(full_chinfo));
+		memcpy(found_service_list, found_service_list_temp, found_service_count*sizeof(full_chinfo));
 	}
 
 	return 0;
@@ -479,6 +514,11 @@ static int32_t analogtv_confInit()
 
 static int32_t analogtv_checkServiceNames()
 {
+	if(found_service_list == NULL) {
+		dprintf("%s(): Incorrect data in founded channel list\n", __func__);
+		return -1;
+	}
+
 	for(uint32_t i = 0; i < analogtv_channelCount; i++) {
 		for(uint32_t j = 0; j < found_service_count; j++) {
 			if(found_service_list[j].freq == analogtv_channelParam[i].frequency) {
@@ -520,10 +560,15 @@ static int32_t analogtv_findServicesInList(interfaceMenu_t *pMenu, char* pStr, v
 			new_service_count++;
 		}
 	}
+
 	full_service_count = new_service_count;
-	for(i = 0; i < full_service_count; i++) {
-		full_service_list[i] = new_service_list[i];
+
+	if(full_service_list != NULL) {
+		free(full_service_list);
 	}
+
+	full_service_list = malloc(full_service_count*sizeof(short_chinfo));
+	memcpy(full_service_list, new_service_list, full_service_count*sizeof(short_chinfo));
 
 	analogtv_fillServiceNamesMenu(full_service_list, full_service_count);
 
