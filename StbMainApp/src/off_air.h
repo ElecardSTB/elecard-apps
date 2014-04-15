@@ -59,7 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /* EPG Record menu layout */
 
-#define ERM_CHANNEL_NAME_LENGTH (100)
+#define ERM_CHANNEL_NAME_LENGTH (150)
 /* Current channel is always visible and not counted */
 #define ERM_VISIBLE_CHANNELS (5)
 #define ERM_DISPLAYING_HOURS (3)
@@ -280,6 +280,8 @@ void offair_displayPlayControl(void);
 int  offair_getLocalEventTime(EIT_event_t *event, struct tm *local_tm, time_t *local_time_t);
 
 time_t offair_getEventDuration(EIT_event_t *event);
+
+int offair_getEventTimes(EIT_event_t *event, time_t *p_start, time_t *p_end);
 
 /** Find schedule event which runs at specified time.
  *  @param[in]  schedule     EPG schedule with list of EIT_event_t elements

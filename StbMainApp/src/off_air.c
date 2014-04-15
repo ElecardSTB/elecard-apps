@@ -2165,7 +2165,7 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 		return 0;
 	}
 
-	pEpg->currentService = GET_NUMBER(pArg);
+	pEpg->currentService = offair_getCurrentChannel();//GET_NUMBER(pArg);
 	pEpg->serviceOffset = 0;
 
 	if(!dvbChannel_hasSchedule(pEpg->serviceOffset)) {
@@ -2576,15 +2576,22 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	default:
 		if(pEpg->highlightedEvent != NULL)
 		{
-			str = buf;
 			event = (EIT_event_t*)pEpg->highlightedEvent->data;
+			str = buf;
+
+			// channel name
+			snprintf(buf, MENU_ENTRY_INFO_LENGTH, "%s", dvb_getServiceName(dvbChannel_getService(pEpg->highlightedService)));
+			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rect, NULL) );
+			gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0); 
+			y += rect.h;
 
 			if(offair_getLocalEventTime(event, &event_tm, &event_tt) == 0)
 			{
 				strftime( buf, 25, _T("DATESTAMP"), &event_tm);
 				DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rect, NULL) );
 				gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
-				x += ERM_CHANNEL_NAME_LENGTH + interfaceInfo.paddingSize;
+// 				x += ERM_CHANNEL_NAME_LENGTH + interfaceInfo.paddingSize;
+				x += rect.w + 3*interfaceInfo.paddingSize;
 				strftime( buf, 10, "%H:%M:%S", &event_tm);
 				DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rect, NULL) );
 				gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
@@ -2623,22 +2630,33 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	}
 }
 
+static EIT_event_t * epgMenu_highlightCurrentEvent(interfaceEpgMenu_t *pEpg)
+{
+	time_t eventStart = 0, eventEnd = 0;
+	time_t maxEndTime = pEpg->curOffset + 3600 * pEpg->displayingHours;
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
+
+	for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
+		pEpg->highlightedEvent;
+		pEpg->highlightedEvent =  pEpg->highlightedEvent->next ) {
+		offair_getEventTimes(pEpg->highlightedEvent->data, &eventStart, &eventEnd);
+		if(eventEnd > pEpg->curOffset && eventStart < maxEndTime )
+			break;
+	}
+	return pEpg->highlightedEvent ? pEpg->highlightedEvent->data : NULL;
+}
+
 static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd)
 {
 	interfaceEpgMenu_t *pEpg = (interfaceEpgMenu_t *)pMenu;
 	interfaceMenu_t *pParent;
-	list_element_t *event_element;
-	EIT_event_t *event;
 	int i, service_index, service_count;
-	time_t eventOffset = 0, eventEnd = 0, end_tt;
-	struct tm t;
+	time_t eventStart = 0;
 	service_index_t *srvIdx;
 
-	switch(cmd->command)
-	{
+	switch(cmd->command) {
 	case interfaceCommandUp:
-		switch( pMenu->selectedItem )
-		{
+		switch( pMenu->selectedItem ) {
 		case MENU_ITEM_BACK:
 		case MENU_ITEM_MAIN:
 			pMenu->selectedItem = MENU_ITEM_EVENT;
@@ -2650,35 +2668,13 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 					break;
 				}
 			}
-			if(service_index != pEpg->highlightedService || pEpg->highlightedEvent == NULL ) {
-				pEpg->highlightedService = service_index;
-				end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
+			if (pEpg->highlightedService != service_index) {
+				pEpg->highlightedService =  service_index;
 
-				srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
-				for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
-					pEpg->highlightedEvent && pEpg->highlightedEvent->next;
-					pEpg->highlightedEvent = pEpg->highlightedEvent->next )
-				{
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&eventOffset);
-					eventEnd = eventOffset + offair_getEventDuration(event);
-					if(eventEnd > pEpg->curOffset && eventOffset < end_tt ) {
-						break;
-					}
-				}
-				if(eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL) {
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&eventOffset);
-					eventEnd = eventOffset + offair_getEventDuration(event);
-				}
-				if(eventEnd <= pEpg->curOffset || eventOffset >= end_tt) {
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&pEpg->curOffset);
-					pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
-						3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
-				}
+				epgMenu_highlightCurrentEvent(pEpg);
+
 				// counting displaying services
-				if(pEpg->highlightedService != pEpg->currentService) {
+				if (pEpg->highlightedService != pEpg->currentService) {
 					service_count = 0;
 					for(i = pEpg->highlightedService; i >= 0; i--) {
 						srvIdx = dvbChannel_getServiceIndex(i);
@@ -2691,14 +2687,8 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 						}
 					}
 				}
-			} else {
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&eventOffset);
-				eventEnd = eventOffset + offair_getEventDuration(event);
-				if(eventEnd <= pEpg->curOffset || eventOffset > pEpg->curOffset + 3600 * pEpg->displayingHours) {
-					pEpg->curOffset = (pEpg->minOffset < eventOffset) ?
-						3600 * (eventOffset / 3600) : pEpg->minOffset;
-				}
+			} else if (!pEpg->highlightedEvent) {
+				epgMenu_highlightCurrentEvent(pEpg);
 			}
 			break;
 		case MENU_ITEM_TIMELINE:
@@ -2720,78 +2710,29 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 					pEpg->highlightedService = pEpg->currentService;
 				} else {
 					pEpg->highlightedService = service_index;
-					if(pEpg->highlightedService <  pEpg->serviceOffset) {
+					if (pEpg->highlightedService < pEpg->serviceOffset) {
 						pEpg->serviceOffset = pEpg->highlightedService;
 					}
 				}
-				end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-				srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
-				for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
-					pEpg->highlightedEvent && pEpg->highlightedEvent->next;
-					pEpg->highlightedEvent = pEpg->highlightedEvent->next )
-				{
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&eventOffset);
-					eventEnd = eventOffset + offair_getEventDuration(event);
-					if( eventEnd > pEpg->curOffset && eventOffset < end_tt )
-					{
-						break;
-					}
-				}
-				if( eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL )
-				{
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&eventOffset);
-					eventEnd = eventOffset + offair_getEventDuration(event);
-				}
-				if( eventEnd <= pEpg->curOffset || eventOffset >= end_tt )
-				{
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&pEpg->curOffset);
-					pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
-						3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
-				}
+				epgMenu_highlightCurrentEvent(pEpg);
 			}
 		}
 		break;
 	case interfaceCommandDown:
-		switch( pMenu->selectedItem )
-		{
+		switch( pMenu->selectedItem ) {
 		case MENU_ITEM_BACK:
 		case MENU_ITEM_MAIN:
 			pMenu->selectedItem = MENU_ITEM_TIMELINE;
 			break;
 		case MENU_ITEM_TIMELINE:
 			pMenu->selectedItem = MENU_ITEM_EVENT;
-			if(pEpg->currentService != pEpg->highlightedService || pEpg->highlightedEvent == NULL) {
-				pEpg->highlightedService = pEpg->currentService;
-				end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-				srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
-				for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
-					pEpg->highlightedEvent && pEpg->highlightedEvent->next;
-					pEpg->highlightedEvent = pEpg->highlightedEvent->next )
-				{
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&eventOffset);
-					eventEnd = eventOffset + offair_getEventDuration(event);
-					if( eventEnd > pEpg->curOffset && eventOffset < end_tt )
-					{
-						break;
-					}
-				}
-				if(eventEnd <= pEpg->curOffset) {
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&eventOffset);
-					eventEnd = eventOffset + offair_getEventDuration(event);
-				}
-				if(eventEnd <= pEpg->curOffset || eventOffset >= end_tt) {
-					event = (EIT_event_t*)pEpg->highlightedEvent->data;
-					offair_getLocalEventTime(event,&t,&pEpg->curOffset);
-					pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
-						3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
-				}
+			if (pEpg->highlightedService != pEpg->currentService) {
+				pEpg->highlightedService =  pEpg->currentService;
+
+				epgMenu_highlightCurrentEvent(pEpg);
+
 				// counting displaying services
-				if(pEpg->highlightedService != pEpg->currentService) {
+				if (pEpg->highlightedService != pEpg->currentService) {
 					service_count = 1; // highlighted
 					for(i = pEpg->highlightedService - 1; i >= 0; i-- ) {
 						srvIdx = dvbChannel_getServiceIndex(i);
@@ -2804,21 +2745,14 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 						}
 					}
 				}
-			} else {
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&eventOffset);
-				eventEnd = eventOffset + offair_getEventDuration(event);
-				if(eventEnd <= pEpg->curOffset || eventOffset > pEpg->curOffset + 3600 * pEpg->displayingHours) {
-					pEpg->curOffset = (pEpg->minOffset < eventOffset) ?
-						3600 * (eventOffset / 3600) : pEpg->minOffset;
-				}
+			} else if (!pEpg->highlightedEvent) {
+				epgMenu_highlightCurrentEvent(pEpg);
 			}
 			break;
 		default: // MENU_ITEM_EVENT
 			service_index = -1;
 			for( i = pEpg->highlightedService == pEpg->currentService ? 0 : pEpg->highlightedService+1;
-				i < dvbChannel_getCount(); i++ )
-			{
+				i < dvbChannel_getCount(); i++ ) {
 				srvIdx = dvbChannel_getServiceIndex(i);
 				if(i != pEpg->currentService && srvIdx && srvIdx->first_event) {
 					service_index = i;
@@ -2830,31 +2764,8 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 				break;
 			}
 			pEpg->highlightedService = service_index;
-			end_tt = pEpg->curOffset + 3600 * pEpg->displayingHours;
-			srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
-			for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
-				pEpg->highlightedEvent && pEpg->highlightedEvent->next;
-				pEpg->highlightedEvent = pEpg->highlightedEvent->next )
-			{
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&eventOffset);
-				eventEnd = eventOffset + offair_getEventDuration(event);
-				if(eventEnd > pEpg->curOffset && eventOffset < end_tt) {
-					break;
-				}
-			}
-			if(eventEnd <= pEpg->curOffset && pEpg->highlightedEvent->next == NULL) {
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&eventOffset);
-				eventEnd = eventOffset + offair_getEventDuration(event);
-			}
-			if(eventEnd <= pEpg->curOffset || eventOffset >= end_tt) {
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&pEpg->curOffset);
-				pEpg->curOffset = (pEpg->minOffset < pEpg->curOffset) ?
-					3600 * (pEpg->curOffset / 3600) : pEpg->minOffset;
-			}
-			if(service_index < pEpg->serviceOffset) {
+			epgMenu_highlightCurrentEvent(pEpg);
+			if (pEpg->serviceOffset > service_index) {
 				pEpg->serviceOffset = service_index;
 			} else {
 				service_count = 1;
@@ -2879,31 +2790,63 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			pMenu->selectedItem = 1-(pMenu->selectedItem+2)-2;
 			break;
 		case MENU_ITEM_TIMELINE:
-			if(pEpg->curOffset > pEpg->minOffset)
-			{
+			if (pEpg->curOffset > pEpg->minOffset)
 				pEpg->curOffset -= 3600;
-			}
 			break;
 		default: // MENU_ITEM_EVENT
 			srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
 			if( pEpg->highlightedService < 0 ||
-				pEpg->highlightedService >= dvbChannel_getCount() ||
-				!srvIdx || !srvIdx->first_event ||
-				pEpg->highlightedEvent == srvIdx->first_event)
-			{
-				break;
+				pEpg->highlightedService >= dvbChannel_getCount() || !srvIdx) {
+				return 0;
 			}
-			for(event_element = srvIdx->first_event;
-				event_element->next != NULL && event_element->next != pEpg->highlightedEvent;
-				event_element = event_element->next);
-			if(event_element->next == pEpg->highlightedEvent) {
-				pEpg->highlightedEvent = event_element;
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&eventOffset);
-				if(eventOffset < pEpg->curOffset) {
-					pEpg->curOffset = (pEpg->minOffset < eventOffset) ?
-						3600 * (eventOffset / 3600) : pEpg->minOffset;
+			if (pEpg->highlightedEvent) {
+				time_t eventEnd = 0;
+				EIT_event_t *event = (EIT_event_t*)pEpg->highlightedEvent->data;
+				offair_getEventTimes(event, &eventStart, &eventEnd);
+				if (eventStart <= pEpg->curOffset) {
+					if (pEpg->curOffset <= pEpg->minOffset) {
+						return 0;
+					}
+					pEpg->curOffset -= 3600;
+					break;
 				}
+
+				list_element_t * prev = srvIdx->first_event;
+				while (prev && prev->next != pEpg->highlightedEvent) {
+					prev = prev->next;
+				}
+				if (!prev) {
+					eprintf("%s:(%s:%s) unable to find previous programme!\n", __FUNCTION__,
+							dvb_getServiceName(srvIdx->service), event->description.event_name);
+					pEpg->highlightedEvent = NULL;
+				} else {
+					pEpg->highlightedEvent = prev;
+					offair_getEventTimes(prev->data, &eventStart, &eventEnd);
+					if (eventEnd <= pEpg->curOffset) {
+						pEpg->highlightedEvent = NULL;
+					}
+				}
+			}
+			// If there was no highlighted event, move timeline one step back and find rightmost event
+			if (!pEpg->highlightedEvent) {
+				if (pEpg->curOffset <= pEpg->minOffset) {
+					return 0;
+				}
+				pEpg->curOffset -= 3600;
+
+				epgMenu_highlightCurrentEvent(pEpg);
+				if (!pEpg->highlightedEvent) {
+					break;
+				}
+				time_t maxStartTime = pEpg->curOffset + 3600*ERM_DISPLAYING_HOURS;
+				for (list_element_t *next = pEpg->highlightedEvent->next; next; next = next->next) {
+					offair_getLocalEventTime(next->data, NULL, &eventStart);
+					if (eventStart >= maxStartTime) {
+						break;
+					}
+					pEpg->highlightedEvent = next;
+				}
+				break;
 			}
 		}
 		break;
@@ -2915,23 +2858,44 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			pMenu->selectedItem = 1-(pMenu->selectedItem+2)-2;
 			break;
 		case MENU_ITEM_TIMELINE:
-			if(pEpg->curOffset < pEpg->maxOffset)
-			{
+			if (pEpg->curOffset < pEpg->maxOffset)
 				pEpg->curOffset += 3600;
-			}
 			break;
 		default: // MENU_ITEM_EVENT
-			if( pEpg->highlightedEvent == NULL || pEpg->highlightedEvent->next == NULL)
-			{
+			if (pEpg->highlightedEvent == NULL) {
+				if (pEpg->curOffset >= pEpg->maxOffset) {
+					break;
+				}
+				pEpg->curOffset += 3600;
+				epgMenu_highlightCurrentEvent(pEpg);
+				break;
+			}
+
+			time_t maxStartTime = pEpg->curOffset + 3600*ERM_DISPLAYING_HOURS;
+			time_t eventEnd = 0;
+			offair_getEventTimes(pEpg->highlightedEvent->data, &eventStart, &eventEnd);
+			if (eventEnd >= maxStartTime) {
+				pEpg->curOffset += 3600;
+				if (pEpg->maxOffset < pEpg->curOffset) {
+					pEpg->maxOffset = pEpg->curOffset;
+				}
+				if (eventEnd <= pEpg->curOffset) {
+					epgMenu_highlightCurrentEvent(pEpg);
+				}
+				break;
+			}
+			if (pEpg->highlightedEvent->next == NULL) {
 				return 0;
 			}
+
 			pEpg->highlightedEvent = pEpg->highlightedEvent->next;
-			event = (EIT_event_t*)pEpg->highlightedEvent->data;
-			offair_getLocalEventTime(event,&t,&eventOffset);
-			eventOffset = 3600 * (eventOffset / 3600);
-			if( eventOffset >= (pEpg->curOffset + pEpg->displayingHours*3600))
-			{
-				pEpg->curOffset = eventOffset;
+			offair_getLocalEventTime(pEpg->highlightedEvent->data, NULL, &eventStart);
+			if (eventStart >= maxStartTime) {
+				pEpg->curOffset += 3600;
+				if (pEpg->maxOffset < pEpg->curOffset) {
+					pEpg->maxOffset = pEpg->curOffset;
+				}
+				epgMenu_highlightCurrentEvent(pEpg);
 			}
 		}
 		break;
@@ -5137,6 +5101,14 @@ time_t offair_getEventDuration(EIT_event_t *event)
 		return 0;
 
 	return decode_bcd_time(event->duration);
+}
+
+int offair_getEventTimes(EIT_event_t *event, time_t *p_start, time_t *p_end)
+{
+	if (offair_getLocalEventTime(event, NULL, p_start))
+		return -1;
+	*p_end = *p_start + offair_getEventDuration(event);
+	return 0;
 }
 
 int offair_findCurrentEvent(list_element_t *schedule, time_t now,
