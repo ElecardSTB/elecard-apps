@@ -931,6 +931,11 @@ typedef struct
 
 #define FUSION_SECRET                "secretKey81"
 
+#define FUSION_FAIL       (-1)
+#define FUSION_OK         (0)
+#define FUSION_SAME_CREEP (1)
+#define FUSION_NEW_CREEP  (2)
+
 typedef enum {
 	FUSION_TOP_LEFT = 0,
 	FUSION_TOP_RIGHT,
@@ -960,6 +965,10 @@ typedef struct _interfaceFusionObject_t {
 
 	pthread_t threadCreepHandle;
 	int checktime;
+
+	unsigned long long creepStartTime;
+	int creepWidth;
+	int creepShown;
 
 } interfaceFusionObject_t;
 #endif

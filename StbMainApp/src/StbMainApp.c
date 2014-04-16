@@ -160,6 +160,7 @@ int fusion_readConfig();
 long fusion_getRemoteFileSize(char * url);
 int fusion_getSecret ();
 int fusion_setMoscowDateTime();
+int fusion_getUtc (char * utcBuffer);
 #endif
 
 /******************************************************************
@@ -1847,79 +1848,32 @@ void fusion_wait (unsigned int timeout_ms)
 
 void * fusion_threadCreepline(void * param)
 {
-	int alreadySlept;
-	int timeToUsleep;
-	int j, i, k;
-
-	char initialCreep[FUSION_MAX_CREEPLEN*2];
-	char spaces[FUSION_SPACES];
-	int indeces[FUSION_MAX_CREEPLEN + FUSION_SPACES];
+	int result;
+	struct timeval tv;
 
 	fusion_readConfig();
 
-	indeces[0] = 0;
-	for (k=1; k<FUSION_SPACES; k++){
-		indeces[k] = indeces[k-1] + 1;
-	}
-	memset(spaces, ' ', FUSION_SPACES);
-
 	while (1){
-		if (fusion_getCreepAndLogo() != 0){
-			fusion_wait(1000*300);
+		result = fusion_getCreepAndLogo();
+		if (result == FUSION_FAIL){
+			fusion_wait(FusionObject.checktime * 1000);
 			continue;
 		}
-		interface_displayMenu(1);	// TODO : check if causes hanging
-
-		for (k=0; k<FUSION_MAX_CREEPLEN; k++){
-			if (FusionObject.creepline[k] == '\n' || FusionObject.creepline[k] == '\r') {
-				FusionObject.creepline[k] = ' ';
-			}
-			if (k && FusionObject.creepline[k] < 128) indeces[k+FUSION_SPACES] = indeces[k+FUSION_SPACES-1] + 1;
-			else indeces[k+FUSION_SPACES] = indeces[k+FUSION_SPACES-1] + 2;
+		else if (result == FUSION_NEW_CREEP){
+			gettimeofday(&tv, NULL);
+			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+			eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
 		}
-
-		j = 0;
-		alreadySlept = 0;
-		while (j < FusionObject.repeats){
-			i = 0;
-
-			sprintf (initialCreep, "%s%s", spaces, FusionObject.creepline);
-			while (i < (strlen(FusionObject.creepline) + FUSION_SPACES))
-			{
-				char * ptr = (char*)(initialCreep + indeces[i]);
-				pthread_mutex_lock(&FusionObject.mutexCreep);
-				if (ptr[0] > 128) ptr ++;
-				snprintf (FusionObject.creepToShow, FUSION_MAX_CREEPLEN, "%s", ptr);
-
-				pthread_mutex_unlock(&FusionObject.mutexCreep);
-
-				i++;
-				//eprintf("%s(%d): creepToShow = %s\n", __FUNCTION__, __LINE__, FusionObject.creepToShow);
-
-				//interface_displayMenu(1);
-
-				fusion_wait(FUSION_MIN_USLEEP);
-				alreadySlept += FUSION_MIN_USLEEP;
-			}
-
-			timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
-			if (timeToUsleep <= 0) break;
-
-			fusion_wait (1000* FusionObject.pause);
-			alreadySlept += FusionObject.pause * 1000;
-			j++;
+		else if (result == FUSION_SAME_CREEP && FusionObject.creepShown)
+		{
+			eprintf ("%s(%d): creepShown got. Wait pause and start again.\n", __FUNCTION__, __LINE__);
+			fusion_wait(FusionObject.pause * 1000);
+			gettimeofday(&tv, NULL);
+			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 		}
-		FusionObject.creepline[0] = '\0';
-		pthread_mutex_lock(&FusionObject.mutexCreep);
-		FusionObject.creepToShow[0] = '\0';
-		pthread_mutex_unlock(&FusionObject.mutexCreep);
+		fusion_wait(FusionObject.checktime * 1000);
+	}
 
-		timeToUsleep = FusionObject.checktime * 1000 - alreadySlept;
-		//eprintf ("%s(%d): checktime = %d, alreadySlept = %d\n", __FUNCTION__, __LINE__, FusionObject.checktime, alreadySlept);
-		if (timeToUsleep <= 0) continue;
-		eprintf ("%s(%d): Sleep %d msec.\n", __FUNCTION__, __LINE__,timeToUsleep);
-		//fusion_wait(timeToUsleep);
-	} // while
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
 }
@@ -1964,10 +1918,8 @@ int fusion_readConfig()
 
 int fusion_refreshEvent(void *pArg)
 {
-	int needUpdate = 0;
-
 	pthread_mutex_lock(&FusionObject.mutexCreep);
-	needUpdate = (strlen(FusionObject.creepToShow) > 0);
+	int needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 	if (needUpdate){
@@ -2040,34 +1992,87 @@ int fusion_getSecret ()
 	return 0;
 }
 
+static char fusion_curlError[CURL_ERROR_SIZE];
+int fusion_streamPos; 
+
+size_t fusion_curlCallback(char * data, size_t size, size_t nmemb, void * stream)
+{
+	int writtenBytes = size * nmemb;
+	memcpy ((char*)stream + fusion_streamPos, data, writtenBytes);
+	fusion_streamPos += writtenBytes;
+	return writtenBytes;
+}
+
+typedef size_t (*curlWriteCB)(void *buffer, size_t size, size_t nmemb, void *userp);
+
+CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, curlWriteCB cb)
+{
+	CURLcode retCode = CURLE_OK;
+	CURL * curl = NULL;
+	struct curl_slist  *headers = NULL;
+
+	if (!url || !strlen(url)) return -1;
+
+	curl = curl_easy_init();
+	if (!curl) return -1;
+
+	*pStreamLen = 0;
+	fusion_streamPos = 0;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, fusion_curlError);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, curlStream);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15);
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
+	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+
+	eprintf ("%s: rq: %s\n", __FUNCTION__, url);
+
+	retCode = curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
+	curl = NULL;
+#ifdef FUSION_TEST
+	char cuttedStream[256];
+	snprintf (cuttedStream, 256, "%s", curlStream);
+	eprintf ("ans: %s ...\n", cuttedStream);
+	//eprintf ("ans: %s\n", playlistBuffer);
+#endif
+
+	if (retCode != CURLE_OK && retCode != CURLE_WRITE_ERROR)
+	{
+		eprintf ("%s: ERROR! %s\n", __FUNCTION__, fusion_curlError);
+		return retCode;
+	}
+	if (!curlStream || strlen(curlStream) == 0) {
+		eprintf ("%s: ERROR! empty response.\n", __FUNCTION__);
+		return -2;
+	}
+	*pStreamLen = fusion_streamPos;
+	return CURLE_OK;
+}
+
 int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 {
 	char * playlistBuffer = NULL;
-	char cmd[PATH_MAX];
-	FILE * f;
-	int ret;
-	
+	int res;
+
+	int buflen;
+
 	if (!url || !strlen(url)) return -1;
 	playlistBuffer = (char *)malloc(FUSION_STREAM_SIZE);
-	memset(playlistBuffer, 0, FUSION_STREAM_SIZE);
-
-	sprintf (cmd, "wget \"%s\" -O "FUSION_PLAYLIST_FILE" 2>/dev/null", url);
-	eprintf ("%s(%d): rq: %s ...\n",   __FUNCTION__, __LINE__, url);
-	//eprintf ("%s(%d): cmd: %s ...\n", __FUNCTION__, __LINE__, cmd);
-	//fusion_getCommandOutput(cmd, result);
-	system(cmd);
-
-	f = fopen(FUSION_PLAYLIST_FILE, "rt");
-	if (!f) {
-		eprintf ("%s(%d): WARNING! Couldn't open playlist dump file %s.\n",   __FUNCTION__, __LINE__, FUSION_PLAYLIST_FILE);
-		free(playlistBuffer);
+	if (!playlistBuffer){
+		eprintf ("%s(%d): ERROR! Malloc failed.\n",   __FUNCTION__, __LINE__);
 		return -1;
 	}
+	memset(playlistBuffer, 0, FUSION_STREAM_SIZE);
 
-	fread(playlistBuffer, FUSION_STREAM_SIZE, 1, f);
-	fclose(f);
+	eprintf ("%s(%d): rq: %s ...\n",   __FUNCTION__, __LINE__, url);
+	fusion_getDataByCurl(url, playlistBuffer, &buflen, (curlWriteCB)fusion_curlCallback);
 
-#if 1
+#ifdef FUSION_TEST
 	char cuttedStream[256];
 	snprintf (cuttedStream, 256, "%s", playlistBuffer);
 	eprintf ("ans: %s ...\n", cuttedStream);
@@ -2079,9 +2084,9 @@ int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 		free(playlistBuffer);
 		return -1;
 	}
-	ret = fusion_checkResponse(playlistBuffer, ppRoot);
+	res = fusion_checkResponse(playlistBuffer, ppRoot);
 	free(playlistBuffer);
-	return ret;
+	return res;
 }
 
 int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
@@ -2192,6 +2197,7 @@ int fusion_getCreepAndLogo ()
 	unsigned int i;
 	time_t now;
 	struct tm nowDate;
+	int result = 0;
 
 	if (!fusion_checkDirectory("/tmp/fusion")) {
 		system("mkdir /tmp/fusion");
@@ -2207,7 +2213,7 @@ int fusion_getCreepAndLogo ()
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
-		return -1;
+		return FUSION_FAIL;
 	}
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
@@ -2242,7 +2248,7 @@ int fusion_getCreepAndLogo ()
 			long logoFileSize = fusion_getRemoteFileSize(FusionObject.logos[i].url);
 
 			if (logoFileSize == -1){	// failed to get remote size
-				FusionObject.logos[i].filepath[0] = '0';
+				FusionObject.logos[i].filepath[0] = '\0';
 				continue;
 			}
 			char tmpStr[PATH_MAX];
@@ -2282,6 +2288,7 @@ int fusion_getCreepAndLogo ()
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 	}
 
+	result = FUSION_SAME_CREEP;
 	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
 	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep-line");
 	if (jsonCreep){
@@ -2299,13 +2306,21 @@ int fusion_getCreepAndLogo ()
 				else {
 					FusionObject.repeats = atoi(jsonRepeats->valuestring);
 				}
+				if (strlen(FusionObject.creepline) != strlen(jsonText->valuestring)) result = FUSION_NEW_CREEP;
 				snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, "%s", jsonText->valuestring);
+
+				for (int k=0; k<FUSION_MAX_CREEPLEN; k++){
+					if (FusionObject.creepline[k] == '\n' || FusionObject.creepline[k] == '\r') {
+						FusionObject.creepline[k] = ' ';
+					}
+				}
+				pgfx_font->GetStringWidth(pgfx_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
 				eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
 			}
 		}
 	}
 	cJSON_Delete(root);
-	return 0;
+	return result;
 }
 
 void fusion_cleanup()

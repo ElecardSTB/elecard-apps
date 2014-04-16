@@ -2060,13 +2060,43 @@ static void interface_displayLogo(void)
 	}
 	pthread_mutex_unlock(&FusionObject.mutexLogo);
 
-	pthread_mutex_lock(&FusionObject.mutexCreep);
-	gfx_drawText(DRAWING_SURFACE, pgfx_font,
-		INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
-		INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-		0, interfaceInfo.screenHeight - 80,
-		FusionObject.creepToShow, 0, 1);
-	pthread_mutex_unlock(&FusionObject.mutexCreep);
+	if (FusionObject.creepStartTime > 0){
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		unsigned long long millisecondsSinceEpoch = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+		unsigned long long deltaTime = millisecondsSinceEpoch - FusionObject.creepStartTime;
+
+		double ratio = 1.0;
+		int timeForCreepSlice = 20*1000; // time that 1 letter follows from right to left 
+		double timeForAllCreep;
+		if (FusionObject.creepWidth > interfaceInfo.screenWidth){
+			ratio = FusionObject.creepWidth / (double)interfaceInfo.screenWidth;
+		}
+		else {
+			ratio = interfaceInfo.screenWidth / (double)FusionObject.creepWidth;
+		}
+		timeForAllCreep = timeForCreepSlice * ratio;
+		int position = (int)(FusionObject.creepWidth * ((double)deltaTime / timeForAllCreep));
+/*
+eprintf("%s(%d): creepWidth = %d, timeForAllCreep = %f, deltaTime = %llu, position = %d\n", 
+	__FUNCTION__, __LINE__, FusionObject.creepWidth, timeForAllCreep, deltaTime, position);
+*/
+		if ((position > interfaceInfo.screenWidth) && ((abs(interfaceInfo.screenWidth - position)) > FusionObject.creepWidth))
+		{ // creepline is shown completely
+			FusionObject.creepShown = 1;
+			FusionObject.creepStartTime = 0;
+		}
+
+		pthread_mutex_lock(&FusionObject.mutexCreep);
+		gfx_drawText(DRAWING_SURFACE, pgfx_font,
+			INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
+			INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+			interfaceInfo.screenWidth - position, 
+			interfaceInfo.screenHeight - 80,
+			FusionObject.creepline, 
+			0, 1);
+		pthread_mutex_unlock(&FusionObject.mutexCreep);
+	}
 #endif
 }
 
