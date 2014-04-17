@@ -1978,7 +1978,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 
 
 	offair_startVideo(screenMain);
-//	offair_updateChannelStatus();
+	offair_updateChannelStatus();
 	saveAppSettings();
 
 	if ( appControlInfo.dvbInfo.active != 0 )
