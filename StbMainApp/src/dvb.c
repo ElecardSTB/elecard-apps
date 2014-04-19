@@ -79,8 +79,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 #define fatal   eprintf
 #define info    dprintf
-#define verbose(...) printf(__VA_ARGS__)
-#define debug(...) printf(__VA_ARGS__)
+#define verbose(...) //printf(__VA_ARGS__)
+#define debug(...) //printf(__VA_ARGS__)
 
 #define PERROR(fmt, ...) eprintf(fmt " (%s)\n", ##__VA_ARGS__, strerror(errno))
 
@@ -850,7 +850,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s, EIT_service_t
 	if(service_t != NULL) {
 		network_id = service_t->original_network_id;
 	} else {
-		network_id = 0x40000000 + (uint32_t)frequency;
+		network_id = 0x80000000 + (uint32_t)frequency;
 	}
 	if(s->service_list != NULL) {
 		services = s->service_list;

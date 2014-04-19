@@ -2,10 +2,11 @@
 #define PLAYLIST_EDITOR_H
 #include "interface.h"
 
+int enterPlaylistSelect(interfaceMenu_t *pMenu, void* pArg);
 int enterPlaylistEditorMenu(interfaceMenu_t *pMenu, void* pArg);
 void playList_saveName(int ,char* , char*);
 void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count);
-// int push_playlist();
+void playlist_switchElementwithNext(int source);
 void playlist_editor_setupdate();
 int getChannelEditor();
 void playlist_switchElement(int , int );

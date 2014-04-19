@@ -59,8 +59,7 @@ typedef struct {
 
 typedef struct {
     uint8_t serviceType;
-    uint16_t network_id;
-    uint16_t channel_number;
+	uint16_t network_id;
 } bouquet_data_t;
 
 typedef struct {
@@ -87,6 +86,8 @@ typedef struct {
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible);
+int32_t dvbChannel_remove(service_index_t *srvIdx);
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
 int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data);
@@ -110,6 +111,6 @@ int32_t dvbChannel_getCount(void);
 //int32_t dvbChannel_invalidateServicess(void);
 int32_t dvbChannel_hasAnyEPG(void);
 int32_t dvbChannel_applyUpdates(void);
-
+void dvbChannel_terminate(void);
 #endif // ENABLE_DVB
 #endif // DVBCHANNEL_H

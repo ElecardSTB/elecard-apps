@@ -3684,9 +3684,7 @@ static int interface_triggerChange(void *pArg)
 static char* interface_getChannelCaption(int dummy, void* pArg)
 {
 	(void)dummy;
-	char *selectedName;
-	selectedName = getSelectedNamePlaylistEditor();
-	char * ptr = strstr(getSelectedNamePlaylistEditor(), ". ");
+	char * ptr = strstr(output_getSelectedNamePlaylistEditor(), ". ");
 	if (ptr) {
 		ptr += 2;
 		return ptr;

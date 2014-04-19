@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "off_air.h"
 
+#include "bouquet.h"
 #include "debug.h"
 #include "dvbChannel.h"
 #include "app_info.h"
@@ -573,6 +574,7 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, ui
 	if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
 		interface_refreshMenu(pMenu);
 		output_showDVBMenu(pMenu, NULL);
+		bouquet_addScanChannels();
 		offair_fillDVBTMenu();
 #ifdef ENABLE_PVR
 		pvr_updateSettings();
@@ -2014,7 +2016,7 @@ static void offair_addDVBChannelsToMenu()
 		{
 			isRadio = 1;
 		}
-		serviceName = dvb_getServiceName(service);
+		serviceName = srv->data.channelsName;// dvb_getServiceName(service);
 
 		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
 		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, i),

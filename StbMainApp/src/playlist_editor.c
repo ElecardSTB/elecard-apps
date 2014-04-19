@@ -1,6 +1,7 @@
 #include "playlist_editor.h"
 
 #include "dvbChannel.h"
+#include "bouquet.h"
 
 #include "interface.h"
 #include "list.h"
@@ -11,9 +12,9 @@
 
 typedef struct _playListEditor_t
 {
-    int radio;
-    int scrambled;
-    service_index_t *service_index;
+	int radio;
+	int scrambled;
+	service_index_t *service_index;
 	service_index_data_t data;
 } playListEditor_t;
 
@@ -22,38 +23,38 @@ list_element_t *playListEditor = NULL;
 static int update_list = false;
 
 static void load_dvb_channels() {
-    if (playListEditor != NULL) {
-        playlist_editor_cleanup();
+	if (playListEditor != NULL) {
+		playlist_editor_cleanup();
 	}
 
-    extern dvb_channels_t g_dvb_channels;
-    struct list_head *pos;
+	extern dvb_channels_t g_dvb_channels;
+	struct list_head *pos;
 
-    list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-        service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 
-        if(srvIdx == NULL)
-            continue;
+		if(srvIdx == NULL)
+			continue;
 
-        list_element_t      *cur_element;
-        playListEditor_t    *element;
+		list_element_t      *cur_element;
+		playListEditor_t    *element;
 
-        if (playListEditor == NULL) {
-            cur_element = playListEditor = allocate_element(sizeof(playListEditor_t));
-        } else {
-            cur_element = append_new_element(playListEditor, sizeof(playListEditor_t));
-        }
-        if (!cur_element)
-            break;
+		if (playListEditor == NULL) {
+			cur_element = playListEditor = allocate_element(sizeof(playListEditor_t));
+		} else {
+			cur_element = append_new_element(playListEditor, sizeof(playListEditor_t));
+		}
+		if (!cur_element)
+			break;
 
-        element = (playListEditor_t *)cur_element->data;
-        element->service_index = srvIdx;
+		element = (playListEditor_t *)cur_element->data;
+		element->service_index = srvIdx;
 		element->data.visible = srvIdx->data.visible;
 		element->data.parent_control = srvIdx->data.parent_control;
-        element->radio = srvIdx->service->service_descriptor.service_type == 2;
-        element->scrambled = dvb_getScrambled(srvIdx->service);
+		element->radio = srvIdx->service->service_descriptor.service_type == 2;
+		element->scrambled = dvb_getScrambled(srvIdx->service);
 		snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
-    }
+	}
 }
 
 void getDVBList(){
@@ -69,128 +70,128 @@ void addList(){
 }
 int lockChannel()
 {
-    return 1;
+	return 1;
 }
 int unlockChannel()
 {
-    return 0;
+	return 0;
 }
 static int color_save = -1;
 
 void setColor(int color) {
-    color_save = color;
+	color_save = color;
 }
 
 int getColor() {
-    return color_save;
+	return color_save;
 }
 
 void set_lockColor(){
-    setColor(interfaceInfo.highlightColor);
+	setColor(interfaceInfo.highlightColor);
 
-    interfaceInfo.highlightColor++;
-    if (interface_colors[interfaceInfo.highlightColor].A==0)
-        interfaceInfo.highlightColor = 0;
+	interfaceInfo.highlightColor++;
+	if (interface_colors[interfaceInfo.highlightColor].A==0)
+		interfaceInfo.highlightColor = 0;
 }
 void set_unLockColor(){
-    interfaceInfo.highlightColor = getColor();
-    setColor(-1);
-    if (interface_colors[interfaceInfo.highlightColor].A==0)
-        interfaceInfo.highlightColor = 0;
+	interfaceInfo.highlightColor = getColor();
+	setColor(-1);
+	if (interface_colors[interfaceInfo.highlightColor].A==0)
+		interfaceInfo.highlightColor = 0;
 }
 void playlist_editor_cleanup(){
-    free_elements(&playListEditor);
+	free_elements(&playListEditor);
 }
 
 int getChannelEditor(){
-    return channelNumber;
+	return channelNumber;
 }
 int get_statusLockPlaylist()
 {
-    if (channelNumber == -1)
-        return false;
-    return true;
+	if (channelNumber == -1)
+		return false;
+	return true;
 }
 
 void playList_saveName(int num, char *prev_name, char *new_name)
 {
-    int i = 0;
-    list_element_t *cur_element;
-    playListEditor_t *element;
-    for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-        element = (playListEditor_t*)cur_element->data;
-        if(element == NULL)
-            continue;
+	int i = 0;
+	list_element_t *cur_element;
+	playListEditor_t *element;
+	for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
+		element = (playListEditor_t*)cur_element->data;
+		if(element == NULL)
+			continue;
 		if (num == i && strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))){
 			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
-            return;
-        }
-        i++;
-    }
+			return;
+		}
+		i++;
+	}
 }
 
 void playlist_editor_setupdate(){
-    update_list = true;
+	update_list = true;
 }
 
 void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count)
 {
-    int i = 0;
-    list_element_t *cur_element;
-    playListEditor_t *element;
-    for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-        element = (playListEditor_t*)cur_element->data;
-        if(element == NULL)
-            continue;
-        if (count == i){
-		char desc[20];
-		if(element->data.visible) {
-			if(element->data.parent_control) {
-				element->data.parent_control = false;
-				element->data.visible = false;
-				snprintf(desc, sizeof(desc), "INVISIBLE");
+	int i = 0;
+	list_element_t *cur_element;
+	playListEditor_t *element;
+	for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
+		element = (playListEditor_t*)cur_element->data;
+		if(element == NULL)
+			continue;
+		if (count == i){
+			char desc[20];
+			if(element->data.visible) {
+				if(element->data.parent_control) {
+					element->data.parent_control = false;
+					element->data.visible = false;
+					snprintf(desc, sizeof(desc), "INVISIBLE");
+				} else {
+					element->data.parent_control = true;
+					snprintf(desc, sizeof(desc), "PARENT");
+				}
 			} else {
-				element->data.parent_control = true;
-				snprintf(desc, sizeof(desc), "PARENT");
+				element->data.visible = true;
+				snprintf(desc, sizeof(desc), "VISIBLE");
 			}
-		} else {
-			element->data.visible = true;
-			snprintf(desc, sizeof(desc), "VISIBLE");
+			interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+			interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+			interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
+			return;
 		}
-		interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
-		interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-		interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
-		return;
-        }
-        i++;
-    }
+		i++;
+	}
 }
 int push_playlist()
 {
-    if (playListEditor == NULL || update_list == false)
-        return false;
-    update_list = false;
-    int first = 0;
-    int i = 0;
-    list_element_t		*service_element;
-    service_element = playListEditor;
-    while (service_element != NULL) {
-        playListEditor_t *curElement = (playListEditor_t *)service_element->data;
-        if (curElement->service_index != NULL) {
+	if (playListEditor == NULL || update_list == false)
+		return false;
+	update_list = false;
+	int first = 0;
+	int i = 0;
+	list_element_t		*service_element;
+	service_element = playListEditor;
+	while (service_element != NULL) {
+		playListEditor_t *curElement = (playListEditor_t *)service_element->data;
+		if (curElement->service_index != NULL) {
 			curElement->service_index->data.visible        = curElement->data.visible;
 			curElement->service_index->data.parent_control = curElement->data.parent_control;
-			snprintf((char*)curElement->service_index->service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
-        }
-        first = dvbChannel_findNumberService(curElement->service_index);
-        if ( i > first)
-            dvbChannel_swapServices(first, i);
-        else
-            dvbChannel_swapServices(i, first);
+			snprintf(curElement->service_index->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
+		}
+		first = dvbChannel_findNumberService(curElement->service_index);
+		if ( i > first)
+			dvbChannel_swapServices(first, i);
+		else
+			dvbChannel_swapServices(i, first);
 
-        i++;
-        service_element = service_element->next;
-    }
-    return true;
+		i++;
+		service_element = service_element->next;
+	}
+	return true;
 }
 
 int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -255,243 +256,117 @@ int check_playlist()
 	return true;
 }
 
-/*
-
-    list_element_t *cur_tr_element;
-    transpounder_t *element_tr;
-    for(cur_tr_element = head_ts_list; cur_tr_element != NULL; cur_tr_element = cur_tr_element->next) {
-        element_tr = (transpounder_t*)cur_tr_element->data;
-
-        if(element_tr == NULL) {
-            continue;
-        }
-
-
-
-
-    extern dvb_channels_t g_dvb_channels;
-    struct list_head *pos;
-
-    list_for_each(pos, &g_dvb_channels.orderSortHead) {
-        service_index_t *srvIdx = list_entry(pos, service_index_t, orderSort);
-
-        if(srvIdx == NULL)
-            continue;
-
-        dvbChannel_findNumberService
-
-        list_element_t      *cur_element;
-        playListEditor_t    *element;
-
-        if (playListEditor == NULL) {
-            cur_element = playListEditor = allocate_element(sizeof(playListEditor_t));
-        } else {
-            cur_element = append_new_element(playListEditor, sizeof(playListEditor_t));
-        }
-        if (!cur_element)
-            break;
-
-        element = (playListEditor_t *)cur_element->data;
-        element->service_index = srvIdx;
-        element->visible = srvIdx->visible;
-        element->radio = srvIdx->service->service_descriptor.service_type == 2;
-        element->scrambled = dvb_getScrambled(srvIdx->service);
-        snprintf(element->name, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
-    }*/
-//}
-
-
 static int swapMenu;
 
 int playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
 {
-    if (channelNumber == -1) {
-        swapMenu = CHANNEL_INFO_GET_CHANNEL(pArg);
-        channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
+	if (channelNumber == -1) {
+		swapMenu = CHANNEL_INFO_GET_CHANNEL(pArg);
+		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 
-        set_lockColor();
-        //return output_saveAndRedraw(saveAppSettings(), pMenu);
-    } else {
-
-        channelNumber = -1;
-        set_unLockColor();
-        printf("\n\nsritch %d -> %d\n\n\n",swapMenu, CHANNEL_INFO_GET_CHANNEL(pArg));
-     //   interface_switchMenuEntryCustom(pMenu, swapMenu,  CHANNEL_INFO_GET_CHANNEL(pArg));
-       // interface_switchMenu(pMenu,swapMenu);
-        swapMenu = -1;
-    }
-    interface_displayMenu(1);
-    return 0;
+		set_lockColor();
+	} else {
+		channelNumber = -1;
+		set_unLockColor();
+		swapMenu = -1;
+	}
+	interface_displayMenu(1);
+	return 0;
 }
 void playlist_switchElementwithNext(int source){
 
-    if (playListEditor == NULL)
-         return;
-    int i = 0;
+	if (playListEditor == NULL)
+		return;
+	int i = 0;
 
-    list_element_t *cur = playListEditor;
-    list_element_t *rec;
-    list_element_t *last = NULL;
-    while(cur != NULL) {
-        if (i == source){
-            if(last == NULL) {
-                playListEditor = cur->next;
-                cur->next = playListEditor->next;
-                playListEditor->next = cur;
-            } else {
-                rec = cur->next;
-                last->next = rec;
-                cur->next = rec->next;
-                rec->next = cur;
-            }
-        }
-        i++;
-        last = cur;
-        cur = cur->next;
-    }
-
-
-/*
-
-
-
-
-
-    service_element = remove_element(&dvb_services, service_element);
-    list_element_t *insert_sorted_element_by_id(list_element_t **head, uint16_t id, uint32_t data_size);
-
-    list_element_t *cur_element;
-    playListEditor_t element;
-
-    cur_element = playListEditor;
-    while (cur_element != NULL) {
-        i++;
-        if (i == source) {
-            element = (playListEditor_t)cur_element->data;
-            remove_element(&playListEditor, cur_element);
-            insert_sorted_element_by_id(&playListEditor, receiver, size);
-
-            source_next_element = cur_element;
-            source_element = cur_element->next;
-        }
-        i++;
-        cur_element = service_element->next;
-    }
-
-
-
-    if (source_element != NULL && receiver_element != NULL) {
-        cur_element = receiver_element;
-        cur_element->next = receiver_next_element;
-        receiver_element = source_element;
-        receiver_next_element = source_next_element;
-
-
-
-        cur_element = receiver_element;
-        cur_element->next = receiver_next_element;
-
-
-
-    }
-
-
-    for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-        element = (playListEditor_t*)cur_element->data;
-
-        if (i == source) {
-            source_element = element;
-        }
-
-        if (i == receiver) {
-            receiver_element = element;
-        }
-        if (source_element != NULL && receiver_element != NULL)
-            break;
-        i++;
-    }
-
-    if (source_element != NULL && receiver_element != NULL) {
-        element = source_element;
-    }
-    */
-
+	list_element_t *cur = playListEditor;
+	list_element_t *rec;
+	list_element_t *last = NULL;
+	while(cur != NULL) {
+		if (i == source){
+			if(last == NULL) {
+				playListEditor = cur->next;
+				cur->next = playListEditor->next;
+				playListEditor->next = cur;
+			} else {
+				rec = cur->next;
+				last->next = rec;
+				cur->next = rec->next;
+				rec->next = cur;
+			}
+		}
+		i++;
+		last = cur;
+		cur = cur->next;
+	}
 }
 
 
 void createPlaylist(interfaceMenu_t  *interfaceMenu)
 {
-    if (playListEditor != NULL)
-        return;
+	if (playListEditor != NULL)
+		return;
+	load_dvb_channels();
+	interfaceMenu_t *channelMenu = interfaceMenu;
+	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+	int32_t i = 0;
+	interface_clearMenuEntries(channelMenu);
 
-    load_dvb_channels();
-    /*
-     if (!(interfaceMenu && !interfaceMenu->menuEntryCount))
-        return;
-    */
-    interfaceMenu_t *channelMenu = interfaceMenu;
-    struct list_head *pos;
-    char channelEntry[MENU_ENTRY_INFO_LENGTH];
-    int32_t i = 0;
-    interface_clearMenuEntries(channelMenu);
-
-    //offair_updateChannelStatus();
-    //	interface_addMenuEntryDisabled(channelMenu, "DVB", 0);
-
-
-    list_element_t *cur_element;
-    playListEditor_t *element;
-    for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-        element = (playListEditor_t*)cur_element->data;
-        if(element == NULL)
-            continue;
+	list_element_t *cur_element;
+	playListEditor_t *element;
+	for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
+		element = (playListEditor_t*)cur_element->data;
+		if(element == NULL)
+			continue;
 
 		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->data.channelsName);
 		interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->data.visible ?
 								   (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
 
-        interfaceMenuEntry_t *entry;
-        entry = menu_getLastEntry(channelMenu);
-        if(entry) {
-	    char desc[20];
-		snprintf(desc, sizeof(desc), "%s", element->data.parent_control ? "PARENT" : (element->data.visible ? "VISIBLE" : "INVISIBLE"));
-	    interface_setMenuEntryLabel(entry, desc);
-		interface_changeMenuEntrySelectable(entry, element->data.visible);
-        }
+		interfaceMenuEntry_t *entry;
+		entry = menu_getLastEntry(channelMenu);
+		if(entry) {
+			char desc[20];
+			snprintf(desc, sizeof(desc), "%s", element->data.parent_control ? "PARENT" : (element->data.visible ? "VISIBLE" : "INVISIBLE"));
+			interface_setMenuEntryLabel(entry, desc);
+			interface_changeMenuEntrySelectable(entry, element->data.visible);
+		}
 
-        if(appControlInfo.dvbInfo.channel == i) {
-            interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
-        }
-        i++;
-    }
+		if(appControlInfo.dvbInfo.channel == i) {
+			interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
+		}
+		i++;
+	}
+}
+int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
+{
+	interfaceMenu_t *channelMenu = interfaceMenu;
+	interface_clearMenuEntries(channelMenu);
+	int i = 0;
+	char *name;
+	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+
+	while ((name = bouquet_getNameBouquetList(i) )!= NULL) {
+		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
+		interface_addMenuEntry(channelMenu, channelEntry, bouquets_setBouquet, CHANNEL_INFO_SET(screenMain, i), thumbnail_epg);
+
+		if (strncasecmp(name, bouquet_getBouquetName(), strlen(name)) == 0) {
+			interfaceMenuEntry_t *entry;
+			entry = menu_getLastEntry(channelMenu);
+			if(entry) {
+				char desc[20];
+				snprintf(desc, sizeof(desc), "SELECTED");
+				interface_setMenuEntryLabel(entry, desc);
+			}
+		}
+		i++;
+	};
+	return 0;
 }
 
 int enterPlaylistEditorMenu(interfaceMenu_t *interfaceMenu, void* pArg)
 {
-
-    printf("%s[%d]\n",__func__, __LINE__);
-    createPlaylist(interfaceMenu);
-/*
-    offair_createPlaylist(&pMenu);
-    printf("%s[%d]\n",__func__, __LINE__);
-    if((dvbChannel_getCount() == 0) && (analogtv_getChannelCount() == 0)) {
-        output_showDVBMenu(pMenu, NULL);
-        interface_showConfirmationBox( _T("DVB_NO_CHANNELS"), thumbnail_dvb, offair_confirmAutoScan, NULL);
-        return 1;
-    }
-
-    printf("%s[%d]\n",__func__, __LINE__);
-    offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
-    return 0;
-*/
-    return 0;
-    /*
-    char buf[MENU_ENTRY_INFO_LENGTH];
-    interface_clearMenuEntries(interfaceMenu);
-    printf("%s[%d]\n");
-    snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYCONTROL_SHOW_ON_START"), interfacePlayControl.showOnStart ? _T("ON") : _T("OFF") );
-    interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlShowOnStart, NULL, settings_interface);
-    return 0;
-*/
+	createPlaylist(interfaceMenu);
+	return 0;
 }
 

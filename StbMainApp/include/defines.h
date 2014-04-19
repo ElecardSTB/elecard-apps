@@ -47,7 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /** @def DEBUG Enable lots of debug output
  */
-#define DEBUG
+//#define DEBUG
 
 /** @def ALLOC_DEBUG Enable alloc/free debug output */
 //#define ALLOC_DEBUG

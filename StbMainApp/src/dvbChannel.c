@@ -82,10 +82,11 @@ static int32_t dvbChannel_isServiceEnabled(EIT_service_t *service)
 service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header)
 {
 	struct list_head *pos;
-
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
-		if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) {
+		if (srv->common.service_id ==  header->service_id &&
+			srv->common.transport_stream_id ==  header->transport_stream_id)
+		/*if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) */{
 			return srv;
 		}
 	}
@@ -244,7 +245,6 @@ int32_t dvbChannel_hasAnyEPG(void)
 	return 0;
 }
 
-//dvb_getNumberOfServices
 int32_t dvbChannel_getCount(void)
 {
 	return g_dvb_channels.viewedCount;
@@ -281,25 +281,26 @@ int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_
 
 int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible)
 {
-    service_index_t *new = dvbChannel_add();
-    if(new) {
-        new->common = *common;
-        new->bouquet_data = *bouquet_data;
+	service_index_t *new = dvbChannel_add();
+	if(new) {
+		new->common = *common;
+		new->bouquet_data = *bouquet_data;
 		new->data.visible = visible;
-    } else {
-        eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
-        return -1;
-    }
-    return 0;
+	} else {
+		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
+		return -1;
+	}
+	return 0;
 }
 
-static int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible)
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->service = service;
 		new->common = service->common;
 		new->data.visible = visible;
+		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen(service->service_descriptor.service_name));
 
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
@@ -309,7 +310,7 @@ static int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible)
 	return 0;
 }
 
-static int32_t dvbChannel_remove(service_index_t *srvIdx)
+int32_t dvbChannel_remove(service_index_t *srvIdx)
 {
 	list_del(&srvIdx->orderNone);
 	g_dvb_channels.totalCount--;
@@ -320,69 +321,22 @@ static int32_t dvbChannel_remove(service_index_t *srvIdx)
 	free(srvIdx);
 	return 0;
 }
-static int32_t dvbChannel_readOrderConfig_afterLamedb(void)
+
+static int32_t dvbChannel_readOrderConfig()
 {
-    char buf[BUFFER_SIZE];
-    FILE* fd;
-
-    fd = fopen(OFFAIR_SERVICES_FILENAME, "r");
-    if(fd == NULL) {
-        dprintf("%s: Failed to open '%s'\n", __FUNCTION__, OFFAIR_SERVICES_FILENAME);
-        return -1;
-    }
-    int i = 0;
-	int num = 0;
-
-    while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
-        uint32_t media_id = 0;
-        uint16_t service_id = 0;
-        uint16_t transport_stream_id = 0;
-        uint16_t audio_track = 0;
-        uint16_t visible = 0;
-
-        if ( sscanf(buf, "service %d media_id %u service_id %hu transport_stream_id %hu audio_track %hu visible %hu\n",
-            &num, &media_id, &service_id, &transport_stream_id, &audio_track, &visible) >= 5)
-        {
-            EIT_common_t common;
-
-            common.media_id = media_id;
-            common.service_id = service_id;
-            common.transport_stream_id = transport_stream_id;
-
-            int first;
-            service_index_t *p_srvIdx;
-			p_srvIdx = dvbChannel_findServiceCommon(&common);
-            if (p_srvIdx != NULL) {
-
-				p_srvIdx->data.visible = visible;
-                first = dvbChannel_findNumberService(p_srvIdx);
-
-                if ( i > first)
-                    dvbChannel_swapServices(first, i);
-                else
-                    dvbChannel_swapServices(i, first);
-
-                i++;
-            }
-        }
-    }
-    fclose(fd);
-    dprintf("%s: imported %d services\n", __FUNCTION__, dvbChannel_getCount());
-
-    return 0;
-}
-
-static int32_t dvbChannel_readOrderConfig(void)
-{
+	char *bouquetName;
+	bouquetName = bouquet_getBouquetName();
 	FILE *fd = NULL;
 	cJSON *root;
 	cJSON *format;
 	char *data;
 	long len;
-
-	fd = fopen(OFFAIR_SERVICES_FILENAME, "r");
+	char fname[BUFFER_SIZE];
+	bouquet_getOffairName(fname, bouquetName);
+	dprintf("read file %s\n", fname);
+	fd = fopen(fname, "r");
 	if(fd == NULL) {
-		dprintf("Error opening %s\n", OFFAIR_SERVICES_FILENAME);
+		dprintf("Error opening %s\n", fname);
 		//Is this need still
 		return -1;
 	}
@@ -424,7 +378,7 @@ static int32_t dvbChannel_readOrderConfig(void)
 		}
 	}
 	cJSON_Delete(root);
-	dprintf("%s: imported services\n", __FUNCTION__);
+	dprintf("%s imported services: %s\n", __FUNCTION__, bouquetName);
 	return 0;
 }
 
@@ -435,6 +389,8 @@ int32_t dvbChannel_writeOrderConfig(void)
 	char *render;
 	struct list_head *pos;
 	uint32_t i = 0;
+	char *bouquetName;
+	bouquetName = bouquet_getBouquetName();
 
 	format = cJSON_CreateArray();
 	if(!format) {
@@ -449,22 +405,19 @@ int32_t dvbChannel_writeOrderConfig(void)
 	}
 	cJSON_AddItemToObject(root, "digital TV channels", format);
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->common.media_id || srvIdx->common.service_id || srvIdx->common.transport_stream_id) {
 			cJSON* fld;
 			fld = cJSON_CreateObject();
 			if (fld) {
 				cJSON_AddNumberToObject(fld, "service", i);
-				cJSON_AddNumberToObject(fld, "media_id", srvIdx->common.media_id);
-				printf("write common.media_id %d\n", srvIdx->common.media_id);
+				cJSON_AddNumberToObject(fld, "media_id", (int)srvIdx->common.media_id);
 				cJSON_AddNumberToObject(fld, "service_id", srvIdx->common.service_id);
 				cJSON_AddNumberToObject(fld, "transport_stream_id", srvIdx->common.transport_stream_id);
 				cJSON_AddStringToObject(fld, "channels_name", srvIdx->data.channelsName);
 				cJSON_AddNumberToObject(fld, "audio_track", srvIdx->data.audio_track);
 				cJSON_AddNumberToObject(fld, "visible", srvIdx->data.visible);
 
-				printf("write visible %d\n", srvIdx->data.visible);
 				cJSON_AddNumberToObject(fld, "parent_control", srvIdx->data.parent_control);
 				cJSON_AddItemToArray(format, fld);
 				i++;
@@ -476,12 +429,14 @@ int32_t dvbChannel_writeOrderConfig(void)
 
 	if(render) {
 		FILE *fd = NULL;
-		fd = fopen(OFFAIR_SERVICES_FILENAME, "w");
+		char fname[BUFFER_SIZE];
+		bouquet_getOffairName(fname, bouquetName);
+		fd = fopen(fname, "w");
 		if (fd) {
 			fwrite(render, strlen(render), 1, fd);
 			fclose(fd);
 		} else {
-			dprintf("Error opening %s\n", OFFAIR_SERVICES_FILENAME);
+			dprintf("Error opening %s\n", fname);
 		}
 		free(render);
 	}
@@ -554,12 +509,23 @@ int32_t dvbChannel_applyUpdates(void)
 	return 0;
 }
 
+void dvbChannel_terminate(void)
+{
+	struct list_head *pos;
+	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+		dvbChannel_remove(srvIdx);
+	}
+}
+
 static int32_t dvbChannel_update(void)
 {
 	if (check_playlist()) {
 		return 0;
 	}
 	playlist_editor_cleanup();
+	if (bouquet_enable())
+		bouquet_loadBouquetsList();
 
 	list_element_t		*service_element;
     struct list_head    *pos;
@@ -570,71 +536,28 @@ static int32_t dvbChannel_update(void)
 	} else {
 		dvbChannel_invalidateServices();
 	}
+
+	if (bouquet_enable()) {
+		bouquet_loadBouquets(&dvb_services);
+	}
+
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
 		if(p_srvIdx) {
-			printf("%s[%d]\n",__func__, __LINE__);
 			p_srvIdx->service = curService;
 			if (strlen(p_srvIdx->data.channelsName) == 0) {
-				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, sizeof((char *)p_srvIdx->service->service_descriptor.service_name));
+				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen(p_srvIdx->service->service_descriptor.service_name));
 			}
 		} else {
-			printf("%s[%d]\n",__func__, __LINE__);
-			dvbChannel_addService(curService, 1);
+			char *bouquetName;
+			bouquetName = bouquet_getBouquetName();
+			if (!(bouquetName != NULL && bouquet_getFolder(bouquet_getBouquetName(bouquetName))))
+				dvbChannel_addService(curService, 1);
+			dprintf("%s :no common data in channels conf \n",__func__);
 		}
 	}
-
-
-/*
-
-	bouquet_downloadFileWithServices(BOUQUET_FULL_LIST);
-
-	if (bouquet_file()) {
-		load_bouquets(); // in g_dvb_channels
-        // bouquets list compare with dvb_services
-		if ( !bouquets_compare(&dvb_services) ){
-			free_services(&dvb_services);
-			load_lamedb(&dvb_services);
-		}
-        dvbChannel_readOrderConfig_afterLamedb();
-    } else {
-		if(list_empty(&g_dvb_channels.orderNoneHead)) {
-
-		} else {
-			dvbChannel_invalidateServices();
-		}
-    }
-	*/
-    //  dvbChannel_getAudioTrack(); // from offair
-/*	service_element = dvb_services;
-    while (service_element != NULL) {
-		service_index_t *p_srvIdx;
-		EIT_service_t *curService = (EIT_service_t *)service_element->data;
-/*        if((curService == NULL)) {
-			continue;
-        }*/
-/*		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
-		if(p_srvIdx) {
-			p_srvIdx->service = curService;
-            p_srvIdx->service->original_network_id = p_srvIdx->bouquet_data.network_id;
-			p_srvIdx->service->service_descriptor.service_type = p_srvIdx->bouquet_data.serviceType;
-/*            p_srvIdx->service->lcn.visible_service_flag = 1;
-            p_srvIdx->service->lcn.logical_channel_number = p_srvIdx->bouquet_data.channel_number;
-            p_srvIdx->service->flags |= serviceFlagHasLCN;
-*/	/*	} else {
-            if (bouquet_file()) {
-                service_element = remove_element(&dvb_services, service_element);
-                continue;
-            } else {
-                dvbChannel_addService(curService, 1);
-            }
-        }
-        service_element = service_element->next;
-    }
-
-	*/
 	//remove elements without service pointer
 	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
@@ -642,6 +565,14 @@ static int32_t dvbChannel_update(void)
 			dvbChannel_remove(srvIdx);
 		}
 	}
+
+	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+#if (defined STSDK)
+		elcdRpcType_t type;
+		cJSON *result = NULL;
+		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
+		cJSON_Delete(result);
+#endif //#if (defined STSDK)
 
 	dvbChannel_writeOrderConfig();
 	return 0;

@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "output.h"
 
 #include "playlist_editor.h"
+#include "bouquet.h"
 #include "debug.h"
 #include "dvbChannel.h"
 #include "l10n.h"
@@ -447,7 +448,7 @@ static inline int output_refillMenu(interfaceMenu_t *pMenu)
 }
 
 /** Refill menu using pActivatedAction and update display */
-static inline void output_redrawMenu(interfaceMenu_t *pMenu)
+void output_redrawMenu(interfaceMenu_t *pMenu)
 {
 	output_refillMenu(pMenu);
 	interface_displayMenu(1);
@@ -458,6 +459,7 @@ static inline void output_redrawMenu(interfaceMenu_t *pMenu)
 *******************************************************************/
 
 #ifdef ENABLE_DVB
+static interfaceListMenu_t InterfacePlaylistSelect;
 interfaceListMenu_t InterfacePlaylistEditor;
 static interfaceListMenu_t InterfacePlaylist_t;
 static interfaceListMenu_t DVBSubMenu;
@@ -2730,6 +2732,7 @@ static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
 	{
 		offair_clearServiceList(1);
+		dvbChannel_terminate();
 		output_redrawMenu(pMenu);
 		return 0;
 	}
@@ -6153,9 +6156,9 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
-char *getSelectedNamePlaylistEditor()
+char *output_getSelectedNamePlaylistEditor()
 {
-	return &InterfacePlaylistEditor.baseMenu.menuEntry[InterfacePlaylistEditor.baseMenu.selectedItem].info;
+	return InterfacePlaylistEditor.baseMenu.menuEntry[InterfacePlaylistEditor.baseMenu.selectedItem].info;
 }
 
 int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
@@ -6224,6 +6227,11 @@ static int output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
 	interface_getText(pMenu, _T("ENTER_CURRENT_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
 	return 0;
 }
+static int output_changeCreateNewBouquet(interfaceMenu_t* pMenu, void* pArg)
+{
+	interface_getText(pMenu, _T("ENTER_BOUQUET_NAME"), "\\w+", bouquet_createNewBouquet, NULL, inputModeABC, &pArg);
+	return 0;
+}
 
 int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
@@ -6265,10 +6273,22 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 
 int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
+	char buf[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
 
-	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_ENABLE"), bouquet_enable()? "ON" : "OFF");
+	interface_addMenuEntry(interfaceMenu, buf, bouquet_enableControl, NULL, settings_interface);
+	if (bouquet_enable()) {
+		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_NEW_BOUQUETS"), output_changeCreateNewBouquet, NULL, settings_interface);
+		snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_SELECT"), bouquet_getBouquetName());
+		interface_addMenuEntry(interfaceMenu, buf, interface_menuActionShowMenu, &InterfacePlaylistSelect, settings_interface);
+	}
 	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditor, settings_interface);
+	if (bouquet_enable()) {
+		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_SAVE_BOUQUETS"), bouquet_saveBouquet, NULL, settings_interface);
+		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_UPDATE"), bouquet_updateBouquet, NULL, settings_interface);
+	}
+	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
 	return 0;
 }
 
@@ -6480,6 +6500,9 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
     createListMenu(&InterfacePlaylist_t, _T("PLAYLIST_T"), settings_interface, NULL, _M &OutputMenu,
         interfaceListMenuIconThumbnail, output_enterPlaylistMenu, NULL, NULL);
+
+	createListMenu(&InterfacePlaylistSelect, _T("PLAYLIST_SELECT"), settings_interface, NULL, _M &InterfacePlaylist_t,
+		interfaceListMenuIconThumbnail, enterPlaylistSelect, NULL, NULL);
 
 	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, 0, statusbar_f4_rename};
     createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylist_t,

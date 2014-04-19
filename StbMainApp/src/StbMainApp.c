@@ -2466,6 +2466,7 @@ void cleanup()
 #ifdef ENABLE_DVB
 	dprintf("%s: terminate dvb\n", __FUNCTION__);
 	dvb_terminate();
+	dvbChannel_terminate();
     playlist_editor_cleanup();
 #endif
 
