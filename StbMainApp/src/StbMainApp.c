@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "StbMainApp.h"
 #include "playlist_editor.h"
+#include "bouquet.h"
 
 #include "debug.h"
 #include "rtp.h"
@@ -2333,6 +2334,8 @@ void initialize(int argc, char *argv[])
 #ifdef STSDK
 	st_init();
 #endif
+
+	bouquet_init();
 
 #ifdef ENABLE_DVB
 	dvb_init();

@@ -72,6 +72,7 @@ int bouquet_saveBouquet(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_enable();
+void bouquet_init();
 void bouquet_setEnable(int i);
 void bouquet_getOffairName(char *fname, char *name);
 char *bouquet_getBouquetName();

@@ -337,7 +337,10 @@ void createPlaylist(interfaceMenu_t  *interfaceMenu)
 		}
 		i++;
 	}
+	if (i == 0)
+		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
 }
+
 int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	interfaceMenu_t *channelMenu = interfaceMenu;
@@ -349,8 +352,9 @@ int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 	while ((name = bouquet_getNameBouquetList(i) )!= NULL) {
 		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
 		interface_addMenuEntry(channelMenu, channelEntry, bouquets_setBouquet, CHANNEL_INFO_SET(screenMain, i), thumbnail_epg);
-
-		if (strncasecmp(name, bouquet_getBouquetName(), strlen(name)) == 0) {
+		char *bouquets_name;
+		bouquets_name = bouquet_getBouquetName();
+		if (bouquets_name != NULL && strcasecmp(name, bouquets_name) == 0) {
 			interfaceMenuEntry_t *entry;
 			entry = menu_getLastEntry(channelMenu);
 			if(entry) {
@@ -361,6 +365,9 @@ int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 		}
 		i++;
 	};
+	if (i == 0)
+		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
+
 	return 0;
 }
 
