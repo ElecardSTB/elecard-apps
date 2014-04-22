@@ -1363,7 +1363,7 @@ void dvb_clearServiceList(int permanent)
 int dvb_readServicesFromDump(char* filename)
 {
 	int res;
-    mysem_get(dvb_semaphore);
+	mysem_get(dvb_semaphore);
 	free_services(&dvb_services);
 	res = services_load_from_dump(&dvb_services, filename);
 	mysem_release(dvb_semaphore);

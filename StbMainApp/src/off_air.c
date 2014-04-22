@@ -1899,7 +1899,6 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	int32_t		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	int32_t		buttons;
 
-    printf("'%s[%d] = %d\n",__func__, __LINE__,channelNumber);
 	EIT_service_t *service = dvbChannel_getService(channelNumber);
 
 	dprintf("%s: channelNumber = %d\n", __FUNCTION__, channelNumber);

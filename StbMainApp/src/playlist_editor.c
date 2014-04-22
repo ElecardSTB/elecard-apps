@@ -51,7 +51,12 @@ static void load_dvb_channels() {
 		element->service_index = srvIdx;
 		element->data.visible = srvIdx->data.visible;
 		element->data.parent_control = srvIdx->data.parent_control;
-		element->radio = srvIdx->service->service_descriptor.service_type == 2;
+
+		if(	(srvIdx->service->service_descriptor.service_type == 2) ||
+			(dvb_hasMediaType(srvIdx->service, mediaTypeAudio) && !dvb_hasMediaType(srvIdx->service, mediaTypeVideo)))
+		{
+			element->radio = 1;
+		}
 		element->scrambled = dvb_getScrambled(srvIdx->service);
 		snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
 	}
@@ -365,9 +370,9 @@ int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 		}
 		i++;
 	};
-	if (i == 0)
+	if (i == 0){
 		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
-
+	}
 	return 0;
 }
 

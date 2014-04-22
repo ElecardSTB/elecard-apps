@@ -301,7 +301,6 @@ int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible)
 		new->common = service->common;
 		new->data.visible = visible;
 		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen(service->service_descriptor.service_name));
-
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -478,21 +477,6 @@ static void dvbChannel_sortOrderRecheck(void)
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(dvbChannel_isServiceEnabled(srvIdx->service)) {
-			srvIdx->data.visible = 1;
-			g_dvb_channels.viewedCount++;
-		} else {
-			srvIdx->data.visible = 0;
-		}
-	}
-}
-
-static void dvbChannel_sortOrderRecheck_2(void)
-{
-	struct list_head	*pos;
-	g_dvb_channels.viewedCount = 0;
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		if(dvbChannel_isServiceEnabled(srvIdx->service)) {
 			if (srvIdx->data.visible == 1)
 			g_dvb_channels.viewedCount++;
 		} else {
@@ -503,7 +487,7 @@ static void dvbChannel_sortOrderRecheck_2(void)
 
 int32_t dvbChannel_applyUpdates(void)
 {
-	dvbChannel_sortOrderRecheck_2();
+	dvbChannel_sortOrderRecheck();
 	dvbChannel_writeOrderConfig();
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 	return 0;
@@ -540,7 +524,6 @@ static int32_t dvbChannel_update(void)
 	if (bouquet_enable()) {
 		bouquet_loadBouquets(&dvb_services);
 	}
-
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
@@ -565,7 +548,6 @@ static int32_t dvbChannel_update(void)
 			dvbChannel_remove(srvIdx);
 		}
 	}
-
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 #if (defined STSDK)
 		elcdRpcType_t type;
