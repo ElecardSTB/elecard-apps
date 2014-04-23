@@ -431,12 +431,10 @@ void filter_bouquets_list(char *bouquet_file)
 	free_elements(&bouquets_list);
 }
 
-void get_bouquets_list(char *bouquet_file, int serviseType)
+void get_bouquets_list(char *bouquet_file)
 {
 	list_element_t *cur_element;
-
 	char buf[BUFFER_SIZE];
-	char path[BOUGET_NAME_SIZE * 2];
 	FILE* fd;
 	uint32_t type;
 	uint32_t flags;
@@ -449,10 +447,9 @@ void get_bouquets_list(char *bouquet_file, int serviseType)
 	uint32_t index_9;
 	uint32_t index_10;
 
-	sprintf(path, "%s/%s/userbouquet.%s.%s",BOUGET_CONFIG_DIR, bouquet_file, bouquet_file, (serviseType == 1 ? "tv" : "radio"));
-	fd = fopen(path, "r");
+	fd = fopen(bouquet_file, "r");
 	if(fd == NULL) {
-		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
+		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
 		return;
 	}
 	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
@@ -762,7 +759,7 @@ int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg)
 		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, bouquetName);
 		struct stat sb;
 		if(!(stat(filename, &sb) == 0  || S_ISDIR( sb.st_mode))) {
-			snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s %s/", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR);
+			snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s %s/%s", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
 			printf("cmd: %s\n",cmd);
 			system(cmd);
 		}
@@ -796,8 +793,23 @@ void bouquet_loadBouquets(list_element_t **services)
 	char *bouquetName;
 	bouquetName = bouquet_getBouquetName();
 	if (bouquetName != NULL && bouquet_getFolder(bouquet_getBouquetName(bouquetName))) {
-		get_bouquets_list(bouquetName, 1/*tv*/);
-		get_bouquets_list(bouquetName, 2/*radio*/);
+		char fileName[1024];
+		free_services(&bouquet_name_tv);
+		free_services(&bouquet_name_radio);
+		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_NAME, "tv");
+		get_bouquets_file_name(&bouquet_name_tv, fileName);
+		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_NAME, "radio");
+		get_bouquets_file_name(&bouquet_name_radio, fileName);
+
+		if (bouquet_name_tv != NULL) {
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_tv->data);
+			get_bouquets_list(fileName/*tv*/);
+		}
+		if (bouquet_name_radio != NULL) {
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_radio->data);
+			get_bouquets_list(fileName/*tv*/);
+		}
+
 		filter_bouquets_list(bouquetName);
 
 		bouquet_loadLamedb(bouquetName, &*services);
@@ -904,7 +916,7 @@ void bouquet_loadBouquetsList(int force)
 void bouquet_loadChannelsFile()
 {
 	get_bouquets_file_name(&bouquet_name_tv, BOUGET_SERVICES_FILENAME_TV);
-	get_bouquets_file_name(&bouquet_name_tv, BOUGET_SERVICES_FILENAME_RADIO);
+	get_bouquets_file_name(&bouquet_name_radio, BOUGET_SERVICES_FILENAME_RADIO);
 }
 
 list_element_t *found_list(EIT_common_t *common, list_element_t **services)
