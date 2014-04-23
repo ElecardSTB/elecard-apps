@@ -509,7 +509,7 @@ static int32_t dvbChannel_update(void)
 	}
 	playlist_editor_cleanup();
 	if (bouquet_enable())
-		bouquet_loadBouquetsList();
+		bouquet_loadBouquetsList(0);
 
 	list_element_t		*service_element;
     struct list_head    *pos;
@@ -533,12 +533,6 @@ static int32_t dvbChannel_update(void)
 			if (strlen(p_srvIdx->data.channelsName) == 0) {
 				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen(p_srvIdx->service->service_descriptor.service_name));
 			}
-		} else {
-			char *bouquetName;
-			bouquetName = bouquet_getBouquetName();
-			if (!(bouquetName != NULL && bouquet_getFolder(bouquet_getBouquetName(bouquetName))))
-				dvbChannel_addService(curService, 1);
-			dprintf("%s :no common data in channels conf \n",__func__);
 		}
 	}
 	//remove elements without service pointer

@@ -70,6 +70,7 @@ void bouquet_addScanChannels();
 int bouquet_getFolder(char *bouquetsFile);
 int bouquet_saveBouquet(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg);
+int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_enable();
 void bouquet_init();

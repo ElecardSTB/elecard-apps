@@ -47,6 +47,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
+#define DEBUG 1
+#define debug(fmt, ...) \
+		do { if (DEBUG) fprintf(stderr, "%s():%d: " fmt, __func__, \
+								__LINE__, __VA_ARGS__); } while (0)
 #define NAME_SPACE                      0xFFFF0000
 
 #define BOUQUET_FULL_LIST	            "/var/etc/elecard/StbMainApp/"
@@ -157,39 +161,40 @@ void bouquet_saveAllBouquet()
 	bouquet_saveLamedb(bouquetName);
 }
 
-void bouquet_sendBouquet(){
-
+int bouquet_sendBouquet()
+{
 	if(!(helperFileExists(GARB_DIR "/.ssh/id_rsa") && helperFileExists(GARB_DIR "/.ssh/id_rsa.pub"))) {
 		eprintf("%s(): No garb private or public key!!!\n", __func__);
-		return ;//-1;
+		return -1;
 	}
 
-		char serverName[16];
-		char loginName[32];
-		char serverDir[256];
-		char cmd[1024];
-		int32_t ret = 0;
+	char serverName[16];
+	char loginName[32];
+	char serverDir[256];
+	char cmd[1024];
+	int32_t ret = 0;
 
-		getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
-		getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
-		getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
+	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
+	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
+	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 
-		FILE* fd;
-		char bouquet_file[BUFFER_SIZE];
+	FILE* fd;
+	char bouquet_file[BUFFER_SIZE];
 
-		sprintf(bouquet_file, "-mkdir %s/../bouquet/%s.STB/\n -put %s/%s/* %s/../bouquet/%s.STB/", serverDir, bouquetName, BOUGET_CONFIG_DIR, bouquetName, serverDir, bouquetName);
-		fd = fopen("/tmp/cmd_bouquet", "wb");
-		if(fd == NULL) {
-			eprintf("%s: Failed to open /tmp/cmd_bouquet \n", __FUNCTION__);
-			return;
-		}
-		fprintf(fd, "%s\n",bouquet_file);
-		fclose(fd);
+	sprintf(bouquet_file, "-mkdir %s/../bouquet/%s.STB/\n -put %s/%s/* %s/../bouquet/%s.STB/\n -put %s/%s %s/../bouquet/",
+							 serverDir,    bouquetName,      BOUGET_CONFIG_DIR, bouquetName, serverDir, bouquetName,  BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, serverDir );
+	fd = fopen("/tmp/cmd_bouquet", "wb");
+	if(fd == NULL) {
+		eprintf("%s: Failed to open /tmp/cmd_bouquet \n", __FUNCTION__);
+		return;
+	}
+	fprintf(fd, "%s\n",bouquet_file);
+	fclose(fd);
 
-		snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
-		printf("cmd: %s\n",cmd);
-		ret = system(cmd);
-	//	return WEXITSTATUS(ret);
+	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
+	printf("cmd: %s\n",cmd);
+	ret = system(cmd);
+	return WEXITSTATUS(ret);
 }
 
 list_element_t *list_getElement(int count, list_element_t **head)
@@ -208,19 +213,16 @@ list_element_t *list_getElement(int count, list_element_t **head)
 void bouquet_addScanChannels()
 {
 	list_element_t		*service_element;
-	char *bouquetName;
-	bouquetName = bouquet_getBouquetName();
 
-	if ((bouquetName != NULL && bouquet_getFolder(bouquet_getBouquetName(bouquetName)))) {
-		for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
-			EIT_service_t *curService = (EIT_service_t *)service_element->data;
-			if(!(dvbChannel_findServiceCommon(&curService->common))){
-				dvbChannel_addService(curService, 1);
-			}
+	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+		EIT_service_t *curService = (EIT_service_t *)service_element->data;
+		if(!(dvbChannel_findServiceCommon(&curService->common))){
+			dvbChannel_addService(curService, 1);
 		}
 	}
 	dvbChannel_writeOrderConfig();
-	bouquet_saveAllBouquet();
+	if (bouquet_enable())
+		bouquet_saveAllBouquet();
 }
 
 int bouquets_setBouquet(interfaceMenu_t *pMenu, void* pArg)
@@ -249,6 +251,19 @@ int bouquets_setBouquet(interfaceMenu_t *pMenu, void* pArg)
 void bouquet_setBouquetName(char *name)
 {
 	sprintf(bouquetName,"%s", name);
+}
+
+void bouquet_removeBouquetName(list_element_t **bouquet_name, char *name)
+{
+	list_element_t *cur_element;
+	for(cur_element = bouquetNameList; cur_element != NULL; cur_element = cur_element->next) {
+		if (cur_element != NULL){
+			if (strncasecmp((char *)cur_element->data, name, strlen(name)) == 0) {
+				remove_element(&*bouquet_name, cur_element);
+				return;
+			}
+		}
+	}
 }
 
 void bouquet_addNewBouquetName(list_element_t **bouquet_name, char *name)
@@ -286,12 +301,14 @@ void bouquet_setNewBouquetName(char *name)
 
 char *bouquet_getBouquetName()
 {
-	list_element_t *cur_element;
-	for(cur_element = bouquetNameList; cur_element != NULL; cur_element = cur_element->next) {
-		if (cur_element != NULL){
-			if (strncasecmp((char *)cur_element->data, bouquetName, strlen(bouquetName)) == 0) {
-				dprintf("%s: %s\n",__func__, bouquetName);
-				return bouquetName;
+	if (bouquet_enable()) {
+		list_element_t *cur_element;
+		for(cur_element = bouquetNameList; cur_element != NULL; cur_element = cur_element->next) {
+			if (cur_element != NULL){
+				if (strncasecmp((char *)cur_element->data, bouquetName, strlen(bouquetName)) == 0) {
+					dprintf("%s: %s\n",__func__, bouquetName);
+					return bouquetName;
+				}
 			}
 		}
 	}
@@ -625,8 +642,6 @@ void bouquet_saveLamedb(char *fileName)
 
 void bouquet_saveBouquets(char *fileName, char *typeName)
 {
-	dprintf("Save name list ");
-
 	FILE* fd;
 	char bouquet_file[BUFFER_SIZE];
 
@@ -697,6 +712,29 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg)
 	saveAppSettings();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
+	return 0;
+}
+int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
+{
+	char *bouquetName;
+	bouquetName = bouquet_getBouquetName();
+	debug("%s\n",bouquetName);
+
+	if (bouquetName != NULL) {
+		char cmd[1024];
+		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUGET_CONFIG_DIR, bouquetName);
+		printf("cmd: %s\n",cmd);
+		system(cmd);
+		bouquet_removeBouquetName(&bouquetNameList, bouquetName);
+		bouquet_loadBouquetsList(1);
+	} else {
+		free_services(&dvb_services);
+	}
+	dvbChannel_terminate();
+	dvbChannel_writeOrderConfig();
+	offair_fillDVBTMenu();
+	output_redrawMenu(pMenu);
+
 	return 0;
 }
 
@@ -802,11 +840,9 @@ int bouquet_downloadBouquetsList()
 
 void bouquet_init()
 {
-	printf("%s[%d]\n",__func__, __LINE__);
 	struct stat sb;
 	if(stat(BOUGET_CONFIG_DIR, &sb) == 0 && S_ISDIR( sb.st_mode))
 		return;
-	printf("%s[%d]\n",__func__, __LINE__);
 	mkdir(BOUGET_CONFIG_DIR, 0777);
 }
 
@@ -854,9 +890,9 @@ void bouquet_parseBouquetsList(list_element_t **bouquet_name)
 	fclose(fd);
 }
 
-void bouquet_loadBouquetsList()
+void bouquet_loadBouquetsList(int force)
 {
-	if (bouquetNameList != NULL)
+	if (bouquetNameList != NULL && force == 0)
 		return;
 
 	if ( bouquet_downloadBouquetsList() == 0 || bouquetNameList == NULL)

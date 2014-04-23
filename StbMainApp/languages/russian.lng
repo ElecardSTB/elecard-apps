@@ -378,6 +378,7 @@ PLAYLIST_UPDATE=Обновить плейлист
 PLAYLIST_ENABLE=Включить плейлист
 PLAYLIST_NEW_BOUQUETS=Создать новый букет
 PLAYLIST_SAVE_BOUQUETS=сохранить букет на сервере
+PLAYLIST_REMOVE=Удалить букет
 PLEASE_WAIT=Пожалуйста, подождите...
 POWER_OFF_CONFIRM=Приставка будет выключена.\nВы уверены, что хотите продолжить?
 POWER_OFF=Выключение...

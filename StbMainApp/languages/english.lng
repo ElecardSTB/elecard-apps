@@ -364,6 +364,7 @@ PLAYLIST_ENABLE=Playlist enable
 PLAYLIST_UPDATE=Playlist update
 PLAYLIST_NEW_BOUQUETS=Create new bouquet
 PLAYLIST_SAVE_BOUQUETS=Bouquet save on server
+PLAYLIST_REMOVE=Remove bouquet
 PLEASE_WAIT=Please wait...
 POWER_OFF_CONFIRM=Are You Shure You Want to Shutdown?
 POWER_OFF=Power Off...
