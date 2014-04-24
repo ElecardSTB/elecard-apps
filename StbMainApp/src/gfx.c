@@ -3620,7 +3620,13 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 #endif // ENABLE_3D
 	
 	/* Flip the surface to update the front buffer */
-	
+#ifdef ENABLE_FUSION
+	DFBRegion rect;
+	rect.x1 = 0;
+	rect.x2 = interfaceInfo.screenWidth;
+	rect.y1 = 0;
+	rect.y2 = interfaceInfo.screenHeight - 80;
+#endif
 #ifndef STSDK
 	{
 		int res;
@@ -3631,14 +3637,23 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 		if (res){
 			eprintf ("%s: - pthread_mutex_timedlock failed. errno = %d\n", __FUNCTION__, errno);
 		}
-		else {
+		else {  
+#ifdef ENABLE_FUSION
+			DFBCHECKLABEL (pSurface->Flip(pSurface, &rect, 0), finish_flip );
+#else
 			DFBCHECKLABEL (pSurface->Flip(pSurface, NULL, 0), finish_flip );
+#endif	/*ENABLE_FUSION*/
 			pthread_mutex_unlock(&flipMutex);
 		}
 	}
 #else
 	// Tripple buffering is not working on ST, so we have to wait for vsync to remove flicker
-	DFBCHECKLABEL (pSurface->Flip(pSurface, NULL, DSFLIP_WAITFORSYNC), finish_flip);
+	
+#ifdef ENABLE_FUSION
+			DFBCHECKLABEL (pSurface->Flip(pSurface, &rect, DSFLIP_WAITFORSYNC), finish_flip);
+#else
+			DFBCHECKLABEL (pSurface->Flip(pSurface, NULL, DSFLIP_WAITFORSYNC), finish_flip);
+#endif	/*ENABLE_FUSION*/	
 #endif
 
 #ifdef STBTI

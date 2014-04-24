@@ -1959,8 +1959,9 @@ int getPngSize (const char *filename, int *w, int *h)
 	return 0;
 }
 
-static void interface_displayLogo(void)
+void interface_displayLogo(void)
 {
+	mysem_get(interface_semaphore);
 #ifdef SHOW_LOGO_TEXT
 	/* Show logo text */
 	int lw = 330;
@@ -2025,6 +2026,7 @@ static void interface_displayLogo(void)
 #ifdef ENABLE_FUSION
 
 	// top left
+	DFBRegion region;		
 	pthread_mutex_lock(&FusionObject.mutexLogo);
 	for (int i=0; i<FusionObject.logoCount; i++){
 		int left=0, top=0;
@@ -2052,15 +2054,33 @@ static void interface_displayLogo(void)
 				top = interfaceInfo.screenHeight - 200;
 				break;
 		}
+
+		region.x1 = left;
+		region.x2 = left + w;
+		region.y1 = top;
+		region.y2 = top + h;
+
 		interface_drawImage(DRAWING_SURFACE, 
 			FusionObject.logos[i].filepath,
 			left, top,
 			w, h, 0, 0, DSBLIT_BLEND_ALPHACHANNEL,
 			interfaceAlignLeft | interfaceAlignTop, 0, 0);
+		
+			DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC);
 	}
 	pthread_mutex_unlock(&FusionObject.mutexLogo);
 
 	if (FusionObject.creepStartTime > 0){
+		gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x0, 0, interfaceInfo.screenHeight - 80, interfaceInfo.screenWidth, 80);
+		if (interfaceInfo.showMenu) {
+			interface_displayStatusbar();
+		}
+
+		region.x1 = 0;
+		region.x2 = interfaceInfo.screenWidth;
+		region.y1 = interfaceInfo.screenHeight - 80;
+		region.y2 = interfaceInfo.screenHeight;
+
 		struct timeval tv;
 		gettimeofday(&tv, NULL);
 		unsigned long long millisecondsSinceEpoch = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
@@ -2092,12 +2112,15 @@ eprintf("%s(%d): creepWidth = %d, timeForAllCreep = %f, deltaTime = %llu, positi
 			INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
 			INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
 			interfaceInfo.screenWidth - position, 
-			interfaceInfo.screenHeight - 80,
+			interfaceInfo.screenHeight - 40,
 			FusionObject.creepline, 
 			0, 1);
 		pthread_mutex_unlock(&FusionObject.mutexCreep);
+
+		DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC);
 	}
 #endif
+	mysem_release(interface_semaphore);
 }
 
 static void interface_displayAll(void)
@@ -2171,7 +2194,7 @@ static void interface_animateMenu(int flipFB, int animate)
 	gfx_clearSurface(DRAWING_SURFACE, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
 
 	interface_displayBackground();
-	interface_displayLogo();
+// 	interface_displayLogo();
 
 	if (!interfaceInfo.showMenu) {
 		//dprintf("%s: display play control\n", __FUNCTION__);
@@ -2213,8 +2236,9 @@ static void interface_animateMenu(int flipFB, int animate)
 	eprintf("%s: menu screen updated in %lu sec\n", __FUNCTION__, (unsigned long)(cur-start));
 #endif
 	mysem_release(interface_semaphore);
-
+#ifndef ENABLE_FUSION
 	interface_setClockRefreshEvent();
+#endif
 }
 
 void interface_displayMenuHeader(void)
@@ -5964,6 +5988,7 @@ static int interface_refreshClock(void *pArg)
 
 void interface_displayClock(int detached)
 {
+#ifndef ENABLE_FUSION
 	time_t rawtime;
 	struct tm cur_time;
 
@@ -6020,6 +6045,7 @@ void interface_displayClock(int detached)
 	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time.tm_min / 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
 	x += INTERFACE_CLOCK_DIGIT_WIDTH;
 	interface_drawIcon(DRAWING_SURFACE, IMAGE_DIR "digits.png", x, y, INTERFACE_CLOCK_DIGIT_WIDTH, INTERFACE_CLOCK_DIGIT_HEIGHT, 0, cur_time.tm_min % 10, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft);
+#endif
 }
 
 inline int interface_playControlSliderIsEnabled()

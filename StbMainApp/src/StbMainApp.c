@@ -1923,7 +1923,8 @@ int fusion_refreshEvent(void *pArg)
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 	if (needUpdate){
-		interface_displayMenu(1);
+// 		interface_displayMenu(1);
+		interface_displayLogo();
 	}
 	interface_addEvent(fusion_refreshEvent, (void*)NULL, 10, 1);
 	return 0;
@@ -1942,13 +1943,13 @@ void fusion_startup()
 
 	fusion_getSecret();
 
-	int result = media_startPlayback();
-	if (result == 0){
-		eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FUSION_STUB);
-	}
-	else {
-		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
-	}
+// 	int result = media_startPlayback();
+// 	if (result == 0){
+// 		eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FUSION_STUB);
+// 	}
+// 	else {
+// 		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
+// 	}
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
