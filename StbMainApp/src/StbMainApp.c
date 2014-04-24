@@ -1924,7 +1924,7 @@ int fusion_refreshEvent(void *pArg)
 
 	if (needUpdate){
 // 		interface_displayMenu(1);
-		interface_displayLogo();
+		interface_displayCreepline();
 	}
 	interface_addEvent(fusion_refreshEvent, (void*)NULL, 10, 1);
 	return 0;
@@ -2287,6 +2287,7 @@ int fusion_getCreepAndLogo ()
 			}
 		}
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
+		interface_displayMenu(1);
 	}
 
 	result = FUSION_SAME_CREEP;

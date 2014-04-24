@@ -771,6 +771,17 @@ static void interface_animateSurface()
 }
 #endif // STB82
 
+void interface_flipStatusbarSurface()
+{
+	DFBRegion region;
+	region.x1 = 0;
+	region.y1 = interfaceInfo.screenHeight - 80;
+	region.x2 = interfaceInfo.screenWidth;
+	region.y2 = interfaceInfo.screenHeight;
+
+	DFBCHECK(DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC));
+}
+
 void interface_flipSurface()
 {
 #ifdef GFX_USE_HELPER_SURFACE
@@ -1959,9 +1970,8 @@ int getPngSize (const char *filename, int *w, int *h)
 	return 0;
 }
 
-void interface_displayLogo(void)
+static void interface_displayLogo(void)
 {
-	mysem_get(interface_semaphore);
 #ifdef SHOW_LOGO_TEXT
 	/* Show logo text */
 	int lw = 330;
@@ -2025,8 +2035,7 @@ void interface_displayLogo(void)
 
 #ifdef ENABLE_FUSION
 
-	// top left
-	DFBRegion region;		
+	// top left		
 	pthread_mutex_lock(&FusionObject.mutexLogo);
 	for (int i=0; i<FusionObject.logoCount; i++){
 		int left=0, top=0;
@@ -2055,31 +2064,26 @@ void interface_displayLogo(void)
 				break;
 		}
 
-		region.x1 = left;
-		region.x2 = left + w;
-		region.y1 = top;
-		region.y2 = top + h;
-
 		interface_drawImage(DRAWING_SURFACE, 
 			FusionObject.logos[i].filepath,
 			left, top,
 			w, h, 0, 0, DSBLIT_BLEND_ALPHACHANNEL,
 			interfaceAlignLeft | interfaceAlignTop, 0, 0);
-		
-			DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC);
 	}
 	pthread_mutex_unlock(&FusionObject.mutexLogo);
+#endif
+}
 
+void interface_displayCreepline(void)
+{
+#ifdef ENABLE_FUSION
+	mysem_get(interface_semaphore);
+	// top left
 	if (FusionObject.creepStartTime > 0){
 		gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x0, 0, interfaceInfo.screenHeight - 80, interfaceInfo.screenWidth, 80);
 		if (interfaceInfo.showMenu) {
 			interface_displayStatusbar();
 		}
-
-		region.x1 = 0;
-		region.x2 = interfaceInfo.screenWidth;
-		region.y1 = interfaceInfo.screenHeight - 80;
-		region.y2 = interfaceInfo.screenHeight;
 
 		struct timeval tv;
 		gettimeofday(&tv, NULL);
@@ -2117,10 +2121,11 @@ eprintf("%s(%d): creepWidth = %d, timeForAllCreep = %f, deltaTime = %llu, positi
 			0, 1);
 		pthread_mutex_unlock(&FusionObject.mutexCreep);
 
-		DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC);
+		interface_flipStatusbarSurface();
 	}
-#endif
+	
 	mysem_release(interface_semaphore);
+#endif
 }
 
 static void interface_displayAll(void)
@@ -2194,13 +2199,18 @@ static void interface_animateMenu(int flipFB, int animate)
 	gfx_clearSurface(DRAWING_SURFACE, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
 
 	interface_displayBackground();
-// 	interface_displayLogo();
+	interface_displayLogo();
 
 	if (!interfaceInfo.showMenu) {
 		//dprintf("%s: display play control\n", __FUNCTION__);
 		interface_displayAll();
 
 		interface_flipSurface();
+#ifdef ENABLE_FUSION
+		if (FusionObject.creepStartTime <= 0){
+			interface_flipStatusbarSurface();
+		}
+#endif
 #ifdef SCREEN_TRACE
 		cur = getCurrentTime();
 		eprintf("%s: screen updated in %lu sec\n", __FUNCTION__, (unsigned long)(cur-start));
@@ -2214,7 +2224,15 @@ static void interface_animateMenu(int flipFB, int animate)
 		tprintf(" >>> %s <<<\n", interfaceInfo.currentMenu->name != NULL ? interfaceInfo.currentMenu->name : "[N/A]");
 		interfaceInfo.currentMenu->displayMenu(interfaceInfo.currentMenu);
 	}
+
+#ifdef ENABLE_FUSION
+	if (FusionObject.creepStartTime <= 0){
+		interface_displayStatusbar();
+		interface_flipStatusbarSurface();
+	}
+#else
 	interface_displayStatusbar();
+#endif
 	interface_displayAll();
 
 	//dprintf("%s: flip\n", __FUNCTION__);

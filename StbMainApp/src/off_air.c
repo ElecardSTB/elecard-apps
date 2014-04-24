@@ -1210,7 +1210,7 @@ void offair_displayPlayControl(void)
 
 		w = INTERFACE_CLOCK_DIGIT_WIDTH*interfaceChannelControl.showingLength;
 		x = interfaceInfo.screenWidth - interfaceInfo.marginSize - INTERFACE_CLOCK_DIGIT_WIDTH*3 - INTERFACE_ROUND_CORNER_RADIUS/2;
-		y = interfaceInfo.marginSize;
+		y = interfaceInfo.marginSize - 10;
 
 		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
 
