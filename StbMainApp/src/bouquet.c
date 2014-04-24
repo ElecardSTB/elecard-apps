@@ -794,8 +794,8 @@ void bouquet_loadBouquets(list_element_t **services)
 	bouquetName = bouquet_getBouquetName();
 	if (bouquetName != NULL && bouquet_getFolder(bouquet_getBouquetName(bouquetName))) {
 		char fileName[1024];
-		free_services(&bouquet_name_tv);
-		free_services(&bouquet_name_radio);
+		free_elements(&bouquet_name_tv);
+		free_elements(&bouquet_name_radio);
 		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_NAME, "tv");
 		get_bouquets_file_name(&bouquet_name_tv, fileName);
 		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_NAME, "radio");
@@ -809,9 +809,7 @@ void bouquet_loadBouquets(list_element_t **services)
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_radio->data);
 			get_bouquets_list(fileName/*tv*/);
 		}
-
 		filter_bouquets_list(bouquetName);
-
 		bouquet_loadLamedb(bouquetName, &*services);
 	}
 }
