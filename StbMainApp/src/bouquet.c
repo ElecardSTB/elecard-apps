@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "list.h"
 #include "debug.h"
 #include "off_air.h"
+#include "l10n.h"
 
 #include "stsdk.h"
 #include <cJSON.h>
@@ -163,6 +164,7 @@ void bouquet_saveAllBouquet()
 
 int bouquet_sendBouquet()
 {
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	if(!(helperFileExists(GARB_DIR "/.ssh/id_rsa") && helperFileExists(GARB_DIR "/.ssh/id_rsa.pub"))) {
 		eprintf("%s(): No garb private or public key!!!\n", __func__);
 		return -1;
@@ -194,6 +196,7 @@ int bouquet_sendBouquet()
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
 	printf("cmd: %s\n",cmd);
 	ret = system(cmd);
+	interface_hideMessageBox();
 	return WEXITSTATUS(ret);
 }
 
@@ -238,10 +241,9 @@ int bouquets_setBouquet(interfaceMenu_t *pMenu, void* pArg)
 			return 0;
 		}
 	}
-
 	dvbChannel_terminate();
 	free_services(&dvb_services);
-	bouquet_setBouquetName (bouquet_getNameBouquetList(number));
+	bouquet_setBouquetName(bouquet_getNameBouquetList(number));
 	saveAppSettings();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
@@ -285,6 +287,7 @@ void bouquet_addNewBouquetName(list_element_t **bouquet_name, char *name)
 
 void bouquet_setNewBouquetName(char *name)
 {
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	char buffName[64];
 	char cmd[1024];
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, name);
@@ -297,6 +300,7 @@ void bouquet_setNewBouquetName(char *name)
 		system(cmd);
 		bouquet_saveBouquetsList(&bouquetNameList);
 	}
+	interface_hideMessageBox();
 }
 
 char *bouquet_getBouquetName()
@@ -713,6 +717,7 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg)
 }
 int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	char *bouquetName;
 	bouquetName = bouquet_getBouquetName();
 	debug("%s\n",bouquetName);
@@ -729,16 +734,18 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 	}
 	dvbChannel_terminate();
 	dvbChannel_writeOrderConfig();
+	interface_hideMessageBox();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
-
 	return 0;
 }
 
 int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
+
 	char *bouquetName;
 	bouquetName = bouquet_getBouquetName();
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 
 	if (bouquetName != NULL) {
 		char serverName[16];
@@ -775,6 +782,7 @@ int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg)
 	if ( bouquet_downloadBouquetsList() == 0 || bouquetNameList == NULL)
 		bouquet_parseBouquetsList(&bouquetNameList);
 
+	interface_hideMessageBox();
 	offair_fillDVBTMenu();
 	return 0;
 }
@@ -816,6 +824,7 @@ void bouquet_loadBouquets(list_element_t **services)
 
 int bouquet_downloadBouquetsList()
 {
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	char serverName[16];
 	char serverDir[256];
 	char filename[256];
@@ -845,6 +854,7 @@ int bouquet_downloadBouquetsList()
 	}
 	printf("cmd: %s\n",cmd);
 	system(cmd);
+	interface_hideMessageBox();
 	return val;
 }
 
@@ -1134,6 +1144,7 @@ int bouquet_file()
 
 void bouquet_downloadFileFromServer(char *shortname, char *fullname)
 {
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	char serverName[16];
 	char serverDir[256];
 	char loginName[32];
@@ -1144,6 +1155,7 @@ void bouquet_downloadFileFromServer(char *shortname, char *fullname)
 	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../channels/%s %s", loginName, serverName, serverDir, shortname, fullname);
 	printf("cmd: %s\n",cmd);
 	system(cmd);
+	interface_hideMessageBox();
 }
 
 void bouquet_downloadFileWithServices(char *filename){
