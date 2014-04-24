@@ -1870,6 +1870,7 @@ void * fusion_threadCreepline(void * param)
 			fusion_wait(FusionObject.pause * 1000);
 			gettimeofday(&tv, NULL);
 			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+			FusionObject.creepShown = 0;
 		}
 		fusion_wait(FusionObject.checktime * 1000);
 	}
