@@ -717,16 +717,17 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg)
 }
 int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
-	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	char *bouquetName;
 	bouquetName = bouquet_getBouquetName();
 	debug("%s\n",bouquetName);
 
 	if (bouquetName != NULL) {
+		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUGET_CONFIG_DIR, bouquetName);
 		printf("cmd: %s\n",cmd);
 		system(cmd);
+		interface_hideMessageBox();
 		bouquet_removeBouquetName(&bouquetNameList, bouquetName);
 		bouquet_loadBouquetsList(1);
 	} else {
@@ -734,7 +735,6 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 	}
 	dvbChannel_terminate();
 	dvbChannel_writeOrderConfig();
-	interface_hideMessageBox();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
 	return 0;
@@ -742,11 +742,11 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 
 int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
-
 	char *bouquetName;
 	bouquetName = bouquet_getBouquetName();
-	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
+	bouquet_loadBouquetsList(1);
 
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	if (bouquetName != NULL) {
 		char serverName[16];
 		char serverDir[256];
@@ -779,9 +779,6 @@ int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg)
 		printf("cmd: %s\n",cmd);
 		system(cmd);
 	}
-	if ( bouquet_downloadBouquetsList() == 0 || bouquetNameList == NULL)
-		bouquet_parseBouquetsList(&bouquetNameList);
-
 	interface_hideMessageBox();
 	offair_fillDVBTMenu();
 	return 0;
@@ -912,12 +909,9 @@ void bouquet_parseBouquetsList(list_element_t **bouquet_name)
 
 void bouquet_loadBouquetsList(int force)
 {
-	if (bouquetNameList != NULL && force == 0)
-		return;
-
-	if ( bouquet_downloadBouquetsList() == 0 || bouquetNameList == NULL)
-		bouquet_parseBouquetsList(&bouquetNameList);
-
+	if (force == 1)
+		bouquet_downloadBouquetsList();
+	bouquet_parseBouquetsList(&bouquetNameList);
 }
 
 
