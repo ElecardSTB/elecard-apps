@@ -160,7 +160,7 @@ int fusion_readConfig();
 long fusion_getRemoteFileSize(char * url);
 int fusion_getSecret ();
 int fusion_setMoscowDateTime();
-int fusion_getUtc (char * utcBuffer);
+int fusion_getUtc (char * utcBuffer, int size);
 #endif
 
 /******************************************************************
@@ -1933,7 +1933,9 @@ int fusion_refreshEvent(void *pArg)
 
 void fusion_startup()
 {
-	fusion_setMoscowDateTime();
+	if (fusion_setMoscowDateTime() != 0){
+		return;
+	}
 
 	sprintf (appControlInfo.mediaInfo.filename, "%s", FUSION_STUB);
 
@@ -2025,8 +2027,8 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, fusion_curlError);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, curlStream);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15);
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60);  // 15
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60);  // 15
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
@@ -2107,10 +2109,10 @@ int fusion_setMoscowDateTime()
 {
 	char setDateString[64];
 	char dateString[64];
-	char utcBuffer [64];
-	memset(utcBuffer, 0, 64);
+	char utcBuffer [1024];
+	memset(utcBuffer, 0, 1024);
 
-	if (fusion_getUtc(utcBuffer) != 0) {
+	if (fusion_getUtc(utcBuffer, 1024) != 0) {
 		eprintf ("%s(%d): WARNING! Couldn't get UTC datetime.\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
@@ -2126,17 +2128,22 @@ int fusion_setMoscowDateTime()
 }
 
 
-int fusion_getUtc (char * utcBuffer)
+int fusion_getUtc (char * utcBuffer, int size)
 {
 	FILE * f;
 	char request[256];
+	char * ptrStartUtc, * ptrEndUtc;
+	char utcData[64];
+	memset(utcData, 0, 64);
 
 	if (!utcBuffer) {
 		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 
-	sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt");  // 2>/dev/null
+	// use earthtools instead timeapi.org which is currently dead
+	//sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt");  // 2>/dev/null
+	sprintf (request, "wget \"http://www.earthtools.org/timezone/0/0\" -O /tmp/utc.txt");
 	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
 	system (request);
 
@@ -2145,10 +2152,20 @@ int fusion_getUtc (char * utcBuffer)
 		eprintf ("%s(%d): ERROR! Couldn't open /tmp/utc.txt.\n",   __FUNCTION__, __LINE__);
 		return -1;
 	}
-	fread(utcBuffer, 64, 1, f);
+	fread(utcBuffer, size, 1, f);
 	fclose(f);
 
 	eprintf ("ans: %s\n", utcBuffer);
+
+	ptrStartUtc = strstr(utcBuffer, "<utctime>");
+	if (ptrStartUtc) {
+		ptrStartUtc += 9;
+		ptrEndUtc = strstr(ptrStartUtc, "</utctime>");
+		if (ptrEndUtc){
+			snprintf (utcData, (int)(ptrEndUtc - ptrStartUtc) + 1, "%s", ptrStartUtc);
+		}
+	}
+	sprintf (utcBuffer, "%s", utcData);
 
 	if (!strlen(utcBuffer) || !strchr(utcBuffer, ' ')) {
 		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
