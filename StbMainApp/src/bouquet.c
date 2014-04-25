@@ -52,8 +52,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define debug(fmt, ...) \
 		do { if (DEBUG) fprintf(stderr, "%s():%d: " fmt, __func__, \
 								__LINE__, __VA_ARGS__); } while (0)
-#define NAME_SPACE                      0xFFFF0000
 
+#define NAME_SPACE                      0xFFFF0000
 #define BOUQUET_FULL_LIST	            "/var/etc/elecard/StbMainApp/"
 #define BOUGET_CONFIG_DIR               "/var/etc/elecard/StbMainApp/bouquet"
 #define BOUGET_CONFIG_FILE               "bouquet.conf"
@@ -90,11 +90,7 @@ typedef struct _transpounder_id_t
 typedef struct _transpounder_t
 {
 	transpounder_id_t transpounder_id;
-	char type;                      // dvb-c/t/
-	uint32_t freq;                  //Frequency
-	uint32_t sym_rate;              //symbol rate
-	uint32_t mod;                   //Modulation
-	uint32_t inversion;             //inversion
+	EIT_media_config_t media;
 } transpounder_t;
 
 typedef struct _services_t
@@ -609,22 +605,28 @@ void bouquet_saveLamedb(char *fileName)
 		element->transpounder_id.ts_id = srvIdx->service->common.transport_stream_id;
 		element->transpounder_id.n_id = srvIdx->service->original_network_id;
 
-		if (srvIdx->service->media.type == serviceMediaDVBC) {
-			element->type = 'c';
-			element->freq = srvIdx->service->media.dvb_c.frequency / 1000;
-			element->sym_rate = srvIdx->service->media.dvb_c.symbol_rate;
-			element->mod = srvIdx->service->media.dvb_c.modulation;
-			element->inversion = srvIdx->service->media.dvb_c.inversion;
-		}
+		memcpy(&element->media,&srvIdx->service->media,sizeof(EIT_media_config_t));
 	}
-
 
 	fprintf(fd, "eDVB services /4/\n");
 	fprintf(fd, "transponders\n");
 	for(cur_element = head_ts_list; cur_element != NULL; cur_element = cur_element->next) {
 		element = (transpounder_t*)cur_element->data;
 		fprintf(fd, "%08x:%04x:%04x\n", element->transpounder_id.name_space, element->transpounder_id.ts_id, element->transpounder_id.n_id);
-		fprintf(fd, "	%c %d:%d:%d:%d:0:0:0\n", element->type, element->freq, element->sym_rate, (element->inversion == 0 ? 2 : 1), element->mod);
+		if (element->media.type == serviceMediaDVBC) {
+			fprintf(fd, "	%c %d:%d:%d:%d:0:0:0\n", 'c', element->media.dvb_c.frequency / 1000,
+														  element->media.dvb_c.symbol_rate,
+														  (element->media.dvb_c.inversion == 0 ? 2 : 1),
+														  element->media.dvb_c.modulation);
+		}
+		if (element->media.type == serviceMediaDVBS) {
+			fprintf(fd, "	%c %d:%d:%d:%d:0:0:0\n", 's', element->media.dvb_s.frequency,
+														  element->media.dvb_s.symbol_rate,
+														  element->media.dvb_s.polarization,
+														  element->media.dvb_s.FEC_inner,
+														  element->media.dvb_s.orbital_position,
+														  (element->media.dvb_s.inversion == 0 ? 2 : 1));
+		}
 		fprintf(fd, "/\n");
 	}
 	fprintf(fd, "end\n");
@@ -812,7 +814,7 @@ void bouquet_loadBouquets(list_element_t **services)
 		}
 		if (bouquet_name_radio != NULL) {
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_radio->data);
-			get_bouquets_list(fileName/*tv*/);
+			get_bouquets_list(fileName/*radio*/);
 		}
 		filter_bouquets_list(bouquetName);
 		bouquet_loadLamedb(bouquetName, &*services);
@@ -997,10 +999,24 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 				break;
 			if (sscanf(buf, " %c %d:%d:%d:%d:%d:%d:%d\n",&type, &freq, &sym_rate, &inversion, &mod, &fec_inner, &flag, &system) != 8)
 				break;
-			element->type = type;
-			element->freq = freq;
-			element->sym_rate = sym_rate;
-			element->mod = mod;
+			if( type == 'c') {
+				element->media.type = serviceMediaDVBC;
+				element->media.frequency = freq * 1000;
+				element->media.dvb_c.frequency = freq * 1000;
+				element->media.dvb_c.symbol_rate = sym_rate;
+				element->media.dvb_c.modulation = mod;
+				element->media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
+			}
+			if( type == 's') {
+				element->media.type = serviceMediaDVBS;
+				element->media.frequency = freq;
+				element->media.dvb_s.frequency = freq;
+				element->media.dvb_s.symbol_rate = sym_rate;
+				element->media.dvb_s.polarization = inversion;
+				element->media.dvb_s.FEC_inner = mod;
+				element->media.dvb_s.orbital_position = fec_inner;
+				element->media.dvb_s.inversion = (flag == 2 ? 0 : 1);
+			}
 
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
 				break;
@@ -1051,14 +1067,21 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 
 			if (service_element != NULL) {
 				element = (EIT_service_t *)service_element->data;
-				if ( element_tr->type == 'c' && 2 == element->media.type &&
-					 element->media.dvb_c.frequency == element_tr->freq * 1000 &&
-					 element->media.dvb_c.symbol_rate == element_tr->sym_rate &&
-					 element->media.dvb_c.modulation == element_tr->mod) {
+				if (element->media.type == serviceMediaDVBC && element_tr->media.type == serviceMediaDVBC &&
+						element->media.dvb_c.frequency == element_tr->media.dvb_c.frequency &&
+						element->media.dvb_c.symbol_rate == element_tr->media.dvb_c.symbol_rate &&
+						element->media.dvb_c.modulation == element_tr->media.dvb_c.modulation &&
+						element->media.dvb_c.inversion == element_tr->media.dvb_c.inversion)
 					continue;
-				} else {
-					remove_element(&*services, service_element);
-				}
+				if (element->media.type == serviceMediaDVBS && element_tr->media.type == serviceMediaDVBS &&
+						element->media.dvb_s.frequency == element_tr->media.dvb_s.frequency &&
+						element->media.dvb_s.symbol_rate == element_tr->media.dvb_s.symbol_rate &&
+						element->media.dvb_s.polarization == element_tr->media.dvb_s.polarization &&
+						element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
+						element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
+						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion)
+					continue;
+				remove_element(&*services, service_element);
 			}
 			list_element_t *cur_element = NULL;
 			if (*services == NULL) {
@@ -1079,12 +1102,21 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 
 			memcpy(&element->service_descriptor.service_name, &service_name, strlen(service_name));
 
-			if (element_tr->type == 'c') {
-				element->media.type = serviceMediaDVBC;
-				element->media.dvb_c.frequency = element_tr->freq * 1000;
-				element->media.dvb_c.symbol_rate = element_tr->sym_rate;
-				element->media.dvb_c.modulation = element_tr->mod;
-				element->common.media_id = element->common.media_id;
+			if (element_tr->media.type == serviceMediaDVBC) {
+				element->media.type = element_tr->media.type;
+				element->media.dvb_c.frequency = element_tr->media.dvb_c.frequency;
+				element->media.dvb_c.symbol_rate = element_tr->media.dvb_c.symbol_rate;
+				element->media.dvb_c.modulation = element_tr->media.dvb_c.modulation;
+			}
+			if (element_tr->media.type == serviceMediaDVBS) {
+				element->media.type = element_tr->media.type;
+				element->media.frequency = element_tr->media.frequency;
+				element->media.dvb_s.frequency = element_tr->media.dvb_s.frequency;
+				element->media.dvb_s.symbol_rate = element_tr->media.dvb_s.symbol_rate;
+				element->media.dvb_s.polarization = element_tr->media.dvb_s.polarization;
+				element->media.dvb_s.FEC_inner = element_tr->media.dvb_s.FEC_inner;
+				element->media.dvb_s.orbital_position = element_tr->media.dvb_s.orbital_position;
+				element->media.dvb_s.inversion = element_tr->media.dvb_s.inversion;
 			}
 		} while (strncasecmp(buf, "end", 3) != 0);
 	} while(0);
