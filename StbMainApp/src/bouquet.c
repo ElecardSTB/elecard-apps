@@ -131,7 +131,7 @@ void bouquet_saveBouquetsConf(char *fileName, char *typeName);
 void bouquet_saveLamedb(char *fileName);
 void bouquet_saveBouquetsList(list_element_t **bouquet_name);
 int bouquet_downloadBouquetsList();
-void bouquet_parseBouquetsList(list_element_t **bouquet_name);
+void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path);
 
 
 /*******************************************************************
@@ -184,7 +184,7 @@ int bouquet_sendBouquet()
 	fd = fopen("/tmp/cmd_bouquet", "wb");
 	if(fd == NULL) {
 		eprintf("%s: Failed to open /tmp/cmd_bouquet \n", __FUNCTION__);
-		return;
+		return 1;
 	}
 	fprintf(fd, "%s\n",bouquet_file);
 	fclose(fd);
@@ -620,7 +620,7 @@ void bouquet_saveLamedb(char *fileName)
 														  element->media.dvb_c.modulation);
 		}
 		if (element->media.type == serviceMediaDVBS) {
-			fprintf(fd, "	%c %d:%d:%d:%d:0:0:0\n", 's', element->media.dvb_s.frequency,
+			fprintf(fd, "	%c %d:%d:%d:%d:%d:%d:0\n", 's', element->media.dvb_s.frequency,
 														  element->media.dvb_s.symbol_rate,
 														  element->media.dvb_s.polarization,
 														  element->media.dvb_s.FEC_inner,
@@ -789,6 +789,8 @@ int bouquet_updateBouquet(interfaceMenu_t* pMenu, void* pArg)
 
 int bouquet_saveBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
+	bouquet_loadBouquetsList(1);
+	bouquet_saveBouquetsList(&bouquetNameList);
 	bouquet_saveAllBouquet();
 	bouquet_sendBouquet();
 	offair_fillDVBTMenu();
@@ -845,14 +847,13 @@ int bouquet_downloadBouquetsList()
 	sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
 	struct stat sb;
 	if(stat(filename, &sb) == 0) {
-		snprintf(cmd, sizeof(cmd), "rm %s/%s_temp", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
 		val = 0;
 	} else {
 		snprintf(cmd, sizeof(cmd), "mv %s/%s_temp %s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
+		printf("cmd: %s\n",cmd);
+		system(cmd);
 		val = -1;
 	}
-	printf("cmd: %s\n",cmd);
-	system(cmd);
 	interface_hideMessageBox();
 	return val;
 }
@@ -886,24 +887,21 @@ void bouquet_saveBouquetsList(list_element_t **bouquet_name)
 	fclose(fd);
 }
 
-void bouquet_parseBouquetsList(list_element_t **bouquet_name)
+void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path)
 {
-
 	char buf[BUFFER_SIZE];
 	FILE* fd;
 
-	char buffName[256];
-	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
-	fd = fopen(buffName, "r");
+	fd = fopen(path, "r");
 	if(fd == NULL) {
-		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, buffName);
+		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
 		return;
 	}
 	// check head file name
 	while ( fgets(buf, BUFFER_SIZE, fd) != NULL ) {
-		if (sscanf(buf, "#BOUQUETS_NAME=%s", buffName) == 1) {
-			if (bouquet_foundBouquetName(buffName) != 0)
-				bouquet_addNewBouquetName(&*bouquet_name, buffName);
+		if (sscanf(buf, "#BOUQUETS_NAME=%s", path) == 1) {
+			if (bouquet_foundBouquetName(path) != 0)
+				bouquet_addNewBouquetName(&*bouquet_name, path);
 		}
 	}
 	fclose(fd);
@@ -913,7 +911,12 @@ void bouquet_loadBouquetsList(int force)
 {
 	if (force == 1)
 		bouquet_downloadBouquetsList();
-	bouquet_parseBouquetsList(&bouquetNameList);
+
+	char buffName[256];
+	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
+	bouquet_parseBouquetsList(&bouquetNameList, buffName);
+	sprintf(buffName, "%s/%s_temp", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
+	bouquet_parseBouquetsList(&bouquetNameList, buffName);
 }
 
 
