@@ -3736,26 +3736,26 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 	dprintf("%s: in\n", __FUNCTION__);
 
 	//interface_removeEvent(interface_triggerChange, NULL);
-	if ( cmd->command == interfaceCommandYellow) {
-		if (enablePlayListEditorMenu(pMenu) && !get_statusLockPlaylist()){
+	if (cmd->command == interfaceCommandYellow &&
+		enablePlayListEditorMenu(pMenu) &&
+		!get_statusLockPlaylist()){
 			interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
-		}
-		return 0;
+			return 0;
 	}
-	if ( cmd->command == interfaceCommandGreen) {
+	if (cmd->command == interfaceCommandGreen && enablePlayListEditorMenu(pMenu)) {
 		playlist_editor_setupdate();
 		offair_fillDVBTMenu();
 		return 0;
 	}
 
-	if ( pMenu->pCustomKeysCallback != NULL )// && pMenu->selectedItem >=0 )
+	if (pMenu->pCustomKeysCallback != NULL )// && pMenu->selectedItem >=0)
 	{
 		if ( pMenu->pCustomKeysCallback(pMenu, cmd,
 			pMenu->selectedItem >=0 ? pMenu->menuEntry[pMenu->selectedItem].pArg : NULL ) == 0 )
 			return 0;
 	}
 
-	if ( cmd->command == interfaceCommandUp )
+	if (cmd->command == interfaceCommandUp)
 	{
 // 		dprintf("%s: up\n", __FUNCTION__);
 		n = pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail ?
