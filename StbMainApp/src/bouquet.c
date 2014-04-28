@@ -929,8 +929,9 @@ list_element_t *found_list(EIT_common_t *common, list_element_t **services)
 	list_element_t	*service_element;
 	for(service_element = *services; service_element != NULL; service_element = service_element->next) {
 		EIT_service_t *element = (EIT_service_t *)service_element->data ;
-
-		if(memcmp(&(element->common), common, sizeof(EIT_common_t)) == 0) {
+		if (common->service_id ==  element->common.service_id &&
+			common->transport_stream_id ==  element->common.transport_stream_id) {
+		//if(memcmp(&(element->common), common, sizeof(EIT_common_t)) == 0) {
 			return service_element;
 		}
 	}
