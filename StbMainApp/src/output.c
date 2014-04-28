@@ -6505,7 +6505,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&InterfacePlaylistSelect, _T("PLAYLIST_SELECT"), settings_interface, NULL, _M &InterfacePlaylist_t,
 		interfaceListMenuIconThumbnail, enterPlaylistSelect, NULL, NULL);
 
-	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, 0, statusbar_f4_rename};
+	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, statusbar_f3_edit, 0};
     createListMenu(&InterfacePlaylistEditor, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylist_t,
 		interfaceListMenuIconThumbnail, enterPlaylistEditorMenu, NULL, NULL);
 

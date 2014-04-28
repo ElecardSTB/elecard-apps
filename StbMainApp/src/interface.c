@@ -3736,7 +3736,7 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 	dprintf("%s: in\n", __FUNCTION__);
 
 	//interface_removeEvent(interface_triggerChange, NULL);
-	if ( cmd->command == interfaceCommandBlue) {
+	if ( cmd->command == interfaceCommandYellow) {
 		if (enablePlayListEditorMenu(pMenu) && !get_statusLockPlaylist()){
 			interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
 		}
