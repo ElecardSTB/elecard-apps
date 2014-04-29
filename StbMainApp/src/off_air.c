@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "off_air.h"
 
+#include "bouquet.h"
 #include "debug.h"
 #include "dvbChannel.h"
 #include "app_info.h"
@@ -573,6 +574,7 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, ui
 	if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
 		interface_refreshMenu(pMenu);
 		output_showDVBMenu(pMenu, NULL);
+		bouquet_addScanChannels();
 		offair_fillDVBTMenu();
 #ifdef ENABLE_PVR
 		pvr_updateSettings();
@@ -839,16 +841,16 @@ static int32_t offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
 		case interfaceCommandGreen:
-			if(srvIdx->audio_track != selected) {
+			if(srvIdx->data.audio_track != selected) {
 				if(dvb_getAudioType(service, selected) !=
-					dvb_getAudioType(service, srvIdx->audio_track))
+					dvb_getAudioType(service, srvIdx->data.audio_track))
 				{
 					offair_stopVideo(which, 0);
-					srvIdx->audio_track = selected;
+					srvIdx->data.audio_track = selected;
 					offair_startVideo(which);
 				} else {
 					dvb_changeAudioPid(appControlInfo.dvbInfo.adapter, dvb_getAudioPid(service, selected));
-					srvIdx->audio_track = selected;
+					srvIdx->data.audio_track = selected;
 				}
 
 				dvbChannel_writeOrderConfig();
@@ -871,7 +873,7 @@ static int32_t offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 		}
 	} else {
 		srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
-		selected = srvIdx ? srvIdx->audio_track : 0;
+		selected = srvIdx ? srvIdx->data.audio_track : 0;
 	}
 
 	buf[0] = 0;
@@ -1534,7 +1536,7 @@ static int offair_audioChanged(void* pArg)
 		if(srvIdx == NULL) {
 			return -1;
 		}
-		srvIdx->audio_track = selected;
+		srvIdx->data.audio_track = selected;
 
 		dvbChannel_writeOrderConfig();
 	}
@@ -1561,34 +1563,31 @@ void offair_startVideo(int which)
 	param.adapter = appControlInfo.dvbInfo.adapter;
 	param.media = &service->media;
 	param.param.liveParam.channelIndex = dvb_getServiceIndex(service);
-	param.param.liveParam.audioIndex = srvIdx->audio_track;
+	param.param.liveParam.audioIndex = srvIdx->data.audio_track;
 	param.directory = NULL;
 
-	if (service->program_map.map.streams == NULL ||
-	   (service->flags & serviceFlagHasPMT) == 0)
-	{
-		offair_stopVideo(which, 1);
+	if(!dvb_hasMedia(service)) {
 		interface_showMessageBox(_T("DVB_SCANNING_SERVICE"), thumbnail_loading, 0);
-		eprintf("offair: Channel '%s' has no PMT info, force rescan on %lu Hz, type %d\n",
-				dvb_getServiceName(service),
-				service->media.frequency,
-				service->media.type);
-		dvb_frequencyScan(appControlInfo.dvbInfo.adapter, service->media.frequency,
-							&service->media, NULL, 1, NULL);
+
+//		offair_stopVideo(screenMain, 1);
+		dvb_scanForBouquet(param.adapter, service);
+		if(!dvb_hasMedia(service)) {//check once again
+			eprintf("%s(): Scrambled or media-less service ignored\n", __func__);
+			interface_showMessageBox(_T("ERR_NO_STREAMS_IN_CHANNEL"), thumbnail_error, 0);
+			return;
+		}
+#if (defined STSDK)
+		elcdRpcType_t type;
+		cJSON *result = NULL;
+		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
+		cJSON_Delete(result);
+#endif //#if (defined STSDK)
+
 		offair_updateChannelStatus();
-
 		interface_hideMessageBox();
-	}
+    }
 
-	if (service->program_map.map.streams == NULL ||
-	   (service->flags & serviceFlagHasPMT) == 0)
-	{
-		eprintf("offair: Channel '%s' has no PIDs!\n", dvb_getServiceName(service));
-		interface_showMessageBox(_T("ERR_NO_STREAMS_IN_CHANNEL"), thumbnail_error, 0);
-		return;
-	}
-
-	int audio_type = dvb_getAudioType(service, srvIdx->audio_track);
+	int audio_type = dvb_getAudioType(service, srvIdx->data.audio_track);
 	int video_type = dvb_getVideoType(service);
 
 #ifdef ENABLE_DVB_DIAG
@@ -1653,7 +1652,7 @@ static void offair_checkParentControl(int which, DvbParam_t *pParam, int audio_t
 	interfaceMenu_t* pMenu = _M &DVBTMenu;
 	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
 
-	if(srvIdx->parent_control == 1) {
+	if(srvIdx->data.parent_control == 1) {
 		const char *mask = "\\d{6}";
 		offair_confDvbStart_t start;
 		start.which = which;
@@ -1724,9 +1723,9 @@ static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, 
 	}
 #ifdef STSDK
 	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
-	if(srvIdx && srvIdx->audio_track) {
-		eprintf("%s: set audio %u\n", __func__, srvIdx->audio_track);
-		gfx_setVideoProviderAudioStream(which, srvIdx->audio_track);
+	if(srvIdx && srvIdx->data.audio_track) {
+		eprintf("%s: set audio %u\n", __func__, srvIdx->data.audio_track);
+		gfx_setVideoProviderAudioStream(which, srvIdx->data.audio_track);
 	}
 #endif
 
@@ -1915,26 +1914,16 @@ int offair_getCurrentChannel(void)
 
 int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 {
-	int channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	char desc[BUFFER_SIZE];
-	int buttons;
+	int32_t		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
+	int32_t		buttons;
+
 	EIT_service_t *service = dvbChannel_getService(channelNumber);
 
 	dprintf("%s: channelNumber = %d\n", __FUNCTION__, channelNumber);
 
 	if((service == NULL) || (dvb_getServiceID(service) == -1)) {
 		eprintf("%s: Unknown service for channel %d\n", __FUNCTION__, channelNumber);
-		return -1;
-	}
-
-	if(!dvb_hasMedia(service)) {
-		eprintf("%s: Scrambled or media-less service ignored %d\n", __FUNCTION__, channelNumber);
-		return -1;
-	}
-
-	if(offair_findCapableTuner(service, NULL) != 0) {
-		eprintf("%s: no tuner found to handle media type %d\n", __FUNCTION__, service->media.type);
-		interface_showMessageBox(_T("ERR_STREAM_NOT_SUPPORTED"), thumbnail_error, 3000);
 		return -1;
 	}
 
@@ -1947,12 +1936,6 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 		return 0;
 	}
 #endif
-	if(appControlInfo.dvbInfo.active != 0) {
-		//interface_playControlSelect(interfacePlayControlStop);
-		// force showState to NOT be triggered
-		interfacePlayControl.activeButton = interfacePlayControlStop;
-		offair_stopVideo(screenMain, 0);
-	}
 
 	appControlInfo.offairInfo.previousChannel = offair_getCurrentChannel();
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
@@ -1976,7 +1959,12 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	interface_playControlSetAudioCallback(offair_audioChanged);
 	interface_channelNumberShow(channelNumber + 1);
 
-
+	if(appControlInfo.dvbInfo.active) {
+		//interface_playControlSelect(interfacePlayControlStop);
+		// force showState to NOT be triggered
+		interfacePlayControl.activeButton = interfacePlayControlStop;
+		offair_stopVideo(screenMain, 0);
+	}
 	offair_startVideo(screenMain);
 	offair_updateChannelStatus();
 	saveAppSettings();
@@ -2031,13 +2019,13 @@ static void offair_addDVBChannelsToMenu()
 // 	for(int i = 0; i < dvbChannel_getCount(); ++i) {
 // 		EIT_service_t *service = dvbChannel_getService(i);
 	list_for_each(pos, dvbChannel_getSortList()) {
-		service_index_t *srv = list_entry(pos, service_index_t, orderSort);
+		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
 		EIT_service_t *service = srv->service;
 		interfaceMenuEntry_t *entry;
 		char *serviceName;
 		int32_t isRadio = 0;
 
-		if(!srv->visible) {
+		if(!srv->data.visible) {
 			continue;
 		}
 		if(	(service->service_descriptor.service_type == 2) ||
@@ -2045,7 +2033,7 @@ static void offair_addDVBChannelsToMenu()
 		{
 			isRadio = 1;
 		}
-		serviceName = dvb_getServiceName(service);
+		serviceName = srv->data.channelsName;// dvb_getServiceName(service);
 
 		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), serviceName);
 		interface_addMenuEntry(channelMenu, channelEntry, offair_channelChange, CHANNEL_INFO_SET(screenMain, i),
@@ -2102,7 +2090,7 @@ int offair_startNextChannel(int direction, void* pArg)
 	direction = direction == 0 ? 1 : -1;
 	for(
 		i = (appControlInfo.dvbInfo.channel + dvbChannel_getCount() + direction ) % dvbChannel_getCount();
-		i != appControlInfo.dvbInfo.channel && (!can_play(i) || !dvb_hasMedia(dvbChannel_getService(i)));
+        i != appControlInfo.dvbInfo.channel && (!can_play(i));
 		i = (i + direction + dvbChannel_getCount()) % dvbChannel_getCount() );
 
 	dprintf("%s: i = %d, ch = %d, total = %d\n", __FUNCTION__, i, appControlInfo.dvbInfo.channel, dvbChannel_getCount());
@@ -2234,9 +2222,9 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 		struct list_head *pos;
 
 		list_for_each(pos, dvbChannel_getSortList()) {
-			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderSort);
+			service_index_t *srvIdx2 = list_entry(pos, service_index_t, orderNone);
 
-			if(!srvIdx2->visible) {
+			if(!srvIdx2->data.visible) {
 				continue;
 			}
 			if(srvIdx2 && srvIdx2->first_event) {
@@ -3794,7 +3782,7 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 	mysem_create(&epg_semaphore);
 	mysem_create(&offair_semaphore);
 
-	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, offair_icons, pParent,
+	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, NULL, pParent,
 		interfaceListMenuIconThumbnail, offair_enterDVBTMenu, NULL, NULL);
 
 	interface_setCustomKeysCallback(_M &DVBTMenu, offair_keyCallback);
@@ -4083,48 +4071,6 @@ static int offair_getUserLCN(interfaceMenu_t *pMenu, char *value, void* pArg)
 }
 #endif
 
-static char* offair_getChannelCaption(int dummy, void* pArg)
-{
-	(void)dummy;
-	char * ptr = strstr(DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, ". ");
-	if (ptr) {
-		ptr += 2;
-		return ptr;
-	}
-	return NULL;
-}
-
-static int offair_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* pArg)
-{
-	if(pStr == NULL) {
-		return -1;
-	}
-
-	if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {
-		EIT_service_t *service;
-		int channelNumber;
-
-		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
-		service = dvbChannel_getService(channelNumber);
-		if(service == NULL) {
-			return -1;
-		}
-
-		snprintf((char *)service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", pStr);
-
-		// todo : save new caption to config file
-	} else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount() + 3)) {
-		uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - dvbChannel_getCount() - 3;
-		analogtv_updateName(selectedItem, pStr);
-	}
-
-#warning "Wrong printing number for analog TV!"
-	snprintf(DVBTMenu.baseMenu.menuEntry[DVBTMenu.baseMenu.selectedItem].info, 
-			  MENU_ENTRY_INFO_LENGTH, "%02d. %s", DVBTMenu.baseMenu.selectedItem - 2, pStr);
-
-	return 0;
-}
-
 static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	EIT_service_t *service;
@@ -4158,16 +4104,6 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 			playlist_addUrl(URL, dvb_getServiceName(service));
 			return 0;
 #endif // DVB_FAVORITES
-		case interfaceCommandBlue:
-			if(DVBTMenu.baseMenu.selectedItem >= 1){
-				interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", offair_saveChannelCaption, offair_getChannelCaption, inputModeABC, pArg);
-			}
-			return 0;
-			/*
-			snprintf(offair_lcn_buf, sizeof(offair_lcn_buf),"%d",channelNumber);
-			offair_changeLCN(pMenu, pArg);
-			return 0;
-			* */
 		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			if(menu_entryIsAnalogTv(pMenu, pMenu->selectedItem)) {

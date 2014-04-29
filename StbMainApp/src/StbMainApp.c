@@ -39,6 +39,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include "StbMainApp.h"
+#include "playlist_editor.h"
+#include "bouquet.h"
 
 #include "debug.h"
 #include "rtp.h"
@@ -2383,6 +2385,8 @@ void initialize(int argc, char *argv[])
 	st_init();
 #endif
 
+	bouquet_init();
+
 #ifdef ENABLE_DVB
 	dvb_init();
 #endif
@@ -2515,6 +2519,8 @@ void cleanup()
 #ifdef ENABLE_DVB
 	dprintf("%s: terminate dvb\n", __FUNCTION__);
 	dvb_terminate();
+	dvbChannel_terminate();
+    playlist_editor_cleanup();
 #endif
 
 #ifdef ENABLE_VIDIMAX

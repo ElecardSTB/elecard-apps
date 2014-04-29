@@ -92,6 +92,9 @@ extern interfaceListMenu_t OutputMenu;
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
+char *output_getSelectedNamePlaylistEditor();
+void output_redrawMenu(interfaceMenu_t *pMenu);
+int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu);
 
 #ifdef __cplusplus
 extern "C" {

@@ -235,6 +235,9 @@ void dvb_scanForEPG(uint32_t adapter, uint32_t frequency );
  */
 void dvb_scanForPSI(uint32_t adapter, uint32_t frequency, list_element_t **out_list );
 
+int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service);
+int32_t dvb_getCountOfServices(void);
+
 /**  @ingroup dvb_service
  *   @brief Function used to return the number of available DVB channels
  *

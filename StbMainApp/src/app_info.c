@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "playlist.h"
 #include "media.h"
 #include "helper.h"
+#include "bouquet.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -488,6 +489,20 @@ int loadAppSettings()
 		{
 			//dprintf("%s: wizard finished %d\n", __FUNCTION__, appControlInfo.offairInfo.wizardFinished);
 		}
+		else if (sscanf(buf, "PLAYLIST_NAME=%s", val) == 1)
+		{
+			bouquet_setBouquetName(val);
+			//dprintf("%s: wizard finished %s\n", __FUNCTION__, val);
+		}
+		else if (sscanf(buf, "PLAYLIST_ENABLE=%s", val) == 1)
+		{
+			if (strncasecmp(val, "YES", 3) == 0) {
+				bouquet_setEnable(1);
+			} else {
+				bouquet_setEnable(0);
+			}
+			//dprintf("%s: wizard finished %s\n", __FUNCTION__, val);
+		}
 #ifdef ENABLE_DVB_DIAG
 		else if (sscanf(buf, "PROFILE_DIAGNOSTICS=%d", &appControlInfo.offairInfo.diagnosticsMode) == 1)
 		{
@@ -825,6 +840,8 @@ int saveAppSettings()
 	fprintf(fd, "BRIGHTNESS=%d\n",                appControlInfo.pictureInfo.brightness);
 	fprintf(fd, "PROFILE_LOCATION=%s\n",          appControlInfo.offairInfo.profileLocation);
 	fprintf(fd, "PROFILE_WIZARD_FINISHED=%d\n",   appControlInfo.offairInfo.wizardFinished);
+	fprintf(fd, "PLAYLIST_NAME=%s\n",             bouquet_getBouquetName());
+	fprintf(fd, "PLAYLIST_ENABLE=%s\n",           bouquet_enable() ? "YES" : "NO");
 #ifdef ENABLE_DVB_DIAG
 	fprintf(fd, "PROFILE_DIAGNOSTICS=%d\n",       appControlInfo.offairInfo.diagnosticsMode == DIAG_FORCED_OFF ?
 	                                                DIAG_FORCED_OFF : DIAG_ON);

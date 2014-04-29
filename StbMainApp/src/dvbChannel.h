@@ -46,32 +46,61 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED DATA    *
 ********************/
 
+
+typedef struct {
+	struct list_head	orderNoneHead;
+
+    uint32_t		viewedCount;
+    uint32_t		totalCount;
+    serviceSort_t	sortOrderType;
+
+//	uint32_t		initialized;
+} dvb_channels_t;
+
+typedef struct {
+    uint8_t serviceType;
+	uint16_t network_id;
+} bouquet_data_t;
+
+typedef struct {
+	uint16_t audio_track;
+	uint16_t visible;
+	uint16_t parent_control;
+	char	 channelsName[MENU_ENTRY_INFO_LENGTH];
+} service_index_data_t;
+
 typedef struct {
 	EIT_common_t	common;
+    bouquet_data_t  bouquet_data;
+	service_index_data_t data;
 	EIT_service_t	*service;
-	uint16_t		audio_track;
-	uint16_t		parent_control;
+
 	/* First EPG event which fit to current timeline.
 	Updated on each call to offair_initEPGRecordMenu. */
 	list_element_t	*first_event;
-	uint16_t		visible;
 
 	//lists
 	struct list_head	orderNone;
-	struct list_head	orderSort;
 } service_index_t;
 
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible);
+int32_t dvbChannel_remove(service_index_t *srvIdx);
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
+service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
+int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data);
+int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible);
+service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header);
+int dvbChannel_findNumberService(service_index_t *srv_id);
 
 struct list_head *dvbChannel_getSortList(void);
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);
 int32_t dvbChannel_writeOrderConfig(void);
 int32_t dvbChannel_sort(serviceSort_t sortType);
 int32_t dvbChannel_initServices(void);
-//int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
+int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
 
 int32_t dvbChannel_hasSchedule( uint32_t channelNumber );
 
@@ -81,6 +110,7 @@ int32_t dvbChannel_getIndex(EIT_service_t *service);
 int32_t dvbChannel_getCount(void);
 //int32_t dvbChannel_invalidateServicess(void);
 int32_t dvbChannel_hasAnyEPG(void);
-
+int32_t dvbChannel_applyUpdates(void);
+void dvbChannel_terminate(void);
 #endif // ENABLE_DVB
 #endif // DVBCHANNEL_H
