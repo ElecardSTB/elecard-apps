@@ -281,6 +281,7 @@ typedef struct
 //   output_confirm<Action> - Use for confirmation message box callbacks
 
 static void output_fillOutputMenu(void);
+static int output_pingMenu(interfaceMenu_t* pMenu, void* pArg);
 static int output_enterNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_leaveNetworkMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_confirmNetworkSettings(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
@@ -5057,6 +5058,7 @@ int output_enterNetworkMenu(interfaceMenu_t *networkMenu, void* notused)
 	if (helperFileExists(BROWSER_CONFIG_FILE))
 #endif
 	interface_addMenuEntry(networkMenu, _T("INTERNET_BROWSING"), interface_menuActionShowMenu, (void*)&WebSubMenu, thumbnail_internet);
+	interface_addMenuEntry(networkMenu, _T("PING"), output_pingMenu, NULL, settings_interface);
 
 #ifdef ENABLE_VERIMATRIX
 	if (helperFileExists(VERIMATRIX_INI_FILE))
@@ -6223,6 +6225,41 @@ static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 		return 1;
 	}
 
+	return 0;
+}
+
+int output_ping(char *value)
+{
+	char cmd[256];
+	int ret = -1;
+	sprintf(cmd , "ping -c 1 %s", value);
+	printf("cmd: %s\n",cmd);
+	ret = system(cmd);
+
+	if (ret != -1)
+		ret = WEXITSTATUS(ret);
+	return ret;
+}
+
+int output_pingVisual(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if(value == NULL) {
+		return 0;
+	}
+	int valuePing;
+	valuePing = output_ping(value);
+
+	if (valuePing == 0){
+		interface_showMessageBox(_T("IP_RELEASE_SUCCESSFUL"), thumbnail_yes, 0);
+	} else {
+		interface_showMessageBox(_T("IP_RELEASE_NOT_SUCCESSFUL"), thumbnail_error, 0);
+	}
+	return -1;
+}
+
+static int output_pingMenu(interfaceMenu_t* pMenu, void* pArg)
+{
+	interface_getText(pMenu, _T("IP_SERVER"), "\\w+", output_pingVisual, NULL, inputModeABC, &pArg);
 	return 0;
 }
 
