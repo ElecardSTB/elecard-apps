@@ -68,7 +68,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAX_TEXT	512
 
 #define GARB_DIR					"/var/etc/garb"
-#define GARB_CONFIG_JSON			GARB_DIR "/config.json"
 #define GARB_CONFIG			GARB_DIR "/config"
 
 /***********************************************

@@ -252,6 +252,7 @@ int32_t dvbChannel_getCount(void)
 
 service_index_t *dvbChannel_add(void)
 {
+	printf("%s[%d]\n",__func__, __LINE__);
 	service_index_t *new = malloc(sizeof(service_index_t));
 	if(new == NULL) {
 		eprintf("%s()[%d]: Error allocating memory!\n", __func__, __LINE__);

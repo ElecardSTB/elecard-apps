@@ -69,7 +69,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANALOGTV_CONFIG_JSON	CONFIG_DIR "/analog.json"
 
 #define ANALOGTV_UNDEF			"UNDEF"
-#define MAX_ANALOG_CHANNELS		128
 
 #define TV_STATION_FULL_LIST	"/tmp/tvchannels.txt"
 
@@ -78,13 +77,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
-typedef struct {
-	uint32_t frequency;
-	uint16_t customNumber;
-	char customCaption[256];
-	char sysEncode[16];
-	char audio[16];
-} analog_service_t;
 
 typedef struct _short_chinfo {
 	char name[50];
