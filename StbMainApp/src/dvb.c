@@ -831,7 +831,7 @@ static int32_t parse_atsc_section(list_element_t **head, uint32_t media_id, uint
  *	   1 when all sections are read on this pid
  *	   -1 on invalid table id
  */
-static int dvb_sectionParse(long frequency, struct section_buf *s, EIT_service_t *service_t)
+static int dvb_sectionParse(long frequency, struct section_buf *s)
 {
 	int table_id;
 	int table_id_ext;
@@ -847,8 +847,9 @@ static int dvb_sectionParse(long frequency, struct section_buf *s, EIT_service_t
 	int updated = 0;
 	uint32_t network_id;
 
-	if(service_t != NULL) {
-		network_id = service_t->original_network_id;
+	service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+	if (srvIdx != NULL) {
+		network_id = srvIdx->service->original_network_id;
 	} else {
 		network_id = 0x80000000 + (uint32_t)frequency;
 	}
@@ -904,7 +905,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s, EIT_service_t
 				cur = *services;
 				while(cur != NULL) {
 					service = (EIT_service_t*)cur->data;
-					if( ((service_t == NULL) || (service->common.service_id == service_t->common.service_id)) &&
+					if( ((srvIdx == NULL) || (service->common.service_id == srvIdx->service->common.service_id)) &&
 						(service->flags & serviceFlagHasPAT) &&
 						service->media.frequency == (unsigned long)frequency )
 					{
@@ -1042,7 +1043,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s, EIT_service_t
 	return 0;
 }
 
-static int32_t dvb_sectionRead(__u32 frequency, struct section_buf *s, EIT_service_t *service)
+static int32_t dvb_sectionRead(__u32 frequency, struct section_buf *s)
 {
 	int section_length, count;
 
@@ -1073,14 +1074,14 @@ static int32_t dvb_sectionRead(__u32 frequency, struct section_buf *s, EIT_servi
 		return -1;
 	}
 
-	if(dvb_sectionParse(frequency, s, service) == 1) {
+	if(dvb_sectionParse(frequency, s) == 1) {
 		return 1;
 	}
 
 	return 0;
 }
 
-static void dvb_filtersRead(__u32 frequency, EIT_service_t *service)
+static void dvb_filtersRead(__u32 frequency)
 {
 	struct list_head *pos;
 	struct list_head *n;
@@ -1104,7 +1105,7 @@ static void dvb_filtersRead(__u32 frequency, EIT_service_t *service)
 			continue;
 		}
 
-		if(s->poll_fd && s->poll_fd->revents && (dvb_sectionRead(frequency, s, service) == 1)) {
+		if(s->poll_fd && s->poll_fd->revents && (dvb_sectionRead(frequency, s) == 1)) {
 			done = 1;
 		}
 
@@ -1188,7 +1189,7 @@ static void dvb_scanForServices(long frequency, uint32_t adapter, uint32_t enabl
 	}
 
 	do {
-		dvb_filtersRead(frequency, NULL);
+		dvb_filtersRead(frequency);
 	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
 	dvb_filtersLock();
 	dvb_filtersFlush();
@@ -1220,7 +1221,7 @@ static void dvb_scanForBouquet_t(uint32_t frequency, uint32_t adapter, EIT_servi
     } while(0);
 
     do {
-        dvb_filtersRead(frequency, service);
+		dvb_filtersRead(frequency);
     } while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
     dvb_filtersLock();
     dvb_filtersFlush();
@@ -1264,7 +1265,7 @@ void dvb_scanForEPG( uint32_t adapter, uint32_t frequency )
 	eit_filter.running_counter = &counter;
 	dvb_filterAdd(&eit_filter);
 	do {
-		dvb_filtersRead(frequency, NULL);
+		dvb_filtersRead(frequency);
 		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((eit_filter.start_time == 0) || (counter > 0));
@@ -1289,7 +1290,7 @@ void dvb_scanForPSI( uint32_t adapter, uint32_t frequency, list_element_t **out_
 	pat_filter.running_counter = &counter;
 	dvb_filterAdd(&pat_filter);
 	do {
-		dvb_filtersRead(frequency, NULL);
+		dvb_filtersRead(frequency);
 		//dprintf("DVB: pat %d, counter %d\n", pat_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((pat_filter.start_time == 0) || (counter > 0));
