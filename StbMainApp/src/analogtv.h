@@ -60,6 +60,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef struct {
 	uint32_t frequency;
 	uint16_t customNumber;
+	uint16_t visible;
+	uint16_t parent_control;
 	char customCaption[256];
 	char sysEncode[16];
 	char audio[16];
@@ -116,6 +118,7 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg);
  */
 
 void analogtv_stop();
+int32_t analogtv_saveConfigFile(void);
 
 int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 

@@ -3697,7 +3697,7 @@ static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void
 	if(pStr == NULL) {
 		return -1;
 	}
-    playList_saveName(pMenu->selectedItem, pMenu->menuEntry[pMenu->selectedItem].info, pStr);
+	playList_saveName(pMenu->selectedItem, pMenu->menuEntry[pMenu->selectedItem].info, pStr);
 	snprintf(pMenu->menuEntry[pMenu->selectedItem].info, MENU_ENTRY_INFO_LENGTH, "%s. %s", offair_getChannelNumberPrefix(pMenu->selectedItem), pStr);
 /*
     if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {

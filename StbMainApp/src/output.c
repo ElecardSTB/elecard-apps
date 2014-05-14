@@ -6163,15 +6163,27 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
+interfaceMenu_t *output_getPlaylistEditorMenu() {
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu))
+		return interfaceInfo.currentMenu;
+	return NULL;
+}
+
 char *output_getSelectedNamePlaylistEditor()
 {
-	return InterfacePlaylistEditorDigital.baseMenu.menuEntry[InterfacePlaylistEditorDigital.baseMenu.selectedItem].info;
+	interfaceListMenu_t  *InterfaceEditor;
+	InterfaceEditor = output_getPlaylistEditorMenu();
+	if (InterfaceEditor != NULL)
+		return InterfaceEditor->baseMenu.menuEntry[InterfaceEditor->baseMenu.selectedItem].info;
+	return NULL;
 }
 
 int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
 {
 	if (!memcmp(interfaceMenu, &InterfacePlaylistEditorDigital.baseMenu, sizeof(interfaceListMenu_t)))
-		return true;
+		return 1;
+	if (!memcmp(interfaceMenu, &InterfacePlaylistEditorAnalog.baseMenu, sizeof(interfaceListMenu_t)))
+		return 2;
 	return false;
 }
 
@@ -6328,6 +6340,7 @@ int output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
 {
 	char *str;
 	interface_clearMenuEntries(interfaceMenu);
+	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditorAnalog, settings_interface);
 	return 0;
 }
 
