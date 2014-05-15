@@ -931,9 +931,7 @@ list_element_t *found_list(EIT_common_t *common, list_element_t **services)
 	list_element_t	*service_element;
 	for(service_element = *services; service_element != NULL; service_element = service_element->next) {
 		EIT_service_t *element = (EIT_service_t *)service_element->data ;
-		if (common->service_id ==  element->common.service_id &&
-			common->transport_stream_id ==  element->common.transport_stream_id) {
-		//if(memcmp(&(element->common), common, sizeof(EIT_common_t)) == 0) {
+		if(memcmp(&(element->common), common, sizeof(EIT_common_t)) == 0) {
 			return service_element;
 		}
 	}
@@ -1080,8 +1078,8 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 						element->media.dvb_s.frequency == element_tr->media.dvb_s.frequency &&
 						element->media.dvb_s.symbol_rate == element_tr->media.dvb_s.symbol_rate &&
 						element->media.dvb_s.polarization == element_tr->media.dvb_s.polarization &&
-						element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
-						element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
+						//element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
+						//element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
 						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion)
 					continue;
 				remove_element(&*services, service_element);
