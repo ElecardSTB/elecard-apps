@@ -462,7 +462,7 @@ static int32_t dvb_filterStart_arch(struct section_buf* s)
 	cJSON_AddStringToObject(params, "uri", pipeName);
 	cJSON_AddNumberToObject(params, "tuner", s->adapter);
 	cJSON_AddNumberToObject(params, "pid", (uint16_t)s->pid);
-	if(s->table_id < 0x100 && s->table_id > 0) {
+	if((s->table_id >= 0) && (s->table_id < 0x100)) {
 		cJSON_AddNumberToObject(params, "tid", (uint8_t)s->table_id);
 	}
 
