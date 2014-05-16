@@ -102,6 +102,7 @@ static uintLookup_t rpc_commands[] = {
 	{elcmd_getDvbTunerStatus,	"getDvbTunerStatus"},
 	{elcmd_TSstreamerOn,		"TSstreamerOn"},
 	{elcmd_TSstreamerOff,		"TSstreamerOff"},
+	{elcmd_env,					"env"},
 
 	// todo: make sure this array match elcdRpcCommand_t enum in rpc.h
 	{elcmd_cmd_count,			NULL},
