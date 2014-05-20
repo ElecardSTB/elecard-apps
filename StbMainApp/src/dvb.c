@@ -939,7 +939,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 							service->common.transport_stream_id, s->transport_stream_id, service->media.frequency,
 							(unsigned long)frequency, service->common.service_id);
 					if (service->program_map.program_map_PID == s->pid &&
-						service->common.media_id == network_id &&
+						//service->common.media_id == network_id &&
 						service->common.transport_stream_id == s->transport_stream_id &&
 						service->media.frequency == (unsigned long)frequency )
 					{
