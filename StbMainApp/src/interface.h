@@ -970,6 +970,12 @@ typedef struct _interfaceFusionObject_t {
 	int creepWidth;
 	int creepShown;
 
+	unsigned int audHandle;
+	char currentDtmfDigit;
+	char currentDtmfMark[8];
+	unsigned long long dtmfStartTime;
+	pthread_mutex_t mutexDtmf;
+
 } interfaceFusionObject_t;
 #endif
 

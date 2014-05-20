@@ -2075,6 +2075,60 @@ static void interface_displayLogo(void)
 #endif
 }
 
+#ifdef ENABLE_FUSION
+void interface_displayDtmf(void)
+{
+	char text[8];
+	struct timeval tv;
+	unsigned long long millisecondsSinceEpoch;
+	unsigned long long deltaTime;
+	DFBRegion region;
+	region.x1 = interfaceInfo.screenWidth / 2 - 100;
+	region.y1 = interfaceInfo.screenHeight - 160;
+	region.x2 = interfaceInfo.screenWidth / 2 + 100;
+	region.y2 = interfaceInfo.screenHeight - 85;
+
+	mysem_get(interface_semaphore);
+	// clear region
+	gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x0, region.x1, region.y1, 200, 75);
+/*
+	gettimeofday(&tv, NULL);
+	millisecondsSinceEpoch = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+
+	deltaTime = millisecondsSinceEpoch - FusionObject.dtmfStartTime;
+	if (deltaTime >= 5*1000){
+		//eprintf("%s(%d): deltatime = %lld, clear currentDtmfmark.\n", __FUNCTION__, __LINE__, deltaTime);
+		pthread_mutex_lock(&FusionObject.mutexDtmf);
+		memset (FusionObject.currentDtmfMark, 0, sizeof(FusionObject.currentDtmfMark));
+		pthread_mutex_unlock(&FusionObject.mutexDtmf);
+		sprintf (text, "_");
+
+		//FusionObject.dtmfStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+	}
+	else {
+		pthread_mutex_lock(&FusionObject.mutexDtmf);
+		sprintf (text, "%s", FusionObject.currentDtmfMark);
+		pthread_mutex_unlock(&FusionObject.mutexDtmf);
+	}
+*/
+	pthread_mutex_lock(&FusionObject.mutexDtmf);
+	sprintf (text, "%c", FusionObject.currentDtmfDigit);
+	pthread_mutex_unlock(&FusionObject.mutexDtmf);
+
+	gfx_drawText(DRAWING_SURFACE, pgfx_font,
+		INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
+		INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+		interfaceInfo.screenWidth / 2, 
+		interfaceInfo.screenHeight - 100,
+		text, 
+		0, 1);
+
+	DFBCHECK(DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC));
+
+	mysem_release(interface_semaphore);
+}
+#endif
+
 void interface_displayCreepline(void)
 {
 #ifdef ENABLE_FUSION
@@ -2094,12 +2148,8 @@ void interface_displayCreepline(void)
 		double ratio = 1.0;
 		int timeForCreepSlice = 20*1000; // time that 1 letter follows from right to left 
 		double timeForAllCreep;
-		if (FusionObject.creepWidth > interfaceInfo.screenWidth){
-			ratio = FusionObject.creepWidth / (double)interfaceInfo.screenWidth;
-		}
-		else {
-			ratio = interfaceInfo.screenWidth / (double)FusionObject.creepWidth;
-		}
+
+		ratio = FusionObject.creepWidth / (double)interfaceInfo.screenWidth;
 		timeForAllCreep = timeForCreepSlice * ratio;
 		int position = (int)(FusionObject.creepWidth * ((double)deltaTime / timeForAllCreep));
 /*

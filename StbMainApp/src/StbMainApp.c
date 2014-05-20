@@ -1919,7 +1919,84 @@ int fusion_readConfig()
 	return 0;
 }
 
-int fusion_refreshEvent(void *pArg)
+#define FUSION_REFRESH_DTMF_MS 5
+#define MAX_SAVED_DIGITS 65
+typedef struct
+{
+    int ErrorCode;
+    unsigned int Handle;
+    char digits[MAX_SAVED_DIGITS];
+    int count;
+} STAUD_Ioctl_GetDtmf_t;
+
+int fusion_refreshDtmfEvent(void *pArg)
+{
+	if (FusionObject.audHandle == 0){
+		FILE * faudhandle = fopen ("/tmp/fusion.audhandle", "rb");
+		if (faudhandle){
+			fread (&FusionObject.audHandle, sizeof(unsigned int), 1, faudhandle);
+			fclose (faudhandle);
+			if (FusionObject.audHandle) eprintf("%s(%d): Got FusionObject.audHandle = %d.\n", __FUNCTION__, __LINE__, FusionObject.audHandle);
+		}
+	}
+	else {
+		int staudlx_fd;
+		STAUD_Ioctl_GetDtmf_t UserData;
+
+		if ((staudlx_fd = open("/dev/stapi/staudlx_ioctl", O_RDWR)) < 0) {
+			eprintf ("%s(%d): ERROR! /dev/stapi/staudlx_ioctl open failed.\n",   __FUNCTION__, __LINE__);
+		}
+		else {
+			memset (&UserData, 0, sizeof(STAUD_Ioctl_GetDtmf_t));
+			UserData.Handle = FusionObject.audHandle;
+			UserData.ErrorCode = 0;
+			UserData.count = 0;
+
+			if (ioctl (staudlx_fd, 0xc004c0e4, &UserData)){   // _IOWR(0X16, 228, NULL)   // STAUD_IOC_GETDTMF
+				eprintf ("%s(%d): ERROR! ioctl failed.\n",   __FUNCTION__, __LINE__);
+			}
+			else {
+				if ((UserData.ErrorCode == 0) && (UserData.digits[0] != ' '))
+				{
+					//eprintf ("%s(%d): ioctl rets %c\n", __FUNCTION__, __LINE__, UserData.digits[0]);	// todo : return it!
+
+					pthread_mutex_lock(&FusionObject.mutexDtmf);
+					FusionObject.currentDtmfDigit = UserData.digits[0];
+					pthread_mutex_unlock(&FusionObject.mutexDtmf);
+/*
+					pthread_mutex_lock(&FusionObject.mutexDtmf);
+					if (strlen(FusionObject.currentDtmfMark) == 0){
+						struct timeval tv;
+						gettimeofday(&tv, NULL);
+						FusionObject.dtmfStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+					}
+					// add char to end
+					if (strlen(FusionObject.currentDtmfMark) >= 5){
+						memset (FusionObject.currentDtmfMark, 0, sizeof(FusionObject.currentDtmfMark));
+					}
+					FusionObject.currentDtmfMark[strlen(FusionObject.currentDtmfMark)] = FusionObject.currentDtmfDigit;
+
+					pthread_mutex_unlock(&FusionObject.mutexDtmf);
+					eprintf ("%s(%d): currentDtmfMark = %s\n", __FUNCTION__, __LINE__, FusionObject.currentDtmfMark);
+					* */
+				}
+				else 
+				{
+					pthread_mutex_lock(&FusionObject.mutexDtmf);
+					FusionObject.currentDtmfDigit = '_';
+					pthread_mutex_unlock(&FusionObject.mutexDtmf);
+				}
+				interface_displayDtmf();
+			}
+		}
+		close (staudlx_fd);
+	}
+
+	interface_addEvent(fusion_refreshDtmfEvent, (void*)NULL, FUSION_REFRESH_DTMF_MS, 1);
+	return 0;
+}
+
+int fusion_refreshViewEvent(void *pArg)
 {
 	pthread_mutex_lock(&FusionObject.mutexCreep);
 	int needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
@@ -1929,7 +2006,7 @@ int fusion_refreshEvent(void *pArg)
 // 		interface_displayMenu(1);
 		interface_displayCreepline();
 	}
-	interface_addEvent(fusion_refreshEvent, (void*)NULL, 10, 1);
+	interface_addEvent(fusion_refreshViewEvent, (void*)NULL, 10, 1);
 	return 0;
 }
 
@@ -1958,8 +2035,11 @@ void fusion_startup()
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
+	pthread_mutex_init(&FusionObject.mutexDtmf, NULL);
 
-	interface_addEvent(fusion_refreshEvent, (void*)NULL, 10, 1);
+	interface_addEvent(fusion_refreshViewEvent, (void*)NULL, 10, 1);
+	interface_addEvent(fusion_refreshDtmfEvent, (void*)NULL, FUSION_REFRESH_DTMF_MS, 1);
+	FusionObject.currentDtmfDigit = '_';
 
 	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
 
@@ -2354,6 +2434,7 @@ void fusion_cleanup()
 
 	pthread_mutex_destroy(&FusionObject.mutexCreep);
 	pthread_mutex_destroy(&FusionObject.mutexLogo);
+	pthread_mutex_destroy(&FusionObject.mutexDtmf);
 }
 #endif
 
