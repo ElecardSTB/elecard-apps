@@ -240,6 +240,7 @@ static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
 static struct dvb_instance dvbInstances[MAX_ADAPTER_SUPPORTED];
 
 static pmysem_t dvb_semaphore;
+static pmysem_t scan_semaphore;
 static pmysem_t dvb_filter_semaphore;
 static NIT_table_t dvb_scan_network;
 
@@ -905,7 +906,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 				cur = *services;
 				while(cur != NULL) {
 					service = (EIT_service_t*)cur->data;
-					if( ((srvIdx == NULL) || (service->common.service_id == srvIdx->service->common.service_id)) &&
+					if( ((srvIdx == NULL) || (memcmp(&(service->common.service_id), &(srvIdx->service->common.service_id), sizeof(EIT_common_t)) == 0)) &&
 						(service->flags & serviceFlagHasPAT) &&
 						service->media.frequency == (unsigned long)frequency )
 					{
@@ -939,7 +940,7 @@ static int dvb_sectionParse(long frequency, struct section_buf *s)
 							service->common.transport_stream_id, s->transport_stream_id, service->media.frequency,
 							(unsigned long)frequency, service->common.service_id);
 					if (service->program_map.program_map_PID == s->pid &&
-						//service->common.media_id == network_id &&
+						service->common.media_id == network_id &&
 						service->common.transport_stream_id == s->transport_stream_id &&
 						service->media.frequency == (unsigned long)frequency )
 					{
@@ -1083,6 +1084,7 @@ static int32_t dvb_sectionRead(__u32 frequency, struct section_buf *s)
 
 static void dvb_filtersRead(__u32 frequency)
 {
+	dprintf("%s: frequency = %d\n", __func__, frequency);
 	struct list_head *pos;
 	struct list_head *n;
 	struct pollfd *fds;
@@ -1145,8 +1147,10 @@ static void dvb_filterServices(list_element_t **head)
 }
 */
 
-static void dvb_scanForServices(long frequency, uint32_t adapter, uint32_t enableNit)
+static void dvb_scanForServices(long frequency, uint32_t adapter, uint32_t enableNit, EIT_service_t *service)
 {
+	extern pmysem_t dvb_semaphore;
+
 	struct section_buf pat_filter;
 	struct section_buf sdt_filter;
 	struct section_buf tvct_filter;
@@ -1156,44 +1160,70 @@ static void dvb_scanForServices(long frequency, uint32_t adapter, uint32_t enabl
 	struct section_buf nit_filter;
 
 	dvb_filtersUnlock();
-	/**
+	mysem_get(scan_semaphore);
+	do {
+		if (service != NULL) {
+			if (service->flags & serviceFlagHasPAT &&
+				service->media.frequency == frequency) {
+				struct section_buf pmt_filter;
+				dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d frequency = %d\n", __FUNCTION__,
+						service->common.transport_stream_id,
+						service->program_map.program_map_PID,
+						service->common.service_id,
+						service->common.media_id,
+						frequency);
+				dvb_filterSetup(&pmt_filter, adapter, service->program_map.program_map_PID, 0x02, 2, &dvb_services);   /* PMT */
+				pmt_filter.transport_stream_id = service->common.transport_stream_id;
+				dvb_filterAdd(&pmt_filter);
+				break;
+			}
+			dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services); /* PAT */
+			dvb_filterAdd(&pat_filter);
+			break;
+		}
+		/**
 	 *  filter timeouts > min repetition rates specified in ETR211
 	 */
-	dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services); /* PAT */
-	//dvb_filterSetup(&sdt1_filter, adapter, 0x11, 0x46, 5, &dvb_services); /* SDT other */
-	dvb_filterSetup(&eit_filter, adapter, 0x12,   -1, 5, &dvb_services); /* EIT */
+		dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services); /* PAT */
+		//dvb_filterSetup(&sdt1_filter, adapter, 0x11, 0x46, 5, &dvb_services); /* SDT other */
+		dvb_filterSetup(&eit_filter, adapter, 0x12,   -1, 5, &dvb_services); /* EIT */
 
-	dvb_filterAdd(&pat_filter);
-	//dvb_filterAdd(&sdt1_filter);
-	dvb_filterAdd(&eit_filter);
+		dvb_filterAdd(&pat_filter);
+		//dvb_filterAdd(&sdt1_filter);
+		dvb_filterAdd(&eit_filter);
 
-	if((dvbfe_getType(adapter) == SYS_ATSC) || (dvbfe_getType(adapter) == SYS_DVBC_ANNEX_B)) {
+		if((dvbfe_getType(adapter) == SYS_ATSC) || (dvbfe_getType(adapter) == SYS_DVBC_ANNEX_B)) {
 #if (defined ENABLE_USE_DVB_APPS)
-		dvb_filterSetup(&tvct_filter, adapter, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, &dvb_services); //Terrestrial Virtual Channel Table (TVCT)
-		dvb_filterAdd(&tvct_filter);
-		dvb_filterSetup(&cvct_filter, adapter, 0x1ffb, stag_atsc_cable_virtual_channel, 5, &dvb_services); //Cable Virtual Channel Table (CVCT)
-		dvb_filterAdd(&cvct_filter);
+			dvb_filterSetup(&tvct_filter, adapter, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, &dvb_services); //Terrestrial Virtual Channel Table (TVCT)
+			dvb_filterAdd(&tvct_filter);
+			dvb_filterSetup(&cvct_filter, adapter, 0x1ffb, stag_atsc_cable_virtual_channel, 5, &dvb_services); //Cable Virtual Channel Table (CVCT)
+			dvb_filterAdd(&cvct_filter);
 #else
-		(void)tvct_filter;
-		(void)cvct_filter;
+			(void)tvct_filter;
+			(void)cvct_filter;
 #endif
-	} else {
-		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, &dvb_services); /* SDT actual */
-		dvb_filterAdd(&sdt_filter);
-	}
+		} else {
+			dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, &dvb_services); /* SDT actual */
+			dvb_filterAdd(&sdt_filter);
+		}
 
-	if(enableNit) {
-		dvb_clearNIT(&dvb_scan_network);
-		dvb_filterSetup(&nit_filter, adapter, 0x10, 0x40, 5, &dvb_services); /* NIT */
-		dvb_filterAdd(&nit_filter);
-	}
+		if(enableNit) {
+			dvb_clearNIT(&dvb_scan_network);
+			dvb_filterSetup(&nit_filter, adapter, 0x10, 0x40, 5, &dvb_services); /* NIT */
+			dvb_filterAdd(&nit_filter);
+		}
+	} while (0);
 
 	do {
 		dvb_filtersRead(frequency);
 	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
+	mysem_release(scan_semaphore);
 	dvb_filtersLock();
 	dvb_filtersFlush();
 
+	if (service != NULL) {
+		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+	}
 	//dvb_filterServices(&dvb_services);
 }
 
@@ -1246,7 +1276,7 @@ int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service)
 		return -1;
 	}
 
-	dvb_scanForBouquet_t(frequency, adapter, service);
+	dvb_scanForServices(frequency, adapter, 0, service);
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 
 	return 0;
@@ -1265,7 +1295,9 @@ void dvb_scanForEPG( uint32_t adapter, uint32_t frequency )
 	eit_filter.running_counter = &counter;
 	dvb_filterAdd(&eit_filter);
 	do {
+		mysem_get(scan_semaphore);
 		dvb_filtersRead(frequency);
+		mysem_release(scan_semaphore);
 		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((eit_filter.start_time == 0) || (counter > 0));
@@ -1290,7 +1322,9 @@ void dvb_scanForPSI( uint32_t adapter, uint32_t frequency, list_element_t **out_
 	pat_filter.running_counter = &counter;
 	dvb_filterAdd(&pat_filter);
 	do {
+		mysem_get(scan_semaphore);
 		dvb_filtersRead(frequency);
+		mysem_release(scan_semaphore);
 		//dprintf("DVB: pat %d, counter %d\n", pat_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((pat_filter.start_time == 0) || (counter > 0));
@@ -1399,7 +1433,7 @@ static int32_t dvb_frequencyScanOne(uint32_t adapter, uint32_t frequency, EIT_me
 			}
 		}
 		eprintf("%s(): adapter=%d, scanning %.3f MHz\n", __func__, adapter, freqMHz);
-		dvb_scanForServices(frequency, adapter, enableNit);
+		dvb_scanForServices(frequency, adapter, enableNit, NULL);
 
 		media->dvb_t.plp_id++;
 
@@ -1567,13 +1601,13 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 			dprintf("%s[%d]: Found something on %u, search channels!\n", __FUNCTION__, adapter, f);
 			SCAN_MESSAGE("DVB[%d]: Found something on %u, search channels!\n", adapter, f);
 			/* Scan for channels within this frequency / transport stream */
-			dvb_scanForServices(f, adapter, 0);
+			dvb_scanForServices(f, adapter, 0, NULL);
 			SCAN_MESSAGE("DVB[%d]: Found %d channels ...\n", adapter, dvb_getNumberOfServices());
 			dprintf("%s[%d]: Found %d channels ...\n", __FUNCTION__, adapter, dvb_getNumberOfServices());
 		}
 
 	} else {
-		dvb_scanForServices(frequency, adapter, 0);
+		dvb_scanForServices(frequency, adapter, 0, NULL);
 		dprintf("%s[%d]: Found %d channels on %u\n", __FUNCTION__, adapter, dvb_getNumberOfServices(), frequency);
 	}
 
@@ -2994,6 +3028,7 @@ void dvb_init(void)
 	dvbfe_init();
 
 	mysem_create(&dvb_semaphore);
+	mysem_create(&scan_semaphore);
 	mysem_create(&dvb_filter_semaphore);
 
 	if(helperFileExists(appControlInfo.dvbCommonInfo.channelConfigFile)){
@@ -3014,6 +3049,7 @@ void dvb_terminate(void)
 	free_services(&dvb_services);
 
 	mysem_destroy(dvb_semaphore);
+	mysem_destroy(scan_semaphore);
 	mysem_destroy(dvb_filter_semaphore);
 	
 	dvbfe_terminate();

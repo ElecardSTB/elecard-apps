@@ -1551,6 +1551,15 @@ void offair_startVideo(int which)
 		return;
 	}
 	service = srvIdx->service;
+	printf("start video:\n");
+	printf(" name: %s\n",service->service_descriptor.service_name);
+	printf(" media_id: %d\n",service->common.media_id);
+	printf(" service_id %d:\n",service->common.service_id);
+	printf(" transport_stream_id: %d\n",service->common.transport_stream_id);
+	printf(" original_network_id: %d\n",service->original_network_id);
+	printf(" frequency: %d\n",service->media.frequency);
+	if (service->media.type == serviceMediaDVBS)
+		printf(" polarization: %d\n",service->media.dvb_s.polarization);
 	if(offair_findCapableTuner(service, &appControlInfo.dvbInfo.adapter) != 0) {
 		eprintf("%s: Failed to find tuner matching type %d\n", __FUNCTION__, service->media.type);
 		return;
