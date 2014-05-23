@@ -6338,7 +6338,6 @@ int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 
 int output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
 {
-	char *str;
 	interface_clearMenuEntries(interfaceMenu);
 	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditorAnalog, settings_interface);
 	return 0;

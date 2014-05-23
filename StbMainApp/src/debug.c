@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "debug.h"
 
+#include "app_info.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -266,6 +267,7 @@ static void *dbg_thread(void *pArg)
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 		pthread_testcancel();
 	}
+	return NULL;
 }
 
 int  dbg_ThreadInit(void)
@@ -289,6 +291,7 @@ int  dbg_ThreadInit(void)
 		eprintf("%s: ERROR not create thread\n", __func__);
 		return -4;
 	}
+	return 0;
 }
 
 void dbg_ThreadStop(void)
@@ -306,6 +309,6 @@ int dbg_getDebag(char *cmd)
 		return gdbDebug;
 	if (strcasecmp(cmd, DEBUG_BOUQUET) == 0)
 		return gdbBouquet;
-
+	return 0;
 }
 

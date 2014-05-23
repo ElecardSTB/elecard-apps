@@ -1164,7 +1164,7 @@ static void dvb_scanForServices(long frequency, uint32_t adapter, uint32_t enabl
 	do {
 		if (service != NULL) {
 			if (service->flags & serviceFlagHasPAT &&
-				service->media.frequency == frequency) {
+				service->media.frequency == (uint32_t)frequency) {
 				struct section_buf pmt_filter;
 				dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d frequency = %d\n", __FUNCTION__,
 						service->common.transport_stream_id,
@@ -1225,37 +1225,6 @@ static void dvb_scanForServices(long frequency, uint32_t adapter, uint32_t enabl
 		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 	}
 	//dvb_filterServices(&dvb_services);
-}
-
-static void dvb_scanForBouquet_t(uint32_t frequency, uint32_t adapter, EIT_service_t *service)
-{
-    struct section_buf pat_filter;
-    dvb_filtersUnlock();
-    do {
-        if (service != NULL &&
-            service->flags & serviceFlagHasPAT &&
-            service->media.frequency == frequency) {
-            struct section_buf pmt_filter;
-            dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d\n", __FUNCTION__,
-                    service->common.transport_stream_id,
-                    service->program_map.program_map_PID,
-                    service->common.service_id,
-                    service->common.media_id);
-            dvb_filterSetup(&pmt_filter, adapter, service->program_map.program_map_PID, 0x02, 2, &dvb_services);   /* PMT */
-            pmt_filter.transport_stream_id = service->common.transport_stream_id;
-            dvb_filterAdd(&pmt_filter);
-            break;
-        }
-        dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services); /* PAT */
-        dvb_filterAdd(&pat_filter);
-    } while(0);
-
-    do {
-		dvb_filtersRead(frequency);
-    } while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
-    dvb_filtersLock();
-    dvb_filtersFlush();
-    dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 }
 
 int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service)

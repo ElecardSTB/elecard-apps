@@ -48,10 +48,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
-#define DEBUG 1
-#define debug(fmt, ...) \
-		do { if (DEBUG) fprintf(stderr, "%s():%d: " fmt, __func__, \
-								__LINE__, __VA_ARGS__); } while (0)
 
 #define NAME_SPACE                      0xFFFF0000
 #define BOUQUET_FULL_LIST	            "/var/etc/elecard/StbMainApp/"
@@ -724,7 +720,7 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getBouquetName();
-	debug("%s\n",bouquetName);
+	dprintf("%s\n",bouquetName);
 
 	if (bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
