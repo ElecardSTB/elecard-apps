@@ -119,6 +119,7 @@ list_element_t *bouquetNameList = NULL;
 list_element_t *bouquet_name_tv = NULL;
 list_element_t *bouquet_name_radio = NULL;
 char bouquetName[CHANNEL_BUFFER_NAME];
+char pName[CHANNEL_BUFFER_NAME];
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -450,6 +451,9 @@ void get_bouquets_list(char *bouquet_file)
 	if(fd == NULL) {
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
 		return;
+	}
+	if (fgets(buf, BUFFER_SIZE, fd) != NULL) {
+		sscanf(buf, "#NAME  %s\n", pName);
 	}
 	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
 		if ( sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
@@ -1043,14 +1047,25 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 
 			if (sscanf(buf, "%x:%x:%x:%x:%x:%x\n",&service_id, &name_space, &transport_stream_id, &original_network_id, &serviceType, &hmm) != 6)
 				break;
-			char service_name[MAX_TEXT];
+			//parse channels name
+			char service_name[MAX_TEXT];			
 			if (fgets(service_name, BUFFER_SIZE, fd) == NULL)
 				break;
+
 			service_name[strlen(service_name) - 1] = '\0';
+			//parese bouquet pName
+			char bouqName[CHANNEL_BUFFER_NAME];
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
 				break;
+			memset(bouqName, 0, strlen(bouqName));
+			sscanf(buf, "p:%s\n",bouqName);
+
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
 				break;
+
+			if ((strlen(bouqName) < 1) && (strncasecmp(pName, bouqName, strlen((pName))) != 0)) {
+				continue;
+			}
 
 			EIT_common_t	common;
 			common.service_id = service_id;
