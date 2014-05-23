@@ -3835,7 +3835,7 @@ static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void
         snprintf((char *)service->service_descriptor.service_name, MENU_ENTRY_INFO_LENGTH, "%s", pStr);
 
         // todo : save new caption to config file
-    } else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount() + 3)) {
+	} else if(DVBTMenu.baseMenu.selectedItem < (int32_t)(dvbChannel_getCount() + analogtv_getChannelCount(0) + 3)) {
         uint32_t selectedItem = DVBTMenu.baseMenu.selectedItem - dvbChannel_getCount() - 3;
         analogtv_updateName(selectedItem, pStr);
     }

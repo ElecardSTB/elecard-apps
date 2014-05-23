@@ -119,6 +119,7 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg);
 
 void analogtv_stop();
 int32_t analogtv_saveConfigFile(void);
+int32_t analogtv_parseConfigFile(int visible);
 
 int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 
@@ -136,7 +137,7 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
 
 void analogtv_initMenu(interfaceMenu_t *pParent);
-uint32_t analogtv_getChannelCount(void);
+uint32_t analogtv_getChannelCount(int visible);
 
 int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 

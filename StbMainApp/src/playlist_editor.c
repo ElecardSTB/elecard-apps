@@ -44,8 +44,7 @@ int getColor() {
 static void load_Analog_channels(list_element_t *curListEditor)
 {
 	extern analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
-	int analogtv_channelCount = analogtv_getChannelCount();
-
+	int analogtv_channelCount = analogtv_getChannelCount(1);
 	int i;
 	for(i = 0; i < analogtv_channelCount; i++) {
 		list_element_t      *cur_element;

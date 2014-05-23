@@ -4589,7 +4589,7 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 		interface_addMenuEntry(tvMenu, _T("ANALOGTV_SEND_CHFILE"), analogtv_sendToServer, NULL, thumbnail_configure);//garb_sendToServer
 	}
 
-	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount()); //analogtv_service_count
+	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount(0)); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);
 	
 	return 0;

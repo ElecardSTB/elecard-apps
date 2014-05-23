@@ -2014,7 +2014,7 @@ char *offair_getChannelNumberPrefix(uint32_t id)
 		"%03d",
 	};
 
-	serviceCount = dvbChannel_getCount() + analogtv_getChannelCount();
+	serviceCount = dvbChannel_getCount() + analogtv_getChannelCount(0);
 	if(serviceCount < 10) {
 		format = formats[0];
 	} else if(serviceCount < 100) {
@@ -2139,7 +2139,7 @@ static int offair_confirmAutoScan(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 
 int offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg)
 {
-	if((dvbChannel_getCount() == 0) && (analogtv_getChannelCount() == 0)) {
+	if((dvbChannel_getCount() == 0) && (analogtv_getChannelCount(0) == 0)) {
 		output_showDVBMenu(pMenu, NULL);
 		interface_showConfirmationBox( _T("DVB_NO_CHANNELS"), thumbnail_dvb, offair_confirmAutoScan, NULL);
 		return 1;
@@ -3222,7 +3222,7 @@ void offair_fillDVBTMenu(void)
 	if(dvbChannel_getCount() > 0) {
 		offair_addDVBChannelsToMenu();
 	}
-	if(analogtv_getChannelCount() > 0) {
+	if(analogtv_getChannelCount(0) > 0) {
 		analogtv_addChannelsToMenu(dvbtMenu, dvbChannel_getCount());
 	}
 
