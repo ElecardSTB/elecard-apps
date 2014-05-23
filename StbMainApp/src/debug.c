@@ -1,4 +1,5 @@
 
+
 /*
  debug.c
 
@@ -40,15 +41,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
+#include <pthread.h>
+#include <poll.h>
 
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
 
-#ifdef ALLOC_DEBUG
-
 #define MAX_ALLOCS (256)
+#define GDB_PIPE "/tmp/pipe_gdg"
+#define SIZE_BUFFER  256
 
+static pthread_t dbgThread;
+
+#ifdef ALLOC_DEBUG
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
@@ -63,6 +69,7 @@ typedef struct _alloc_info_t {
 * STATIC DATA                                                     *
 *******************************************************************/
 
+static pthread_t dbgThread;
 static int initialized = 0;
 static alloc_info_t allocs[MAX_ALLOCS];
 
@@ -215,5 +222,90 @@ void *dbg_realloc(void *ptr, size_t size, const char *location)
 
 	return p;
 }
-
 #endif // #ifdef ALLOC_DEBUG
+
+static void *dbg_thread(void *pArg)
+{
+	struct pollfd pfd[1];
+	char buff[SIZE_BUFFER];
+	int32_t len = 0;
+	int32_t fd = (int32_t)pArg;
+
+	pfd[0].fd = fd;
+	pfd[0].events = POLLIN;
+	while(1) {
+		if(poll(pfd, 1, 1000) > 0) {
+			if(pfd[0].revents & POLLIN) {
+				memset(buff, 0, sizeof(buff));
+				len = read(fd, buff, SIZE_BUFFER);
+				if(len < 0) {
+					eprintf("%s: %d: errno=%d: %s\n", __func__, __LINE__, errno, strerror(errno));
+					continue;
+				}
+				buff[len] = '\0';
+				if (strncasecmp(buff, "?", 1) == 0 ) {
+					printf("Debag help:\n");
+					printf("%s=%d\n",DEBUG_MESSAGE, gdbDebug);
+					printf("%s=%d\n",DEBUG_BOUQUET, gdbBouquet);
+				}
+				else if (strncasecmp(buff, DEBUG_MESSAGE, 5) == 0 ) {
+					sscanf(buff + 6, "%d\n", &gdbDebug);
+					if (gdbDebug) {
+						setoutputlevel(errorLevelDebug);
+					} else {
+						setoutputlevel(errorLevelNormal);
+					}
+					saveAppSettings();
+				}
+				else if (strncasecmp(buff, DEBUG_BOUQUET, 7) == 0 ) {
+					sscanf(buff + 8, "%d\n", &gdbBouquet);
+					saveAppSettings();
+				}
+			}
+		}
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+		pthread_testcancel();
+	}
+}
+
+int  dbg_ThreadInit(void)
+{
+	int32_t thread;
+	int32_t dbg_pipe = -1;
+
+	unlink(GDB_PIPE);
+	if(mkfifo(GDB_PIPE, 0666) < 0) {
+		eprintf("ttx: Unable to create a fifo buffer\n");
+		return -1;
+	}
+	dbg_pipe = open(GDB_PIPE, O_RDONLY | O_NONBLOCK);
+	if(dbg_pipe < 0) {
+		unlink(GDB_PIPE);
+		eprintf("Error in opening file %s\n", GDB_PIPE);
+		return -2;
+	}
+	thread = pthread_create(&dbgThread, NULL, dbg_thread, (void *)dbg_pipe);
+	if(thread != 0) {
+		eprintf("%s: ERROR not create thread\n", __func__);
+		return -4;
+	}
+}
+
+void dbg_ThreadStop(void)
+{
+	if(dbgThread) {
+		pthread_cancel(dbgThread);
+		pthread_join(dbgThread, NULL);
+		dbgThread = 0;
+	}
+}
+
+int dbg_getDebag(char *cmd)
+{
+	if (strcasecmp(cmd, DEBUG_MESSAGE) == 0)
+		return gdbDebug;
+	if (strcasecmp(cmd, DEBUG_BOUQUET) == 0)
+		return gdbBouquet;
+
+}
+

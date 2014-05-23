@@ -2498,6 +2498,8 @@ void cleanup()
 	}
 #endif
 
+	dbg_ThreadStop();
+
 	unlink(APP_LOCK_FILE);
 }
 
@@ -2714,6 +2716,7 @@ int main(int argc, char *argv[])
 		fclose(pidfile);
 	}
 
+	dbg_ThreadInit();
 	appInfo_init();
 
 #ifdef ENABLE_BROWSER
