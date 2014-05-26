@@ -491,9 +491,14 @@ int loadAppSettings()
 		{
 			//dprintf("%s: wizard finished %d\n", __FUNCTION__, appControlInfo.offairInfo.wizardFinished);
 		}
-		else if (sscanf(buf, "PLAYLIST_NAME=%s", val) == 1)
+		else if (sscanf(buf, "PLAYLIST_DIGITAL_NAME=%s", val) == 1)
 		{
-			bouquet_setBouquetName(val);
+			bouquet_setDigitalBouquetName(val);
+			//dprintf("%s: wizard finished %s\n", __FUNCTION__, val);
+		}
+		else if (sscanf(buf, "PLAYLIST_ANALOG_NAME=%s", val) == 1)
+		{
+			bouquet_setAnalogBouquetName(val);
 			//dprintf("%s: wizard finished %s\n", __FUNCTION__, val);
 		}
 		else if (sscanf(buf, "PLAYLIST_ENABLE=%s", val) == 1)
@@ -848,7 +853,8 @@ int saveAppSettings()
 	fprintf(fd, "BRIGHTNESS=%d\n",                appControlInfo.pictureInfo.brightness);
 	fprintf(fd, "PROFILE_LOCATION=%s\n",          appControlInfo.offairInfo.profileLocation);
 	fprintf(fd, "PROFILE_WIZARD_FINISHED=%d\n",   appControlInfo.offairInfo.wizardFinished);
-	fprintf(fd, "PLAYLIST_NAME=%s\n",             bouquet_getBouquetName());
+	fprintf(fd, "PLAYLIST_DIGITAL_NAME=%s\n",     bouquet_getDigitalBouquetName());
+	fprintf(fd, "PLAYLIST_ANALOG_NAME=%s\n",      bouquet_getAnalogBouquetName());
 	fprintf(fd, "PLAYLIST_ENABLE=%s\n",           bouquet_enable() ? "YES" : "NO");
 #ifdef ENABLE_DVB_DIAG
 	fprintf(fd, "PROFILE_DIAGNOSTICS=%d\n",       appControlInfo.offairInfo.diagnosticsMode == DIAG_FORCED_OFF ?

@@ -132,6 +132,7 @@ int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size);
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 
 int32_t analogtv_updateName(uint32_t chanIndex, char* str);
+void analogtv_removeServiceList(int permanent);
 
 void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
@@ -143,6 +144,10 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 
 int32_t analogtv_fillFoundServList(void);
 int32_t analogtv_updateFoundServiceFile(void);
+int32_t analogtv_findOnFrequency(uint32_t frequency);
+void analogtv_swapService(int x, int y);
+void analogtv_removeService(int index);
+
 
 int32_t analogtv_hasTuner(void);
 #else /* ENABLE_ANALOGTV */

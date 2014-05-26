@@ -324,14 +324,14 @@ int32_t dvbChannel_remove(service_index_t *srvIdx)
 static int32_t dvbChannel_readOrderConfig()
 {
 	char *bouquetName;
-	bouquetName = bouquet_getBouquetName();
+	bouquetName = bouquet_getDigitalBouquetName();
 	FILE *fd = NULL;
 	cJSON *root;
 	cJSON *format;
 	char *data;
 	long len;
 	char fname[BUFFER_SIZE];
-	bouquet_getOffairName(fname, bouquetName);
+	bouquet_getDigitalName(CONFIG_DIR, fname, bouquetName);
 	dprintf("read file %s\n", fname);
 	fd = fopen(fname, "r");
 	if(fd == NULL) {
@@ -389,7 +389,7 @@ int32_t dvbChannel_writeOrderConfig(void)
 	struct list_head *pos;
 	uint32_t i = 0;
 	char *bouquetName;
-	bouquetName = bouquet_getBouquetName();
+	bouquetName = bouquet_getDigitalBouquetName();
 
 	format = cJSON_CreateArray();
 	if(!format) {
@@ -429,7 +429,7 @@ int32_t dvbChannel_writeOrderConfig(void)
 	if(render) {
 		FILE *fd = NULL;
 		char fname[BUFFER_SIZE];
-		bouquet_getOffairName(fname, bouquetName);
+		bouquet_getDigitalName(CONFIG_DIR, fname, bouquetName);
 		fd = fopen(fname, "w");
 		if (fd) {
 			fwrite(render, strlen(render), 1, fd);
@@ -507,9 +507,11 @@ static int32_t dvbChannel_update(void)
 	if (check_playlist()) {
 		return 0;
 	}
-	playlist_editor_cleanup();
-	if (bouquet_enable())
-		bouquet_loadBouquetsList(0);
+	playlist_editor_cleanup(1);
+	if (bouquet_enable()) {
+		bouquet_loadDigitalBouquetsList(0);
+		bouquet_loadAnalogBouquetsList(0);
+	}
 
 	list_element_t		*service_element;
     struct list_head    *pos;

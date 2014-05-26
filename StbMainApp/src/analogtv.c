@@ -122,10 +122,8 @@ static pmysem_t analogtv_semaphore;
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
-
-int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
+void analogtv_removeServiceList(int permanent)
 {
-	int permanent = (int)pArg;
 	mysem_get(analogtv_semaphore);
 	analogtv_channelCount = 0;
 	analogtv_channelCountVisible = 0;
@@ -135,6 +133,12 @@ int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 
 	remove(ANALOGTV_CONFIG_JSON);
 	if (permanent > 0) remove(appControlInfo.tvInfo.channelConfigFile);
+}
+
+int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
+{
+	int permanent = (int)pArg;
+	analogtv_removeServiceList(permanent);
 
 	pMenu->pActivatedAction(pMenu, pMenu->pArg);
 	interface_displayMenu(1);
@@ -205,6 +209,8 @@ int32_t analogtv_parseConfigFile(int visible)
 	cJSON *format;
 	char *data;
 	long len;
+	analogtv_channelCountVisible = 0;
+	analogtv_channelCount = 0;
 
 	fd = fopen(ANALOGTV_CONFIG_JSON, "r");
 	if(fd == NULL) {
@@ -212,6 +218,7 @@ int32_t analogtv_parseConfigFile(int visible)
 		//Is this need still
 		return analogtv_parseOldConfigFile();
 	}
+	printf("%s[%d] = %s\n",__func__, __LINE__, ANALOGTV_CONFIG_JSON);
 	fseek(fd, 0, SEEK_END);
 	len = ftell(fd);
 	fseek(fd, 0, SEEK_SET);
@@ -353,6 +360,41 @@ int32_t analogtv_updateFoundServiceFile(void)
 		fclose(file);
 	}
 	return 0;
+}
+
+int32_t analogtv_findOnFrequency(uint32_t frequency)
+{
+	uint32_t i;
+	for (i = 0; i < analogtv_channelCount; i++) {
+		if (analogtv_channelParam[i].frequency == frequency) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void analogtv_swapService(int x, int y)
+{
+	if (x == y)
+		return;
+	analog_service_t tempService;
+	memcpy(&tempService, &analogtv_channelParam[x], sizeof(analog_service_t));
+	memcpy(&analogtv_channelParam[x], &analogtv_channelParam[y], sizeof(analog_service_t));
+	memcpy(&analogtv_channelParam[y], &tempService, sizeof(analog_service_t));
+}
+
+void analogtv_removeService(int index)
+{
+	uint32_t i;
+	for (i = 0; i < analogtv_channelCount; i++) {
+		if ((i == index) && ((i + 1) < analogtv_channelCount)) {
+			memcpy(&analogtv_channelParam[i], &analogtv_channelParam[i + 1], sizeof(analog_service_t));
+		}
+	}
+	memset(&analogtv_channelParam[analogtv_channelCount], 0, sizeof(analog_service_t));
+	analogtv_channelCount--;
+	return -1;
+
 }
 
 static int32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)

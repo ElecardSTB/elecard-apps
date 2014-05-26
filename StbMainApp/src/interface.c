@@ -3494,6 +3494,7 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 			case interfaceCommandOk:
 			case interfaceCommandPageUp:
 			case interfaceCommandPageDown:
+			//case interfaceCommandLeft:
 				break;
 			default:
 				return;
@@ -3869,6 +3870,18 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		offair_fillDVBTMenu();
 		return 0;
 	}
+	/*if (cmd->command == interfaceCommandLeft && get_statusLockPlaylist()) {
+		if (enablePlayListEditorMenu(pMenu)) {
+			n = pListMenu != NULL && pListMenu->listMenuType == interfaceListMenuBigThumbnail ?
+				(pMenu->selectedItem + pListMenu->infoAreaWidth) % pMenu->menuEntryCount : pMenu->selectedItem;
+			if (n >= 0 && n < pMenu->menuEntryCount) {
+				playlist_editor_removeElement(n);
+			}
+			return 1;
+		}
+		interface_displayMenu(1);
+		return 1;
+	}*/
 
 	if (pMenu->pCustomKeysCallback != NULL )// && pMenu->selectedItem >=0)
 	{
