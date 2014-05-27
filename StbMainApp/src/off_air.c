@@ -2092,7 +2092,7 @@ int offair_setChannel(int channel, void* pArg)
 	}
 
 	if(channel >= dvbChannel_getCount()) {
-		channel = channel - dvbChannel_getCount();
+		channel = channel - dvbChannel_getCount() - 1;
 		analogtv_activateChannel(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, channel));
 		return 0;
 	}
