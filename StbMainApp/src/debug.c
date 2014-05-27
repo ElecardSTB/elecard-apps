@@ -312,3 +312,8 @@ int dbg_getDebag(char *cmd)
 	return 0;
 }
 
+int  dbg_cmdSystem(char *cmd)
+{
+	dprintf("cmd: %s\n", cmd);
+	return system(cmd);
+}

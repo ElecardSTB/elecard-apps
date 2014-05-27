@@ -193,7 +193,7 @@ int bouquet_sendBouquet()
 
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
 	printf("cmd: %s\n",cmd);
-	ret = system(cmd);
+	ret = dbg_cmdSystem(cmd);
 	interface_hideMessageBox();
 	return WEXITSTATUS(ret);
 }
@@ -285,7 +285,7 @@ void bouquet_setAnalogBouquetName(char *name)
 	if(stat(fname, &sb) == 0) {
 		snprintf(cmd, sizeof(cmd), "cp %s %s/../analog.json", fname, BOUGET_CONFIG_DIR_ANALOG);
 		dprintf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 	} else {
 		analogtv_removeServiceList(0);
 	}
@@ -335,7 +335,7 @@ void bouquet_setNewBouquetName(char *name)
 
 		snprintf(cmd, sizeof(cmd), "mkdir -p %s", buffName);
 		printf("cmd = %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 		bouquet_saveBouquetsList(&bouquetNameDigitalList);
 	}
 	interface_hideMessageBox();
@@ -792,7 +792,7 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUGET_CONFIG_DIR, bouquetName);
 		printf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 		interface_hideMessageBox();
 		bouquet_removeBouquetName(&bouquetNameDigitalList, bouquetName);
 		bouquet_loadDigitalBouquetsList(1);
@@ -823,7 +823,7 @@ int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg)
 		getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../analog/analog.%s.json %s/analog.%s.json", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR_ANALOG, bouquetName);
 		printf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 	}
 	char *name = bouquet_getAnalogBouquetName();
 	bouquet_setAnalogBouquetName(name);
@@ -847,20 +847,20 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "mv %s/%s/ %s/%s_temp", BOUGET_CONFIG_DIR, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
 		printf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 		getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
 		getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 		getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s.%s %s/%s", loginName, serverName, serverDir, bouquetName, "STB", BOUGET_CONFIG_DIR, bouquetName);
 		printf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 
 		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, bouquetName);
 		struct stat sb;
 		if(!(stat(filename, &sb) == 0  || S_ISDIR( sb.st_mode))) {
 			snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s %s/%s", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
 			printf("cmd: %s\n",cmd);
-			system(cmd);
+			dbg_cmdSystem(cmd);
 		}
 
 		if(!(stat(filename, &sb) == 0  || S_ISDIR( sb.st_mode))) {
@@ -869,7 +869,7 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 			snprintf(cmd, sizeof(cmd), "rm -r %s/%s_temp/", BOUGET_CONFIG_DIR, bouquetName);
 		}
 		printf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 	}
 	interface_hideMessageBox();
 	offair_fillDVBTMenu();
@@ -909,7 +909,7 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
 	printf("cmd: %s\n",cmd);
-	ret = system(cmd);
+	ret = dbg_cmdSystem(cmd);
 	interface_hideMessageBox();
 	return WEXITSTATUS(ret);
 }
@@ -923,7 +923,7 @@ void bouquet_saveAnalogBouquet()
 
 	snprintf(cmd, sizeof(cmd), "cp %s/../analog.json %s", BOUGET_CONFIG_DIR_ANALOG, fname);
 	dprintf("cmd: %s\n",cmd);
-	system(cmd);
+	dbg_cmdSystem(cmd);
 
 	offair_fillDVBTMenu();
 	return 0;
@@ -982,7 +982,7 @@ int bouquet_downloadBouquetsList(int index)
 		snprintf(cmd, sizeof(cmd), "mv %s/%s %s/%s_temp", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG, BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
 	}
 	printf("cmd: %s\n",cmd);
-	system(cmd);
+	dbg_cmdSystem(cmd);
 
 	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
 	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
@@ -994,7 +994,7 @@ int bouquet_downloadBouquetsList(int index)
 
 	}
 	printf("cmd: %s\n",cmd);
-	system(cmd);
+	dbg_cmdSystem(cmd);
 
 	if (index == 1) {
 		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
@@ -1011,7 +1011,7 @@ int bouquet_downloadBouquetsList(int index)
 			snprintf(cmd, sizeof(cmd), "mv %s/%s_temp %s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG, BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
 		}
 		printf("cmd: %s\n",cmd);
-		system(cmd);
+		dbg_cmdSystem(cmd);
 		val = -1;
 	}
 	interface_hideMessageBox();
@@ -1370,7 +1370,7 @@ void bouquet_downloadFileFromServer(char *shortname, char *fullname)
 	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../channels/%s %s", loginName, serverName, serverDir, shortname, fullname);
 	printf("cmd: %s\n",cmd);
-	system(cmd);
+	dbg_cmdSystem(cmd);
 	interface_hideMessageBox();
 }
 

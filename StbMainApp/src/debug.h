@@ -84,6 +84,8 @@ void *dbg_realloc(void *ptr, size_t size, const char *location);
 int  dbg_ThreadInit(void);
 void  dbg_ThreadStop(void);
 int  dbg_getDebag(char *);
+int  dbg_cmdSystem(char *);
+
 
 #ifdef __cplusplus
 };
