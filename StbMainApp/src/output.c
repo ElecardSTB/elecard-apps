@@ -6172,10 +6172,10 @@ interfaceMenu_t *output_getPlaylistEditorMenu() {
 
 char *output_getSelectedNamePlaylistEditor()
 {
-	interfaceListMenu_t  *InterfaceEditor;
-	InterfaceEditor = output_getPlaylistEditorMenu();
-	if (InterfaceEditor != NULL)
-		return InterfaceEditor->baseMenu.menuEntry[InterfaceEditor->baseMenu.selectedItem].info;
+	interfaceMenu_t  *baseMenu;
+	baseMenu = output_getPlaylistEditorMenu();
+	if (baseMenu != NULL)
+		return baseMenu->menuEntry[baseMenu->selectedItem].info;
 	return NULL;
 }
 
@@ -6336,25 +6336,28 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 
 int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
-	char *str;
+	char str[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
-	str = _T("PLAYLIST_ANALOG");
-	interface_addMenuEntry(interfaceMenu, str, interface_menuActionShowMenu, &InterfacePlaylistAnalog, settings_interface);
-	str = _T("PLAYLIST_DIGITAL");
-	interface_addMenuEntry(interfaceMenu, str, interface_menuActionShowMenu, &InterfacePlaylistDigital, settings_interface);
+	snprintf(str, sizeof(str), "%s: %s", _T("PLAYLIST_ENABLE"), bouquet_enable()? "ON" : "OFF");
+	interface_addMenuEntry(interfaceMenu, str, bouquet_enableControl, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_ANALOG"), interface_menuActionShowMenu, &InterfacePlaylistAnalog, settings_interface);
+	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_DIGITAL"), interface_menuActionShowMenu, &InterfacePlaylistDigital, settings_interface);
 	return 0;
 }
 
 int output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
 {
-	char *str;
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
-	snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_SELECT"), bouquet_getAnalogBouquetName());
-	interface_addMenuEntry(interfaceMenu, buf, interface_menuActionShowMenu, &InterfacePlaylistSelectAnalog, settings_interface);
+	if (bouquet_enable()) {
+		snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_SELECT"), bouquet_getAnalogBouquetName());
+		interface_addMenuEntry(interfaceMenu, buf, interface_menuActionShowMenu, &InterfacePlaylistSelectAnalog, settings_interface);
+	}
 	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditorAnalog, settings_interface);	
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_UPDATE"), bouquet_updateAnalogBouquet, NULL, settings_interface);
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_SAVE_BOUQUETS"), bouquet_saveAnalogMenuBouquet, NULL, settings_interface);
+	if (bouquet_enable()) {
+		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_UPDATE"), bouquet_updateAnalogBouquet, NULL, settings_interface);
+		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_SAVE_BOUQUETS"), bouquet_saveAnalogMenuBouquet, NULL, settings_interface);
+	}
 	return 0;
 }
 
@@ -6363,8 +6366,6 @@ int output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
 
-	snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_ENABLE"), bouquet_enable()? "ON" : "OFF");
-	interface_addMenuEntry(interfaceMenu, buf, bouquet_enableControl, NULL, settings_interface);
 	if (bouquet_enable()) {
 		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_NEW_BOUQUETS"), output_changeCreateNewBouquet, NULL, settings_interface);
 		snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_SELECT"), bouquet_getDigitalBouquetName());

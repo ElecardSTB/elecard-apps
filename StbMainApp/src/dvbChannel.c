@@ -507,10 +507,9 @@ static int32_t dvbChannel_update(void)
 	if (check_playlist()) {
 		return 0;
 	}
-	playlist_editor_cleanup(1);
+	playlist_editor_cleanup(digitalBouquet);
 	if (bouquet_enable()) {
 		bouquet_loadDigitalBouquetsList(0);
-		bouquet_loadAnalogBouquetsList(0);
 	}
 
 	list_element_t		*service_element;

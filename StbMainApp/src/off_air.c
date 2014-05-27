@@ -3222,6 +3222,7 @@ void offair_fillDVBTMenu(void)
 	if(dvbChannel_getCount() > 0) {
 		offair_addDVBChannelsToMenu();
 	}
+	bouquet_loadAnalogBouquetsList(0);
 	if(analogtv_getChannelCount(0) > 0) {
 		analogtv_addChannelsToMenu(dvbtMenu, dvbChannel_getCount());
 	}

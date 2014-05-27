@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "stsdk.h"
 #include "gfx.h"
 #include "off_air.h"
+#include "playlist_editor.h"
 
 #include <cJSON.h>
 #include <sys/stat.h>
@@ -130,6 +131,7 @@ void analogtv_removeServiceList(int permanent)
 	mysem_release(analogtv_semaphore);
 	appControlInfo.offairInfo.previousChannel = 0;
 	saveAppSettings();
+	playlist_editor_cleanup(analogBouquet);
 
 	remove(ANALOGTV_CONFIG_JSON);
 	if (permanent > 0) remove(appControlInfo.tvInfo.channelConfigFile);
@@ -218,7 +220,6 @@ int32_t analogtv_parseConfigFile(int visible)
 		//Is this need still
 		return analogtv_parseOldConfigFile();
 	}
-	printf("%s[%d] = %s\n",__func__, __LINE__, ANALOGTV_CONFIG_JSON);
 	fseek(fd, 0, SEEK_END);
 	len = ftell(fd);
 	fseek(fd, 0, SEEK_SET);
@@ -385,16 +386,14 @@ void analogtv_swapService(int x, int y)
 
 void analogtv_removeService(int index)
 {
-	uint32_t i;
-	for (i = 0; i < analogtv_channelCount; i++) {
-		if ((i == index) && ((i + 1) < analogtv_channelCount)) {
+	int i;
+	for (i = 0; i < (int)analogtv_channelCount; i++) {
+		if ((i == index) && ((i + 1) < (int)analogtv_channelCount)) {
 			memcpy(&analogtv_channelParam[i], &analogtv_channelParam[i + 1], sizeof(analog_service_t));
 		}
 	}
 	memset(&analogtv_channelParam[analogtv_channelCount], 0, sizeof(analog_service_t));
 	analogtv_channelCount--;
-	return -1;
-
 }
 
 static int32_t analogtv_renameFromList(interfaceMenu_t *pMenu, void* pArg)

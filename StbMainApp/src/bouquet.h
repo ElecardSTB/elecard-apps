@@ -48,6 +48,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED TYPEDEFS                            *
 ************************************************/
 
+typedef enum _typeBouquet_t {
+	fullBouquet = 0,
+	analogBouquet = 1,
+	digitalBouquet = 2,
+} typeBouquet_t;
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
@@ -63,6 +69,9 @@ void bouquet_loadChannelsFile();
 int bouquets_getNumberPlaylist();
 void bouquets_setNumberPlaylist(int num);
 
+void bouquet_loadBouquet(typeBouquet_t index, char * name);
+void bouquet_stashBouquet(typeBouquet_t index, char * name);
+
 int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg);
 int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg);
 int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg);
@@ -77,13 +86,14 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg);
 
 int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg);
+int bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg);
 int bouquet_enable();
 void bouquet_init();
 void bouquet_setEnable(int i);
 void bouquet_getDigitalName(char *dir, char *fname, char *name);
-void bouquet_getAnalogName(char *dir, char *fname, char *name);
+void bouquet_getAnalogJsonName(char *fname, char *name);
 char *bouquet_getDigitalBouquetName();
 char *bouquet_getAnalogBouquetName();
 char *bouquet_getNameBouquetList(list_element_t **head, int number);

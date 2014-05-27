@@ -55,6 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define BOUQUET_FULL_LIST	            "/var/etc/elecard/StbMainApp/"
 #define BOUGET_CONFIG_DIR               "/var/etc/elecard/StbMainApp/bouquet"
 #define BOUGET_CONFIG_DIR_ANALOG        "/var/etc/elecard/StbMainApp/analog"
+#define BOUGET_ANALOG_MAIN_FILE         "analog.json"
 #define BOUGET_CONFIG_FILE              "bouquet.conf"
 #define BOUGET_CONFIG_FILE_ANALOG       "analog.list"
 #define BOUGET_NAME                     "bouquets"
@@ -132,7 +133,8 @@ void bouquet_saveBouquets(char *fileName, char *typeName);
 void bouquet_saveBouquetsConf(char *fileName, char *typeName);
 void bouquet_saveLamedb(char *fileName);
 void bouquet_saveBouquetsList(list_element_t **bouquet_name);
-int bouquet_downloadBouquetsList(int index); //index 1 = digital/ 2 = analog
+void bouquet_downloadDigitalConfigList();
+void bouquet_downloadAnalogConfigList();
 void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path);
 
 
@@ -225,18 +227,17 @@ void bouquet_addScanChannels()
 	if (bouquet_enable())
 		bouquet_saveAllBouquet();
 }
+
 int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg)
 {
 	(void)pMenu;
 	char *name;
 	int number;
-
 	number = CHANNEL_INFO_GET_CHANNEL(pArg);
 	name = bouquet_getAnalogBouquetName();
-	if (name != NULL) {
-		if (strcasecmp(name, bouquet_getNameBouquetList(&bouquetNameAnalogList, number)) == 0) {
-			return 0;
-		}
+	if ((name != NULL) &&
+			(strcasecmp(name, bouquet_getNameBouquetList(&bouquetNameAnalogList, number)) == 0)) {
+		return 0;
 	}
 	bouquet_setAnalogBouquetName(bouquet_getNameBouquetList(&bouquetNameAnalogList, number));
 	saveAppSettings();
@@ -250,15 +251,11 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg)
 	(void)pMenu;
 	char *name;
 	int number;
-
 	number = CHANNEL_INFO_GET_CHANNEL(pArg);
 	name = bouquet_getDigitalBouquetName();
-	printf("%s[%d]\n",__func__, __LINE__);
-	if (name != NULL) {
-		if (strcasecmp(name, bouquet_getNameBouquetList(&bouquetNameDigitalList, number)) == 0) {
-			printf("%s[%d]\n",__func__, __LINE__);
-			return 0;
-		}
+	if ((name != NULL) &&
+			(strcasecmp(name, bouquet_getNameBouquetList(&bouquetNameDigitalList, number)) == 0)) {
+		return 0;
 	}
 	dvbChannel_terminate();
 	free_services(&dvb_services);
@@ -276,21 +273,8 @@ void bouquet_setDigitalBouquetName(char *name)
 
 void bouquet_setAnalogBouquetName(char *name)
 {
-	char cmd[1024];
-	char fname[BUFFER_SIZE];
-	struct stat sb;
-
-	bouquet_getAnalogName(BOUGET_CONFIG_DIR_ANALOG, fname ,name);
-
-	if(stat(fname, &sb) == 0) {
-		snprintf(cmd, sizeof(cmd), "cp %s %s/../analog.json", fname, BOUGET_CONFIG_DIR_ANALOG);
-		dprintf("cmd: %s\n",cmd);
-		dbg_cmdSystem(cmd);
-	} else {
-		analogtv_removeServiceList(0);
-	}
+	bouquet_loadBouquet(analogBouquet, name);
 	sprintf(bouquetAnalogName,"%s", name);
-	playlist_editor_cleanup(2);
 }
 
 void bouquet_removeBouquetName(list_element_t **bouquet_name, char *name)
@@ -346,11 +330,9 @@ char *bouquet_getDigitalBouquetName()
 	if (bouquet_enable()) {
 		list_element_t *cur_element;
 		for(cur_element = bouquetNameDigitalList; cur_element != NULL; cur_element = cur_element->next) {
-			if (cur_element != NULL){
-				if (strncasecmp((char *)cur_element->data, bouquetDigitalName, strlen(bouquetDigitalName)) == 0) {
-					dprintf("%s: %s\n",__func__, bouquetDigitalName);
-					return bouquetDigitalName;
-				}
+			if ((cur_element != NULL) &&
+					(strncasecmp((char *)cur_element->data, bouquetDigitalName, strlen(bouquetDigitalName)) == 0)) {
+				return bouquetDigitalName;
 			}
 		}
 	}
@@ -361,11 +343,9 @@ char *bouquet_getAnalogBouquetName()
 {
 	list_element_t *cur_element;
 	for(cur_element = bouquetNameAnalogList; cur_element != NULL; cur_element = cur_element->next) {
-		if (cur_element != NULL){
-			if (strncasecmp((char *)cur_element->data, bouquetAnalogName, strlen(bouquetAnalogName)) == 0) {
-				dprintf("%s: %s\n",__func__, bouquetAnalogName);
-				return bouquetAnalogName;
-			}
+		if ( (cur_element != NULL) &&
+			 (strncasecmp((char *)cur_element->data, bouquetAnalogName, strlen(bouquetAnalogName)) == 0)) {
+			return bouquetAnalogName;
 		}
 	}
 	return NULL;
@@ -374,7 +354,7 @@ char *bouquet_getAnalogBouquetName()
 
 int bouquet_foundBouquetName(list_element_t **bouquet_name, char *name)
 {
-	if (!bouquet_enable() || name == NULL)
+	if (/*!bouquet_enable() ||*/ name == NULL)
 		return -1;
 	list_element_t *cur_element;
 	for(cur_element = *bouquet_name; cur_element != NULL; cur_element = cur_element->next) {
@@ -402,10 +382,12 @@ void bouquet_getDigitalName(char *dir, char *fname, char *name)
 {
 	sprintf(fname,"%s/offair.%s%s", dir, (name == NULL ? "" : name), (name == NULL ? "conf" : ".conf"));
 }
-void bouquet_getAnalogName(char *dir, char *fname, char *name)
+void bouquet_getAnalogJsonName(char *fname, char *name)
 {
-	sprintf(fname,"%s/analog.%s%s", dir, (name == NULL ? "" : name), (name == NULL ? "json" : ".json"));
-	dprintf("analog file: %s\n", fname);
+	if (name == NULL)
+		sprintf(fname,"analog.json");
+	else
+		sprintf(fname,"analog.%s.json", name);
 }
 
 void get_bouquets_file_name(list_element_t **bouquet_name, char *bouquet_file)
@@ -753,13 +735,39 @@ void bouquet_saveBouquetsConf(char *fileName, char *typeName)
 	}
 	fclose(fd);
 }
+void bouquet_stashBouquet(typeBouquet_t index, char * name)
+{
+	char cmd[256];
+	char fname[256];
+	if (index == analogBouquet) {
+		bouquet_getAnalogJsonName(fname ,name);
+		snprintf(cmd, sizeof(cmd), "cp %s/../%s %s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_ANALOG_MAIN_FILE,
+														BOUGET_CONFIG_DIR_ANALOG, fname);
+	}
+	dbg_cmdSystem(cmd);
+}
+
+void bouquet_loadBouquet(typeBouquet_t index, char * name)
+{
+	char cmd[256];
+	char fname[256];
+	if (index == analogBouquet) {
+		bouquet_getAnalogJsonName(fname ,name);
+		analogtv_removeServiceList(0);
+		snprintf(cmd, sizeof(cmd), "cp %s/%s %s/../%s", BOUGET_CONFIG_DIR_ANALOG, fname,
+														BOUGET_CONFIG_DIR_ANALOG, BOUGET_ANALOG_MAIN_FILE);
+	}
+	dbg_cmdSystem(cmd);
+}
 
 int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg)
 {
 	if (bouquet_enable()) {
 		bouquet_setEnable(0);
+		bouquet_loadBouquet(analogBouquet, NULL);
 	} else {
 		bouquet_setEnable(1);
+		bouquet_stashBouquet(analogBouquet, NULL);
 	}
 	saveAppSettings();
 	dvbChannel_terminate();
@@ -781,11 +789,12 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg)
 	output_redrawMenu(pMenu);
 	return 0;
 }
+
 int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-	debug("%s\n",bouquetName);
+	dprintf("%s\n",bouquetName);
 
 	if (bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
@@ -805,11 +814,16 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 	output_redrawMenu(pMenu);
 	return 0;
 }
+
+int bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg)
+{
+	bouquet_loadAnalogBouquetsList(1);
+}
+
 int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
 	char *bouquetName;
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-	bouquet_loadAnalogBouquetsList(1);
 	bouquetName = bouquet_getAnalogBouquetName();
 	if (bouquetName != NULL) {
 		char serverName[16];
@@ -822,11 +836,11 @@ int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg)
 		getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 		getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../analog/analog.%s.json %s/analog.%s.json", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR_ANALOG, bouquetName);
-		printf("cmd: %s\n",cmd);
 		dbg_cmdSystem(cmd);
 	}
 	char *name = bouquet_getAnalogBouquetName();
-	bouquet_setAnalogBouquetName(name);
+	if (name != NULL)
+		bouquet_setAnalogBouquetName(name);
 	interface_hideMessageBox();
 	offair_fillDVBTMenu();
 	return 0;
@@ -875,19 +889,28 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 	offair_fillDVBTMenu();
 	return 0;
 }
+
 int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
-	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-	if(!(helperFileExists(GARB_DIR "/.ssh/id_rsa") && helperFileExists(GARB_DIR "/.ssh/id_rsa.pub"))) {
-		eprintf("%s(): No garb private or public key!!!\n", __func__);
-		return -1;
-	}
-
 	char serverName[16];
 	char loginName[32];
 	char serverDir[256];
 	char cmd[1024];
 	int32_t ret = 0;
+
+	char *bouquetName = bouquet_getAnalogBouquetName();
+	if (bouquetName == NULL) {
+		eprintf("%s(): Noе selected bouquet!!!\n", __func__);
+		return -1;
+	}
+
+	if(!(helperFileExists(GARB_DIR "/.ssh/id_rsa") && helperFileExists(GARB_DIR "/.ssh/id_rsa.pub"))) {
+		eprintf("%s(): No garb private or public key!!!\n", __func__);
+		return -1;
+	}
+
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
+	bouquet_stashBouquet(analogBouquet, bouquetName);
 
 	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
 	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
@@ -897,7 +920,7 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 	char bouquet_file[BUFFER_SIZE];
 
 	sprintf(bouquet_file, "-put %s/analog.%s.json %s/../analog/analog.%s.json",
-								  BOUGET_CONFIG_DIR_ANALOG, bouquetAnalogName, serverDir, bouquetAnalogName);
+								  BOUGET_CONFIG_DIR_ANALOG, bouquetName, serverDir, bouquetName);
 
 	fd = fopen("/tmp/cmd_bouquet", "wb");
 	if(fd == NULL) {
@@ -908,7 +931,6 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 	fclose(fd);
 
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
-	printf("cmd: %s\n",cmd);
 	ret = dbg_cmdSystem(cmd);
 	interface_hideMessageBox();
 	return WEXITSTATUS(ret);
@@ -918,15 +940,12 @@ void bouquet_saveAnalogBouquet()
 {
 	char cmd[1024];
 	char fname[BUFFER_SIZE];
-	struct stat sb;
-	bouquet_getAnalogName(BOUGET_CONFIG_DIR_ANALOG, fname ,bouquet_getAnalogBouquetName());
 
+	bouquet_stashBouquet(analogBouquet, bouquet_getAnalogBouquetName());
 	snprintf(cmd, sizeof(cmd), "cp %s/../analog.json %s", BOUGET_CONFIG_DIR_ANALOG, fname);
-	dprintf("cmd: %s\n",cmd);
 	dbg_cmdSystem(cmd);
 
 	offair_fillDVBTMenu();
-	return 0;
 }
 
 int bouquet_saveDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
@@ -965,66 +984,57 @@ void bouquet_loadBouquets(list_element_t **services)
 	}
 }
 
-int bouquet_downloadBouquetsList(int index)
+void bouquet_downloadAnalogConfigList()
 {
-	printf("%s[%d index = %d]\n",__func__, __LINE__, index);
+	char serverName[16];
+	char serverDir[256];
+	char loginName[32];
+	char cmd[1024];
+
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
+
+	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
+	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
+	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
+
+	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../analog/%s %s", loginName, serverName, serverDir, BOUGET_CONFIG_FILE_ANALOG, BOUGET_CONFIG_DIR_ANALOG);
+	dbg_cmdSystem(cmd);
+	interface_hideMessageBox();
+}
+
+void bouquet_downloadDigitalConfigList()
+{
 	char serverName[16];
 	char serverDir[256];
 	char filename[256];
 	char loginName[32];
 	char cmd[1024];
-	int val;
 
-	if (index == 1) {
-		snprintf(cmd, sizeof(cmd), "mv %s/%s %s/%s_temp", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
-	} else {
-		snprintf(cmd, sizeof(cmd), "mv %s/%s %s/%s_temp", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG, BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
-	}
-	printf("cmd: %s\n",cmd);
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
+	snprintf(cmd, sizeof(cmd), "mv %s/%s %s/%s_temp", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
 	dbg_cmdSystem(cmd);
 
-	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
-	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
-	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
-	if (index == 1) {
-		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../bouquet/%s %s", loginName, serverName, serverDir, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR);
-	} else {
-		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../analog/%s %s", loginName, serverName, serverDir, BOUGET_CONFIG_FILE_ANALOG, BOUGET_CONFIG_DIR_ANALOG);
-
-	}
-	printf("cmd: %s\n",cmd);
+	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../bouquet/%s %s", loginName, serverName, serverDir, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR);
 	dbg_cmdSystem(cmd);
 
-	if (index == 1) {
-		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
-	} else {
-		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
-	}
+	sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
+
 	struct stat sb;
-	if(stat(filename, &sb) == 0) {
-		val = 0;
-	} else {
-		if (index == 1) {
-			snprintf(cmd, sizeof(cmd), "mv %s/%s_temp %s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
-		} else {
-			snprintf(cmd, sizeof(cmd), "mv %s/%s_temp %s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG, BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
-		}
-		printf("cmd: %s\n",cmd);
+	if(!(stat(filename, &sb) == 0)) {
+		snprintf(cmd, sizeof(cmd), "mv %s/%s_temp %s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
 		dbg_cmdSystem(cmd);
-		val = -1;
 	}
 	interface_hideMessageBox();
-	return val;
 }
 
 void bouquet_init()
 {
 	struct stat sb;
-//	if(stat(BOUGET_CONFIG_DIR, &sb) == 0 && S_ISDIR( sb.st_mode))
-//		return;
-	mkdir(BOUGET_CONFIG_DIR, 0777);
-	mkdir(BOUGET_CONFIG_DIR_ANALOG, 0777);
+	if(!(stat(BOUGET_CONFIG_DIR, &sb) == 0 && S_ISDIR( sb.st_mode)))
+		mkdir(BOUGET_CONFIG_DIR, 0777);
+
+	if(!(stat(BOUGET_CONFIG_DIR_ANALOG, &sb) == 0 && S_ISDIR( sb.st_mode)))
+		mkdir(BOUGET_CONFIG_DIR_ANALOG, 0777);
 }
 
 void bouquet_saveBouquetsList(list_element_t **bouquet_name)
@@ -1060,11 +1070,7 @@ void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path)
 	}
 	// check head file name
 	while ( fgets(buf, BUFFER_SIZE, fd) != NULL ) {
-		if (sscanf(buf, "#BOUQUETS_NAME=%s", path) == 1) {
-			if (bouquet_foundBouquetName(&*bouquet_name, path) != 0)
-				bouquet_addNewBouquetName(&*bouquet_name, path);
-		} else
-		if (sscanf(buf, "#ANALOG_NAME=%s", path) == 1) {
+		if ((sscanf(buf, "#BOUQUETS_NAME=%s", path) == 1) || (sscanf(buf, "#ANALOG_NAME=%s", path) == 1)) {
 			if (bouquet_foundBouquetName(&*bouquet_name, path) != 0)
 				bouquet_addNewBouquetName(&*bouquet_name, path);
 		}
@@ -1075,7 +1081,7 @@ void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path)
 void bouquet_loadDigitalBouquetsList(int force)
 {
 	if (force == 1)
-		bouquet_downloadBouquetsList(1);
+		bouquet_downloadDigitalConfigList();
 
 	char buffName[256];
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
@@ -1086,13 +1092,11 @@ void bouquet_loadDigitalBouquetsList(int force)
 
 void bouquet_loadAnalogBouquetsList(int force)
 {
-	if (force == 1)
-		bouquet_downloadBouquetsList(2);
-
 	char buffName[256];
+	if (force == 1)
+		bouquet_downloadAnalogConfigList();
+
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
-	bouquet_parseBouquetsList(&bouquetNameAnalogList, buffName);
-	sprintf(buffName, "%s/%s_temp", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
 	bouquet_parseBouquetsList(&bouquetNameAnalogList, buffName);
 }
 

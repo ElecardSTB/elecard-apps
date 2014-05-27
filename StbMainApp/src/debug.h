@@ -86,7 +86,6 @@ void  dbg_ThreadStop(void);
 int  dbg_getDebag(char *);
 int  dbg_cmdSystem(char *);
 
-
 #ifdef __cplusplus
 };
 #endif

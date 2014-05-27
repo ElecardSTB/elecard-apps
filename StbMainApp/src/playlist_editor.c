@@ -118,10 +118,14 @@ void set_unLockColor(){
 		interfaceInfo.highlightColor = 0;
 }
 
-void playlist_editor_cleanup(int index){
-	if (index == 0 || index == 1)
+void playlist_editor_cleanup(typeBouquet_t index){
+/*	if (index == 0 || index == 1)
 		free_elements(&playListEditorDigital);
 	if (index == 0 || index == 2)
+		free_elements(&playListEditorAnalog);*/
+	if (index == fullBouquet || index == digitalBouquet)
+		free_elements(&playListEditorDigital);
+	if (index == fullBouquet || index == analogBouquet)
 		free_elements(&playListEditorAnalog);
 }
 
@@ -419,15 +423,24 @@ void playlist_editor_removeElement()
 int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	extern list_element_t *bouquetNameAnalogList;
-	interfaceMenu_t *channelMenu = interfaceMenu;
-	interface_clearMenuEntries(channelMenu);
+	interfaceMenu_t *channelMenu;
 	int i = 0;
 	char *name;
+	char *bouquets_name;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+
+	channelMenu = interfaceMenu;
+	interface_clearMenuEntries(channelMenu);
+
+	snprintf(channelEntry, sizeof(channelEntry), "%s: %s", _T("PLAYLIST_NOW_SELECT"), bouquet_getAnalogBouquetName());
+	interface_addMenuEntryDisabled(channelMenu, channelEntry, 0);
+	interface_addMenuEntry(channelMenu, _T("PLAYLIST_UPDATE_LIST"), bouquet_updateAnalogBouquetList, NULL, settings_interface);
+	interface_addMenuEntryDisabled(channelMenu, "List of analog channels:", 0);
+
+
 	while ((name = bouquet_getNameBouquetList(&bouquetNameAnalogList, i) )!= NULL) {
 		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
 		interface_addMenuEntry(channelMenu, channelEntry, bouquets_setAnalogBouquet, CHANNEL_INFO_SET(screenMain, i), thumbnail_epg);
-		char *bouquets_name;
 		bouquets_name = bouquet_getAnalogBouquetName();
 		if (bouquets_name != NULL && strcasecmp(name, bouquets_name) == 0) {
 			interfaceMenuEntry_t *entry;
@@ -439,7 +452,7 @@ int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 			}
 		}
 		i++;
-	};
+	}
 	if (i == 0){
 		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
 	}
@@ -449,16 +462,18 @@ int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 int enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	extern list_element_t *bouquetNameDigitalList;
-
-	interfaceMenu_t *channelMenu = interfaceMenu;
-	interface_clearMenuEntries(channelMenu);
+	interfaceMenu_t *channelMenu;
 	int i = 0;
 	char *name;
+	char *bouquets_name;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+
+	channelMenu = interfaceMenu;
+	interface_clearMenuEntries(channelMenu);
+
 	while ((name = bouquet_getNameBouquetList(&bouquetNameDigitalList, i) )!= NULL) {
 		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
 		interface_addMenuEntry(channelMenu, channelEntry, bouquets_setDigitalBouquet, CHANNEL_INFO_SET(screenMain, i), thumbnail_epg);
-		char *bouquets_name;
 		bouquets_name = bouquet_getDigitalBouquetName();
 		if (bouquets_name != NULL && strcasecmp(name, bouquets_name) == 0) {
 			interfaceMenuEntry_t *entry;
@@ -470,7 +485,7 @@ int enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 			}
 		}
 		i++;
-	};
+	}
 	if (i == 0){
 		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
 	}
@@ -483,16 +498,15 @@ int enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
 	if (playListEditorAnalog != NULL)
 		return 0;
 
-	list_element_t *cur_element;
-	cur_element = playListEditorAnalog;
-	load_Analog_channels(&cur_element);
-
+	list_element_t *cur_element = playListEditorAnalog;
 	interfaceMenu_t *channelMenu = interfaceMenu;
+	playListEditorAnalog_t *element;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 	int32_t i = 0;
-	interface_clearMenuEntries(channelMenu);
 
-	playListEditorAnalog_t *element;
+	interface_clearMenuEntries(channelMenu);
+	load_Analog_channels(&cur_element);
+
 	for(cur_element = playListEditorAnalog; cur_element != NULL; cur_element = cur_element->next) {
 		element = (playListEditorAnalog_t*)cur_element->data;
 		if(element == NULL)

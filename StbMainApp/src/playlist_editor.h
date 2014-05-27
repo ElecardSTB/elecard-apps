@@ -1,6 +1,7 @@
 #ifndef PLAYLIST_EDITOR_H
 #define PLAYLIST_EDITOR_H
 #include "interface.h"
+#include "bouquet.h"
 
 int enterPlaylistDigitalSelect(interfaceMenu_t *pMenu, void* pArg);
 int enterPlaylistAnalogSelect(interfaceMenu_t *pMenu, void* pArg);
@@ -13,7 +14,7 @@ void playlist_editor_removeElement();
 void playlist_editor_setupdate();
 int getChannelEditor();
 void playlist_switchElement(int , int );
-void playlist_editor_cleanup(int);
+void playlist_editor_cleanup(typeBouquet_t);
 int get_statusLockPlaylist();
 void set_unLockColor();
 int check_playlist();
