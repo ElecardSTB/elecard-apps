@@ -860,20 +860,18 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 		char loginName[32];
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "mv %s/%s/ %s/%s_temp", BOUGET_CONFIG_DIR, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
-		printf("cmd: %s\n",cmd);
 		dbg_cmdSystem(cmd);
 		getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
 		getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 		getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
+
 		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s.%s %s/%s", loginName, serverName, serverDir, bouquetName, "STB", BOUGET_CONFIG_DIR, bouquetName);
-		printf("cmd: %s\n",cmd);
 		dbg_cmdSystem(cmd);
 
 		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, bouquetName);
 		struct stat sb;
 		if(!(stat(filename, &sb) == 0  || S_ISDIR( sb.st_mode))) {
 			snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s %s/%s", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
-			printf("cmd: %s\n",cmd);
 			dbg_cmdSystem(cmd);
 		}
 
@@ -882,7 +880,6 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 		} else {
 			snprintf(cmd, sizeof(cmd), "rm -r %s/%s_temp/", BOUGET_CONFIG_DIR, bouquetName);
 		}
-		printf("cmd: %s\n",cmd);
 		dbg_cmdSystem(cmd);
 	}
 	interface_hideMessageBox();
@@ -1013,6 +1010,10 @@ void bouquet_downloadDigitalConfigList()
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	snprintf(cmd, sizeof(cmd), "mv %s/%s %s/%s_temp", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
 	dbg_cmdSystem(cmd);
+
+	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
+	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
+	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 
 	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../bouquet/%s %s", loginName, serverName, serverDir, BOUGET_CONFIG_FILE, BOUGET_CONFIG_DIR);
 	dbg_cmdSystem(cmd);
