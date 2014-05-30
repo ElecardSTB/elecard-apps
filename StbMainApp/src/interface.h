@@ -936,6 +936,13 @@ typedef struct
 #define FUSION_SAME_CREEP (1)
 #define FUSION_NEW_CREEP  (2)
 
+#define FUSION_DATETIME_LEN (64)
+
+#define FUSION_MODE_UNDEF (0)
+#define FUSION_MODE_FILES (1)
+#define FUSION_MODE_HLS   (2)
+#define FUSION_MODE_TV    (3)
+
 typedef enum {
 	FUSION_TOP_LEFT = 0,
 	FUSION_TOP_RIGHT,
@@ -975,6 +982,11 @@ typedef struct _interfaceFusionObject_t {
 	char currentDtmfMark[8];
 	unsigned long long dtmfStartTime;
 	pthread_mutex_t mutexDtmf;
+
+	int mode;
+	char streamUrl[PATH_MAX];
+	char firmwareUpdatePath[PATH_MAX];
+	char firmwareUpdateTime[FUSION_DATETIME_LEN];
 
 } interfaceFusionObject_t;
 #endif

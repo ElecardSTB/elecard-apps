@@ -2016,22 +2016,9 @@ void fusion_startup()
 		return;
 	}
 
-	sprintf (appControlInfo.mediaInfo.filename, "%s", FUSION_STUB);
-
-	appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
-	appControlInfo.mediaInfo.bHttp = 1;
-
 	memset(&FusionObject, 0, sizeof(interfaceFusionObject_t));
 
 	fusion_getSecret();
-
-	int result = media_startPlayback();
-	if (result == 0){
-		eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FUSION_STUB);
-	}
-	else {
-		eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
-	}
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
@@ -2299,6 +2286,7 @@ int fusion_getCreepAndLogo ()
 	time_t now;
 	struct tm nowDate;
 	int result = 0;
+	int oldMode;
 
 	if (!fusion_checkDirectory("/tmp/fusion")) {
 		system("mkdir /tmp/fusion");
@@ -2315,6 +2303,67 @@ int fusion_getCreepAndLogo ()
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
 		return FUSION_FAIL;
+	}
+
+	oldMode = FusionObject.mode;
+	cJSON* jsonMode = cJSON_GetObjectItem(root, "mode");
+	if (jsonMode)
+	{
+		if (jsonMode->valuestring){
+			if (strncmp("ondemand", jsonMode->valuestring, 8) == 0){
+				eprintf ("%s(%d): Mode ondemand.\n", __FUNCTION__, __LINE__);
+				FusionObject.mode = FUSION_MODE_FILES;
+				snprintf(FusionObject.streamUrl, PATH_MAX, FUSION_STUB);
+				eprintf ("%s(%d): On-demand stub = %s.\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
+			}
+			else if (strncmp("stream", jsonMode->valuestring, 6) == 0){
+				eprintf ("%s(%d): Mode stream (hls).\n", __FUNCTION__, __LINE__);
+				FusionObject.mode = FUSION_MODE_HLS;
+
+				cJSON * jsonStreamUrl =  cJSON_GetObjectItem(root, "stream");
+				if (jsonStreamUrl && jsonStreamUrl->valuestring){
+					snprintf(FusionObject.streamUrl, PATH_MAX, jsonStreamUrl->valuestring);
+					eprintf ("%s(%d): Stream URL = %s.\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
+				}
+			}
+			else if (strncmp("tv", jsonMode->valuestring, 2) == 0){
+				eprintf ("%s(%d): Mode satellite.\n", __FUNCTION__, __LINE__);
+				FusionObject.mode = FUSION_MODE_TV;
+			}
+		}
+	}
+	if (oldMode != FusionObject.mode)
+	{
+		// stop old video
+		if (appControlInfo.mediaInfo.active){
+			eprintf ("%s(%d): WARNING! Mode changed. Stop current playback.\n", __FUNCTION__, __LINE__);
+			media_stopPlayback();
+			appControlInfo.mediaInfo.filename[0] = 0;
+		}
+		// start new video
+		switch (FusionObject.mode){
+			case FUSION_MODE_FILES:
+			case FUSION_MODE_HLS:				// test to see how fusion ondemand stops
+				snprintf (appControlInfo.mediaInfo.filename, PATH_MAX, "%s", FusionObject.streamUrl);
+				appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
+				appControlInfo.mediaInfo.bHttp = 1;
+
+				eprintf ("%s(%d): Start playing in new mode.\n", __FUNCTION__, __LINE__);
+				int result = media_startPlayback();
+				if (result == 0){
+					eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
+				}
+				else {
+					eprintf ("%s(%d): ERROR! media_startPlayback rets %d\n", __FUNCTION__, __LINE__, result);
+				}
+			break;
+			default:
+				eprintf ("%s(%d): WARNING! Mode %d unsupported.\n", __FUNCTION__, __LINE__, FusionObject.mode);
+			break;
+		}
+	}
+	else {
+		// do nothing
 	}
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
