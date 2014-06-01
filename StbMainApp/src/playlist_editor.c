@@ -45,6 +45,7 @@ int getColor() {
 static void load_Analog_channels(list_element_t *curListEditor)
 {
 	extern analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
+	//analogtv_parseConfigFile(1);
 	int analogtv_channelCount = analogtv_getChannelCount(1);
 	int i;
 	for(i = 0; i < analogtv_channelCount; i++) {
@@ -505,7 +506,7 @@ int enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
 	int32_t i = 0;
 
 	interface_clearMenuEntries(channelMenu);
-	load_Analog_channels(&cur_element);
+	load_Analog_channels(cur_element);// fixed pointer on list
 
 	for(cur_element = playListEditorAnalog; cur_element != NULL; cur_element = cur_element->next) {
 		element = (playListEditorAnalog_t*)cur_element->data;

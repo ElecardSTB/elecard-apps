@@ -840,6 +840,7 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 int bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg)
 {
 	bouquet_loadAnalogBouquetsList(1);
+	return 0;
 }
 
 int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg)
