@@ -2915,12 +2915,9 @@ int main(int argc, char *argv[])
 		setoutput((errorLevel_t)i, (i == errorLevelError || i == errorLevelWarning) ? stderr : stdout);
 	}
 
-	char *path;
-	path = getenv("DEBUG");
-	if(path && strcasecmp(path, "1") == 0) {
+	if(dbg_getDebag("DEBUG")) {
 		setoutputlevel(errorLevelDebug);
 	} else {
-#undef DEBUG
 		setoutputlevel(errorLevelNormal);
 	}
 

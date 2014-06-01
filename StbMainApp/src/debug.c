@@ -274,6 +274,8 @@ int  dbg_ThreadInit(void)
 {
 	int32_t thread;
 	int32_t dbg_pipe = -1;
+	gdbDebug = 0;
+	gdbBouquet = 0;
 
 	unlink(GDB_PIPE);
 	if(mkfifo(GDB_PIPE, 0666) < 0) {
