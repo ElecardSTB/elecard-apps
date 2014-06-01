@@ -135,6 +135,7 @@ void bouquet_saveLamedb(char *fileName);
 void bouquet_saveBouquetsList(list_element_t **bouquet_name);
 void bouquet_downloadDigitalConfigList();
 void bouquet_downloadAnalogConfigList();
+void bouquet_loadAnalogBouquetsList(int);
 void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path);
 
 
@@ -155,7 +156,14 @@ int bouquets_getNumberPlaylist()
 void bouquet_saveAllBouquet()
 {
 	char *bouquetName;
+	char buffName[128];
+	struct stat sb;
+
 	bouquetName = bouquet_getDigitalBouquetName();
+	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, bouquetName);
+	if(!(stat(buffName, &sb) == 0 && S_ISDIR( sb.st_mode)))
+		mkdir(buffName, 0777);
+
 	bouquet_saveBouquets(bouquetName, "tv");
 	bouquet_saveBouquets(bouquetName, "radio");
 	bouquet_saveBouquetsConf(bouquetName, "tv");
@@ -194,7 +202,6 @@ int bouquet_sendBouquet()
 	fclose(fd);
 
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
-	printf("cmd: %s\n",cmd);
 	ret = dbg_cmdSystem(cmd);
 	interface_hideMessageBox();
 	return WEXITSTATUS(ret);
@@ -215,11 +222,13 @@ list_element_t *list_getElement(int count, list_element_t **head)
 
 void bouquet_addScanChannels()
 {
+	//fixed radio type
 	list_element_t		*service_element;
 
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 		if(!(dvbChannel_findServiceCommon(&curService->common))){
+			curService->common.media_id = curService->original_network_id;
 			dvbChannel_addService(curService, 1);
 		}
 	}
@@ -318,7 +327,6 @@ void bouquet_setNewBouquetName(char *name)
 		bouquet_addNewBouquetName(&bouquetNameDigitalList, name);
 
 		snprintf(cmd, sizeof(cmd), "mkdir -p %s", buffName);
-		printf("cmd = %s\n",cmd);
 		dbg_cmdSystem(cmd);
 		bouquet_saveBouquetsList(&bouquetNameDigitalList);
 	}
@@ -598,14 +606,11 @@ int bouquet_getFolder(char *bouquetsFile)
 {
 	char buffName[256];
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, bouquetsFile);
-
 	struct stat sb;
-	if(stat(buffName, &sb) == 0) {
-		if ( S_ISDIR( sb.st_mode)) {
-			return true;
-		}
-	}
-	return false;
+
+	if(stat(buffName, &sb) == 0 && S_ISDIR( sb.st_mode))
+		return 1;
+	return 0;
 }
 
 void bouquet_saveLamedb(char *fileName)
@@ -621,13 +626,10 @@ void bouquet_saveLamedb(char *fileName)
 	sprintf(dirName, "%s/%s/lamedb",BOUGET_CONFIG_DIR ,fileName);
 	fd = fopen(dirName, "wb");
 
-
-
 	if(fd == NULL) {
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, dirName);
 		return;
 	}
-
 
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
@@ -672,6 +674,20 @@ void bouquet_saveLamedb(char *fileName)
 														  element->media.dvb_s.FEC_inner,
 														  element->media.dvb_s.orbital_position,
 														  (element->media.dvb_s.inversion == 0 ? 2 : 1));
+		}
+		if (element->media.type == serviceMediaDVBT) {
+			fprintf(fd, "	%c %d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d\n", 't', element->media.dvb_t.centre_frequency,
+																			 element->media.dvb_t.bandwidth,
+																			 element->media.dvb_t.code_rate_HP_stream,
+																			 element->media.dvb_t.code_rate_LP_stream,
+																			 0,
+																			 element->media.dvb_t.transmission_mode,
+																			 element->media.dvb_t.guard_interval,
+																			 element->media.dvb_t.hierarchy_information,
+																			 (element->media.dvb_t.inversion == 0 ? 2 : 1),
+																			 0,
+																			 0,
+																			 element->media.dvb_t.plp_id);
 		}
 		fprintf(fd, "/\n");
 	}
@@ -800,14 +816,20 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUGET_CONFIG_DIR, bouquetName);
-		printf("cmd: %s\n",cmd);
 		dbg_cmdSystem(cmd);
 		interface_hideMessageBox();
 		bouquet_removeBouquetName(&bouquetNameDigitalList, bouquetName);
 		bouquet_loadDigitalBouquetsList(1);
-	} else {
-		free_services(&dvb_services);
 	}
+	free_services(&dvb_services);
+	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+#if (defined STSDK)
+		elcdRpcType_t type;
+		cJSON *result = NULL;
+		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
+		cJSON_Delete(result);
+#endif //#if (defined STSDK)
+
 	dvbChannel_terminate();
 	dvbChannel_writeOrderConfig();
 	offair_fillDVBTMenu();
@@ -959,7 +981,7 @@ void bouquet_loadBouquets(list_element_t **services)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-	if (bouquetName != NULL && bouquet_getFolder(bouquet_getDigitalBouquetName(bouquetName))) {
+	if (bouquetName != NULL && bouquet_getFolder(bouquetName)) {
 		char fileName[1024];
 		free_elements(&bouquet_name_tv);
 		free_elements(&bouquet_name_radio);
@@ -967,7 +989,6 @@ void bouquet_loadBouquets(list_element_t **services)
 		get_bouquets_file_name(&bouquet_name_tv, fileName);
 		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_NAME, "radio");
 		get_bouquets_file_name(&bouquet_name_radio, fileName);
-
 		if (bouquet_name_tv != NULL) {
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_tv->data);
 			get_bouquets_list(fileName/*tv*/);
@@ -978,6 +999,7 @@ void bouquet_loadBouquets(list_element_t **services)
 		}
 		filter_bouquets_list(bouquetName);
 		bouquet_loadLamedb(bouquetName, &*services);
+
 	}
 }
 
@@ -1170,36 +1192,69 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 			element->transpounder_id.ts_id = ts_id;
 			element->transpounder_id.n_id = n_id;
 
-			char type;
-			uint32_t freq;
-			uint32_t sym_rate;
-			uint32_t inversion; //0 - auto, 1 - on, 2 - off
-			uint32_t mod;
-			uint32_t fec_inner;
-			uint32_t flag;
-			uint32_t system; // 0 - DVB-C, 1 DVB-C ANNEX C
-
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
 				break;
-			if (sscanf(buf, " %c %d:%d:%d:%d:%d:%d:%d\n",&type, &freq, &sym_rate, &inversion, &mod, &fec_inner, &flag, &system) != 8)
-				break;
-			if( type == 'c') {
-				element->media.type = serviceMediaDVBC;
-				element->media.frequency = freq * 1000;
-				element->media.dvb_c.frequency = freq * 1000;
-				element->media.dvb_c.symbol_rate = sym_rate;
-				element->media.dvb_c.modulation = mod;
-				element->media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
-			}
-			if( type == 's') {
-				element->media.type = serviceMediaDVBS;
-				element->media.frequency = freq;
-				element->media.dvb_s.frequency = freq;
-				element->media.dvb_s.symbol_rate = sym_rate;
-				element->media.dvb_s.polarization = inversion;
-				element->media.dvb_s.FEC_inner = mod;
-				element->media.dvb_s.orbital_position = fec_inner;
-				element->media.dvb_s.inversion = (flag == 2 ? 0 : 1);
+
+			switch(buf[1])
+			{
+				case 's':
+				{
+					uint32_t freq, sym_rate, polarization, FEC_inner, orbital_position, inversion/*0 - auto, 1 - on, 2 - off*/, system/*0 - DVB-C, 1 DVB-C ANNEX C*/, modulation, rolloff, pilot;
+
+					element->media.type = serviceMediaDVBS;
+					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d\n",
+							   &freq, &sym_rate, &polarization, &FEC_inner, &orbital_position, &inversion, &system, &modulation, &rolloff, &pilot);
+
+					element->media.frequency = freq;
+					element->media.dvb_s.frequency = freq;
+					element->media.dvb_s.symbol_rate = sym_rate;
+					element->media.dvb_s.polarization = polarization;
+					element->media.dvb_s.FEC_inner = FEC_inner;
+					element->media.dvb_s.orbital_position = orbital_position;
+					element->media.dvb_s.inversion = (inversion == 2 ? 0 : 1);
+					//system
+					//modulation
+					//rolloff
+					//pilot
+				}
+				case 'c':
+				{
+					uint32_t freq, sym_rate, inversion, mod, fec_inner, flag, system;
+
+					element->media.type = serviceMediaDVBC;
+					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d\n",
+							   &freq, &sym_rate, &inversion, &mod, &fec_inner, &flag, &system);
+
+					element->media.type = serviceMediaDVBC;
+					element->media.frequency = freq * 1000;
+					element->media.dvb_c.frequency = freq * 1000;
+					element->media.dvb_c.symbol_rate = sym_rate;
+					element->media.dvb_c.modulation = mod;
+					element->media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
+				}
+				case 't':
+				{
+					uint32_t freq, bandwidth, code_rate_HP, code_rate_LP, modulation, transmission_mode, guard_interval, hierarchy, inversion, flags, system, plpid;
+
+					element->media.type = serviceMediaDVBT;
+					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+						&freq, &bandwidth, &code_rate_HP, &code_rate_LP, &modulation, &transmission_mode, &guard_interval, &hierarchy, &inversion, &flags, &system, &plpid);
+
+					element->media.frequency = freq;
+					element->media.dvb_t.centre_frequency = freq;
+					element->media.dvb_t.bandwidth = bandwidth;
+					element->media.dvb_t.code_rate_HP_stream = code_rate_HP;
+					element->media.dvb_t.code_rate_LP_stream = code_rate_LP;
+					//modulation
+					element->media.dvb_t.transmission_mode = transmission_mode;
+					element->media.dvb_t.guard_interval = guard_interval;
+					element->media.dvb_t.hierarchy_information = hierarchy;
+					element->media.dvb_t.inversion = (inversion == 2 ? 0 : 1);
+					//flags
+					//system
+					element->media.dvb_t.plp_id = plpid;
+				}
+
 			}
 
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
@@ -1276,6 +1331,11 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 						//element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
 						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion)
 					continue;
+				if (element->media.type == serviceMediaDVBT && element_tr->media.type == serviceMediaDVBT &&
+						element->media.dvb_t.centre_frequency == element_tr->media.dvb_t.centre_frequency &&
+						element->media.dvb_t.bandwidth == element_tr->media.dvb_t.bandwidth &&
+						element->media.dvb_t.inversion == element_tr->media.dvb_t.inversion)
+					continue;
 				remove_element(&*services, service_element);
 			}
 			list_element_t *cur_element = NULL;
@@ -1312,6 +1372,22 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 				element->media.dvb_s.FEC_inner = element_tr->media.dvb_s.FEC_inner;
 				element->media.dvb_s.orbital_position = element_tr->media.dvb_s.orbital_position;
 				element->media.dvb_s.inversion = element_tr->media.dvb_s.inversion;
+			}
+			if (element_tr->media.type == serviceMediaDVBT) {
+				element->media.type = element_tr->media.type;
+				element->media.frequency = element_tr->media.frequency;
+				element->media.dvb_t.centre_frequency = element_tr->media.dvb_t.centre_frequency;
+				element->media.dvb_t.bandwidth = element_tr->media.dvb_t.bandwidth;
+				element->media.dvb_t.code_rate_HP_stream = element_tr->media.dvb_t.code_rate_HP_stream;
+				element->media.dvb_t.code_rate_LP_stream = element_tr->media.dvb_t.code_rate_LP_stream;
+				element->media.dvb_t.constellation = element_tr->media.dvb_t.constellation;
+				element->media.dvb_t.generation = element_tr->media.dvb_t.generation;
+				element->media.dvb_t.guard_interval = element_tr->media.dvb_t.guard_interval;
+				element->media.dvb_t.hierarchy_information = element_tr->media.dvb_t.hierarchy_information;
+				element->media.dvb_t.inversion = element_tr->media.dvb_t.inversion;
+				element->media.dvb_t.plp_id = element_tr->media.dvb_t.plp_id;
+				element->media.dvb_t.transmission_mode = element_tr->media.dvb_t.transmission_mode;
+				element->media.dvb_t.other_frequency_flag = element_tr->media.dvb_t.other_frequency_flag;
 			}
 		} while (strncasecmp(buf, "end", 3) != 0);
 	} while(0);
@@ -1374,7 +1450,6 @@ void bouquet_downloadFileFromServer(char *shortname, char *fullname)
 	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../channels/%s %s", loginName, serverName, serverDir, shortname, fullname);
-	printf("cmd: %s\n",cmd);
 	dbg_cmdSystem(cmd);
 	interface_hideMessageBox();
 }
