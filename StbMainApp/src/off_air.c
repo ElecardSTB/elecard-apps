@@ -134,6 +134,8 @@ interfaceListMenu_t DVBTMenu;
 
 #define CHANNEL_STATUS_ID 1
 
+#define DEFAULT_FREQUENCY 474000000
+
 
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
@@ -588,12 +590,17 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, ui
 int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {	
 	uint32_t adapter;
-	uint32_t low_freq, high_freq, freq_step, frequency;
+	uint32_t low_freq, high_freq, freq_step, freq_substep, frequency;
 	int32_t which = GET_NUMBER(pArg);
 	char buf[256];
 
 	adapter = offair_getTuner();
 	dvbfe_getTuner_freqs(adapter, &low_freq, &high_freq, &freq_step);
+	
+	freq_substep = (DEFAULT_FREQUENCY - low_freq) % freq_step;
+	if(freq_substep != 0) {
+		freq_step = freq_step - freq_substep;
+	}
 
 	for(frequency = low_freq; frequency <= high_freq; frequency += freq_step) {
 		dprintf( "%s: [ %u < %u < %u ]\n", __FUNCTION__, low_freq, frequency, high_freq);
@@ -615,6 +622,12 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		interface_sliderShow(0, 0);
 		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
 		interface_showMessageBox(buf, thumbnail_info, 5000);
+		if(freq_substep) {
+			uint32_t temp_step;
+			temp_step = freq_step;
+			freq_step = freq_substep;
+			freq_substep = temp_step;
+		}
 	}
 	return -1;
 
