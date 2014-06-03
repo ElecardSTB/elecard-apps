@@ -1217,6 +1217,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 					//modulation
 					//rolloff
 					//pilot
+					break;
 				}
 				case 'c':
 				{
@@ -1232,6 +1233,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 					element->media.dvb_c.symbol_rate = sym_rate;
 					element->media.dvb_c.modulation = mod;
 					element->media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
+					break;
 				}
 				case 't':
 				{
@@ -1254,6 +1256,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 					//flags
 					//system
 					element->media.dvb_t.plp_id = plpid;
+					break;
 				}
 
 			}
