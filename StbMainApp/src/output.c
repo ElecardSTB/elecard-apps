@@ -36,8 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "output.h"
 
-#include "playlist_editor.h"
-#include "bouquet.h"
 #include "debug.h"
 #include "dvbChannel.h"
 #include "l10n.h"
@@ -52,6 +50,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "stats.h"
 #include "stsdk.h"
 #include "media.h"
+#include "playlist_editor.h"
+#include "bouquet.h"
 
 #include "dvb.h"
 #include "analogtv.h"
@@ -289,9 +289,6 @@ static int output_enterVideoMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterGraphicsModeMenu(interfaceMenu_t *pMenu, void* pArg);
 static int output_enterTimeMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterInterfaceMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistDigital(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistAnalog(interfaceMenu_t *pMenu, void* notused);
 static int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterWANMenu (interfaceMenu_t *wanMenu, void* pArg);
 static int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface);
@@ -371,6 +368,9 @@ static int output_toggleVoipBuzzer(interfaceMenu_t* pMenu, void* pArg);
 #ifdef ENABLE_DVB
 static int output_enterDVBMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterDiseqcMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterPlaylistMenu(interfaceMenu_t *pMenu, void* notused);
+static int output_enterPlaylistDigital(interfaceMenu_t *pMenu, void* notused);
+static int output_enterPlaylistAnalog(interfaceMenu_t *pMenu, void* notused);
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbPolarization(interfaceMenu_t *pMenu, void* pArg);
@@ -6173,13 +6173,13 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
-interfaceMenu_t *output_getPlaylistEditorMenu() {
+interfaceMenu_t *output_getPlaylistEditorMenu(void) {
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu))
 		return interfaceInfo.currentMenu;
 	return NULL;
 }
 
-char *output_getSelectedNamePlaylistEditor()
+char *output_getSelectedNamePlaylistEditor(void)
 {
 	interfaceMenu_t  *baseMenu;
 	baseMenu = output_getPlaylistEditorMenu();
@@ -6190,21 +6190,99 @@ char *output_getSelectedNamePlaylistEditor()
 
 int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
 {
+#ifdef ENABLE_DVB
 	if (!memcmp(interfaceMenu, &InterfacePlaylistEditorDigital.baseMenu, sizeof(interfaceListMenu_t)))
 		return 1;
 	if (!memcmp(interfaceMenu, &InterfacePlaylistEditorAnalog.baseMenu, sizeof(interfaceListMenu_t)))
 		return 2;
+#endif
 	return false;
 }
 int enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu)
 {
+#ifdef ENABLE_DVB
 	if (!memcmp(interfaceMenu, &InterfacePlaylistSelectDigital.baseMenu, sizeof(interfaceListMenu_t)))
 		return 1;
 	if (!memcmp(interfaceMenu, &InterfacePlaylistSelectAnalog.baseMenu, sizeof(interfaceListMenu_t)))
 		return 2;
+#endif
 	return false;
 }
 
+int output_ping(char *value)
+{
+	char cmd[256];
+	int ret = -1;
+	sprintf(cmd , "ping -c 1 %s", value);
+	printf("cmd: %s\n",cmd);
+	ret = system(cmd);
+
+	if (ret != -1)
+		ret = WEXITSTATUS(ret);
+	return ret;
+}
+
+int output_pingVisual(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if(value == NULL) {
+		return 0;
+	}
+	int valuePing;
+	valuePing = output_ping(value);
+
+	if (valuePing == 0){
+		interface_showMessageBox(_T("IP_RELEASE_SUCCESSFUL"), thumbnail_yes, 0);
+	} else {
+		interface_showMessageBox(_T("IP_RELEASE_NOT_SUCCESSFUL"), thumbnail_error, 0);
+	}
+	return -1;
+}
+
+static int output_pingMenu(interfaceMenu_t* pMenu, void* pArg)
+{
+	interface_getText(pMenu, _T("IP_SERVER"), "\\w+", output_pingVisual, NULL, inputModeABC, &pArg);
+	return 0;
+}
+
+int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
+{
+	char buf[MENU_ENTRY_INFO_LENGTH];
+
+	// assert (interfaceMenu == _M &InterfaceMenu);
+	interface_clearMenuEntries(interfaceMenu);
+
+	sprintf( buf, "%s: %s", _T("FILE_SORTING"), _T( appControlInfo.mediaInfo.fileSorting == naturalsort ? "SORT_NATURAL" : "SORT_ALPHA" ));
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleFileSorting, NULL, settings_interface);
+
+#ifdef STB82
+	char *str;
+	switch( interfaceInfo.animation )
+	{
+		case interfaceAnimationVerticalCinema:     str = _T("VERTICAL_CINEMA");     break;
+		case interfaceAnimationVerticalPanorama:   str = _T("VERTICAL_PANORAMA");   break;
+		case interfaceAnimationHorizontalPanorama: str = _T("HORIZONTAL_PANORAMA"); break;
+		case interfaceAnimationHorizontalSlide:    str = _T("HORIZONTAL_SLIDE");    break;
+		case interfaceAnimationHorizontalStripes:  str = _T("HORIZONTAL_STRIPES");  break;
+		default:                                   str = _T("NONE");
+	}
+	snprintf(buf, sizeof(buf), "%s: %s", _T("MENU_ANIMATION"), str);
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleInterfaceAnimation, NULL, settings_interface);
+#endif
+	interface_addMenuEntry(interfaceMenu, _T("CHANGE_HIGHLIGHT_COLOR"), output_toggleHighlightColor, NULL, settings_interface);
+	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYCONTROL_SHOW_TIMEOUT"), interfacePlayControl.showTimeout, _T("SECOND_SHORT"));
+	interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlTimeout, NULL, settings_interface);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYCONTROL_SHOW_ON_START"), interfacePlayControl.showOnStart ? _T("ON") : _T("OFF") );
+	interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlShowOnStart, NULL, settings_interface);
+#ifdef ENABLE_VOIP
+	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_INDICATION"), _T( interfaceInfo.enableVoipIndication ? "ON" : "OFF" ));
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipIndication, NULL, settings_interface);
+	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
+	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
+#endif
+	return 0;
+}
+
+#ifdef ENABLE_DVB
 static int output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	unsigned char out[16];
@@ -6258,88 +6336,16 @@ static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 	return 0;
 }
 
-int output_ping(char *value)
-{
-	char cmd[256];
-	int ret = -1;
-	sprintf(cmd , "ping -c 1 %s", value);
-	printf("cmd: %s\n",cmd);
-	ret = system(cmd);
-
-	if (ret != -1)
-		ret = WEXITSTATUS(ret);
-	return ret;
-}
-
-int output_pingVisual(interfaceMenu_t *pMenu, char *value, void* pArg)
-{
-	if(value == NULL) {
-		return 0;
-	}
-	int valuePing;
-	valuePing = output_ping(value);
-
-	if (valuePing == 0){
-		interface_showMessageBox(_T("IP_RELEASE_SUCCESSFUL"), thumbnail_yes, 0);
-	} else {
-		interface_showMessageBox(_T("IP_RELEASE_NOT_SUCCESSFUL"), thumbnail_error, 0);
-	}
-	return -1;
-}
-
-static int output_pingMenu(interfaceMenu_t* pMenu, void* pArg)
-{
-	interface_getText(pMenu, _T("IP_SERVER"), "\\w+", output_pingVisual, NULL, inputModeABC, &pArg);
-	return 0;
-}
-
 static int output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
 {
 	const char *mask = "\\d{6}";
 	interface_getText(pMenu, _T("ENTER_CURRENT_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
 	return 0;
 }
+
 static int output_changeCreateNewBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
 	interface_getText(pMenu, _T("ENTER_BOUQUET_NAME"), "\\w+", bouquet_createNewBouquet, NULL, inputModeABC, &pArg);
-	return 0;
-}
-
-int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
-{
-	char buf[MENU_ENTRY_INFO_LENGTH];
-
-	// assert (interfaceMenu == _M &InterfaceMenu);
-	interface_clearMenuEntries(interfaceMenu);
-
-	sprintf( buf, "%s: %s", _T("FILE_SORTING"), _T( appControlInfo.mediaInfo.fileSorting == naturalsort ? "SORT_NATURAL" : "SORT_ALPHA" ));
-	interface_addMenuEntry(interfaceMenu, buf, output_toggleFileSorting, NULL, settings_interface);
-
-#ifdef STB82
-	char *str;
-	switch( interfaceInfo.animation )
-	{
-		case interfaceAnimationVerticalCinema:     str = _T("VERTICAL_CINEMA");     break;
-		case interfaceAnimationVerticalPanorama:   str = _T("VERTICAL_PANORAMA");   break;
-		case interfaceAnimationHorizontalPanorama: str = _T("HORIZONTAL_PANORAMA"); break;
-		case interfaceAnimationHorizontalSlide:    str = _T("HORIZONTAL_SLIDE");    break;
-		case interfaceAnimationHorizontalStripes:  str = _T("HORIZONTAL_STRIPES");  break;
-		default:                                   str = _T("NONE");
-	}
-	snprintf(buf, sizeof(buf), "%s: %s", _T("MENU_ANIMATION"), str);
-	interface_addMenuEntry(interfaceMenu, buf, output_toggleInterfaceAnimation, NULL, settings_interface);
-#endif
-	interface_addMenuEntry(interfaceMenu, _T("CHANGE_HIGHLIGHT_COLOR"), output_toggleHighlightColor, NULL, settings_interface);
-	snprintf(buf, sizeof(buf), "%s: %d %s", _T("PLAYCONTROL_SHOW_TIMEOUT"), interfacePlayControl.showTimeout, _T("SECOND_SHORT"));
-	interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlTimeout, NULL, settings_interface);
-	snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYCONTROL_SHOW_ON_START"), interfacePlayControl.showOnStart ? _T("ON") : _T("OFF") );
-	interface_addMenuEntry(interfaceMenu, buf, output_togglePlayControlShowOnStart, NULL, settings_interface);
-#ifdef ENABLE_VOIP
-	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_INDICATION"), _T( interfaceInfo.enableVoipIndication ? "ON" : "OFF" ));
-	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipIndication, NULL, settings_interface);
-	snprintf(buf, sizeof(buf), "%s: %s", _T("VOIP_BUZZER"), _T( appControlInfo.voipInfo.buzzer ? "ON" : "OFF" ));
-	interface_addMenuEntry(interfaceMenu, buf, output_toggleVoipBuzzer, NULL, settings_interface);
-#endif
 	return 0;
 }
 
@@ -6389,6 +6395,7 @@ int output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
 	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
 	return 0;
 }
+#endif //#ifdef ENABLE_DVB
 
 int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 {
@@ -6488,8 +6495,10 @@ void output_fillOutputMenu(void)
 	str = _T("INTERFACE");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InterfaceMenu, settings_interface);
 
+#ifdef ENABLE_DVB
 	str = _T("PLAYLIST_MAIN");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InterfacePlaylistMain, settings_interface);
+#endif
 
 	str = _T("PLAYBACK");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &PlaybackMenu, thumbnail_loading);
@@ -6596,6 +6605,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
 
+#ifdef ENABLE_DVB
 	createListMenu(&InterfacePlaylistMain, _T("PLAYLIST_MAIN"), settings_interface, NULL, _M &OutputMenu,
         interfaceListMenuIconThumbnail, output_enterPlaylistMenu, NULL, NULL);
 
@@ -6617,6 +6627,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&InterfacePlaylistEditorAnalog, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylistAnalog,
 		interfaceListMenuIconThumbnail, enterPlaylistEditorAnalog, NULL, NULL);
+#endif //#ifdef ENABLE_DVB
 
 	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterPlaybackMenu, NULL, NULL);

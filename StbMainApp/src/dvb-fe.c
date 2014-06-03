@@ -29,6 +29,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef ENABLE_DVB
 /******************************************************************
 * INCLUDE FILES                                                   *
 *******************************************************************/
@@ -1329,3 +1330,5 @@ int32_t dvbfe_terminate(void)
 	mysem_destroy(dvbfe_semaphore);
 	return 0;
 }
+
+#endif //#ifdef ENABLE_DVB

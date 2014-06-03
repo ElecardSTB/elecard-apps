@@ -1,5 +1,6 @@
 #include "playlist_editor.h"
 
+#ifdef ENABLE_DVB
 #include "dvbChannel.h"
 #include "output.h"
 #include "bouquet.h"
@@ -11,16 +12,14 @@
 #include "l10n.h"
 #include "md5.h"
 
-typedef struct _playListEditorDigital_t
-{
+typedef struct {
 	int radio;
 	int scrambled;
 	service_index_t *service_index;
 	service_index_data_t data;
 } playListEditorDigital_t;
 
-typedef struct _playListEditorAnalog_t
-{
+typedef struct {
 	uint32_t frequency;
 	//analog_service_t *service_index;
 	service_index_data_t data;
@@ -104,7 +103,8 @@ static void load_digital_channels(list_element_t *curListEditor)
 	}
 }
 
-void set_lockColor(){
+static void set_lockColor(void)
+{
 	setColor(interfaceInfo.highlightColor);
 
 	interfaceInfo.highlightColor++;
@@ -112,14 +112,16 @@ void set_lockColor(){
 		interfaceInfo.highlightColor = 0;
 }
 
-void set_unLockColor(){
+static void set_unLockColor(void)
+{
 	interfaceInfo.highlightColor = getColor();
 	setColor(-1);
 	if (interface_colors[interfaceInfo.highlightColor].A==0)
 		interfaceInfo.highlightColor = 0;
 }
 
-void playlist_editor_cleanup(typeBouquet_t index){
+void playlist_editor_cleanup(typeBouquet_t index)
+{
 /*	if (index == 0 || index == 1)
 		free_elements(&playListEditorDigital);
 	if (index == 0 || index == 2)
@@ -130,9 +132,11 @@ void playlist_editor_cleanup(typeBouquet_t index){
 		free_elements(&playListEditorAnalog);
 }
 
-int getChannelEditor(){
+int getChannelEditor(void)
+{
 	return channelNumber;
 }
+
 int get_statusLockPlaylist()
 {
 	if (channelNumber == -1)
@@ -175,7 +179,8 @@ void playList_saveName(int num, char *prev_name, char *new_name)
 	}
 }
 
-void playlist_editor_setupdate(){
+void playlist_editor_setupdate(void)
+{
 	update_list = true;
 }
 
@@ -287,7 +292,7 @@ int push_playlist()
 			i++;
 		}
 		analogtv_saveConfigFile();
-		bouquet_saveAnalogBouquet(NULL, NULL);
+		bouquet_saveAnalogBouquet();
 		return true;
 	}
 	return -1;
@@ -411,7 +416,7 @@ void playlist_switchElementwithNext(int source){
 		curList = curList->next;
 	}
 }
-void playlist_editor_removeElement()
+void playlist_editor_removeElement(void)
 {
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
 	//	curList = playListEditorDigital;
@@ -577,3 +582,5 @@ int enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
 		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
 	return 0;
 }
+
+#endif //#ifdef ENABLE_DVB

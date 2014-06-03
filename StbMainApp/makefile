@@ -257,6 +257,10 @@ endif
 
 ifeq ($(ENABLE_DVB),1)
     LOCAL_CFLAGS += -DENABLE_DVB=$(ENABLE_DVB)
+    #AnalogTV enabled with dvb support only
+    ifeq ($(ENABLE_ANALOGTV),1)
+        LOCAL_CFLAGS += -DENABLE_ANALOGTV
+    endif
 endif
 
 ifeq ($(ENABLE_IPTV),1)
@@ -374,10 +378,6 @@ endif
 
 ifeq ($(ENABLE_FUSION),1)
 	LOCAL_CFLAGS += -DENABLE_FUSION=$(ENABLE_FUSION) -DDISABLE_STANDBY
-endif
-
-ifeq ($(ENABLE_ANALOGTV),1)
-	LOCAL_CFLAGS += -DENABLE_ANALOGTV
 endif
 
 ifeq ($(ENABLE_USE_DVB_APPS),1)

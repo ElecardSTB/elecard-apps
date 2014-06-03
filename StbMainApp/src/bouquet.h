@@ -34,11 +34,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
+#include <stdint.h>
+
 #include "interface.h"
 #include "defines.h"
 #include "dvbChannel.h"
-
-#ifdef ENABLE_DVB
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -63,53 +63,65 @@ typedef enum _typeBouquet_t {
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
+#ifdef ENABLE_DVB
 
-void bouquet_loadChannelsFile();
+void bouquet_loadChannelsFile(void);
 
-int bouquets_getNumberPlaylist();
-void bouquets_setNumberPlaylist(int num);
+int32_t bouquets_getNumberPlaylist(void);
+void bouquets_setNumberPlaylist(int32_t num);
 
 void bouquet_loadBouquet(typeBouquet_t index, char * name);
 void bouquet_stashBouquet(typeBouquet_t index, char * name);
 
-int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg);
-int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg);
-int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg);
-void bouquet_loadDigitalBouquetsList();
-void bouquet_loadAnalogBouquetsList();
-void bouquet_addScanChannels();
-int bouquet_getFolder(char *bouquetsFile);
-int bouquet_saveDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg);
+int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg);
+int32_t bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg);
+void bouquet_loadDigitalBouquetsList(int force);
+void bouquet_loadAnalogBouquetsList(int force);
+void bouquet_addScanChannels(void);
+int32_t bouquet_getFolder(char *bouquetsFile);
+int32_t bouquet_saveDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
 
-void bouquet_saveAnalogBouquet();
-int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg);
+void bouquet_saveAnalogBouquet(void);
+int32_t bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg);
 
-int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
-int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg);
-int bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg);
-int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg);
-int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg);
-int bouquet_enable();
-void bouquet_init();
-void bouquet_setEnable(int i);
+int32_t bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_enable(void);
+void bouquet_init(void);
+void bouquet_setEnable(int32_t i);
 void bouquet_getDigitalName(char *dir, char *fname, char *name);
 void bouquet_getAnalogJsonName(char *fname, char *name);
-char *bouquet_getDigitalBouquetName();
-char *bouquet_getAnalogBouquetName();
-char *bouquet_getNameBouquetList(list_element_t **head, int number);
+char *bouquet_getDigitalBouquetName(void);
+char *bouquet_getAnalogBouquetName(void);
+char *bouquet_getNameBouquetList(list_element_t **head, int32_t number);
 void bouquet_setDigitalBouquetName(char *name);
 void bouquet_setAnalogBouquetName(char *name);
 void bouquet_loadBouquets(list_element_t **services);
-int bouquet_enable();
-//int bouquet_file();
-//int bouquet_getFile();
+
+//int32_t bouquet_file(void);
+//int32_t bouquet_getFile(void);
 void bouquet_downloadFileWithServices(char *filename);
 void  bouquet_dump(char *filename);
-list_element_t *get_bouquet_list();
+list_element_t *get_bouquet_list(void);
 void bouquet_loadLamedb(char *bouquet_file, list_element_t **);
-void bouquets_free_serveces();
-int bouquets_compare(list_element_t **);
+void bouquets_free_serveces(void);
+int32_t bouquets_compare(list_element_t **);
 EIT_service_t *bouquet_findService(EIT_common_t *header);
+#else // ENABLE_DVB
+
+#define bouquet_init()
+#define bouquet_setDigitalBouquetName(name)
+#define bouquet_setAnalogBouquetName(name)
+#define bouquet_setEnable(n)
+#define bouquet_getDigitalBouquetName()		""
+#define bouquet_getAnalogBouquetName()		""
+#define bouquet_enable()					0
+#define bouquet_createNewBouquet			NULL
+#define bouquet_enableControl				NULL
 
 #endif // ENABLE_DVB
 #endif // BOUQUET_H

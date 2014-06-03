@@ -177,15 +177,11 @@ static int menu_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd
 void menu_buildMainMenu()
 {
 	char *str = NULL;
-	int  main_icons[4] = { 0, 0, 0,
-#ifdef ENABLE_FAVORITES
-#ifdef ENABLE_VIDIMAX
-	0
+	int main_icons[4] = { 0, 0, 0,
+#if (defined ENABLE_FAVORITES) && !(defined ENABLE_VIDIMAX)
+		statusbar_f4_favorites
 #else
-	statusbar_f4_favorites
-#endif	
-#else
-	0
+		0
 #endif
 	};
 

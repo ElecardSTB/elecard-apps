@@ -462,7 +462,8 @@ type_known:
 	pthread_exit(NULL);
 }
 
-const char *getModulationName(fe_modulation_t modulation)
+#ifdef ENABLE_DVB
+static const char *getModulationName(fe_modulation_t modulation)
 {
 	int32_t i;
 	for(i = 0; modulation_names[i].name != NULL; i++) {
@@ -473,7 +474,6 @@ const char *getModulationName(fe_modulation_t modulation)
 	return NULL;
 }
 
-#ifdef ENABLE_DVB
 void st_setTuneParams(uint32_t adapter, cJSON *params, EIT_media_config_t *media)
 {
 	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(adapter));

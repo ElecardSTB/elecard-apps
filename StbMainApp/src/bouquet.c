@@ -148,12 +148,12 @@ void bouquets_setNumberPlaylist(int num)
 	bouquets_coun_list = num;
 }
 
-int bouquets_getNumberPlaylist()
+int bouquets_getNumberPlaylist(void)
 {
 	return bouquets_coun_list;
 }
 
-void bouquet_saveAllBouquet()
+static void bouquet_saveAllBouquet(void)
 {
 	char *bouquetName;
 	char buffName[128];
@@ -170,7 +170,7 @@ void bouquet_saveAllBouquet()
 	bouquet_saveLamedb(bouquetName);
 }
 
-int bouquet_sendBouquet()
+static int bouquet_sendBouquet(void)
 {
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	if(!(helperFileExists(GARB_DIR "/.ssh/id_rsa") && helperFileExists(GARB_DIR "/.ssh/id_rsa.pub"))) {
@@ -220,7 +220,7 @@ list_element_t *list_getElement(int count, list_element_t **head)
 	return NULL;
 }
 
-void bouquet_addScanChannels()
+void bouquet_addScanChannels(void)
 {
 	//fixed radio type
 	list_element_t		*service_element;
@@ -333,7 +333,7 @@ void bouquet_setNewBouquetName(char *name)
 	interface_hideMessageBox();
 }
 
-char *bouquet_getDigitalBouquetName()
+char *bouquet_getDigitalBouquetName(void)
 {
 	if (bouquet_enable()) {
 		list_element_t *cur_element;
@@ -347,7 +347,7 @@ char *bouquet_getDigitalBouquetName()
 	return NULL;
 }
 
-char *bouquet_getAnalogBouquetName()
+char *bouquet_getAnalogBouquetName(void)
 {
 	list_element_t *cur_element;
 	for(cur_element = bouquetNameAnalogList; cur_element != NULL; cur_element = cur_element->next) {
@@ -580,7 +580,7 @@ void get_addStandardPlaylist(list_element_t **bouquet_name,char *bouquet_file)
 	sprintf(element_data, "%s", bouquet_file);
 }
 
-int bouquet_enable()
+int bouquet_enable(void)
 {
 	return bouquets_enable;
 }
@@ -956,7 +956,7 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 	return WEXITSTATUS(ret);
 }
 
-void bouquet_saveAnalogBouquet()
+void bouquet_saveAnalogBouquet(void)
 {
 	char cmd[1024];
 	char fname[BUFFER_SIZE];
@@ -1051,7 +1051,7 @@ void bouquet_downloadDigitalConfigList()
 	interface_hideMessageBox();
 }
 
-void bouquet_init()
+void bouquet_init(void)
 {
 	struct stat sb;
 	if(!(stat(BOUGET_CONFIG_DIR, &sb) == 0 && S_ISDIR( sb.st_mode)))
@@ -1125,7 +1125,7 @@ void bouquet_loadAnalogBouquetsList(int force)
 }
 
 
-void bouquet_loadChannelsFile()
+void bouquet_loadChannelsFile(void)
 {
 	get_bouquets_file_name(&bouquet_name_tv, BOUGET_SERVICES_FILENAME_TV);
 	get_bouquets_file_name(&bouquet_name_radio, BOUGET_SERVICES_FILENAME_RADIO);

@@ -279,7 +279,9 @@ int  offair_setPreviousChannel(int previousChannel);
 
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg);
 void offair_displayPlayControl(void);
-
+#else /* ENABLE_DVB */
+#define offair_getChannelNumberPrefix(id)	""
+#define offair_fillDVBTMenu()
 #endif /* ENABLE_DVB */
 
 int  offair_getLocalEventTime(EIT_event_t *event, struct tm *local_tm, time_t *local_time_t);
