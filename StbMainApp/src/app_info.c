@@ -141,6 +141,8 @@ int loadAppSettings()
 	int res = 0;
 	char cmd[1024];
 	int i;
+	extern int32_t gdbDebug;
+	extern int32_t gdbBouquet;
 
 	fd = fopen(SETTINGS_FILE, "rb");
 
@@ -545,6 +547,12 @@ int loadAppSettings()
 			//dprintf("%s: Analog TV file with channel names %s\n", __FUNCTION__, appControlInfo.tvInfo.channelNamesFile );
 		}
 #endif
+		else if (sscanf(buf, "DEBUG=%d", &gdbDebug ) == 1)
+		{
+		}
+		else if (sscanf(buf, "DEBUG_BOUQUET=%d", &gdbBouquet ) == 1)
+		{
+		}
 	}
 
 	fclose(fd);
@@ -873,6 +881,10 @@ int saveAppSettings()
 	fprintf(fd, "ATVAUDIOMODE=%d\n",         	appControlInfo.tvInfo.audioMode);
 	fprintf(fd, "ATVCHANNELNAMESFILE=%s\n",         	appControlInfo.tvInfo.channelNamesFile);
 #endif
+	extern int32_t gdbDebug;
+	extern int32_t gdbBouquet;
+	fprintf(fd, "DEBUG=%d\n",         	gdbDebug);
+	fprintf(fd, "DEBUG_BOUQUET=%d\n",   gdbBouquet);
 	fclose(fd);
 	rename( SETTINGS_FILE ".tmp", SETTINGS_FILE );
 

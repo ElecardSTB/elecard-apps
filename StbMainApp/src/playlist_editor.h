@@ -3,7 +3,8 @@
 #include "interface.h"
 
 int enterPlaylistSelect(interfaceMenu_t *pMenu, void* pArg);
-int enterPlaylistEditorMenu(interfaceMenu_t *pMenu, void* pArg);
+int enterPlaylistEditorDigital(interfaceMenu_t *pMenu, void* pArg);
+int enterPlaylistEditorAnalog(interfaceMenu_t *pMenu, void* pArg);
 void playList_saveName(int ,char* , char*);
 void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count);
 void playlist_switchElementwithNext(int source);

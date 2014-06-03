@@ -1,8 +1,9 @@
 #include "playlist_editor.h"
 
 #include "dvbChannel.h"
+#include "output.h"
 #include "bouquet.h"
-
+#include "analogtv.h"
 #include "interface.h"
 #include "list.h"
 #include "dvb.h"
@@ -10,23 +11,63 @@
 #include "l10n.h"
 #include "md5.h"
 
-typedef struct _playListEditor_t
+typedef struct _playListEditorDigital_t
 {
 	int radio;
 	int scrambled;
 	service_index_t *service_index;
 	service_index_data_t data;
-} playListEditor_t;
+} playListEditorDigital_t;
+
+typedef struct _playListEditorAnalog_t
+{
+	analog_service_t *service_index;
+	service_index_data_t data;
+} playListEditorAnalog_t;
 
 static int channelNumber = -1;
-list_element_t *playListEditor = NULL;
+list_element_t *playListEditorDigital = NULL;
+list_element_t *playListEditorAnalog = NULL;
 static int update_list = false;
+static int color_save = -1;
+static int swapMenu;
 
-static void load_dvb_channels() {
-	if (playListEditor != NULL) {
-		playlist_editor_cleanup();
+
+void setColor(int color) {
+	color_save = color;
+}
+
+int getColor() {
+	return color_save;
+}
+
+static void load_Analog_channels(list_element_t *curListEditor)
+{
+	extern analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
+	int analogtv_channelCount = analogtv_getChannelCount();
+
+	int i;
+	for(i = 0; i < analogtv_channelCount; i++) {
+		list_element_t      *cur_element;
+		playListEditorAnalog_t    *element;
+
+		if (playListEditorAnalog == NULL) {
+			cur_element = playListEditorAnalog = allocate_element(sizeof(playListEditorAnalog_t));
+		} else {
+			cur_element = append_new_element(playListEditorAnalog, sizeof(playListEditorAnalog_t));
+		}
+		if (!cur_element)
+			break;
+		element = (playListEditorAnalog_t *)cur_element->data;
+		element->service_index =  &analogtv_channelParam[i];
+		snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", analogtv_channelParam[i].customCaption);
+		element->data.visible = analogtv_channelParam[i].visible;
+		element->data.parent_control = analogtv_channelParam[i].parent_control;
 	}
+}
 
+static void load_digital_channels(list_element_t *curListEditor)
+{
 	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 
@@ -37,17 +78,17 @@ static void load_dvb_channels() {
 			continue;
 
 		list_element_t      *cur_element;
-		playListEditor_t    *element;
+		playListEditorDigital_t    *element;
 
-		if (playListEditor == NULL) {
-			cur_element = playListEditor = allocate_element(sizeof(playListEditor_t));
+		if (playListEditorDigital == NULL) {
+			cur_element = playListEditorDigital = allocate_element(sizeof(playListEditorDigital_t));
 		} else {
-			cur_element = append_new_element(playListEditor, sizeof(playListEditor_t));
+			cur_element = append_new_element(playListEditorDigital, sizeof(playListEditorDigital_t));
 		}
 		if (!cur_element)
 			break;
 
-		element = (playListEditor_t *)cur_element->data;
+		element = (playListEditorDigital_t *)cur_element->data;
 		element->service_index = srvIdx;
 		element->data.visible = srvIdx->data.visible;
 		element->data.parent_control = srvIdx->data.parent_control;
@@ -62,35 +103,6 @@ static void load_dvb_channels() {
 	}
 }
 
-void getDVBList(){
-
-}
-
-void saveList(){
-
-}
-
-void addList(){
-
-}
-int lockChannel()
-{
-	return 1;
-}
-int unlockChannel()
-{
-	return 0;
-}
-static int color_save = -1;
-
-void setColor(int color) {
-	color_save = color;
-}
-
-int getColor() {
-	return color_save;
-}
-
 void set_lockColor(){
 	setColor(interfaceInfo.highlightColor);
 
@@ -98,14 +110,16 @@ void set_lockColor(){
 	if (interface_colors[interfaceInfo.highlightColor].A==0)
 		interfaceInfo.highlightColor = 0;
 }
+
 void set_unLockColor(){
 	interfaceInfo.highlightColor = getColor();
 	setColor(-1);
 	if (interface_colors[interfaceInfo.highlightColor].A==0)
 		interfaceInfo.highlightColor = 0;
 }
+
 void playlist_editor_cleanup(){
-	free_elements(&playListEditor);
+	free_elements(&playListEditorDigital);
 }
 
 int getChannelEditor(){
@@ -122,16 +136,34 @@ void playList_saveName(int num, char *prev_name, char *new_name)
 {
 	int i = 0;
 	list_element_t *cur_element;
-	playListEditor_t *element;
-	for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-		element = (playListEditor_t*)cur_element->data;
-		if(element == NULL)
-			continue;
-		if (num == i && strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))){
-			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
-			return;
+
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
+		playListEditorDigital_t *element;
+		for(cur_element = playListEditorDigital; cur_element != NULL; cur_element = cur_element->next) {
+			element = (playListEditorDigital_t*)cur_element->data;
+			if(element == NULL)
+				continue;
+			if (num == i && strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))){
+				snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
+				return;
+			}
+			i++;
 		}
-		i++;
+		return;
+	}
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
+		playListEditorAnalog_t *element;
+		for(cur_element = playListEditorAnalog; cur_element != NULL; cur_element = cur_element->next) {
+			element = (playListEditorAnalog_t*)cur_element->data;
+			if(element == NULL)
+				continue;
+			if (num == i && strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))){
+				snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
+				return;
+			}
+			i++;
+		}
+		return;
 	}
 }
 
@@ -143,60 +175,114 @@ void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count)
 {
 	int i = 0;
 	list_element_t *cur_element;
-	playListEditor_t *element;
-	for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-		element = (playListEditor_t*)cur_element->data;
-		if(element == NULL)
-			continue;
-		if (count == i){
-			char desc[20];
-			if(element->data.visible) {
-				if(element->data.parent_control) {
-					element->data.parent_control = false;
+
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
+		playListEditorDigital_t *element;
+		for(cur_element = playListEditorDigital; cur_element != NULL; cur_element = cur_element->next) {
+			element = (playListEditorDigital_t*)cur_element->data;
+			if(element == NULL)
+				continue;
+			if (count == i){
+				char desc[20];
+				if(element->data.visible) {
+					if(element->data.parent_control) {
+						element->data.parent_control = false;
+						element->data.visible = false;
+						snprintf(desc, sizeof(desc), "INVISIBLE");
+					} else {
+						element->data.parent_control = true;
+						snprintf(desc, sizeof(desc), "PARENT");
+					}
+				} else {
+					element->data.visible = true;
+					snprintf(desc, sizeof(desc), "VISIBLE");
+				}
+				interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+				interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+				interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
+				return;
+			}
+			i++;
+		}
+		return;
+	}
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
+		playListEditorAnalog_t *element;
+		for(cur_element = playListEditorAnalog; cur_element != NULL; cur_element = cur_element->next) {
+			element = (playListEditorAnalog_t*)cur_element->data;
+			if(element == NULL)
+				continue;
+			if (count == i){
+				char desc[20];
+				if(element->data.visible) {
 					element->data.visible = false;
 					snprintf(desc, sizeof(desc), "INVISIBLE");
 				} else {
-					element->data.parent_control = true;
-					snprintf(desc, sizeof(desc), "PARENT");
+					element->data.visible = true;
+					snprintf(desc, sizeof(desc), "VISIBLE");
 				}
-			} else {
-				element->data.visible = true;
-				snprintf(desc, sizeof(desc), "VISIBLE");
+				interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+				interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? thumbnail_tvstandard : thumbnail_not_selected);
+				interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
+				return;
 			}
-			interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
-			interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-			interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
-			return;
+			i++;
 		}
-		i++;
+		return;
 	}
 }
+
 int push_playlist()
 {
-	if (playListEditor == NULL || update_list == false)
+	if ((playListEditorDigital == NULL &&  playListEditorAnalog == NULL) || update_list == false)
 		return false;
 	update_list = false;
 	int first = 0;
 	int i = 0;
 	list_element_t		*service_element;
-	service_element = playListEditor;
-	while (service_element != NULL) {
-		playListEditor_t *curElement = (playListEditor_t *)service_element->data;
-		if (curElement->service_index != NULL) {
-			curElement->service_index->data.visible        = curElement->data.visible;
-			curElement->service_index->data.parent_control = curElement->data.parent_control;
-			snprintf(curElement->service_index->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
-		}
-		first = dvbChannel_findNumberService(curElement->service_index);
-		if ( i > first)
-			dvbChannel_swapServices(first, i);
-		else
-			dvbChannel_swapServices(i, first);
 
-		i++;
-		service_element = service_element->next;
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
+		service_element = playListEditorDigital;
+		while (service_element != NULL) {
+			playListEditorDigital_t *curElement = (playListEditorDigital_t *)service_element->data;
+			if (curElement->service_index != NULL) {
+				curElement->service_index->data.visible        = curElement->data.visible;
+				curElement->service_index->data.parent_control = curElement->data.parent_control;
+				snprintf(curElement->service_index->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
+			}
+			first = dvbChannel_findNumberService(curElement->service_index);
+			if ( i > first)
+				dvbChannel_swapServices(first, i);
+			else
+				dvbChannel_swapServices(i, first);
+
+			i++;
+			service_element = service_element->next;
+		}
+		return true;
 	}
-	return true;
+	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
+		service_element = playListEditorAnalog;
+		while (service_element != NULL) {
+			playListEditorAnalog_t *curElement = (playListEditorAnalog_t *)service_element->data;
+			if (curElement->service_index != NULL) {
+				curElement->service_index->visible        = curElement->data.visible;
+				curElement->service_index->parent_control = curElement->data.parent_control;
+				snprintf(curElement->service_index->customCaption, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
+			}/*
+			first = dvbChannel_findNumberService(curElement->service_index);
+			if ( i > first)
+				dvbChannel_swapServices(first, i);
+			else
+				dvbChannel_swapServices(i, first);
+*/
+			i++;
+			service_element = service_element->next;
+		}
+		analogtv_saveConfigFile();
+		return true;
+	}
+
 }
 
 int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -239,17 +325,17 @@ int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* p
 
 int check_playlist()
 {
-	if (playListEditor == NULL || update_list == false)
+	if ((playListEditorDigital == NULL && playListEditorAnalog == NULL) || update_list == false)
 		return false;
-	extern interfaceListMenu_t InterfacePlaylistEditor;
+	extern interfaceListMenu_t InterfacePlaylistEditorDigital;
 
-	list_element_t		*service_element = playListEditor;
+	list_element_t		*service_element = playListEditorDigital;
 	while (service_element != NULL) {
-		playListEditor_t *curElement = (playListEditor_t *)service_element->data;
+		playListEditorDigital_t *curElement = (playListEditorDigital_t *)service_element->data;
 		if (curElement->service_index != NULL) {
 			if((!curElement->data.parent_control) && (curElement->service_index->data.parent_control)) {
 				const char *mask = "\\d{6}";
-				interface_getText((interfaceMenu_t*)&InterfacePlaylistEditor, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, NULL);
+				interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, NULL);
 				return true;
 			}
 		}
@@ -260,8 +346,6 @@ int check_playlist()
 	dvbChannel_applyUpdates();
 	return true;
 }
-
-static int swapMenu;
 
 int playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -278,21 +362,22 @@ int playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
 	interface_displayMenu(1);
 	return 0;
 }
+
 void playlist_switchElementwithNext(int source){
 
-	if (playListEditor == NULL)
+	if (playListEditorDigital == NULL)
 		return;
 	int i = 0;
 
-	list_element_t *cur = playListEditor;
+	list_element_t *cur = playListEditorDigital;
 	list_element_t *rec;
 	list_element_t *last = NULL;
 	while(cur != NULL) {
 		if (i == source){
 			if(last == NULL) {
-				playListEditor = cur->next;
-				cur->next = playListEditor->next;
-				playListEditor->next = cur;
+				playListEditorDigital = cur->next;
+				cur->next = playListEditorDigital->next;
+				playListEditorDigital->next = cur;
 			} else {
 				rec = cur->next;
 				last->next = rec;
@@ -304,46 +389,6 @@ void playlist_switchElementwithNext(int source){
 		last = cur;
 		cur = cur->next;
 	}
-}
-
-
-void createPlaylist(interfaceMenu_t  *interfaceMenu)
-{
-	if (playListEditor != NULL)
-		return;
-	load_dvb_channels();
-	interfaceMenu_t *channelMenu = interfaceMenu;
-	char channelEntry[MENU_ENTRY_INFO_LENGTH];
-	int32_t i = 0;
-	interface_clearMenuEntries(channelMenu);
-
-	list_element_t *cur_element;
-	playListEditor_t *element;
-	for(cur_element = playListEditor; cur_element != NULL; cur_element = cur_element->next) {
-		element = (playListEditor_t*)cur_element->data;
-		if(element == NULL)
-			continue;
-
-		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->data.channelsName);
-		interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->data.visible ?
-								   (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-
-		interfaceMenuEntry_t *entry;
-		entry = menu_getLastEntry(channelMenu);
-		if(entry) {
-			char desc[20];
-			snprintf(desc, sizeof(desc), "%s", element->data.parent_control ? "PARENT" : (element->data.visible ? "VISIBLE" : "INVISIBLE"));
-			interface_setMenuEntryLabel(entry, desc);
-			interface_changeMenuEntrySelectable(entry, element->data.visible);
-		}
-
-		if(appControlInfo.dvbInfo.channel == i) {
-			interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
-		}
-		i++;
-	}
-	if (i == 0)
-		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
 }
 
 int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
@@ -376,9 +421,87 @@ int enterPlaylistSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 	return 0;
 }
 
-int enterPlaylistEditorMenu(interfaceMenu_t *interfaceMenu, void* pArg)
+int enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
 {
-	createPlaylist(interfaceMenu);
+	if (playListEditorAnalog != NULL)
+		return 0;
+
+	list_element_t *cur_element;
+	cur_element = playListEditorAnalog;
+	load_Analog_channels(&cur_element);
+
+	interfaceMenu_t *channelMenu = interfaceMenu;
+	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+	int32_t i = 0;
+	interface_clearMenuEntries(channelMenu);
+
+	playListEditorAnalog_t *element;
+	for(cur_element = playListEditorAnalog; cur_element != NULL; cur_element = cur_element->next) {
+		element = (playListEditorAnalog_t*)cur_element->data;
+		if(element == NULL)
+			continue;
+
+		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->data.channelsName);
+		interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->data.visible ? thumbnail_tvstandard : thumbnail_not_selected);
+
+		interfaceMenuEntry_t *entry;
+		entry = menu_getLastEntry(channelMenu);
+		if(entry) {
+			char desc[20];
+			snprintf(desc, sizeof(desc), "%s", element->data.visible ? "VISIBLE" : "INVISIBLE");
+			interface_setMenuEntryLabel(entry, desc);
+			interface_changeMenuEntrySelectable(entry, element->data.visible);
+		}
+
+		if(appControlInfo.dvbInfo.channel == i) {
+			interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
+		}
+		i++;
+	}
+	if (i == 0)
+		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
 	return 0;
 }
 
+int enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
+{
+	if (playListEditorDigital != NULL)
+		return 0;
+	list_element_t *cur_element;
+	playListEditorDigital_t *element;
+	interfaceMenu_t *channelMenu = interfaceMenu;
+	char channelEntry[MENU_ENTRY_INFO_LENGTH];
+	int32_t i = 0;
+	cur_element = playListEditorDigital;
+
+	load_digital_channels(playListEditorDigital);
+	interface_clearMenuEntries(channelMenu);
+
+	for(cur_element = playListEditorDigital ; cur_element != NULL; cur_element = cur_element->next) {
+		element = (playListEditorDigital_t*)cur_element->data;
+		if(element == NULL)
+			continue;
+
+
+		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->data.channelsName);
+		interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->data.visible ?
+								   (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+
+		interfaceMenuEntry_t *entry;
+		entry = menu_getLastEntry(channelMenu);
+		if(entry) {
+			char desc[20];
+			snprintf(desc, sizeof(desc), "%s", element->data.parent_control ? "PARENT" : (element->data.visible ? "VISIBLE" : "INVISIBLE"));
+			interface_setMenuEntryLabel(entry, desc);
+			interface_changeMenuEntrySelectable(entry, element->data.visible);
+		}
+
+		if(appControlInfo.dvbInfo.channel == i) {
+			interface_setSelectedItem(channelMenu, interface_getMenuEntryCount(channelMenu) - 1);
+		}
+		i++;
+	}
+	if (i == 0)
+		interface_addMenuEntryDisabled(channelMenu, "NULL", 0);
+	return 0;
+}

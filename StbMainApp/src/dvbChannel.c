@@ -84,9 +84,9 @@ service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header)
 	struct list_head *pos;
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
-		if (srv->common.service_id ==  header->service_id &&
-			srv->common.transport_stream_id ==  header->transport_stream_id)
-		/*if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) */{
+		//if (srv->common.service_id ==  header->service_id &&
+		//	srv->common.transport_stream_id ==  header->transport_stream_id)
+		if(memcmp(&(srv->common), header, sizeof(EIT_common_t)) == 0) {
 			return srv;
 		}
 	}

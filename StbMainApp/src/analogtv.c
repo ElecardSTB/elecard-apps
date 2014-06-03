@@ -69,7 +69,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANALOGTV_CONFIG_JSON	CONFIG_DIR "/analog.json"
 
 #define ANALOGTV_UNDEF			"UNDEF"
-#define MAX_ANALOG_CHANNELS		128
 
 #define TV_STATION_FULL_LIST	"/tmp/tvchannels.txt"
 
@@ -78,13 +77,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
-typedef struct {
-	uint32_t frequency;
-	uint16_t customNumber;
-	char customCaption[256];
-	char sysEncode[16];
-	char audio[16];
-} analog_service_t;
 
 typedef struct _short_chinfo {
 	char name[50];
@@ -241,6 +233,7 @@ static int32_t analogtv_parseConfigFile(void)
 			cJSON *subitem = cJSON_GetArrayItem(format, i);
 			if(subitem) {
 				analogtv_channelParam[i].frequency = objGetInt(subitem, "frequency", 0);
+				analogtv_channelParam[i].visible = objGetInt(subitem, "visible", 1);
 				strncpy(analogtv_channelParam[i].customCaption, objGetString(subitem, "name", ""), sizeof(analogtv_channelParam[0].customCaption));
 				strncpy(analogtv_channelParam[i].sysEncode, objGetString(subitem, "system encode", ANALOGTV_UNDEF), sizeof(analogtv_channelParam[0].sysEncode));
 				strncpy(analogtv_channelParam[i].audio, objGetString(subitem, "audio demod mode", ANALOGTV_UNDEF), sizeof(analogtv_channelParam[0].audio));
@@ -255,7 +248,7 @@ static int32_t analogtv_parseConfigFile(void)
 	return 0;
 }
 
-static int32_t analogtv_saveConfigFile(void)
+int32_t analogtv_saveConfigFile(void)
 {
 	cJSON* root;
 	cJSON* format;
@@ -282,6 +275,7 @@ static int32_t analogtv_saveConfigFile(void)
 		if(fld) {
 			cJSON_AddNumberToObject(fld, "id", i + 1);
 			cJSON_AddNumberToObject(fld, "frequency", analogtv_channelParam[i].frequency);
+			cJSON_AddNumberToObject(fld, "visible", analogtv_channelParam[i].visible);
 			cJSON_AddStringToObject(fld, "name", analogtv_channelParam[i].customCaption);
 			cJSON_AddStringToObject(fld, "system encode", analogtv_channelParam[i].sysEncode);
 			cJSON_AddStringToObject(fld, "audio demod mode", analogtv_channelParam[i].audio);
@@ -868,6 +862,8 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
 
 	interface_addMenuEntryDisabled(pMenu, "AnalogTV", 0);
 	for(i = 0; i < analogtv_channelCount; i++) {
+		if (!(analogtv_channelParam[i].visible))
+			continue;
 		char channelEntry[32];
 
 		sprintf(channelEntry, "%s. %s", offair_getChannelNumberPrefix(startIndex + i), analogtv_channelParam[i].customCaption);

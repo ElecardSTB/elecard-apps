@@ -39,6 +39,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * EXPORTED MACROS                              *
 ************************************************/
+#define DEBUG_MESSAGE         "DEBUG"
+#define DEBUG_BOUQUET "BOUQUET"
+
+#define dprintf(...)	DPRINT(errorLevelDebug, __VA_ARGS__)
 
 #ifdef TRACE
 	#define TRACEE printf("ENTER: %s\n", __FUNCTION__);
@@ -66,6 +70,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
 
+int32_t gdbDebug;
+int32_t gdbBouquet;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -74,6 +81,9 @@ void *dbg_calloc(size_t nmemb, size_t size, const char *location);
 void *dbg_malloc(size_t size, const char *location);
 void  dbg_free   (void *ptr,  const char *location);
 void *dbg_realloc(void *ptr, size_t size, const char *location);
+int  dbg_ThreadInit(void);
+void  dbg_ThreadStop(void);
+int  dbg_getDebag(char *);
 
 #ifdef __cplusplus
 };

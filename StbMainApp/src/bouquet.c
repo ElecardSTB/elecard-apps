@@ -68,7 +68,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAX_TEXT	512
 
 #define GARB_DIR					"/var/etc/garb"
-#define GARB_CONFIG_JSON			GARB_DIR "/config.json"
 #define GARB_CONFIG			GARB_DIR "/config"
 
 /***********************************************
@@ -120,6 +119,7 @@ list_element_t *bouquetNameList = NULL;
 list_element_t *bouquet_name_tv = NULL;
 list_element_t *bouquet_name_radio = NULL;
 char bouquetName[CHANNEL_BUFFER_NAME];
+char pName[CHANNEL_BUFFER_NAME];
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -451,6 +451,9 @@ void get_bouquets_list(char *bouquet_file)
 	if(fd == NULL) {
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
 		return;
+	}
+	if (fgets(buf, BUFFER_SIZE, fd) != NULL) {
+		sscanf(buf, "#NAME  %s\n", pName);
 	}
 	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
 		if ( sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
@@ -932,9 +935,7 @@ list_element_t *found_list(EIT_common_t *common, list_element_t **services)
 	list_element_t	*service_element;
 	for(service_element = *services; service_element != NULL; service_element = service_element->next) {
 		EIT_service_t *element = (EIT_service_t *)service_element->data ;
-		if (common->service_id ==  element->common.service_id &&
-			common->transport_stream_id ==  element->common.transport_stream_id) {
-		//if(memcmp(&(element->common), common, sizeof(EIT_common_t)) == 0) {
+		if(memcmp(&(element->common), common, sizeof(EIT_common_t)) == 0) {
 			return service_element;
 		}
 	}
@@ -1046,14 +1047,25 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 
 			if (sscanf(buf, "%x:%x:%x:%x:%x:%x\n",&service_id, &name_space, &transport_stream_id, &original_network_id, &serviceType, &hmm) != 6)
 				break;
-			char service_name[MAX_TEXT];
+			//parse channels name
+			char service_name[MAX_TEXT];			
 			if (fgets(service_name, BUFFER_SIZE, fd) == NULL)
 				break;
+
 			service_name[strlen(service_name) - 1] = '\0';
+			//parese bouquet pName
+			char bouqName[CHANNEL_BUFFER_NAME];
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
 				break;
+			memset(bouqName, 0, strlen(bouqName));
+			sscanf(buf, "p:%s\n",bouqName);
+
 			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
 				break;
+
+			if ((strlen(bouqName) < 1) && (strncasecmp(pName, bouqName, strlen((pName))) != 0)) {
+				continue;
+			}
 
 			EIT_common_t	common;
 			common.service_id = service_id;
@@ -1081,8 +1093,8 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 						element->media.dvb_s.frequency == element_tr->media.dvb_s.frequency &&
 						element->media.dvb_s.symbol_rate == element_tr->media.dvb_s.symbol_rate &&
 						element->media.dvb_s.polarization == element_tr->media.dvb_s.polarization &&
-						element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
-						element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
+						//element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
+						//element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
 						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion)
 					continue;
 				remove_element(&*services, service_element);

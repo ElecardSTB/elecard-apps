@@ -51,9 +51,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS                              *
 ************************************************/
 
+#define MAX_ANALOG_CHANNELS		128
+
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
+
+typedef struct {
+	uint32_t frequency;
+	uint16_t customNumber;
+	uint16_t visible;
+	uint16_t parent_control;
+	char customCaption[256];
+	char sysEncode[16];
+	char audio[16];
+} analog_service_t;
 
 typedef enum {
 	TV_SYSTEM_PAL = 0,
@@ -106,6 +118,7 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg);
  */
 
 void analogtv_stop();
+int32_t analogtv_saveConfigFile(void);
 
 int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 
@@ -134,7 +147,7 @@ int32_t analogtv_hasTuner(void);
 #else /* ENABLE_ANALOGTV */
 
 static inline int32_t analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg) { return 0; }
-//const char *analogtv_getServiceName(uint32_t index) { return NULL; }
+const char *analogtv_getServiceName(uint32_t index) { return NULL; }
 static inline uint32_t analogtv_getChannelCount(void) { return 0; }
 static inline void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex) { return ; }
 static inline int32_t analogtv_updateName(uint32_t chanIndex, char* str) { return 0; }

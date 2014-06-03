@@ -2678,6 +2678,8 @@ void cleanup()
 	}
 #endif
 
+	dbg_ThreadStop();
+
 	unlink(APP_LOCK_FILE);
 }
 
@@ -2894,6 +2896,7 @@ int main(int argc, char *argv[])
 		fclose(pidfile);
 	}
 
+	dbg_ThreadInit();
 	appInfo_init();
 
 #ifdef ENABLE_BROWSER
@@ -2911,11 +2914,15 @@ int main(int argc, char *argv[])
 	for(i = 0; i < errorLevelCount; i++) {
 		setoutput((errorLevel_t)i, (i == errorLevelError || i == errorLevelWarning) ? stderr : stdout);
 	}
-#ifdef DEBUG
-	setoutputlevel(errorLevelDebug);
-#else
-	setoutputlevel(errorLevelNormal);
-#endif
+
+	char *path;
+	path = getenv("DEBUG");
+	if(path && strcasecmp(path, "1") == 0) {
+		setoutputlevel(errorLevelDebug);
+	} else {
+#undef DEBUG
+		setoutputlevel(errorLevelNormal);
+	}
 
 	do {
 		restart = 0;
