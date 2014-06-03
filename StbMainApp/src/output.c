@@ -6393,6 +6393,7 @@ int output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
 int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
+	const char *str = NULL;
 
 	interface_clearMenuEntries(pMenu);
 
@@ -6408,7 +6409,6 @@ int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 	snprintf(buf, sizeof(buf), "%s: %s", _T("FADEIN_VOLUME"), _T( appControlInfo.soundInfo.fadeinVolume ? "ON" : "OFF" ));
 	interface_addMenuEntry(pMenu, buf, output_toggleVolumeFadein, NULL, settings_interface);
 
-	char *str = NULL;
 	switch(appControlInfo.mediaInfo.playbackMode) {
 		case playback_looped:     str = _T("LOOPED");    break;
 		case playback_sequential: str = _T("SEQUENTAL"); break;

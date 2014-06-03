@@ -774,6 +774,11 @@ int32_t analogtv_setNextAudioMode()
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	switch(cmd->command) {
+		case interfaceCommandUp:
+		case interfaceCommandDown:
+			interface_menuActionShowMenu(interfaceInfo.currentMenu, &DVBTMenu);
+			interface_showMenu(1, 1);
+			return 0;
 		case interfaceCommand0:
 			if (interfaceChannelControl.length)
 				return 1;
@@ -791,7 +796,6 @@ int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 				}
 			}
 			return 0;
-		case interfaceCommandMainMenu://DIKS_HOME
 		case interfaceCommandYellow:
 			analogtv_setNextAudioMode();
 			return 0;
@@ -822,11 +826,12 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	uint32_t id = (uint32_t)pArg;
 	uint32_t freq = analogtv_channelParam[id].frequency;
 	char cmd[32];
-	int buttons;
+	int32_t buttons;
+	int32_t previousChannel;
 
 	dprintf("%s: in %d\n", __FUNCTION__, id);
 
-	int previousChannel = offair_getCurrentChannel();
+	previousChannel = offair_getCurrentChannel();
 	if(appControlInfo.tvInfo.active != 0) {
 		//interface_playControlSelect(interfacePlayControlStop);
 		// force showState to NOT be triggered

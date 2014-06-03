@@ -1400,41 +1400,6 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 	fclose(fd);
 }
 
-int32_t getParam(const char *path, const char *param, const char *defaultValue, char *output)
-{
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	FILE *fd;
-	int32_t found = 0;
-	int32_t plen, vlen;
-
-	fd = fopen(path, "r");
-	if(fd != NULL) {
-		while(fgets(buf, sizeof(buf), fd) != NULL) {
-			plen = strlen(param);
-			vlen = strlen(buf)-1;
-			if(strncmp(buf, param, plen) == 0 && buf[plen] == '=') {
-				while(buf[vlen] == '\r' || buf[vlen] == '\n' || buf[vlen] == ' ') {
-					buf[vlen] = 0;
-					vlen--;
-				}
-				if(vlen-plen > 0) {
-					if(output != NULL) {
-						strcpy(output, &buf[plen+1]);
-					}
-					found = 1;
-				}
-				break;
-			}
-		}
-		fclose(fd);
-	}
-
-	if(!found && defaultValue && output) {
-		strcpy(output, defaultValue);
-	}
-	return found;
-}
-
 int bouquet_file()
 {
 	struct stat sb;

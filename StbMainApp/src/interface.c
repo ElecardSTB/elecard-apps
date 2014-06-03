@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "voip.h"
 #include "teletext.h"
 #include "pvr.h"
+#include "stsdk.h"
 #ifdef STB225
 #include "Stb225.h"
 #endif
@@ -73,6 +74,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <directfb.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <time.h>
 
 #include <directfb_keynames.h>
 
@@ -4262,10 +4264,9 @@ int interface_MenuDefaultProcessCommand(interfaceMenu_t *pMenu, pinterfaceComman
 		interface_displayMenu(1);
 	}
 
-	if (executeAction)
-	{
-		if (pMenu->menuEntry[pMenu->selectedItem].pAction != NULL)
-		{
+	//executeAction is always zero!!!
+	if(executeAction) {
+		if(pMenu->menuEntry[pMenu->selectedItem].pAction != NULL) {
 			pMenu->menuEntry[pMenu->selectedItem].pAction(pMenu, pMenu->menuEntry[pMenu->selectedItem].pArg);
 		}
 	}

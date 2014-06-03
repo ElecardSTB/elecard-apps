@@ -128,6 +128,7 @@ int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
 
 const char *analogtv_getServiceName(uint32_t index);
 int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size);
+int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
 
 int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
 

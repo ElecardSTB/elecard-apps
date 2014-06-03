@@ -272,6 +272,11 @@ int  offair_checkForUpdates(void);
 
 int  offair_setChannel(int channel, void* pArg);
 
+// DVB or Analog channel number suitable for offair_setChannel()
+int  offair_getCurrentChannel(void);
+
+int  offair_setPreviousChannel(int previousChannel);
+
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg);
 void offair_displayPlayControl(void);
 

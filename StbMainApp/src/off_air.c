@@ -232,7 +232,6 @@ static wizardSettings_t   *wizardSettings = NULL;
 #ifdef ENABLE_DVB
 static void offair_setStateCheckTimer(int which, int bEnable);
 static int  offair_startNextChannel(int direction, void* pArg);
-int  offair_setChannel(int channel, void* pArg);
 static int  offair_infoTimerEvent(void *pArg);
 static int  offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static void offair_startDvbVideo(int which, DvbParam_t *param, int audio_type, int video_type);
@@ -958,7 +957,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 #endif
 		return 0;
 	} else
-#ifndef STSDK
+#if 0 // !STSDK
 	if(button == interfacePlayControlAudioTracks) {
 		//dprintf("%S: request change tracks\n", __FUNCTION__);
 		if(dvb_getAudioCount(current_service()) > 0) {
@@ -1478,6 +1477,11 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 		}
 	}
 
+	if(appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV &&
+	   analogtv_playControlProcessCommand(cmd, pArg) == 0) {
+		return 0;
+	}
+
 	switch (cmd->command)
 	{
 		case interfaceCommandUp:
@@ -1849,7 +1853,7 @@ static void offair_getServiceDescription(EIT_service_t *service, char *desc, cha
 			sprintf( &desc[strlen(desc)], "%s%s ", desc[0] == 0 ? "" : "\n", str);
 			offair_getLocalEventTime( event, NULL, &start_time );
 			start_time += offair_getEventDuration( event );
-			strftime(&desc[strlen(desc)], 11, "(%T)", localtime( &start_time ));
+			strftime(&desc[strlen(desc)], 11, "(%H:%M)", localtime( &start_time ));
 			sprintf( &desc[strlen(desc)], " %s", event->description.event_name );
 			/*if (event->description.text[0] != 0)
 			{
@@ -1939,6 +1943,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	char desc[BUFFER_SIZE];
 	int32_t		channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
 	int32_t		buttons;
+	int32_t		previousChannel;
 
 	EIT_service_t *service = dvbChannel_getService(channelNumber);
 
@@ -1959,7 +1964,7 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	}
 #endif
 
-	appControlInfo.offairInfo.previousChannel = offair_getCurrentChannel();
+	previousChannel = offair_getCurrentChannel();
 	appControlInfo.playbackInfo.playlistMode = playlistModeNone;
 	appControlInfo.playbackInfo.streamSource = streamSourceDVB;
 	appControlInfo.mediaInfo.bHttp = 0;
@@ -1991,11 +1996,9 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	offair_updateChannelStatus();
 	saveAppSettings();
 
-	if ( appControlInfo.dvbInfo.active != 0 )
-	{
+	if(appControlInfo.dvbInfo.active != 0) {
 		interface_showMenu(0, 1);
-// 		if (appControlInfo.dvbInfo.previousChannel != previousChannel)
-// 			appControlInfo.dvbInfo.previousChannel  = previousChannel;
+		offair_setPreviousChannel(previousChannel);
 	}
 
 	//interface_menuActionShowMenu(pMenu, (void*)&DVBTMenu);
@@ -2234,7 +2237,7 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 		interface_showMessageBox(_T("EPG_UNAVAILABLE"), thumbnail_error, 3000);
 		return -1;
 	}
-	if(pEpg->maxOffset - pEpg->minOffset < ERM_DISPLAYING_HOURS * 3600) {
+	if (pEpg->maxOffset - pEpg->minOffset < ERM_DISPLAYING_HOURS * 3600) {
 		pEpg->maxOffset = pEpg->minOffset + ERM_DISPLAYING_HOURS * 3600;
 	}
 	srvIdx = dvbChannel_getServiceIndex(pEpg->currentService);
@@ -2274,10 +2277,12 @@ int offair_initEPGRecordMenu(interfaceMenu_t *pMenu, void *pArg)
 	gfx_drawRectangle(DRAWING_SURFACE, 255, 255, 255, 0x40, x, y+4, w, 2); \
 	gfx_drawRectangle(DRAWING_SURFACE, 255, 255, 255, 0x60, x, y+2, w, 2); \
 	gfx_drawRectangle(DRAWING_SURFACE, 255, 255, 255, 0x80, x, y, w, 2);
+
 static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 {
 	interfaceEpgMenu_t *pEpg = (interfaceEpgMenu_t *)pMenu;
 	int fh, x, y, w, l, displayedChannels, i, j, timelineEnd, r,g,b,a;
+	int tr, tg, tb, ta;
 	interfaceColor_t *color;
 	DFBRectangle rect;
 	char buf[MAX_TEXT];
@@ -2292,6 +2297,10 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	int job_channel;
 #endif
 	service_index_t *srvIdx = dvbChannel_getServiceIndex(pEpg->currentService);
+	tr = INTERFACE_BOOKMARK_RED;
+	tg = INTERFACE_BOOKMARK_GREEN;
+	tb = INTERFACE_BOOKMARK_BLUE;
+	ta = INTERFACE_BOOKMARK_ALPHA;
 
 	if(srvIdx == NULL) {
 		return;
@@ -2416,7 +2425,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 				buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
 				l = getMaxStringLength(buf, w-ERM_TIMESTAMP_WIDTH);
 				buf[l] = 0;
-				gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
+				gfx_drawText(DRAWING_SURFACE, pgfx_font, tr, tg, tb, ta, x, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
 			}
 		}
 		event_element = event_element->next;
@@ -2453,7 +2462,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 				//gfx_drawRectangle(DRAWING_SURFACE, ERM_HIGHLIGHTED_CELL_RED, ERM_HIGHLIGHTED_CELL_GREEN, ERM_HIGHLIGHTED_CELL_BLUE, ERM_HIGHLIGHTED_CELL_ALPHA, x + ERM_CHANNEL_NAME_LENGTH - 2*interfaceInfo.paddingSize, y, 2*interfaceInfo.paddingSize, fh);
 			}
 
-			gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, buf, 0, 0);
+			gfx_drawText(DRAWING_SURFACE, pgfx_font, tr, tg, tb, ta, x, y+rect.h - interfaceInfo.paddingSize, buf, 0, 0);
 			displayedChannels++;
 
 			x += interfaceInfo.paddingSize + ERM_CHANNEL_NAME_LENGTH;
@@ -2489,7 +2498,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 						buf[MENU_ENTRY_INFO_LENGTH-1] = 0;
 						l = getMaxStringLength(buf, w-ERM_TIMESTAMP_WIDTH);
 						buf[l] = 0;
-						gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, buf, 0, 0);
+						gfx_drawText(DRAWING_SURFACE, pgfx_font, tr, tg, tb, ta, x, y+rect.h - interfaceInfo.paddingSize, buf, 0, 0);
 					}
 				}
 				event_element = event_element->next;
@@ -2648,7 +2657,8 @@ static EIT_event_t * epgMenu_highlightCurrentEvent(interfaceEpgMenu_t *pEpg)
 
 	for(pEpg->highlightedEvent = srvIdx ? srvIdx->first_event : NULL;
 		pEpg->highlightedEvent;
-		pEpg->highlightedEvent =  pEpg->highlightedEvent->next ) {
+		pEpg->highlightedEvent =  pEpg->highlightedEvent->next )
+	{
 		offair_getEventTimes(pEpg->highlightedEvent->data, &eventStart, &eventEnd);
 		if(eventEnd > pEpg->curOffset && eventStart < maxEndTime )
 			break;
@@ -2806,7 +2816,9 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		default: // MENU_ITEM_EVENT
 			srvIdx = dvbChannel_getServiceIndex(pEpg->highlightedService);
 			if( pEpg->highlightedService < 0 ||
-				pEpg->highlightedService >= dvbChannel_getCount() || !srvIdx) {
+				pEpg->highlightedService >= dvbChannel_getCount() ||
+				!srvIdx)
+			{
 				return 0;
 			}
 			if (pEpg->highlightedEvent) {
@@ -2836,9 +2848,8 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 						pEpg->highlightedEvent = NULL;
 					}
 				}
-			}
-			// If there was no highlighted event, move timeline one step back and find rightmost event
-			if (!pEpg->highlightedEvent) {
+			} else {
+				// If there was no highlighted event, move timeline one step back and find rightmost event
 				if (pEpg->curOffset <= pEpg->minOffset) {
 					return 0;
 				}
@@ -2856,8 +2867,8 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 					}
 					pEpg->highlightedEvent = next;
 				}
-				break;
 			}
+			break;
 		}
 		break;
 	case interfaceCommandRight:
