@@ -1998,8 +1998,11 @@ int fusion_refreshDtmfEvent(void *pArg)
 
 int fusion_refreshViewEvent(void *pArg)
 {
+	int needUpdate = 0;
 	pthread_mutex_lock(&FusionObject.mutexCreep);
-	int needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
+	if (FusionObject.creepline){
+		needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
+	}
 	pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 	if (needUpdate){
@@ -2082,7 +2085,6 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 {
 	CURLcode retCode = CURLE_OK;
 	CURL * curl = NULL;
-	struct curl_slist  *headers = NULL;
 
 	if (!url || !strlen(url)) return -1;
 
@@ -2177,7 +2179,6 @@ int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
 int fusion_setMoscowDateTime()
 {
 	char setDateString[64];
-	char dateString[64];
 	char utcBuffer [1024];
 	memset(utcBuffer, 0, 1024);
 
@@ -2254,6 +2255,42 @@ int32_t fusion_checkDirectory(const char *path)
 	return 1;
 }
 
+#define FUSION_MODIFIED 1
+#define FUSION_NOT_MODIFIED 0
+#define FUSION_ERR_FILETIME (-1)
+
+int fusion_checkLastModified (char * url)
+{
+	CURL *curl;
+	CURLcode res;
+	long lastModified;
+	if (!url || strlen(url) == 0) 
+		return FUSION_ERR_FILETIME;
+
+	curl = curl_easy_init();
+	if (!curl) return FUSION_ERR_FILETIME;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+	curl_easy_setopt(curl, CURLOPT_FILETIME, 1);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+
+	curl_easy_perform(curl);
+	res = curl_easy_getinfo(curl, CURLOPT_FILETIME, &lastModified);
+	curl_easy_cleanup(curl);
+	if (res != 0) {
+		eprintf ("%s: WARNING! Couldn't get filetime for %s\n", __FUNCTION__, url);
+		return FUSION_ERR_FILETIME;
+	}
+	eprintf ("%s: lastModified = %ld for %s...\n", __FUNCTION__, lastModified, url);
+
+	if (FusionObject.lastModified == lastModified)
+		return FUSION_NOT_MODIFIED;
+
+	FusionObject.lastModified = lastModified;
+	return FUSION_MODIFIED;
+}
+
 long fusion_getRemoteFileSize(char * url)
 {
 	CURL *curl;
@@ -2266,6 +2303,7 @@ long fusion_getRemoteFileSize(char * url)
 
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 
 	curl_easy_perform(curl);
 	res = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &remoteFileSize);
@@ -2299,6 +2337,19 @@ int fusion_getCreepAndLogo ()
 	sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", 
 	         FusionObject.server, FusionObject.secret, 
 	         nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday);
+
+	// test
+	result = fusion_checkLastModified(request);
+	if (result == FUSION_NOT_MODIFIED){
+		eprintf ("%s(%d): Playlist not modified.\n",   __FILE__, __LINE__);
+		return FUSION_SAME_CREEP;
+	}
+	else if (result == FUSION_ERR_FILETIME){
+		eprintf ("%s(%d): WARNING! Problem getting playlist modification time.\n",   __FILE__, __LINE__);
+		//return FUSION_SAME_CREEP;
+	}
+	else eprintf ("%s(%d): Playlist modified.\n",   __FILE__, __LINE__);
+	// end test
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
@@ -2408,7 +2459,7 @@ int fusion_getCreepAndLogo ()
 			if ((ptr != NULL) && (logoFileSize > 0)) {
 				ptr += 7;
 				while ((ptrSlash = strchr(ptr, '/')) != NULL) ptrSlash[0] = '_';
-				sprintf (FusionObject.logos[i].filepath, "/tmp/fusion/logo_%d_%s", logoFileSize, ptr);
+				sprintf (FusionObject.logos[i].filepath, "/tmp/fusion/logo_%ld_%s", logoFileSize, ptr);
 			}
 			else {
 				eprintf ("%s(%d): WARNING! Incorrect logo url\n", __FUNCTION__, __LINE__); 
@@ -2443,32 +2494,83 @@ int fusion_getCreepAndLogo ()
 	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
 	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep-line");
 	if (jsonCreep){
-		cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, 0);
-		if (jsonItem){
+		int creepCount = cJSON_GetArraySize(jsonCreep);
+		int allCreepsLen = 0;
+		int allCreepsWithSpaceLen = 0;
+		char * allCreeps;
+		eprintf ("%s(%d): creepCount = %d\n", __FUNCTION__, __LINE__, creepCount);
+		for (i=0; i<creepCount; i++){
+			cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
+			if (!jsonItem) continue;
 			cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
-			if (jsonText) {
-				cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "pause");
-				if (!jsonPause) FusionObject.pause = FUSION_DEFAULT_CREEP_PAUSE;
-				else {
-					FusionObject.pause = atoi(jsonPause->valuestring);
-				}
-				cJSON * jsonRepeats = cJSON_GetObjectItem(jsonItem, "count");
-				if (!jsonRepeats) FusionObject.repeats = FUSION_DEFAULT_CREEP_REPEATS;
-				else {
-					FusionObject.repeats = atoi(jsonRepeats->valuestring);
-				}
-				if (strlen(FusionObject.creepline) != strlen(jsonText->valuestring)) result = FUSION_NEW_CREEP;
-				snprintf (FusionObject.creepline, FUSION_MAX_CREEPLEN, "%s", jsonText->valuestring);
-
-				for (int k=0; k<FUSION_MAX_CREEPLEN; k++){
-					if (FusionObject.creepline[k] == '\n' || FusionObject.creepline[k] == '\r') {
-						FusionObject.creepline[k] = ' ';
-					}
-				}
-				pgfx_font->GetStringWidth(pgfx_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
-				eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
-			}
+			if (!jsonText) continue;
+			allCreepsLen += FUSION_MAX_CREEPLEN;
 		}
+		allCreepsWithSpaceLen = allCreepsLen + (creepCount-1)*strlen(FUSION_CREEP_SPACES);
+		allCreeps = (char*)malloc(allCreepsWithSpaceLen);
+		allCreeps[0] = '\0';
+		if (!allCreeps) {
+			eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes.\n", __FUNCTION__, __LINE__, allCreepsLen);
+			cJSON_Delete(root);
+			return FUSION_SAME_CREEP;
+		}
+		for (i=0; i<creepCount; i++){
+			cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
+			if (!jsonItem) continue;
+			cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
+			if (!jsonText) continue;
+
+			// todo : now count and pause are rewritten
+			// do something with it
+			cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "pause");
+			if (!jsonPause) FusionObject.pause = FUSION_DEFAULT_CREEP_PAUSE;
+			else {
+				FusionObject.pause = atoi(jsonPause->valuestring);
+			}
+			cJSON * jsonRepeats = cJSON_GetObjectItem(jsonItem, "count");
+			if (!jsonRepeats) FusionObject.repeats = FUSION_DEFAULT_CREEP_REPEATS;
+			else {
+				FusionObject.repeats = atoi(jsonRepeats->valuestring);
+			}
+
+			if (i) strncat(allCreeps, FUSION_CREEP_SPACES, strlen(FUSION_CREEP_SPACES));
+			strncat(allCreeps, jsonText->valuestring, FUSION_MAX_CREEPLEN /*strlen(jsonText->valuestring)*/);
+		}
+		for (int k=0; k<allCreepsWithSpaceLen; k++){
+			if (allCreeps[k] == '\n' || allCreeps[k] == '\r') allCreeps[k] = ' ';
+		}
+
+		pthread_mutex_lock(&FusionObject.mutexCreep);
+		if (!FusionObject.creepline){
+			result = FUSION_NEW_CREEP;
+			FusionObject.creepline = (char*)malloc(allCreepsWithSpaceLen);
+			if (!FusionObject.creepline) {
+				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
+				cJSON_Delete(root);
+				return FUSION_SAME_CREEP;
+			}
+			FusionObject.creepline[0] = '\0';
+
+			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
+			eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+		}
+		else if (strcmp(FusionObject.creepline, allCreeps)) {
+			result = FUSION_NEW_CREEP;
+			if (FusionObject.creepline) {
+				free (FusionObject.creepline);
+				FusionObject.creepline = NULL;
+			}
+			FusionObject.creepline = (char*)malloc(allCreepsWithSpaceLen);
+			if (!FusionObject.creepline) {
+				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
+				cJSON_Delete(root);
+				return FUSION_SAME_CREEP;
+			}
+			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
+			eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+		}
+		pgfx_font->GetStringWidth(pgfx_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
+		pthread_mutex_unlock(&FusionObject.mutexCreep);
 	}
 	cJSON_Delete(root);
 	return result;
@@ -2479,6 +2581,10 @@ void fusion_cleanup()
 	if (FusionObject.threadCreepHandle){
 		pthread_cancel(FusionObject.threadCreepHandle);
 		pthread_join(FusionObject.threadCreepHandle, NULL);
+	}
+	if (FusionObject.creepline) {
+		free (FusionObject.creepline);
+		FusionObject.creepline = NULL;
 	}
 
 	pthread_mutex_destroy(&FusionObject.mutexCreep);
@@ -2614,6 +2720,10 @@ void cleanup()
 	*/
 #ifdef ENABLE_VOIP
 	voip_cleanup();
+#endif
+
+#ifdef ENABLE_FUSION
+	fusion_cleanup();
 #endif
 
 #ifdef ENABLE_SECUREMEDIA

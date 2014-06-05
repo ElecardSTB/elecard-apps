@@ -2134,6 +2134,7 @@ void interface_displayDtmf(void)
 void interface_displayCreepline(void)
 {
 #ifdef ENABLE_FUSION
+	if (!FusionObject.creepline) return;
 	mysem_get(interface_semaphore);
 	// top left
 	if (FusionObject.creepStartTime > 0){
@@ -2179,6 +2180,7 @@ eprintf("%s(%d): creepWidth = %d, timeForAllCreep = %f, deltaTime = %llu, positi
 	
 	mysem_release(interface_semaphore);
 #endif
+	return;
 }
 
 static void interface_displayAll(void)

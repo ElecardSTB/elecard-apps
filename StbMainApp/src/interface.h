@@ -913,7 +913,7 @@ typedef struct
 #define FUSION_URL_LEN        (512)
 
 #define FUSION_MAX_LOGOS             (4)
-#define FUSION_MAX_CREEPLEN           (2*1024)
+#define FUSION_MAX_CREEPLEN          (1024)
 
 #define FUSION_SPACES        250
 #define FUSION_SYMBOLS_FITS  250
@@ -928,6 +928,12 @@ typedef struct
 
 #define FUSION_DEFAULT_CREEP_PAUSE    (10)
 #define FUSION_DEFAULT_CREEP_REPEATS  (1)
+#define FUSION_CREEP_SPACES           \
+"\
+                               \
+                               \
+                               \
+                               "
 
 #define FUSION_SECRET                "secretKey81"
 
@@ -960,8 +966,7 @@ typedef struct _interfaceFusionObject_t {
 	unsigned char secret[64];
 	char server[512];
 
-	char creepline[FUSION_MAX_CREEPLEN];
-	char creepToShow[FUSION_MAX_CREEPLEN];
+	char * creepline;
 	int pause;
 	int repeats;
 	pthread_mutex_t mutexCreep;
@@ -987,6 +992,8 @@ typedef struct _interfaceFusionObject_t {
 	char streamUrl[PATH_MAX];
 	char firmwareUpdatePath[PATH_MAX];
 	char firmwareUpdateTime[FUSION_DATETIME_LEN];
+
+	long lastModified;
 
 } interfaceFusionObject_t;
 #endif
@@ -1203,6 +1210,10 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd);
  *  @param[in] flipFB         If set to 1 displays redrawn menu on screen
  */
 void interface_displayMenu(int flipFB);
+
+#ifdef ENABLE_FUSION
+void interface_displayDtmf(void);
+#endif
 
 /**
  *  @brief Sets default menu values
