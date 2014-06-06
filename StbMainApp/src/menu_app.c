@@ -483,8 +483,12 @@ void menu_cleanup()
 #ifdef ENABLE_TELETES
 	teletes_cleanupMenu();
 #endif
+#ifdef ENABLE_IPTV
 	rtp_cleanupMenu();
+#endif
+#ifdef ENABLE_VOD
 	rtsp_cleanupMenu();
+#endif
 #ifdef ENABLE_RUTUBE
 	rutube_cleanupMenu();
 #endif
