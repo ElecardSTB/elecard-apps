@@ -2192,7 +2192,8 @@ int fusion_setMoscowDateTime()
 	system(setDateString);
 
 	// set timezone
-	system("rm /var/etc/localtime && ln -s /usr/share/zoneinfo/Russia/Moscow /var/etc/localtime");
+	system("rm /var/etc/localtime");
+	system("ln -s /usr/share/zoneinfo/Russia/Moscow /var/etc/localtime");
 
 	return 0;
 }
