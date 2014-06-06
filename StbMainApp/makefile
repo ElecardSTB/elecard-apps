@@ -116,6 +116,7 @@ ENABLE_USE_CJSON ?= 0
 ENABLE_TELETEXT ?= 0
 ENABLE_ANALOGTV ?= 0
 ENABLE_USE_DVB_APPS ?= 0
+ENABLE_MUDFLAP ?= 0
 
 TEST_SERVER ?= 1
 
@@ -158,6 +159,13 @@ LOCAL_CFLAGS += \
 LOCAL_CXXFLAGS += \
 	-O3 -w \
 	-Itinyxml \
+
+#libmudflap should stay before libpthread in linker flags
+ifeq ($(ENABLE_MUDFLAP),1)
+#	LOCAL_CFLAGS += -fmudflap -fmudflapth -funwind-tables
+	SEP_FLAGS_StbMainApp.c = -fmudflap -fmudflapth -funwind-tables
+	LOCAL_LDFLAGS += -lmudflapth -rdynamic
+endif
 
 LOCAL_LDFLAGS += \
 	-lnet \
