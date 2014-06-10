@@ -405,18 +405,16 @@ static void offair_setInfoUpdateTimer(int which, int bEnable)
 {
 	//dprintf("%s: %s info timer\n", __FUNCTION__, bEnable ? "set" : "unset");
 
-	if (bEnable)
-	{
+	if(bEnable) {
 		offair_infoTimerEvent(SET_NUMBER(which));
-	} else
-	{
+	} else {
 		//interface_notifyText(NULL, 1);
 		interface_customSlider(NULL, NULL, 0, 1);
 		interface_removeEvent(offair_infoTimerEvent, SET_NUMBER(which));
 	}
 }
 
-int offair_sliderCallback(int id, interfaceCustomSlider_t *info, void *pArg)
+static int32_t offair_sliderCallback(int32_t id, interfaceCustomSlider_t *info, void *pArg)
 {
 	uint16_t snr, signal;
 	uint32_t ber, uncorrected_blocks;

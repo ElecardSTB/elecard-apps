@@ -70,26 +70,26 @@ void bouquet_loadChannelsFile(void);
 int32_t bouquets_getNumberPlaylist(void);
 void bouquets_setNumberPlaylist(int32_t num);
 
-void bouquet_loadBouquet(typeBouquet_t index, char * name);
-void bouquet_stashBouquet(typeBouquet_t index, char * name);
+void bouquet_loadBouquet(typeBouquet_t index, char *name);
+void bouquet_stashBouquet(typeBouquet_t index, char *name);
 
-int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg);
-int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg);
-int32_t bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg);
+int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
+int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
+int32_t bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg);
 void bouquet_loadDigitalBouquetsList(int force);
 void bouquet_loadAnalogBouquetsList(int force);
 void bouquet_addScanChannels(void);
 int32_t bouquet_getFolder(char *bouquetsFile);
-int32_t bouquet_saveDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
 
 void bouquet_saveAnalogBouquet(void);
-int32_t bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_saveAnalogMenuBouquet(interfaceMenu_t *pMenu, void *pArg);
 
-int32_t bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg);
-int32_t bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg);
-int32_t bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg);
-int32_t bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg);
-int32_t bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg);
+int32_t bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
+int32_t bouquet_updateAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
+int32_t bouquet_updateAnalogBouquetList(interfaceMenu_t *pMenu, void *pArg);
+int32_t bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg);
+int32_t bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_enable(void);
 void bouquet_init(void);
 void bouquet_setEnable(int32_t i);

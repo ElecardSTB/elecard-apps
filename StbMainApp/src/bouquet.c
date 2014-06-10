@@ -1,7 +1,7 @@
 /*
  bouquet.c
 
-Copyright (C) 2013  Elecard Devices
+Copyright (C) 2014  Elecard Devices
 
 All rights reserved.
 
@@ -52,14 +52,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #define NAME_SPACE                      0xFFFF0000
-#define BOUQUET_FULL_LIST	            "/var/etc/elecard/StbMainApp/"
-#define BOUGET_CONFIG_DIR               "/var/etc/elecard/StbMainApp/bouquet"
-#define BOUGET_CONFIG_DIR_ANALOG        "/var/etc/elecard/StbMainApp/analog"
+#define BOUGET_CONFIG_DIR               CONFIG_DIR "/bouquet"
+#define BOUGET_CONFIG_DIR_ANALOG        CONFIG_DIR "/analog"
 #define BOUGET_ANALOG_MAIN_FILE         "analog.json"
 #define BOUGET_CONFIG_FILE              "bouquet.conf"
 #define BOUGET_CONFIG_FILE_ANALOG       "analog.list"
 #define BOUGET_NAME                     "bouquets"
-#define BOUGET_STANDARD_NAME            "" //"Elecard playlist"
+//#define BOUGET_STANDARD_NAME            "" //"Elecard playlist"
 #define BOUGET_SERVICES_FILENAME_TV     BOUGET_CONFIG_DIR "/" BOUGET_NAME ".tv"
 #define BOUGET_SERVICES_FILENAME_RADIO  BOUGET_CONFIG_DIR "/" BOUGET_NAME ".radio"
 #define BOUGET_LAMEDB_FILENAME          BOUGET_CONFIG_DIR "/" "lamedb"
@@ -80,23 +79,20 @@ typedef struct {
 	EIT_common_t	common;
 } bouquet_t;
 
-typedef struct _transpounder_id_t
-{
+typedef struct {
 	uint32_t ts_id;         //Transpounder_ID
 	uint32_t n_id;          //Network_ID
 	uint32_t name_space;    //Namespace(media_ID -?)
-} transpounder_id_t;
+} transponder_id_t;
 
-typedef struct _transpounder_t
-{
-	transpounder_id_t transpounder_id;
+typedef struct {
+	transponder_id_t transpounder_id;
 	EIT_media_config_t media;
-} transpounder_t;
+} transponder_t;
 
-typedef struct _services_t
-{
+typedef struct {
 	uint32_t s_id;                   //Services_ID
-	transpounder_id_t transpounder_id;
+	transponder_id_t transpounder_id;
 	char channel_name[CHANNEL_BUFFER_NAME]; //channels_name
 	char provider_name[CHANNEL_BUFFER_NAME]; //provider_name
 	uint32_t v_pid;                 //video pid
@@ -105,13 +101,11 @@ typedef struct _services_t
 	uint32_t p_pid;                 //PCR
 	uint32_t ac_pid;                //AC3
 	uint32_t f;                     //f - ?
-
 } services_t;
 
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
-
 list_element_t *head_ts_list = NULL;
 list_element_t *bouquets_list = NULL;
 static int bouquets_coun_list = 0;
@@ -127,16 +121,14 @@ char pName[CHANNEL_BUFFER_NAME];
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
-
-int bouquet_foundBouquetName(list_element_t **bouquet_name, char *name);
-void bouquet_saveBouquets(char *fileName, char *typeName);
-void bouquet_saveBouquetsConf(char *fileName, char *typeName);
-void bouquet_saveLamedb(char *fileName);
-void bouquet_saveBouquetsList(list_element_t **bouquet_name);
-void bouquet_downloadDigitalConfigList();
-void bouquet_downloadAnalogConfigList();
-void bouquet_loadAnalogBouquetsList(int);
-void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path);
+static int bouquet_foundBouquetName(list_element_t **bouquet_name, char *name);
+static void bouquet_saveBouquets(char *fileName, char *typeName);
+static void bouquet_saveBouquetsConf(char *fileName, char *typeName);
+static void bouquet_saveLamedb(char *fileName);
+static void bouquet_saveBouquetsList(list_element_t **bouquet_name);
+static void bouquet_downloadDigitalConfigList();
+static void bouquet_downloadAnalogConfigList();
+static void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path);
 
 
 /*******************************************************************
@@ -161,8 +153,9 @@ static void bouquet_saveAllBouquet(void)
 
 	bouquetName = bouquet_getDigitalBouquetName();
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, bouquetName);
-	if(!(stat(buffName, &sb) == 0 && S_ISDIR( sb.st_mode)))
+	if(!(stat(buffName, &sb) == 0 && S_ISDIR(sb.st_mode))) {
 		mkdir(buffName, 0777);
+	}
 
 	bouquet_saveBouquets(bouquetName, "tv");
 	bouquet_saveBouquets(bouquetName, "radio");
@@ -188,17 +181,17 @@ static int bouquet_sendBouquet(void)
 	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 
-	FILE* fd;
+	FILE *fd;
 	char bouquet_file[BUFFER_SIZE];
 
 	sprintf(bouquet_file, "-mkdir %s/../bouquet/%s.STB/\n -put %s/%s/* %s/../bouquet/%s.STB/\n -put %s/%s %s/../bouquet/",
-							 serverDir,    bouquetDigitalName,      BOUGET_CONFIG_DIR, bouquetDigitalName, serverDir, bouquetDigitalName,  BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, serverDir );
+			serverDir,    bouquetDigitalName,      BOUGET_CONFIG_DIR, bouquetDigitalName, serverDir, bouquetDigitalName,  BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE, serverDir);
 	fd = fopen("/tmp/cmd_bouquet", "wb");
 	if(fd == NULL) {
 		eprintf("%s: Failed to open /tmp/cmd_bouquet \n", __FUNCTION__);
 		return 1;
 	}
-	fprintf(fd, "%s\n",bouquet_file);
+	fprintf(fd, "%s\n", bouquet_file);
 	fclose(fd);
 
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
@@ -213,8 +206,9 @@ list_element_t *list_getElement(int count, list_element_t **head)
 	int cur_count = 0;
 
 	for(cur_element = *head; cur_element != NULL; cur_element = cur_element->next) {
-		if (cur_count == count)
+		if(cur_count == count) {
 			return cur_element;
+		}
 		cur_count++;
 	}
 	return NULL;
@@ -227,24 +221,25 @@ void bouquet_addScanChannels(void)
 
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
-		if(!(dvbChannel_findServiceCommon(&curService->common))){
+		if(!(dvbChannel_findServiceCommon(&curService->common))) {
 			curService->common.media_id = curService->original_network_id;
 			dvbChannel_addService(curService, 1);
 		}
 	}
 	dvbChannel_writeOrderConfig();
-	if (bouquet_enable())
+	if(bouquet_enable()) {
 		bouquet_saveAllBouquet();
+	}
 }
 
-int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg)
+int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	(void)pMenu;
 	char *name;
 	int number;
 	number = CHANNEL_INFO_GET_CHANNEL(pArg);
 	name = bouquet_getAnalogBouquetName();
-	if ((name != NULL) &&
+	if((name != NULL) &&
 			(strcasecmp(name, bouquet_getNameBouquetList(&bouquetNameAnalogList, number)) == 0)) {
 		return 0;
 	}
@@ -255,14 +250,14 @@ int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg)
+int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	(void)pMenu;
 	char *name;
 	int number;
 	number = CHANNEL_INFO_GET_CHANNEL(pArg);
 	name = bouquet_getDigitalBouquetName();
-	if ((name != NULL) &&
+	if((name != NULL) &&
 			(strcasecmp(name, bouquet_getNameBouquetList(&bouquetNameDigitalList, number)) == 0)) {
 		return 0;
 	}
@@ -277,21 +272,21 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void* pArg)
 
 void bouquet_setDigitalBouquetName(char *name)
 {
-	sprintf(bouquetDigitalName,"%s", name);
+	sprintf(bouquetDigitalName, "%s", name);
 }
 
 void bouquet_setAnalogBouquetName(char *name)
 {
 	bouquet_loadBouquet(analogBouquet, name);
-	sprintf(bouquetAnalogName,"%s", name);
+	sprintf(bouquetAnalogName, "%s", name);
 }
 
 void bouquet_removeBouquetName(list_element_t **bouquet_name, char *name)
 {
 	list_element_t *cur_element;
 	for(cur_element = bouquetNameDigitalList; cur_element != NULL; cur_element = cur_element->next) {
-		if (cur_element != NULL){
-			if (strncasecmp((char *)cur_element->data, name, strlen(name)) == 0) {
+		if(cur_element != NULL) {
+			if(strncasecmp((char *)cur_element->data, name, strlen(name)) == 0) {
 				remove_element(&*bouquet_name, cur_element);
 				return;
 			}
@@ -304,13 +299,14 @@ void bouquet_addNewBouquetName(list_element_t **bouquet_name, char *name)
 	list_element_t *cur_element;
 	char *element_data;
 
-	if (*bouquet_name == NULL) {
+	if(*bouquet_name == NULL) {
 		cur_element = *bouquet_name = allocate_element(BOUGET_NAME_SIZE);
 	} else {
 		cur_element = append_new_element(*bouquet_name, BOUGET_NAME_SIZE);
 	}
-	if (!cur_element)
+	if(!cur_element) {
 		return;
+	}
 	element_data = (char *)cur_element->data;
 	strncpy(element_data, name, BOUGET_NAME_SIZE);
 
@@ -322,8 +318,8 @@ void bouquet_setNewBouquetName(char *name)
 	char buffName[64];
 	char cmd[1024];
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, name);
-	sprintf(bouquetDigitalName,"%s", name);
-	if (bouquet_getDigitalBouquetName() == NULL) {
+	sprintf(bouquetDigitalName, "%s", name);
+	if(bouquet_getDigitalBouquetName() == NULL) {
 		bouquet_addNewBouquetName(&bouquetNameDigitalList, name);
 
 		snprintf(cmd, sizeof(cmd), "mkdir -p %s", buffName);
@@ -335,10 +331,10 @@ void bouquet_setNewBouquetName(char *name)
 
 char *bouquet_getDigitalBouquetName(void)
 {
-	if (bouquet_enable()) {
+	if(bouquet_enable()) {
 		list_element_t *cur_element;
 		for(cur_element = bouquetNameDigitalList; cur_element != NULL; cur_element = cur_element->next) {
-			if ((cur_element != NULL) &&
+			if((cur_element != NULL) &&
 					(strncasecmp((char *)cur_element->data, bouquetDigitalName, strlen(bouquetDigitalName)) == 0)) {
 				return bouquetDigitalName;
 			}
@@ -351,8 +347,8 @@ char *bouquet_getAnalogBouquetName(void)
 {
 	list_element_t *cur_element;
 	for(cur_element = bouquetNameAnalogList; cur_element != NULL; cur_element = cur_element->next) {
-		if ( (cur_element != NULL) &&
-			 (strncasecmp((char *)cur_element->data, bouquetAnalogName, strlen(bouquetAnalogName)) == 0)) {
+		if((cur_element != NULL) &&
+				(strncasecmp((char *)cur_element->data, bouquetAnalogName, strlen(bouquetAnalogName)) == 0)) {
 			return bouquetAnalogName;
 		}
 	}
@@ -362,13 +358,14 @@ char *bouquet_getAnalogBouquetName(void)
 
 int bouquet_foundBouquetName(list_element_t **bouquet_name, char *name)
 {
-	if (/*!bouquet_enable() ||*/ name == NULL)
+	if(/*!bouquet_enable() ||*/ name == NULL) {
 		return -1;
+	}
 	list_element_t *cur_element;
 	for(cur_element = *bouquet_name; cur_element != NULL; cur_element = cur_element->next) {
-		if (cur_element != NULL){
-			if (strcasecmp((char *)cur_element->data, name) == 0) {
-				dprintf("%s: %s\n",__func__, name);
+		if(cur_element != NULL) {
+			if(strcasecmp((char *)cur_element->data, name) == 0) {
+				dprintf("%s: %s\n", __func__, name);
 				return 0;
 			}
 		}
@@ -380,7 +377,7 @@ char *bouquet_getNameBouquetList(list_element_t **head, int number)
 {
 	list_element_t *NameElement;
 	NameElement = list_getElement(number, head);
-	if (NameElement != NULL){
+	if(NameElement != NULL) {
 		return (char *)NameElement->data;
 	}
 	return NULL;
@@ -388,20 +385,21 @@ char *bouquet_getNameBouquetList(list_element_t **head, int number)
 
 void bouquet_getDigitalName(char *dir, char *fname, char *name)
 {
-	sprintf(fname,"%s/offair.%s%s", dir, (name == NULL ? "" : name), (name == NULL ? "conf" : ".conf"));
+	sprintf(fname, "%s/offair.%s%s", dir, (name == NULL ? "" : name), (name == NULL ? "conf" : ".conf"));
 }
 void bouquet_getAnalogJsonName(char *fname, char *name)
 {
-	if (name == NULL)
-		sprintf(fname,"analog.json");
-	else
-		sprintf(fname,"analog.%s.json", name);
+	if(name == NULL) {
+		sprintf(fname, "analog.json");
+	} else {
+		sprintf(fname, "analog.%s.json", name);
+	}
 }
 
 void get_bouquets_file_name(list_element_t **bouquet_name, char *bouquet_file)
 {
 	char buf[BUFFER_SIZE];
-	FILE* fd;
+	FILE *fd;
 	list_element_t *cur_element;
 	char *element_data;
 
@@ -411,42 +409,44 @@ void get_bouquets_file_name(list_element_t **bouquet_name, char *bouquet_file)
 		return;
 	}
 	// check head file name
-	while ( fgets(buf, BUFFER_SIZE, fd) != NULL ) {
-		if ( strncasecmp(buf, "#SERVICE", 8) !=0 )
+	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
+		if(strncasecmp(buf, "#SERVICE", 8) != 0) {
 			continue;
+		}
 
-		if (*bouquet_name == NULL) {
+		if(*bouquet_name == NULL) {
 			cur_element = *bouquet_name = allocate_element(BOUGET_NAME_SIZE);
 		} else {
 			cur_element = append_new_element(*bouquet_name, BOUGET_NAME_SIZE);
 		}
-		if (!cur_element)
+		if(!cur_element) {
 			break;
+		}
 
 		element_data = (char *)cur_element->data;
 
-		char * ptr;
+		char *ptr;
 		int    ch = '"';
-		ptr = strchr( buf, ch ) + 1;
-		sscanf(ptr,"%s \n",element_data); //get bouquet_name type: name" (with ")
+		ptr = strchr(buf, ch) + 1;
+		sscanf(ptr, "%s \n", element_data); //get bouquet_name type: name" (with ")
 		element_data[strlen(element_data) - 1] = '\0'; //get bouquet_name type: name
 		dprintf("Get bouquet file name: %s\n", element_data);
 	}
 	fclose(fd);
 }
 
-transpounder_t *found_transpounder(EIT_common_t	*common, uint32_t name_space)
+transponder_t *found_transpounder(EIT_common_t	*common, uint32_t name_space)
 {
 	list_element_t *cur_tr_element;
-	transpounder_t *element_tr;
+	transponder_t *element_tr;
 
 	for(cur_tr_element = head_ts_list; cur_tr_element != NULL; cur_tr_element = cur_tr_element->next) {
-		element_tr = (transpounder_t*)cur_tr_element->data;
+		element_tr = (transponder_t *)cur_tr_element->data;
 
 		if(element_tr == NULL) {
 			continue;
 		}
-		if (name_space == element_tr->transpounder_id.name_space &&
+		if(name_space == element_tr->transpounder_id.name_space &&
 				common->transport_stream_id == element_tr->transpounder_id.ts_id &&
 				common->media_id == element_tr->transpounder_id.n_id) {
 			return element_tr;
@@ -460,9 +460,9 @@ int bouquets_found(EIT_common_t *common)
 	list_element_t *found;
 	for(found = bouquets_list; found != NULL; found = found->next) {
 		bouquet_t *curService = (bouquet_t *)found->data;
-		if (common->service_id ==  curService->common.service_id &&
-			common->transport_stream_id ==  curService->common.transport_stream_id) {
-		//if(memcmp((common), &(curService->common), sizeof(EIT_common_t)) == 0) {
+		if(common->service_id ==  curService->common.service_id &&
+				common->transport_stream_id ==  curService->common.transport_stream_id) {
+			//if(memcmp((common), &(curService->common), sizeof(EIT_common_t)) == 0) {
 			return true;
 		}
 	}
@@ -475,7 +475,7 @@ void filter_bouquets_list(char *bouquet_file)
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
 
-		if (!(bouquets_found(&(srv->common)))) {
+		if(!(bouquets_found(&(srv->common)))) {
 			dvbChannel_remove(srv);
 		}
 	}
@@ -486,7 +486,7 @@ void get_bouquets_list(char *bouquet_file)
 {
 	list_element_t *cur_element;
 	char buf[BUFFER_SIZE];
-	FILE* fd;
+	FILE *fd;
 	uint32_t type;
 	uint32_t flags;
 	uint32_t serviceType;
@@ -503,34 +503,36 @@ void get_bouquets_list(char *bouquet_file)
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
 		return;
 	}
-	if (fgets(buf, BUFFER_SIZE, fd) != NULL) {
+	if(fgets(buf, BUFFER_SIZE, fd) != NULL) {
 		sscanf(buf, "#NAME  %s\n", pName);
 	}
 	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
-		if ( sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
-					&flags,
-					&serviceType,
-					&service_id,
-					&transport_stream_id,
-					&network_id,
-					&name_space,
-					&index_8,
-					&index_9,
-					&index_10) != 10) {
+		if(sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
+				  &flags,
+				  &serviceType,
+				  &service_id,
+				  &transport_stream_id,
+				  &network_id,
+				  &name_space,
+				  &index_8,
+				  &index_9,
+				  &index_10) != 10) {
 			continue;
 		}
-		if (service_id == 0 && transport_stream_id == 0 && network_id == 0)
+		if(service_id == 0 && transport_stream_id == 0 && network_id == 0) {
 			continue;
+		}
 
 		bouquet_t *element;
 
-		if (bouquets_list == NULL) {
+		if(bouquets_list == NULL) {
 			cur_element  = bouquets_list = allocate_element(sizeof(bouquet_t));
 		} else {
 			cur_element = append_new_element(bouquets_list, sizeof(bouquet_t));
 		}
-		if (cur_element == NULL)
+		if(cur_element == NULL) {
 			break;
+		}
 		element = (bouquet_t *)cur_element->data;
 		element->bouquet_data.serviceType = serviceType;
 		element->bouquet_data.network_id = network_id;
@@ -540,7 +542,7 @@ void get_bouquets_list(char *bouquet_file)
 
 		service_index_t *p_srvIdx;
 		p_srvIdx = dvbChannel_findServiceCommon(&element->common);
-		if (p_srvIdx == NULL) {
+		if(p_srvIdx == NULL) {
 			dvbChannel_addBouquetData(&element->common, &element->bouquet_data, /*visible*/ true);
 		}
 	}
@@ -551,30 +553,33 @@ int bouquets_compare(list_element_t **services)
 {
 	list_element_t	*service_element;
 
-	if (dvbChannel_getCount() != dvb_getCountOfServices())
+	if(dvbChannel_getCount() != dvb_getCountOfServices()) {
 		return 0;
+	}
 
 	for(service_element = *services; service_element != NULL; service_element = service_element->next) {
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
-		if (dvbChannel_findServiceCommon(&curService->common) == NULL)
+		if(dvbChannel_findServiceCommon(&curService->common) == NULL) {
 			return 0;
+		}
 	}
 	return 1;
 }
 
-void get_addStandardPlaylist(list_element_t **bouquet_name,char *bouquet_file)
+void get_addStandardPlaylist(list_element_t **bouquet_name, char *bouquet_file)
 {
 	list_element_t *cur_element;
 	char *element_data;
 	free_elements(&*bouquet_name);
 
-	if (*bouquet_name == NULL) {
+	if(*bouquet_name == NULL) {
 		cur_element = *bouquet_name = allocate_element(BOUGET_NAME_SIZE);
 	} else {
 		cur_element = append_new_element(*bouquet_name, BOUGET_NAME_SIZE);
 	}
-	if (!cur_element)
+	if(!cur_element) {
 		return;
+	}
 
 	element_data = (char *)cur_element->data;
 	sprintf(element_data, "%s", bouquet_file);
@@ -592,11 +597,12 @@ void bouquet_setEnable(int i)
 
 int bouquet_getFile(char *fileName)
 {
-	//bouquet_downloadFileWithServices(BOUQUET_FULL_LIST);
+	//bouquet_downloadFileWithServices(CONFIG_DIR);
 	struct stat sb;
 	if(stat(fileName, &sb) == 0) {
-		if ( S_ISDIR( sb.st_mode))
+		if(S_ISDIR(sb.st_mode)) {
 			return false;
+		}
 		return true;
 	}
 	return false;
@@ -608,8 +614,9 @@ int bouquet_getFolder(char *bouquetsFile)
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, bouquetsFile);
 	struct stat sb;
 
-	if(stat(buffName, &sb) == 0 && S_ISDIR( sb.st_mode))
+	if(stat(buffName, &sb) == 0 && S_ISDIR(sb.st_mode)) {
 		return 1;
+	}
 	return 0;
 }
 
@@ -620,10 +627,10 @@ void bouquet_saveLamedb(char *fileName)
 	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 	list_element_t *cur_element;
-	transpounder_t *element;
-	FILE* fd;
+	transponder_t *element;
+	FILE *fd;
 
-	sprintf(dirName, "%s/%s/lamedb",BOUGET_CONFIG_DIR ,fileName);
+	sprintf(dirName, "%s/%s/lamedb", BOUGET_CONFIG_DIR , fileName);
 	fd = fopen(dirName, "wb");
 
 	if(fd == NULL) {
@@ -636,58 +643,60 @@ void bouquet_saveLamedb(char *fileName)
 
 		element = found_transpounder(&(srvIdx->common), NAME_SPACE);
 
-		if (element != NULL)
+		if(element != NULL) {
 			continue;
-
-		if (head_ts_list == NULL) {
-			cur_element = head_ts_list = allocate_element(sizeof(transpounder_t));
-		} else {
-			cur_element = append_new_element(head_ts_list, sizeof(transpounder_t));
 		}
-		if (cur_element == NULL)
-			break;
 
-		element = (transpounder_t *)cur_element->data;
+		if(head_ts_list == NULL) {
+			cur_element = head_ts_list = allocate_element(sizeof(transponder_t));
+		} else {
+			cur_element = append_new_element(head_ts_list, sizeof(transponder_t));
+		}
+		if(cur_element == NULL) {
+			break;
+		}
+
+		element = (transponder_t *)cur_element->data;
 
 		element->transpounder_id.name_space = NAME_SPACE;
 		element->transpounder_id.ts_id = srvIdx->service->common.transport_stream_id;
 		element->transpounder_id.n_id = srvIdx->service->original_network_id;
 
-		memcpy(&element->media,&srvIdx->service->media,sizeof(EIT_media_config_t));
+		memcpy(&element->media, &srvIdx->service->media, sizeof(EIT_media_config_t));
 	}
 
 	fprintf(fd, "eDVB services /4/\n");
 	fprintf(fd, "transponders\n");
 	for(cur_element = head_ts_list; cur_element != NULL; cur_element = cur_element->next) {
-		element = (transpounder_t*)cur_element->data;
+		element = (transponder_t *)cur_element->data;
 		fprintf(fd, "%08x:%04x:%04x\n", element->transpounder_id.name_space, element->transpounder_id.ts_id, element->transpounder_id.n_id);
-		if (element->media.type == serviceMediaDVBC) {
+		if(element->media.type == serviceMediaDVBC) {
 			fprintf(fd, "	%c %d:%d:%d:%d:0:0:0\n", 'c', element->media.dvb_c.frequency / 1000,
-														  element->media.dvb_c.symbol_rate,
-														  (element->media.dvb_c.inversion == 0 ? 2 : 1),
-														  element->media.dvb_c.modulation);
+					element->media.dvb_c.symbol_rate,
+					(element->media.dvb_c.inversion == 0 ? 2 : 1),
+					element->media.dvb_c.modulation);
 		}
-		if (element->media.type == serviceMediaDVBS) {
+		if(element->media.type == serviceMediaDVBS) {
 			fprintf(fd, "	%c %d:%d:%d:%d:%d:%d:0\n", 's', element->media.dvb_s.frequency,
-														  element->media.dvb_s.symbol_rate,
-														  element->media.dvb_s.polarization,
-														  element->media.dvb_s.FEC_inner,
-														  element->media.dvb_s.orbital_position,
-														  (element->media.dvb_s.inversion == 0 ? 2 : 1));
+					element->media.dvb_s.symbol_rate,
+					element->media.dvb_s.polarization,
+					element->media.dvb_s.FEC_inner,
+					element->media.dvb_s.orbital_position,
+					(element->media.dvb_s.inversion == 0 ? 2 : 1));
 		}
-		if (element->media.type == serviceMediaDVBT) {
+		if(element->media.type == serviceMediaDVBT) {
 			fprintf(fd, "	%c %d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d\n", 't', element->media.dvb_t.centre_frequency,
-																			 element->media.dvb_t.bandwidth,
-																			 element->media.dvb_t.code_rate_HP_stream,
-																			 element->media.dvb_t.code_rate_LP_stream,
-																			 0,
-																			 element->media.dvb_t.transmission_mode,
-																			 element->media.dvb_t.guard_interval,
-																			 element->media.dvb_t.hierarchy_information,
-																			 (element->media.dvb_t.inversion == 0 ? 2 : 1),
-																			 0,
-																			 0,
-																			 element->media.dvb_t.plp_id);
+					element->media.dvb_t.bandwidth,
+					element->media.dvb_t.code_rate_HP_stream,
+					element->media.dvb_t.code_rate_LP_stream,
+					0,
+					element->media.dvb_t.transmission_mode,
+					element->media.dvb_t.guard_interval,
+					element->media.dvb_t.hierarchy_information,
+					(element->media.dvb_t.inversion == 0 ? 2 : 1),
+					0,
+					0,
+					element->media.dvb_t.plp_id);
 		}
 		fprintf(fd, "/\n");
 	}
@@ -707,16 +716,16 @@ void bouquet_saveLamedb(char *fileName)
 
 void bouquet_saveBouquets(char *fileName, char *typeName)
 {
-	FILE* fd;
+	FILE *fd;
 	char bouquet_file[BUFFER_SIZE];
 
-	sprintf(bouquet_file, "%s/%s/bouquets.%s",BOUGET_CONFIG_DIR , fileName, typeName);
+	sprintf(bouquet_file, "%s/%s/bouquets.%s", BOUGET_CONFIG_DIR , fileName, typeName);
 	fd = fopen(bouquet_file, "wb");
 	if(fd == NULL) {
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
 		return;
 	}
-	fprintf(fd, "#NAME Bouquets (%s)\n",typeName);
+	fprintf(fd, "#NAME Bouquets (%s)\n", typeName);
 	fprintf(fd, "#SERVICE 1:7:1:0:0:0:0:0:0:0:FROM BOUQUET \"userbouquet.%s.%s\" ORDER BY bouquet\n", fileName, typeName);
 	fclose(fd);
 }
@@ -725,12 +734,12 @@ void bouquet_saveBouquetsConf(char *fileName, char *typeName)
 {
 	dprintf("Save services list in Bouquets\n");
 
-	FILE* fd;
+	FILE *fd;
 	char bouquet_file[BUFFER_SIZE];
 	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 
-	sprintf(bouquet_file, "%s/%s/userbouquet.%s.%s",BOUGET_CONFIG_DIR, fileName, fileName, typeName);
+	sprintf(bouquet_file, "%s/%s/userbouquet.%s.%s", BOUGET_CONFIG_DIR, fileName, fileName, typeName);
 	fd = fopen(bouquet_file, "wb");
 	if(fd == NULL) {
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
@@ -740,45 +749,45 @@ void bouquet_saveBouquetsConf(char *fileName, char *typeName)
 
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		if ( srvIdx->data.visible )
+		if(srvIdx->data.visible)
 			fprintf(fd, "#SERVICE 1:0:%d:%x:%x:%x:%08x:0:0:0:\n",
 					srvIdx->service->service_descriptor.service_type,
 					srvIdx->common.service_id,
 					srvIdx->common.transport_stream_id,
 					srvIdx->service->original_network_id,
-					NAME_SPACE );
+					NAME_SPACE);
 
 	}
 	fclose(fd);
 }
-void bouquet_stashBouquet(typeBouquet_t index, char * name)
+void bouquet_stashBouquet(typeBouquet_t index, char *name)
 {
 	char cmd[256];
 	char fname[256];
-	if (index == analogBouquet) {
-		bouquet_getAnalogJsonName(fname ,name);
+	if(index == analogBouquet) {
+		bouquet_getAnalogJsonName(fname , name);
 		snprintf(cmd, sizeof(cmd), "cp %s/../%s %s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_ANALOG_MAIN_FILE,
-														BOUGET_CONFIG_DIR_ANALOG, fname);
+				 BOUGET_CONFIG_DIR_ANALOG, fname);
 	}
 	dbg_cmdSystem(cmd);
 }
 
-void bouquet_loadBouquet(typeBouquet_t index, char * name)
+void bouquet_loadBouquet(typeBouquet_t index, char *name)
 {
 	char cmd[256];
 	char fname[256];
-	if (index == analogBouquet) {
-		bouquet_getAnalogJsonName(fname ,name);
+	if(index == analogBouquet) {
+		bouquet_getAnalogJsonName(fname , name);
 		analogtv_removeServiceList(0);
 		snprintf(cmd, sizeof(cmd), "cp %s/%s %s/../%s", BOUGET_CONFIG_DIR_ANALOG, fname,
-														BOUGET_CONFIG_DIR_ANALOG, BOUGET_ANALOG_MAIN_FILE);
+				 BOUGET_CONFIG_DIR_ANALOG, BOUGET_ANALOG_MAIN_FILE);
 	}
 	dbg_cmdSystem(cmd);
 }
 
-int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg)
 {
-	if (bouquet_enable()) {
+	if(bouquet_enable()) {
 		bouquet_setEnable(0);
 		bouquet_loadBouquet(analogBouquet, NULL);
 	} else {
@@ -792,7 +801,7 @@ int bouquet_enableControl(interfaceMenu_t* pMenu, void* pArg)
 	return 1;
 }
 
-int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg)
+int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg)
 {
 	if(value == NULL) {
 		return 0;
@@ -806,13 +815,13 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void* pArg)
 	return 0;
 }
 
-int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-	dprintf("%s\n",bouquetName);
+	dprintf("%s\n", bouquetName);
 
-	if (bouquetName != NULL) {
+	if(bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUGET_CONFIG_DIR, bouquetName);
@@ -824,10 +833,10 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 	free_services(&dvb_services);
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 #if (defined STSDK)
-		elcdRpcType_t type;
-		cJSON *result = NULL;
-		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
-		cJSON_Delete(result);
+	elcdRpcType_t type;
+	cJSON *result = NULL;
+	st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
+	cJSON_Delete(result);
 #endif //#if (defined STSDK)
 
 	dvbChannel_terminate();
@@ -837,18 +846,18 @@ int bouquet_removeBouquet(interfaceMenu_t* pMenu, void* pArg)
 	return 0;
 }
 
-int bouquet_updateAnalogBouquetList(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_updateAnalogBouquetList(interfaceMenu_t *pMenu, void *pArg)
 {
 	bouquet_loadAnalogBouquetsList(1);
 	return 0;
 }
 
-int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_updateAnalogBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	bouquetName = bouquet_getAnalogBouquetName();
-	if (bouquetName != NULL) {
+	if(bouquetName != NULL) {
 		char serverName[16];
 		char serverDir[256];
 		//			char filename[256];
@@ -862,21 +871,22 @@ int bouquet_updateAnalogBouquet(interfaceMenu_t* pMenu, void* pArg)
 		dbg_cmdSystem(cmd);
 	}
 	char *name = bouquet_getAnalogBouquetName();
-	if (name != NULL)
+	if(name != NULL) {
 		bouquet_setAnalogBouquetName(name);
+	}
 	interface_hideMessageBox();
 	offair_fillDVBTMenu();
 	return 0;
 }
 
-int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 
 	bouquet_loadDigitalBouquetsList(1);
 	bouquetName = bouquet_getDigitalBouquetName();
-	if (bouquetName != NULL) {
+	if(bouquetName != NULL) {
 		char serverName[16];
 		char serverDir[256];
 		char filename[256];
@@ -893,12 +903,12 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 
 		sprintf(filename , "%s/%s", BOUGET_CONFIG_DIR, bouquetName);
 		struct stat sb;
-		if(!(stat(filename, &sb) == 0  || S_ISDIR( sb.st_mode))) {
+		if(!(stat(filename, &sb) == 0  || S_ISDIR(sb.st_mode))) {
 			snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s %s/%s", loginName, serverName, serverDir, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
 			dbg_cmdSystem(cmd);
 		}
 
-		if(!(stat(filename, &sb) == 0  || S_ISDIR( sb.st_mode))) {
+		if(!(stat(filename, &sb) == 0  || S_ISDIR(sb.st_mode))) {
 			snprintf(cmd, sizeof(cmd), "mv %s/%s_temp/ %s/%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_CONFIG_DIR, bouquetName);
 		} else {
 			snprintf(cmd, sizeof(cmd), "rm -r %s/%s_temp/", BOUGET_CONFIG_DIR, bouquetName);
@@ -910,7 +920,7 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
 	return 0;
 }
 
-int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_saveAnalogMenuBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char serverName[16];
 	char loginName[32];
@@ -919,7 +929,7 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 	int32_t ret = 0;
 
 	char *bouquetName = bouquet_getAnalogBouquetName();
-	if (bouquetName == NULL) {
+	if(bouquetName == NULL) {
 		eprintf("%s(): Noе selected bouquet!!!\n", __func__);
 		return -1;
 	}
@@ -936,18 +946,18 @@ int bouquet_saveAnalogMenuBouquet(interfaceMenu_t* pMenu, void* pArg)
 	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 
-	FILE* fd;
+	FILE *fd;
 	char bouquet_file[BUFFER_SIZE];
 
 	sprintf(bouquet_file, "-put %s/analog.%s.json %s/../analog/analog.%s.json",
-								  BOUGET_CONFIG_DIR_ANALOG, bouquetName, serverDir, bouquetName);
+			BOUGET_CONFIG_DIR_ANALOG, bouquetName, serverDir, bouquetName);
 
 	fd = fopen("/tmp/cmd_bouquet", "wb");
 	if(fd == NULL) {
 		eprintf("%s: Failed to open /tmp/cmd_bouquet \n", __FUNCTION__);
 		return 1;
 	}
-	fprintf(fd, "%s\n",bouquet_file);
+	fprintf(fd, "%s\n", bouquet_file);
 	fclose(fd);
 
 	snprintf(cmd, sizeof(cmd), "sftp -b /tmp/cmd_bouquet -i /var/etc/garb/.ssh/id_rsa %s@%s", loginName, serverName);
@@ -968,7 +978,7 @@ void bouquet_saveAnalogBouquet(void)
 	offair_fillDVBTMenu();
 }
 
-int bouquet_saveDigitalBouquet(interfaceMenu_t* pMenu, void* pArg)
+int bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	bouquet_loadDigitalBouquetsList(1);
 	bouquet_saveBouquetsList(&bouquetNameDigitalList);
@@ -982,7 +992,7 @@ void bouquet_loadBouquets(list_element_t **services)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-	if (bouquetName != NULL && bouquet_getFolder(bouquetName)) {
+	if(bouquetName != NULL && bouquet_getFolder(bouquetName)) {
 		char fileName[1024];
 		free_elements(&bouquet_name_tv);
 		free_elements(&bouquet_name_radio);
@@ -990,11 +1000,11 @@ void bouquet_loadBouquets(list_element_t **services)
 		get_bouquets_file_name(&bouquet_name_tv, fileName);
 		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUGET_CONFIG_DIR, bouquetName, BOUGET_NAME, "radio");
 		get_bouquets_file_name(&bouquet_name_radio, fileName);
-		if (bouquet_name_tv != NULL) {
+		if(bouquet_name_tv != NULL) {
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_tv->data);
 			get_bouquets_list(fileName/*tv*/);
 		}
-		if (bouquet_name_radio != NULL) {
+		if(bouquet_name_radio != NULL) {
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUGET_CONFIG_DIR, bouquetName, (char *)bouquet_name_radio->data);
 			get_bouquets_list(fileName/*radio*/);
 		}
@@ -1054,16 +1064,18 @@ void bouquet_downloadDigitalConfigList()
 void bouquet_init(void)
 {
 	struct stat sb;
-	if(!(stat(BOUGET_CONFIG_DIR, &sb) == 0 && S_ISDIR( sb.st_mode)))
+	if(!(stat(BOUGET_CONFIG_DIR, &sb) == 0 && S_ISDIR(sb.st_mode))) {
 		mkdir(BOUGET_CONFIG_DIR, 0777);
+	}
 
-	if(!(stat(BOUGET_CONFIG_DIR_ANALOG, &sb) == 0 && S_ISDIR( sb.st_mode)))
+	if(!(stat(BOUGET_CONFIG_DIR_ANALOG, &sb) == 0 && S_ISDIR(sb.st_mode))) {
 		mkdir(BOUGET_CONFIG_DIR_ANALOG, 0777);
+	}
 }
 
 void bouquet_saveBouquetsList(list_element_t **bouquet_name)
 {
-	FILE* fd;
+	FILE *fd;
 	char buffName[256];
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
 
@@ -1075,7 +1087,7 @@ void bouquet_saveBouquetsList(list_element_t **bouquet_name)
 
 	list_element_t *cur_element;
 	for(cur_element = *bouquet_name; cur_element != NULL; cur_element = cur_element->next) {
-		if (cur_element != NULL){
+		if(cur_element != NULL) {
 			fprintf(fd, "#BOUQUETS_NAME=%s\n", (char *)cur_element->data);
 		}
 	}
@@ -1085,7 +1097,7 @@ void bouquet_saveBouquetsList(list_element_t **bouquet_name)
 void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path)
 {
 	char buf[BUFFER_SIZE];
-	FILE* fd;
+	FILE *fd;
 
 	fd = fopen(path, "r");
 	if(fd == NULL) {
@@ -1093,10 +1105,11 @@ void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path)
 		return;
 	}
 	// check head file name
-	while ( fgets(buf, BUFFER_SIZE, fd) != NULL ) {
-		if ((sscanf(buf, "#BOUQUETS_NAME=%s", path) == 1) || (sscanf(buf, "#ANALOG_NAME=%s", path) == 1)) {
-			if (bouquet_foundBouquetName(&*bouquet_name, path) != 0)
+	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
+		if((sscanf(buf, "#BOUQUETS_NAME=%s", path) == 1) || (sscanf(buf, "#ANALOG_NAME=%s", path) == 1)) {
+			if(bouquet_foundBouquetName(&*bouquet_name, path) != 0) {
 				bouquet_addNewBouquetName(&*bouquet_name, path);
+			}
 		}
 	}
 	fclose(fd);
@@ -1104,8 +1117,9 @@ void bouquet_parseBouquetsList(list_element_t **bouquet_name, char *path)
 
 void bouquet_loadDigitalBouquetsList(int force)
 {
-	if (force == 1)
+	if(force == 1) {
 		bouquet_downloadDigitalConfigList();
+	}
 
 	char buffName[256];
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR, BOUGET_CONFIG_FILE);
@@ -1117,8 +1131,9 @@ void bouquet_loadDigitalBouquetsList(int force)
 void bouquet_loadAnalogBouquetsList(int force)
 {
 	char buffName[256];
-	if (force == 1)
+	if(force == 1) {
 		bouquet_downloadAnalogConfigList();
+	}
 
 	sprintf(buffName, "%s/%s", BOUGET_CONFIG_DIR_ANALOG, BOUGET_CONFIG_FILE_ANALOG);
 	bouquet_parseBouquetsList(&bouquetNameAnalogList, buffName);
@@ -1149,62 +1164,67 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 	dprintf("Load services list from lamedb\n");
 	char path[BOUGET_NAME_SIZE * 2];
 	char buf[BUFFER_SIZE];
-	FILE* fd;
-	sprintf(path, "%s/%s/lamedb",BOUGET_CONFIG_DIR, bouquet_file);
+	FILE *fd;
+	sprintf(path, "%s/%s/lamedb", BOUGET_CONFIG_DIR, bouquet_file);
 	fd = fopen(path, "r");
 	if(fd == NULL) {
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, BOUGET_LAMEDB_FILENAME);
 		return;
 	}
 	do {
-		if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
+		}
 		//parse head file name
 		/*
 		 *  not done
 		 */
-		if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
-		if (strncasecmp(buf, "transponders", 12) != 0)
+		}
+		if(strncasecmp(buf, "transponders", 12) != 0) {
 			break;
+		}
 		//------ start parse transponders list -----//
-		if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
+		}
 		do {
 			uint32_t name_space;
 			uint32_t ts_id;
 			uint32_t n_id;
-			if (sscanf(buf, "%x:%x:%x\n",&name_space, &ts_id, &n_id) != 3)
+			if(sscanf(buf, "%x:%x:%x\n", &name_space, &ts_id, &n_id) != 3) {
 				break;
+			}
 
 			list_element_t *cur_element;
-			transpounder_t *element;
+			transponder_t *element;
 
-			if (head_ts_list == NULL) {
-				cur_element = head_ts_list = allocate_element(sizeof(transpounder_t));
+			if(head_ts_list == NULL) {
+				cur_element = head_ts_list = allocate_element(sizeof(transponder_t));
 			} else {
-				cur_element = append_new_element(head_ts_list, sizeof(transpounder_t));
+				cur_element = append_new_element(head_ts_list, sizeof(transponder_t));
 			}
-			if (cur_element == NULL)
+			if(cur_element == NULL) {
 				break;
+			}
 
-			element = (transpounder_t *)cur_element->data;
+			element = (transponder_t *)cur_element->data;
 			element->transpounder_id.name_space = name_space;
 			element->transpounder_id.ts_id = ts_id;
 			element->transpounder_id.n_id = n_id;
 
-			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
+			}
 
-			switch(buf[1])
-			{
-				case 's':
-				{
+			switch(buf[1]) {
+				case 's': {
 					uint32_t freq, sym_rate, polarization, FEC_inner, orbital_position, inversion/*0 - auto, 1 - on, 2 - off*/, system/*0 - DVB-C, 1 DVB-C ANNEX C*/, modulation, rolloff, pilot;
 
 					element->media.type = serviceMediaDVBS;
 					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d\n",
-							   &freq, &sym_rate, &polarization, &FEC_inner, &orbital_position, &inversion, &system, &modulation, &rolloff, &pilot);
+						   &freq, &sym_rate, &polarization, &FEC_inner, &orbital_position, &inversion, &system, &modulation, &rolloff, &pilot);
 
 					element->media.frequency = freq;
 					element->media.dvb_s.frequency = freq;
@@ -1219,13 +1239,12 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 					//pilot
 					break;
 				}
-				case 'c':
-				{
+				case 'c': {
 					uint32_t freq, sym_rate, inversion, mod, fec_inner, flag, system;
 
 					element->media.type = serviceMediaDVBC;
 					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d\n",
-							   &freq, &sym_rate, &inversion, &mod, &fec_inner, &flag, &system);
+						   &freq, &sym_rate, &inversion, &mod, &fec_inner, &flag, &system);
 
 					element->media.type = serviceMediaDVBC;
 					element->media.frequency = freq * 1000;
@@ -1235,13 +1254,12 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 					element->media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
 					break;
 				}
-				case 't':
-				{
+				case 't': {
 					uint32_t freq, bandwidth, code_rate_HP, code_rate_LP, modulation, transmission_mode, guard_interval, hierarchy, inversion, flags, system, plpid;
 
 					element->media.type = serviceMediaDVBT;
 					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
-						&freq, &bandwidth, &code_rate_HP, &code_rate_LP, &modulation, &transmission_mode, &guard_interval, &hierarchy, &inversion, &flags, &system, &plpid);
+						   &freq, &bandwidth, &code_rate_HP, &code_rate_LP, &modulation, &transmission_mode, &guard_interval, &hierarchy, &inversion, &flags, &system, &plpid);
 
 					element->media.frequency = freq;
 					element->media.dvb_t.centre_frequency = freq;
@@ -1261,20 +1279,26 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 
 			}
 
-			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
-			if (strncasecmp(buf, "/", 1) != 0 )
+			}
+			if(strncasecmp(buf, "/", 1) != 0) {
 				break;
-			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+			}
+			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
-		} while (strncasecmp(buf, "end", 3) != 0);
+			}
+		} while(strncasecmp(buf, "end", 3) != 0);
 		//------ start parse services list -----//
-		if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
-		if (strncasecmp(buf, "services", 8) != 0)
+		}
+		if(strncasecmp(buf, "services", 8) != 0) {
 			break;
-		if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+		}
+		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
+		}
 		do {
 			uint32_t service_id;
 			uint32_t name_space;
@@ -1283,25 +1307,29 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 			uint32_t serviceType;
 			uint32_t hmm;
 
-			if (sscanf(buf, "%x:%x:%x:%x:%x:%x\n",&service_id, &name_space, &transport_stream_id, &original_network_id, &serviceType, &hmm) != 6)
+			if(sscanf(buf, "%x:%x:%x:%x:%x:%x\n", &service_id, &name_space, &transport_stream_id, &original_network_id, &serviceType, &hmm) != 6) {
 				break;
+			}
 			//parse channels name
-			char service_name[MAX_TEXT];			
-			if (fgets(service_name, BUFFER_SIZE, fd) == NULL)
+			char service_name[MAX_TEXT];
+			if(fgets(service_name, BUFFER_SIZE, fd) == NULL) {
 				break;
+			}
 
 			service_name[strlen(service_name) - 1] = '\0';
 			//parese bouquet pName
 			char bouqName[CHANNEL_BUFFER_NAME];
-			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
+			}
 			memset(bouqName, 0, strlen(bouqName));
-			sscanf(buf, "p:%s\n",bouqName);
+			sscanf(buf, "p:%s\n", bouqName);
 
-			if (fgets(buf, BUFFER_SIZE, fd) == NULL)
+			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
+			}
 
-			if ((strlen(bouqName) < 1) && (strncasecmp(pName, bouqName, strlen((pName))) != 0)) {
+			if((strlen(bouqName) < 1) && (strncasecmp(pName, bouqName, strlen((pName))) != 0)) {
 				continue;
 			}
 
@@ -1310,47 +1338,52 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 			common.transport_stream_id = transport_stream_id;
 			common.media_id  = original_network_id;
 
-			transpounder_t *element_tr;
+			transponder_t *element_tr;
 			element_tr = found_transpounder(&common, name_space);
-			if (element_tr == NULL)
+			if(element_tr == NULL) {
 				continue;
+			}
 
 			EIT_service_t *element;
 			list_element_t *service_element;
 			service_element = found_list(&common, &*services);
 
-			if (service_element != NULL) {
+			if(service_element != NULL) {
 				element = (EIT_service_t *)service_element->data;
-				if (element->media.type == serviceMediaDVBC && element_tr->media.type == serviceMediaDVBC &&
+				if(element->media.type == serviceMediaDVBC && element_tr->media.type == serviceMediaDVBC &&
 						element->media.dvb_c.frequency == element_tr->media.dvb_c.frequency &&
 						element->media.dvb_c.symbol_rate == element_tr->media.dvb_c.symbol_rate &&
 						element->media.dvb_c.modulation == element_tr->media.dvb_c.modulation &&
-						element->media.dvb_c.inversion == element_tr->media.dvb_c.inversion)
+						element->media.dvb_c.inversion == element_tr->media.dvb_c.inversion) {
 					continue;
-				if (element->media.type == serviceMediaDVBS && element_tr->media.type == serviceMediaDVBS &&
+				}
+				if(element->media.type == serviceMediaDVBS && element_tr->media.type == serviceMediaDVBS &&
 						element->media.dvb_s.frequency == element_tr->media.dvb_s.frequency &&
 						element->media.dvb_s.symbol_rate == element_tr->media.dvb_s.symbol_rate &&
 						element->media.dvb_s.polarization == element_tr->media.dvb_s.polarization &&
 						//element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
 						//element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
-						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion)
+						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion) {
 					continue;
-				if (element->media.type == serviceMediaDVBT && element_tr->media.type == serviceMediaDVBT &&
+				}
+				if(element->media.type == serviceMediaDVBT && element_tr->media.type == serviceMediaDVBT &&
 						element->media.dvb_t.centre_frequency == element_tr->media.dvb_t.centre_frequency &&
 						element->media.dvb_t.bandwidth == element_tr->media.dvb_t.bandwidth &&
-						element->media.dvb_t.inversion == element_tr->media.dvb_t.inversion)
+						element->media.dvb_t.inversion == element_tr->media.dvb_t.inversion) {
 					continue;
+				}
 				remove_element(&*services, service_element);
 			}
 			list_element_t *cur_element = NULL;
-			if (*services == NULL) {
+			if(*services == NULL) {
 				*services = cur_element = allocate_element(sizeof(EIT_service_t));
 			} else {
 				cur_element = append_new_element(*services, sizeof(EIT_service_t));
 			}
 
-			if (!cur_element)
+			if(!cur_element) {
 				break;
+			}
 			element = (EIT_service_t *)cur_element->data;
 
 			element->common.service_id = common.service_id;
@@ -1361,13 +1394,13 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 
 			memcpy(&element->service_descriptor.service_name, &service_name, strlen(service_name));
 
-			if (element_tr->media.type == serviceMediaDVBC) {
+			if(element_tr->media.type == serviceMediaDVBC) {
 				element->media.type = element_tr->media.type;
 				element->media.dvb_c.frequency = element_tr->media.dvb_c.frequency;
 				element->media.dvb_c.symbol_rate = element_tr->media.dvb_c.symbol_rate;
 				element->media.dvb_c.modulation = element_tr->media.dvb_c.modulation;
 			}
-			if (element_tr->media.type == serviceMediaDVBS) {
+			if(element_tr->media.type == serviceMediaDVBS) {
 				element->media.type = element_tr->media.type;
 				element->media.frequency = element_tr->media.frequency;
 				element->media.dvb_s.frequency = element_tr->media.dvb_s.frequency;
@@ -1377,7 +1410,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 				element->media.dvb_s.orbital_position = element_tr->media.dvb_s.orbital_position;
 				element->media.dvb_s.inversion = element_tr->media.dvb_s.inversion;
 			}
-			if (element_tr->media.type == serviceMediaDVBT) {
+			if(element_tr->media.type == serviceMediaDVBT) {
 				element->media.type = element_tr->media.type;
 				element->media.frequency = element_tr->media.frequency;
 				element->media.dvb_t.centre_frequency = element_tr->media.dvb_t.centre_frequency;
@@ -1393,7 +1426,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 				element->media.dvb_t.transmission_mode = element_tr->media.dvb_t.transmission_mode;
 				element->media.dvb_t.other_frequency_flag = element_tr->media.dvb_t.other_frequency_flag;
 			}
-		} while (strncasecmp(buf, "end", 3) != 0);
+		} while(strncasecmp(buf, "end", 3) != 0);
 	} while(0);
 
 	free_elements(&head_ts_list);
@@ -1403,8 +1436,9 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 int bouquet_file()
 {
 	struct stat sb;
-	if(stat(BOUGET_SERVICES_FILENAME_TV, &sb) == 0 || stat(BOUGET_SERVICES_FILENAME_RADIO, &sb) == 0)
+	if(stat(BOUGET_SERVICES_FILENAME_TV, &sb) == 0 || stat(BOUGET_SERVICES_FILENAME_RADIO, &sb) == 0) {
 		return true;
+	}
 	return false;
 }
 
@@ -1423,7 +1457,8 @@ void bouquet_downloadFileFromServer(char *shortname, char *fullname)
 	interface_hideMessageBox();
 }
 
-void bouquet_downloadFileWithServices(char *filename){
+void bouquet_downloadFileWithServices(char *filename)
+{
 	printf("%s[%d]\n", __func__, __LINE__);
 	//    struct stat sb;
 	//  if(stat(filename, &sb) != 0) {

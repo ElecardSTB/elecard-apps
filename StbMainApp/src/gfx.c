@@ -3646,7 +3646,7 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 			pthread_mutex_unlock(&flipMutex);
 		}
 	}
-#else
+#else //#ifndef STSDK
 	// Tripple buffering is not working on ST, so we have to wait for vsync to remove flicker
 	
 #ifdef ENABLE_FUSION
@@ -3654,7 +3654,7 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 #else
 			DFBCHECKLABEL (pSurface->Flip(pSurface, NULL, DSFLIP_WAITFORSYNC), finish_flip);
 #endif	/*ENABLE_FUSION*/	
-#endif
+#endif //#ifndef STSDK
 
 #ifdef STBTI
 	/* Flip the attribute layer as well */
