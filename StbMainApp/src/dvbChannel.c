@@ -298,7 +298,7 @@ int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible)
 		new->service = service;
 		new->common = service->common;
 		new->data.visible = visible;
-		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen(service->service_descriptor.service_name));
+		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen((char *)service->service_descriptor.service_name));
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -505,7 +505,7 @@ static int32_t dvbChannel_update(void)
 	if (check_playlist()) {
 		return 0;
 	}
-	playlist_editor_cleanup(digitalBouquet);
+	playlist_editor_cleanup(eBouquet_digital);
 	if (bouquet_enable()) {
 		bouquet_loadDigitalBouquetsList(0);
 	}
@@ -530,7 +530,7 @@ static int32_t dvbChannel_update(void)
 		if(p_srvIdx) {
 			p_srvIdx->service = curService;
 			if (strlen(p_srvIdx->data.channelsName) == 0) {
-				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen(p_srvIdx->service->service_descriptor.service_name));
+				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen((char *)p_srvIdx->service->service_descriptor.service_name));
 			}
 		}
 	}

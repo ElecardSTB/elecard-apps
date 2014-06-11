@@ -2940,7 +2940,7 @@ void cleanup()
 	dprintf("%s: terminate dvb\n", __FUNCTION__);
 	dvb_terminate();
 	dvbChannel_terminate();
-	playlist_editor_cleanup(fullBouquet);
+	playlist_editor_cleanup(eBouquet_full);
 #endif
 
 #ifdef ENABLE_VIDIMAX

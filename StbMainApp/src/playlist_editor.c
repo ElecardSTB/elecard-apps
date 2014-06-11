@@ -126,9 +126,9 @@ void playlist_editor_cleanup(typeBouquet_t index)
 		free_elements(&playListEditorDigital);
 	if (index == 0 || index == 2)
 		free_elements(&playListEditorAnalog);*/
-	if (index == fullBouquet || index == digitalBouquet)
+	if (index == eBouquet_full || index == eBouquet_digital)
 		free_elements(&playListEditorDigital);
-	if (index == fullBouquet || index == analogBouquet)
+	if (index == eBouquet_full || index == eBouquet_analog)
 		free_elements(&playListEditorAnalog);
 }
 
@@ -428,10 +428,9 @@ void playlist_editor_removeElement(void)
 }
 int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
-	extern list_element_t *bouquetNameAnalogList;
 	interfaceMenu_t *channelMenu;
 	int i = 0;
-	char *name;
+	const char *name;
 	char *bouquets_name;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 
@@ -444,7 +443,7 @@ int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 	interface_addMenuEntryDisabled(channelMenu, "List of analog channels:", 0);
 
 
-	while ((name = bouquet_getNameBouquetList(&bouquetNameAnalogList, i) )!= NULL) {
+	while((name = strList_get(&bouquetNameAnalogList, i))!= NULL) {
 		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
 		interface_addMenuEntry(channelMenu, channelEntry, bouquets_setAnalogBouquet, CHANNEL_INFO_SET(screenMain, i), thumbnail_epg);
 		bouquets_name = bouquet_getAnalogBouquetName();
@@ -467,17 +466,16 @@ int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 
 int enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
-	extern list_element_t *bouquetNameDigitalList;
 	interfaceMenu_t *channelMenu;
 	int i = 0;
-	char *name;
+	const char *name;
 	char *bouquets_name;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 
 	channelMenu = interfaceMenu;
 	interface_clearMenuEntries(channelMenu);
 
-	while ((name = bouquet_getNameBouquetList(&bouquetNameDigitalList, i) )!= NULL) {
+	while ((name = strList_get(&bouquetNameDigitalList, i) )!= NULL) {
 		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
 		interface_addMenuEntry(channelMenu, channelEntry, bouquets_setDigitalBouquet, CHANNEL_INFO_SET(screenMain, i), thumbnail_epg);
 		bouquets_name = bouquet_getDigitalBouquetName();

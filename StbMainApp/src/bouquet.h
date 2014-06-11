@@ -47,22 +47,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
-
-typedef enum _typeBouquet_t {
-	fullBouquet = 0,
-	analogBouquet = 1,
-	digitalBouquet = 2,
+typedef enum {
+	eBouquet_full = 0,
+	eBouquet_analog,
+	eBouquet_digital,
 } typeBouquet_t;
 
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-
-
+extern struct list_head bouquetNameDigitalList;
+extern struct list_head bouquetNameAnalogList;
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
+int32_t strList_add    (struct list_head *listHead, const char *str);
+int32_t strList_remove (struct list_head *listHead, const char *str);
+int32_t strList_isExist(struct list_head *listHead, const char *str);
+const char *strList_get(struct list_head *listHead, uint32_t number);
+
 #ifdef ENABLE_DVB
 
 void bouquet_loadChannelsFile(void);
@@ -70,8 +74,8 @@ void bouquet_loadChannelsFile(void);
 int32_t bouquets_getNumberPlaylist(void);
 void bouquets_setNumberPlaylist(int32_t num);
 
-void bouquet_loadBouquet(typeBouquet_t index, char *name);
-void bouquet_stashBouquet(typeBouquet_t index, char *name);
+void bouquet_loadBouquet(typeBouquet_t index, const char *name);
+void bouquet_stashBouquet(typeBouquet_t index, const char *name);
 
 int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
@@ -94,12 +98,11 @@ int32_t bouquet_enable(void);
 void bouquet_init(void);
 void bouquet_setEnable(int32_t i);
 void bouquet_getDigitalName(char *dir, char *fname, char *name);
-void bouquet_getAnalogJsonName(char *fname, char *name);
 char *bouquet_getDigitalBouquetName(void);
 char *bouquet_getAnalogBouquetName(void);
 char *bouquet_getNameBouquetList(list_element_t **head, int32_t number);
-void bouquet_setDigitalBouquetName(char *name);
-void bouquet_setAnalogBouquetName(char *name);
+void bouquet_setDigitalBouquetName(const char *name);
+void bouquet_setAnalogBouquetName(const char *name);
 void bouquet_loadBouquets(list_element_t **services);
 
 //int32_t bouquet_file(void);
@@ -108,7 +111,6 @@ void bouquet_downloadFileWithServices(char *filename);
 void  bouquet_dump(char *filename);
 list_element_t *get_bouquet_list(void);
 void bouquet_loadLamedb(char *bouquet_file, list_element_t **);
-void bouquets_free_serveces(void);
 int32_t bouquets_compare(list_element_t **);
 EIT_service_t *bouquet_findService(EIT_common_t *header);
 #else // ENABLE_DVB

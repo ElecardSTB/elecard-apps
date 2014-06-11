@@ -41,12 +41,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "interface.h"
 #include "list.h"
 
-#ifdef ENABLE_DVB
+
 /*******************
 * EXPORTED DATA    *
 ********************/
-
-
 typedef struct {
 	struct list_head	orderNoneHead;
 
@@ -83,6 +81,7 @@ typedef struct {
 	struct list_head	orderNone;
 } service_index_t;
 
+#ifdef ENABLE_DVB
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/

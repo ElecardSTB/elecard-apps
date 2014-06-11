@@ -131,7 +131,7 @@ void analogtv_removeServiceList(int permanent)
 	mysem_release(analogtv_semaphore);
 	appControlInfo.offairInfo.previousChannel = 0;
 	saveAppSettings();
-	playlist_editor_cleanup(analogBouquet);
+	playlist_editor_cleanup(eBouquet_analog);
 
 	remove(ANALOGTV_CONFIG_JSON);
 	if (permanent > 0) remove(appControlInfo.tvInfo.channelConfigFile);
