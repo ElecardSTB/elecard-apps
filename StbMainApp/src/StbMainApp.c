@@ -1848,6 +1848,90 @@ void fusion_wait (unsigned int timeout_ms)
 	return;
 }
 
+int fusion_getCommandOutput (char * cmd, char * result)
+{
+	FILE *fp;
+	char line[PATH_MAX];
+	char * movingPtr;
+
+	if (cmd == NULL) return -1;
+	fp = popen(cmd, "r");
+	if (fp == NULL) {
+		eprintf("%s: Failed to run command %s\n", __FUNCTION__, cmd);
+		return -1;
+	}
+
+	movingPtr = result;
+	while (fgets(line, sizeof(line)-1, fp) != NULL) {
+		sprintf(movingPtr, "%s", line);
+		movingPtr += strlen(line);
+		//eprintf ("%s: result = %s\n", __FUNCTION__, result);
+	}
+	pclose(fp);
+	return 0;
+}
+
+void * fusion_threadCheckReboot (void * param)
+{
+	time_t now;
+	struct tm nowDate, rebootDate;
+
+	while (1)
+	{
+		if (strlen(FusionObject.firmware) && strlen(FusionObject.reboottime))
+		{
+			char localTimestamp[32] = {0};
+			char remoteTimestamp[32] = {0};
+			fusion_getCommandOutput ("cat /firmwareDesc | grep \"pack name:\" | tr -s ' ' | cut -d'.' -f3", localTimestamp);  // eg. 201406111921
+			//eprintf ("%s(%d): localTimestamp = %s\n", __FUNCTION__, __LINE__, localTimestamp);
+
+			// get datetime of remote firmware
+			char * ptrDev = strstr(FusionObject.firmware, "dev");
+			if (ptrDev){
+				char * ptrFirstDot = strchr(ptrDev, '.');
+				if (ptrFirstDot){
+					ptrFirstDot ++;
+					char * ptrLastDot = strchr(ptrFirstDot, '.');
+					if (ptrLastDot){
+						snprintf (remoteTimestamp, min(32, (int)(ptrLastDot - ptrFirstDot + 1)), ptrFirstDot);
+						//eprintf ("%s(%d): remoteTimestamp = %s\n", __FUNCTION__, __LINE__, remoteTimestamp);
+					}
+				}
+			}
+
+			if (strlen (remoteTimestamp) && strcmp(localTimestamp, remoteTimestamp))
+			{
+				time (&now);
+				nowDate = *localtime (&now);
+
+				rebootDate.tm_year = nowDate.tm_year;
+				rebootDate.tm_mon = nowDate.tm_mon;
+				rebootDate.tm_mday = nowDate.tm_mday;
+				sscanf(FusionObject.reboottime, "%02d:%02d:%02d", &rebootDate.tm_hour, &rebootDate.tm_min, &rebootDate.tm_sec);
+/*
+				eprintf ("%s(%d): Reboot date is %04d-%02d-%02d %02d:%02d:%02d, now = %02d:%02d:%02d %02d:%02d:%02d, checktime = %d\n", 
+							  __FUNCTION__, __LINE__, 
+							rebootDate.tm_year, rebootDate.tm_mon, rebootDate.tm_mday,
+							rebootDate.tm_hour, rebootDate.tm_min, rebootDate.tm_sec,
+							nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday,
+							nowDate.tm_hour, nowDate.tm_min, nowDate.tm_sec, 
+							FusionObject.checktime);
+*/
+				double diff = difftime(mktime(&rebootDate), mktime(&nowDate));
+				//eprintf ("%s(%d): diff = %f\n", __FUNCTION__, __LINE__, diff);
+				if ((diff > 0) && (diff <= 60)){
+					eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
+					system ("reboot");
+				}
+			}
+		}
+		fusion_wait(10 * 1000);
+	}
+
+	pthread_exit((void *)&gStatus);
+	return (void*)NULL;
+}
+
 void * fusion_threadCreepline(void * param)
 {
 	int result;
@@ -1913,6 +1997,10 @@ int fusion_readConfig()
 			ptr += 10;
 			FusionObject.checktime = atoi(ptr);
 			eprintf (" %s: checktime = %d\n",   __FUNCTION__, FusionObject.checktime);
+		}else if ((ptr = strcasestr((const char*) line, (const char*)"DEMO ")) != NULL){
+			ptr += 5;
+			sprintf (FusionObject.demoUrl, "%s", ptr);
+			eprintf (" %s: demo url = %s\n",   __FUNCTION__, FusionObject.demoUrl);
 		}
 	}
 	fclose (f);
@@ -2032,6 +2120,7 @@ void fusion_startup()
 	FusionObject.currentDtmfDigit = '_';
 
 	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
+	pthread_create(&FusionObject.threadCheckReboot, NULL, fusion_threadCheckReboot, (void*)NULL);
 
 	return;
 }
@@ -2333,11 +2422,14 @@ int fusion_getCreepAndLogo ()
 
 	time (&now);
 	nowDate = *localtime (&now);
-	nowDate.tm_year += 1900;
-	nowDate.tm_mon += 1;
-	sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", 
-	         FusionObject.server, FusionObject.secret, 
-	         nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday);
+
+	if (strlen(FusionObject.demoUrl)){
+		sprintf (request, "%s", FusionObject.demoUrl);
+	}
+	else {
+		sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", FusionObject.server, FusionObject.secret, 
+		         nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday);
+	}
 
 	// test
 	result = fusion_checkLastModified(request);
@@ -2416,6 +2508,34 @@ int fusion_getCreepAndLogo ()
 	}
 	else {
 		// do nothing
+	}
+
+	cJSON * jsonReboot = cJSON_GetObjectItem(root, "reboot_time");
+	if (jsonReboot){
+		if (strcmp(FusionObject.reboottime, jsonReboot->valuestring)){
+			eprintf ("%s(%d): New reboottime set %s\n", __FUNCTION__, __LINE__, jsonReboot->valuestring);
+			snprintf (FusionObject.reboottime, PATH_MAX, jsonReboot->valuestring);
+
+			cJSON * jsonFirmware = cJSON_GetObjectItem(root, "firmware");
+			if (jsonFirmware){
+				if (strcmp(FusionObject.firmware, jsonFirmware->valuestring)){
+					eprintf ("%s(%d): New firmware path set %s\n", __FUNCTION__, __LINE__, jsonFirmware->valuestring);
+					snprintf (FusionObject.firmware, PATH_MAX, jsonFirmware->valuestring);
+
+					char cmd [PATH_MAX];
+					system("hwconfigManager s 0 UPFOUND 1");
+					system("hwconfigManager s 0 UPNET 1");	// test: check remote firmware every reboot
+					sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
+					system (cmd);
+				}
+			}
+			else {
+				FusionObject.firmware[0] = '\0';
+			}
+		}
+	}
+	else {
+		FusionObject.reboottime[0] = '\0';
 	}
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
@@ -2582,6 +2702,10 @@ void fusion_cleanup()
 	if (FusionObject.threadCreepHandle){
 		pthread_cancel(FusionObject.threadCreepHandle);
 		pthread_join(FusionObject.threadCreepHandle, NULL);
+	}
+	if (FusionObject.threadCheckReboot){
+		pthread_cancel(FusionObject.threadCheckReboot);
+		pthread_join(FusionObject.threadCheckReboot, NULL);
 	}
 	if (FusionObject.creepline) {
 		free (FusionObject.creepline);

@@ -976,6 +976,7 @@ typedef struct _interfaceFusionObject_t {
 	pthread_mutex_t mutexLogo;
 
 	pthread_t threadCreepHandle;
+	pthread_t threadCheckReboot;
 	int checktime;
 
 	unsigned long long creepStartTime;
@@ -994,6 +995,10 @@ typedef struct _interfaceFusionObject_t {
 	char firmwareUpdateTime[FUSION_DATETIME_LEN];
 
 	long lastModified;
+	char firmware[PATH_MAX];
+	char reboottime[FUSION_DATETIME_LEN];
+
+	char demoUrl[PATH_MAX];
 
 } interfaceFusionObject_t;
 #endif
