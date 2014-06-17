@@ -113,8 +113,6 @@ typedef struct {
 /******************************************************************
 * DATA                                                            *
 *******************************************************************/
-//list_element_t *bouquetNameDigitalList = NULL;
-//static list_element_t *bouquetNameAnalogList = NULL;
 LIST_HEAD(bouquetNameDigitalList);
 LIST_HEAD(bouquetNameAnalogList);
 
@@ -122,12 +120,13 @@ LIST_HEAD(bouquetNameAnalogList);
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
+LIST_HEAD(bouquet_name_tv);
+LIST_HEAD(bouquet_name_radio);
+
 static list_element_t *head_ts_list = NULL;
 static list_element_t *bouquets_list = NULL;
 static int bouquets_coun_list = 0;
 static int bouquets_enable = 0;
-static list_element_t *bouquet_name_tv = NULL;
-static list_element_t *bouquet_name_radio = NULL;
 static char bouquetDigitalName[CHANNEL_BUFFER_NAME];
 static char bouquetAnalogName[CHANNEL_BUFFER_NAME];
 static char pName[CHANNEL_BUFFER_NAME];
@@ -343,7 +342,7 @@ static void bouquet_getAnalogJsonName(char *fname, const char *name)
 	}
 }
 
-void get_bouquets_file_name(list_element_t **bouquet_name, char *bouquet_file)
+static void get_bouquets_file_name(struct list_head *listHead, char *bouquet_file)
 {
 	char buf[BUFFER_SIZE];
 	FILE *fd;
@@ -355,30 +354,20 @@ void get_bouquets_file_name(list_element_t **bouquet_name, char *bouquet_file)
 	}
 	// check head file name
 	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
-		list_element_t *cur_element;
-		char *element_data;
+		char *ptr;
 
 		if(strncasecmp(buf, "#SERVICE", 8) != 0) {
 			continue;
 		}
 
-		if(*bouquet_name == NULL) {
-			cur_element = *bouquet_name = allocate_element(BOUQUET_NAME_SIZE);
-		} else {
-			cur_element = append_new_element(*bouquet_name, BOUQUET_NAME_SIZE);
-		}
-		if(!cur_element) {
-			break;
-		}
-
-		element_data = (char *)cur_element->data;
-
-		char *ptr;
 		ptr = strchr(buf, '"');
 		if(ptr) {
-			sscanf(ptr + 1, "%s \n", element_data); //get bouquet_name type: name" (with ")
-			element_data[strlen(element_data) - 1] = '\0'; //get bouquet_name type: name
-			dprintf("Get bouquet file name: %s\n", element_data);
+			char name[256];
+			sscanf(ptr + 1, "%s \n", name); //get bouquet_name type: name" (with ")
+			name[strlen(name) - 1] = '\0'; //get bouquet_name type: name
+			strList_add(listHead, name);
+
+			dprintf("Get bouquet file name: %s\n", name);
 		}
 	}
 	fclose(fd);
@@ -940,18 +929,20 @@ void bouquet_loadBouquets(list_element_t **services)
 	bouquetName = bouquet_getDigitalBouquetName();
 	if(bouquetName != NULL && bouquet_getFolder(bouquetName)) {
 		char fileName[1024];
-		free_elements(&bouquet_name_tv);
-		free_elements(&bouquet_name_radio);
+		strList_release(&bouquet_name_tv);
+		strList_release(&bouquet_name_radio);
+
 		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, bouquetName, BOUQUET_NAME, "tv");
 		get_bouquets_file_name(&bouquet_name_tv, fileName);
 		snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, bouquetName, BOUQUET_NAME, "radio");
 		get_bouquets_file_name(&bouquet_name_radio, fileName);
-		if(bouquet_name_tv != NULL) {
-			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, (char *)bouquet_name_tv->data);
+
+		if(!list_empty(&bouquet_name_tv)) {
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&bouquet_name_tv, 0));
 			get_bouquets_list(fileName/*tv*/);
 		}
-		if(bouquet_name_radio != NULL) {
-			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, (char *)bouquet_name_radio->data);
+		if(!list_empty(&bouquet_name_radio)) {
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&bouquet_name_radio, 0));
 			get_bouquets_list(fileName/*radio*/);
 		}
 		filter_bouquets_list(bouquetName);
@@ -1028,6 +1019,18 @@ void bouquet_init(void)
 		mkdir(BOUQUET_CONFIG_DIR_ANALOG, 0777);
 	}
 }
+
+void bouquet_terminate(void)
+{
+	free_elements(&head_ts_list);
+	free_elements(&bouquets_list);
+
+	strList_release(&bouquet_name_tv);
+	strList_release(&bouquet_name_radio);
+	strList_release(&bouquetNameDigitalList);
+	strList_release(&bouquetNameAnalogList);
+}
+
 
 static int32_t bouquet_saveBouquetsList(struct list_head *listHead)
 {
@@ -1498,6 +1501,24 @@ int32_t strList_isExist(struct list_head *listHead, const char *str)
 		}
 	}
 
+	return 0;
+}
+
+int32_t strList_release(struct list_head *listHead)
+{
+	struct list_head *pos;
+	struct list_head *n;
+	list_for_each_safe(pos, n, listHead) {
+		strList_t *el = list_entry(pos, strList_t, list);
+
+		list_del(pos);
+		if(el->str) {
+			free(el->str);
+		} else {
+			eprintf("%s(): Something wrong, element has no str!\n", __func__);
+		}
+		free(el);
+	}
 	return 0;
 }
 

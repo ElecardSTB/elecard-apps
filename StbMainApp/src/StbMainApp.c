@@ -2921,6 +2921,7 @@ void cleanup()
 	dprintf("%s: terminate gfx\n", __FUNCTION__);
 
 	gfx_terminate();
+	bouquet_terminate();
 #ifdef STSDK
 	st_terminate();
 #endif

@@ -65,6 +65,7 @@ extern struct list_head bouquetNameAnalogList;
 int32_t strList_add    (struct list_head *listHead, const char *str);
 int32_t strList_remove (struct list_head *listHead, const char *str);
 int32_t strList_isExist(struct list_head *listHead, const char *str);
+int32_t strList_release(struct list_head *listHead);
 const char *strList_get(struct list_head *listHead, uint32_t number);
 
 #ifdef ENABLE_DVB
@@ -96,6 +97,7 @@ int32_t bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_enable(void);
 void bouquet_init(void);
+void bouquet_terminate(void);
 void bouquet_setEnable(int32_t i);
 void bouquet_getDigitalName(char *dir, char *fname, char *name);
 char *bouquet_getDigitalBouquetName(void);
