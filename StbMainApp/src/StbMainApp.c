@@ -1980,7 +1980,7 @@ int fusion_readConfig()
 	FusionObject.checktime = FUSION_DEFAULT_CHECKTIME;
 	sprintf (FusionObject.server, "%s", FUSION_DEFAULT_SERVER_PATH);
 
-	pFusion->demoUrl[0] = '\0'; // test
+	FusionObject.demoUrl[0] = '\0'; // test
 
 	f = fopen(FUSION_HWCONFIG, "rt");
 	if (!f) return -1;
@@ -2104,6 +2104,56 @@ int fusion_refreshViewEvent(void *pArg)
 	return 0;
 }
 
+#define USB_ROOT "/mnt/"
+static char g_usbRoot[PATH_MAX] = {0};
+static char g_efpPath[PATH_MAX] = {0};
+int fusion_getUsbRoot()
+{
+	int hasDrives = 0;
+	DIR *usbDir = opendir(USB_ROOT);
+	if (usbDir != NULL) {
+		struct dirent *first_item = NULL;
+		struct dirent *item = readdir(usbDir);
+		while (item) {
+			if(strncmp(item->d_name, "sd", 2) == 0) {
+				hasDrives++;
+				if(!first_item)
+					first_item = item;
+			}
+			item = readdir(usbDir);
+		}
+		if (hasDrives == 1) {
+			sprintf(g_usbRoot, "%s%s", USB_ROOT, first_item->d_name);
+			eprintf("%s: Found %s\n", __FUNCTION__, g_usbRoot);
+			closedir(usbDir);
+			return 1;  // yes
+		}
+		closedir(usbDir);
+	}
+	else {
+		eprintf("%s: opendir %s failed\n", __FUNCTION__, USB_ROOT);
+	}
+	return 0; // no
+}
+
+
+int fusion_removeFirmwareFormFlash()
+{
+	char command[PATH_MAX];
+	if (strlen(g_usbRoot) == 0){
+		if (fusion_getUsbRoot() == 0) return 0; // no
+	}
+	int result = fusion_checkDirectory(g_usbRoot);
+	if (result == 1) // yes
+	{
+		// remove all *.efp to this folder to prevent firmware update on reboot
+		sprintf (command, "rm %s/*.efp", g_usbRoot);
+		system (command);
+	}
+
+	return result;
+}
+
 void fusion_startup()
 {
 	if (fusion_setMoscowDateTime() != 0){
@@ -2113,6 +2163,7 @@ void fusion_startup()
 	memset(&FusionObject, 0, sizeof(interfaceFusionObject_t));
 
 	fusion_getSecret();
+	fusion_removeFirmwareFormFlash();
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
@@ -2527,7 +2578,8 @@ int fusion_getCreepAndLogo ()
 
 					char cmd [PATH_MAX];
 					system("hwconfigManager s 0 UPFOUND 1");
-					system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
+					//system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
+					system("hwconfigManager f 0 UPNOUSB");	// remove no-checking usb on reboot
 					system("hwconfigManager s 0 UPNET 1");	// test: check remote firmware every reboot
 					sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
 					system (cmd);
