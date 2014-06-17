@@ -1940,6 +1940,7 @@ void * fusion_threadCreepline(void * param)
 	fusion_readConfig();
 
 	while (1){
+		//fusion_readConfig(); // test
 		result = fusion_getCreepAndLogo();
 		if (result == FUSION_FAIL){
 			fusion_wait(FusionObject.checktime * 1000);
@@ -1978,6 +1979,8 @@ int fusion_readConfig()
 
 	FusionObject.checktime = FUSION_DEFAULT_CHECKTIME;
 	sprintf (FusionObject.server, "%s", FUSION_DEFAULT_SERVER_PATH);
+
+	pFusion->demoUrl[0] = '\0'; // test
 
 	f = fopen(FUSION_HWCONFIG, "rt");
 	if (!f) return -1;
@@ -2428,7 +2431,7 @@ int fusion_getCreepAndLogo ()
 	}
 	else {
 		sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", FusionObject.server, FusionObject.secret, 
-		         nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday);
+		         nowDate.tm_year + 1900, nowDate.tm_mon+1, nowDate.tm_mday);
 	}
 
 	// test
@@ -2524,6 +2527,7 @@ int fusion_getCreepAndLogo ()
 
 					char cmd [PATH_MAX];
 					system("hwconfigManager s 0 UPFOUND 1");
+					system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
 					system("hwconfigManager s 0 UPNET 1");	// test: check remote firmware every reboot
 					sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
 					system (cmd);
