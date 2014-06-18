@@ -2484,8 +2484,7 @@ int fusion_getCreepAndLogo ()
 		sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", FusionObject.server, FusionObject.secret, 
 		         nowDate.tm_year + 1900, nowDate.tm_mon+1, nowDate.tm_mday);
 	}
-
-	// test
+/*
 	result = fusion_checkLastModified(request);
 	if (result == FUSION_NOT_MODIFIED){
 		eprintf ("%s(%d): Playlist not modified.\n",   __FILE__, __LINE__);
@@ -2496,7 +2495,7 @@ int fusion_getCreepAndLogo ()
 		//return FUSION_SAME_CREEP;
 	}
 	else eprintf ("%s(%d): Playlist modified.\n",   __FILE__, __LINE__);
-	// end test
+	*/
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! fusion_downloadPlaylist rets error.\n",   __FILE__, __LINE__);
@@ -2569,29 +2568,30 @@ int fusion_getCreepAndLogo ()
 		if (strcmp(FusionObject.reboottime, jsonReboot->valuestring)){
 			eprintf ("%s(%d): New reboottime set %s\n", __FUNCTION__, __LINE__, jsonReboot->valuestring);
 			snprintf (FusionObject.reboottime, PATH_MAX, jsonReboot->valuestring);
-
-			cJSON * jsonFirmware = cJSON_GetObjectItem(root, "firmware");
-			if (jsonFirmware){
-				if (strcmp(FusionObject.firmware, jsonFirmware->valuestring)){
-					eprintf ("%s(%d): New firmware path set %s\n", __FUNCTION__, __LINE__, jsonFirmware->valuestring);
-					snprintf (FusionObject.firmware, PATH_MAX, jsonFirmware->valuestring);
-
-					char cmd [PATH_MAX];
-					system("hwconfigManager s 0 UPFOUND 1");
-					//system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
-					system("hwconfigManager f 0 UPNOUSB");	// remove no-checking usb on reboot
-					system("hwconfigManager s 0 UPNET 1");	// test: check remote firmware every reboot
-					sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
-					system (cmd);
-				}
-			}
-			else {
-				FusionObject.firmware[0] = '\0';
-			}
 		}
 	}
 	else {
 		FusionObject.reboottime[0] = '\0';
+	}
+
+	cJSON * jsonFirmware = cJSON_GetObjectItem(root, "firmware");
+	if (jsonFirmware){
+		if (strcmp(FusionObject.firmware, jsonFirmware->valuestring)){
+			char cmd [PATH_MAX];
+			eprintf ("%s(%d): New firmware path set %s\n", __FUNCTION__, __LINE__, jsonFirmware->valuestring);
+			snprintf (FusionObject.firmware, PATH_MAX, jsonFirmware->valuestring);
+
+			system("hwconfigManager s 0 UPFOUND 1");
+			//system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
+			system("hwconfigManager f 0 UPNOUSB");	// remove no-checking usb on reboot
+			system("hwconfigManager s 0 UPNET 1");	// check remote firmware every reboot
+			sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
+			system (cmd);
+		}
+		else {
+			FusionObject.firmware[0] = '\0';
+			system("hwconfigManager f 0 UPURL 1");	// remove update url
+		}
 	}
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
