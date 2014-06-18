@@ -2588,10 +2588,9 @@ int fusion_getCreepAndLogo ()
 			sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
 			system (cmd);
 		}
-		else {
-			FusionObject.firmware[0] = '\0';
-			system("hwconfigManager f 0 UPURL 1");	// remove update url
-		}
+	}else {
+		FusionObject.firmware[0] = '\0';
+		system("hwconfigManager f 0 UPURL 1");	// remove update url
 	}
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
