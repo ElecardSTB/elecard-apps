@@ -53,6 +53,44 @@ typedef enum {
 	eBouquet_all,
 } typeBouquet_t;
 
+typedef struct _bouquetCommonData_t {
+	uint32_t transport_stream_id;
+	uint32_t network_id;
+	uint32_t name_space;
+} bouquetCommonData_t;
+
+
+typedef struct _transpounder_t {
+	bouquetCommonData_t data;
+	EIT_media_config_t media;
+} transpounder_t;
+
+
+typedef struct _lamedb_data {
+	uint32_t service_id;
+	uint32_t serviceType;
+	uint32_t hmm;
+	bouquetCommonData_t data;
+	char channelsName[64];
+	char transponderName[64];
+} lamedb_data_t;
+
+typedef struct {
+	uint32_t type;
+	uint32_t flags;
+	uint32_t serviceType;
+	uint32_t service_id;
+	uint32_t index_8;
+	uint32_t index_9;
+	uint32_t index_10;
+	bouquetCommonData_t data;
+	transpounder_t transpounder;
+	lamedb_data_t lamedbData;
+
+	struct list_head	channelsList;
+} bouquet_element_list_t;
+
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
@@ -70,7 +108,10 @@ const char *strList_get(struct list_head *listHead, uint32_t number);
 
 #ifdef ENABLE_DVB
 
-//not used anywhere
+void bouquet_LoadingBouquet(typeBouquet_t type);
+void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead);
+bouquet_element_list_t *digitalList_add(struct list_head *listHead);
+
 void bouquet_loadChannelsFile(void);
 int32_t bouquets_getNumberPlaylist(void);
 void bouquets_setNumberPlaylist(int32_t num);
@@ -111,7 +152,7 @@ void bouquet_loadBouquets(list_element_t **services);
 void bouquet_downloadFileWithServices(char *filename);
 void  bouquet_dump(char *filename);
 list_element_t *get_bouquet_list(void);
-void bouquet_loadLamedb(char *bouquet_file, list_element_t **);
+
 int32_t bouquets_compare(list_element_t **);
 EIT_service_t *bouquet_findService(EIT_common_t *header);
 #else // ENABLE_DVB

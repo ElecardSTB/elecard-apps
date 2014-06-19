@@ -109,13 +109,36 @@ typedef struct {
 	struct list_head    list;
 } strList_t;
 
+
+
+typedef struct {
+	uint8_t            *data;
+	struct list_head    list;
+} voidList_t;
+
+typedef struct {
+	char name[64];
+	struct list_head	NameDigitalList;
+	struct list_head	name_tv;
+	struct list_head	name_radio;
+	struct list_head	channelsList;
+} bouquetDigital_t;
+
+
+bouquetDigital_t digitalBouquet = {
+	.name               = "",
+	.NameDigitalList	= LIST_HEAD_INIT(digitalBouquet.NameDigitalList),
+	.name_tv	        = LIST_HEAD_INIT(digitalBouquet.name_tv),
+	.name_radio	        = LIST_HEAD_INIT(digitalBouquet.name_radio),
+	.channelsList	    = LIST_HEAD_INIT(digitalBouquet.channelsList),
+};
+
 #ifdef ENABLE_DVB
 /******************************************************************
 * DATA                                                            *
 *******************************************************************/
 LIST_HEAD(bouquetNameDigitalList);
 LIST_HEAD(bouquetNameAnalogList);
-
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -134,12 +157,21 @@ static char pName[CHANNEL_BUFFER_NAME];
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
+static void bouquets_addTranspounderData(struct list_head *listHead, transpounder_t *tspElement);
+static void bouquets_addlamedbData(struct list_head *listHead, lamedb_data_t *lamedbElement);
+static void bouquet_loadLamedb( const char *bouquet_file, struct list_head *listHead);
+static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element);
+
+
+
+static void get_bouquets_file_name(struct list_head *listHead, char *bouquet_file);
+static void get_bouquets_list(struct list_head *listHead, char *bouquet_file);
 
 static void bouquet_saveBouquets(char *fileName, char *typeName);
 static void bouquet_saveBouquetsConf(char *fileName, char *typeName);
 static void bouquet_saveLamedb(char *fileName);
 static int32_t bouquet_saveBouquetsList(struct list_head *listHead);
-static int32_t bouquet_downloadDigitalConfigList(void);
+static int32_t bouquet_downloadDigitalConfigList(char *path);
 static int32_t bouquet_downloadAnalogConfigList(void);
 static void bouquet_parseBouquetsList(struct list_head *listHead, const char *path);
 
@@ -150,6 +182,188 @@ static int32_t bouquet_isExist(char *bouquetsFile);
 /*******************************************************************
 * FUNCTION IMPLEMENTATION                                          *
 ********************************************************************/
+void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead)
+{
+	switch (type)
+	{
+		case eBouquet_digital:
+		{
+			struct list_head *pos;
+			list_for_each(pos, &digitalBouquet.channelsList) {
+				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
+				bouquet_find_or_AddChannels(element);
+			}
+		}
+			break;
+
+		case eBouquet_analog:
+		{
+			break;
+		}
+		default: ;
+	}
+
+}
+
+static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
+{
+	struct list_head *pos;
+	service_index_t *srvIdx;
+	extern dvb_channels_t g_dvb_channels;
+
+	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+		srvIdx = list_entry(pos, service_index_t, orderNone);
+		if (srvIdx->common.service_id == element->service_id &&
+				srvIdx->common.transport_stream_id == element->data.transport_stream_id &&
+				srvIdx->common.media_id == element->data.network_id) {
+			srvIdx->flag = 1;
+
+			if (srvIdx->service != NULL) {
+				if(srvIdx->service->media.type == serviceMediaDVBC && element->transpounder.media.type == serviceMediaDVBC &&
+						srvIdx->service->media.dvb_c.frequency == element->transpounder.media.dvb_c.frequency &&
+						srvIdx->service->media.dvb_c.symbol_rate == element->transpounder.media.dvb_c.symbol_rate &&
+						srvIdx->service->media.dvb_c.modulation == element->transpounder.media.dvb_c.modulation &&
+						srvIdx->service->media.dvb_c.inversion == element->transpounder.media.dvb_c.inversion) {
+					return 0;
+				}
+				if(srvIdx->service->media.type == serviceMediaDVBS && element->transpounder.media.type == serviceMediaDVBS &&
+						srvIdx->service->media.dvb_s.frequency == element->transpounder.media.dvb_s.frequency &&
+						srvIdx->service->media.dvb_s.symbol_rate == element->transpounder.media.dvb_s.symbol_rate &&
+						srvIdx->service->media.dvb_s.polarization == element->transpounder.media.dvb_s.polarization &&
+						//element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
+						//element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
+						srvIdx->service->media.dvb_s.inversion == element->transpounder.media.dvb_s.inversion) {
+					return 0;
+				}
+				if(srvIdx->service->media.type == serviceMediaDVBT && element->transpounder.media.type == serviceMediaDVBT &&
+						srvIdx->service->media.dvb_t.centre_frequency == element->transpounder.media.dvb_t.centre_frequency &&
+						srvIdx->service->media.dvb_t.bandwidth == element->transpounder.media.dvb_t.bandwidth &&
+						srvIdx->service->media.dvb_t.inversion == element->transpounder.media.dvb_t.inversion) {
+					return 0;
+				}
+				memset(srvIdx->service, 0, sizeof(EIT_service_t));
+			}
+			break;
+		}
+	}
+	EIT_service_t *el;
+	if (pos == &g_dvb_channels.orderNoneHead) {
+		list_element_t *cur_element = NULL;
+		if(dvb_services == NULL) {
+			dvb_services = cur_element = allocate_element(sizeof(EIT_service_t));
+		} else {
+			cur_element = append_new_element(dvb_services, sizeof(EIT_service_t));
+		}
+		if(!cur_element) {
+			return -1;
+		}
+		el = (EIT_service_t *)cur_element->data;
+		el->common.media_id = element->data.network_id;
+		el->common.service_id = element->service_id;
+		el->common.transport_stream_id = element->data.transport_stream_id;
+		el->original_network_id = element->data.network_id;
+		strncpy((char *)el->service_descriptor.service_name, element->lamedbData.channelsName, strlen(element->lamedbData.channelsName));
+		dvbChannel_addService(el, 1, 1);
+	} else {
+		el = srvIdx->service;
+	}
+
+	if(element->transpounder.media.type == serviceMediaDVBC) {
+		el->media.type = element->transpounder.media.type;
+		el->media.dvb_c.frequency = element->transpounder.media.dvb_c.frequency;
+		el->media.dvb_c.symbol_rate = element->transpounder.media.dvb_c.symbol_rate;
+		el->media.dvb_c.modulation = element->transpounder.media.dvb_c.modulation;
+		return 0;
+	}
+	if(element->transpounder.media.type == serviceMediaDVBS) {
+		el->media.type = element->transpounder.media.type;
+		el->media.frequency = element->transpounder.media.frequency;
+		el->media.dvb_s.frequency = element->transpounder.media.dvb_s.frequency;
+		el->media.dvb_s.symbol_rate = element->transpounder.media.dvb_s.symbol_rate;
+		el->media.dvb_s.polarization = element->transpounder.media.dvb_s.polarization;
+		el->media.dvb_s.FEC_inner = element->transpounder.media.dvb_s.FEC_inner;
+		el->media.dvb_s.orbital_position = element->transpounder.media.dvb_s.orbital_position;
+		el->media.dvb_s.inversion = element->transpounder.media.dvb_s.inversion;
+		return 0;
+	}
+	if(element->transpounder.media.type == serviceMediaDVBT) {
+		el->media.type = element->transpounder.media.type;
+		el->media.frequency = element->transpounder.media.frequency;
+		el->media.dvb_t.centre_frequency = element->transpounder.media.dvb_t.centre_frequency;
+		el->media.dvb_t.bandwidth = element->transpounder.media.dvb_t.bandwidth;
+		el->media.dvb_t.code_rate_HP_stream = element->transpounder.media.dvb_t.code_rate_HP_stream;
+		el->media.dvb_t.code_rate_LP_stream = element->transpounder.media.dvb_t.code_rate_LP_stream;
+		el->media.dvb_t.constellation = element->transpounder.media.dvb_t.constellation;
+		el->media.dvb_t.generation = element->transpounder.media.dvb_t.generation;
+		el->media.dvb_t.guard_interval = element->transpounder.media.dvb_t.guard_interval;
+		el->media.dvb_t.hierarchy_information = element->transpounder.media.dvb_t.hierarchy_information;
+		el->media.dvb_t.inversion = element->transpounder.media.dvb_t.inversion;
+		el->media.dvb_t.plp_id = element->transpounder.media.dvb_t.plp_id;
+		el->media.dvb_t.transmission_mode = element->transpounder.media.dvb_t.transmission_mode;
+		el->media.dvb_t.other_frequency_flag = element->transpounder.media.dvb_t.other_frequency_flag;
+		return 0;
+	}
+	return 0;
+}
+
+void bouquet_LoadingBouquet(typeBouquet_t type)
+{
+	char fileName[1024];
+	struct list_head *pos;
+
+	switch (type)
+	{
+		case eBouquet_digital:
+		{
+			if (digitalBouquet.name == NULL)
+				break;
+			dprintf("loading bouquet name: %s\n",digitalBouquet.name);
+
+			bouquet_loadDigitalBouquetsList(1/*download list with server and parser*/);
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, BOUQUET_NAME, "tv");
+			get_bouquets_file_name(&digitalBouquet.name_tv, fileName);
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, BOUQUET_NAME, "radio");
+			get_bouquets_file_name(&digitalBouquet.name_radio, fileName);
+			if(!list_empty(&digitalBouquet.name_tv)) {
+				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, strList_get(&digitalBouquet.name_tv, 0));
+				get_bouquets_list(&digitalBouquet.channelsList, fileName/*tv*/);
+			}
+			if(!list_empty(&digitalBouquet.name_radio)) {
+				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, strList_get(&digitalBouquet.name_radio, 0));
+				get_bouquets_list(&digitalBouquet.channelsList, fileName/*radio*/);
+			}
+
+			list_for_each(pos, &digitalBouquet.channelsList) {
+				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
+				printf("%s: %d %d\n",__func__, element->service_id, element->data.name_space);
+
+			}
+
+			bouquet_loadLamedb(digitalBouquet.name, &digitalBouquet.channelsList);
+
+
+			list_for_each(pos, &digitalBouquet.channelsList) {
+				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
+				printf("%s: %s %d\n",__func__, element->lamedbData.channelsName, element->data.name_space);
+
+			}
+
+			break;
+		}
+		case eBouquet_analog:
+		{
+
+			break;
+		}
+		default: ;
+	}
+
+}
+
+
+
+
+
 
 void bouquets_setNumberPlaylist(int num)
 {
@@ -236,7 +450,7 @@ void bouquet_addScanChannels(void)
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 		if(!(dvbChannel_findServiceCommon(&curService->common))) {
 			curService->common.media_id = curService->original_network_id;
-			dvbChannel_addService(curService, 1);
+			dvbChannel_addService(curService, 1, 0);
 		}
 	}
 	dvbChannel_writeOrderConfig();
@@ -286,6 +500,7 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 void bouquet_setDigitalBouquetName(const char *name)
 {
 	sprintf(bouquetDigitalName, "%s", name);
+	sprintf(digitalBouquet.name, "%s", name);
 }
 
 void bouquet_setAnalogBouquetName(const char *name)
@@ -421,9 +636,11 @@ void filter_bouquets_list(char *bouquet_file)
 	free_elements(&bouquets_list);
 }
 
-void get_bouquets_list(char *bouquet_file)
+static void get_bouquets_list(struct list_head *listHead, char *bouquet_file)
 {
-	list_element_t *cur_element;
+	dprintf("%s loading: %s\n",__func__, bouquet_file );
+
+
 	char buf[BUFFER_SIZE];
 	FILE *fd;
 	uint32_t type;
@@ -445,6 +662,7 @@ void get_bouquets_list(char *bouquet_file)
 	if(fgets(buf, BUFFER_SIZE, fd) != NULL) {
 		sscanf(buf, "#NAME  %s\n", pName);
 	}
+
 	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
 		if(sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
 				  &flags,
@@ -458,31 +676,18 @@ void get_bouquets_list(char *bouquet_file)
 				  &index_10) != 10) {
 			continue;
 		}
-		if(service_id == 0 && transport_stream_id == 0 && network_id == 0) {
-			continue;
-		}
-
-		bouquet_t *element;
-
-		if(bouquets_list == NULL) {
-			cur_element  = bouquets_list = allocate_element(sizeof(bouquet_t));
-		} else {
-			cur_element = append_new_element(bouquets_list, sizeof(bouquet_t));
-		}
-		if(cur_element == NULL) {
-			break;
-		}
-		element = (bouquet_t *)cur_element->data;
-		element->bouquet_data.serviceType = serviceType;
-		element->bouquet_data.network_id = network_id;
-		element->common.service_id = service_id;
-		element->common.transport_stream_id = transport_stream_id;
-		element->common.media_id = network_id;
-
-		service_index_t *p_srvIdx;
-		p_srvIdx = dvbChannel_findServiceCommon(&element->common);
-		if(p_srvIdx == NULL) {
-			dvbChannel_addBouquetData(&element->common, &element->bouquet_data, /*visible*/ true);
+		bouquet_element_list_t *element = digitalList_add(listHead);
+		if (element) {
+			element->type = type;
+			element->flags = flags;
+			element->serviceType = serviceType;
+			element->service_id = service_id;
+			element->data.transport_stream_id = transport_stream_id;
+			element->data.network_id = network_id;
+			element->data.name_space = name_space;
+			element->index_8 = index_8;
+			element->index_9 = index_9;
+			element->index_10 = index_10;
 		}
 	}
 	fclose(fd);
@@ -922,6 +1127,7 @@ int bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 
 void bouquet_loadBouquets(list_element_t **services)
 {
+	/*
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
 	if(bouquet_isExist(bouquetName)) {
@@ -936,16 +1142,16 @@ void bouquet_loadBouquets(list_element_t **services)
 
 		if(!list_empty(&bouquet_name_tv)) {
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&bouquet_name_tv, 0));
-			get_bouquets_list(fileName/*tv*/);
-		}
+			get_bouquets_list(fileName/*tv*///);
+/*		}
 		if(!list_empty(&bouquet_name_radio)) {
 			snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&bouquet_name_radio, 0));
-			get_bouquets_list(fileName/*radio*/);
-		}
+			get_bouquets_list(fileName/*radio*///);
+/*		}
 		filter_bouquets_list(bouquetName);
 		bouquet_loadLamedb(bouquetName, services);
 
-	}
+	}*/
 }
 
 int32_t bouquet_downloadAnalogConfigList(void)
@@ -967,40 +1173,22 @@ int32_t bouquet_downloadAnalogConfigList(void)
 	return 0;
 }
 
-int32_t bouquet_downloadDigitalConfigList(void)
+
+static int32_t bouquet_downloadDigitalConfigList(char *path)
 {
 	char serverName[16];
 	char serverDir[256];
-	char filename[256];
-	char filename_tmp[256];
 	char loginName[32];
 	char cmd[1024];
-
-	snprintf(filename, sizeof(filename), "%s/%s", BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE);
-	snprintf(filename_tmp, sizeof(filename_tmp), "%s_temp", filename);
-
-	if(rename(filename, filename_tmp) != 0) {
-		eprintf("%s(): Cant rename file %s into %s: %m\n", __func__, filename, filename_tmp);
-		return -1;
-	}
 
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", serverDir);
 	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
 	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
 
-	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../bouquet/%s %s", loginName, serverName, serverDir, BOUQUET_CONFIG_FILE, BOUQUET_CONFIG_DIR);
+	snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa %s@%s:%s/../bouquet/%s %s", loginName, serverName, serverDir, BOUQUET_CONFIG_FILE, path);
 	dbg_cmdSystem(cmd);
 
-	if(!helperFileExists(filename)) {
-		snprintf(cmd, sizeof(cmd), "mv %s_temp %s", filename, filename);
-		dbg_cmdSystem(cmd);
-		if(rename(filename_tmp, filename) != 0) {
-			eprintf("%s(): Cant rename file %s into %s: %m\n", __func__, filename_tmp, filename);
-			interface_hideMessageBox();
-			return -2;
-		}
-	}
 	interface_hideMessageBox();
 	return 0;
 }
@@ -1079,17 +1267,19 @@ void bouquet_parseBouquetsList(struct list_head *listHead, const char *path)
 	fclose(fd);
 }
 
-void bouquet_loadDigitalBouquetsList(int force)
-{
-	if(force == 1) {
-		bouquet_downloadDigitalConfigList();
-	}
 
-	char buffName[256];
-	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE);
-	bouquet_parseBouquetsList(&bouquetNameDigitalList, buffName);
-	sprintf(buffName, "%s/%s_temp", BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE);
-	bouquet_parseBouquetsList(&bouquetNameDigitalList, buffName);
+void bouquet_loadDigitalBouquetsList(int download)
+{
+	char path[128];
+	strList_release(&digitalBouquet.NameDigitalList);
+	if (download == 1) {
+		sprintf(path, "/tmp/bouquet.list");
+		remove(path);
+		bouquet_downloadDigitalConfigList(path);
+		bouquet_parseBouquetsList(&digitalBouquet.NameDigitalList, path);
+	}
+	sprintf(path, "%s/%s", BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE);
+	bouquet_parseBouquetsList(&digitalBouquet.NameDigitalList, path);
 }
 
 void bouquet_loadAnalogBouquetsList(int force)
@@ -1123,7 +1313,7 @@ list_element_t *found_list(EIT_common_t *common, list_element_t **services)
 	return NULL;
 }
 
-void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
+void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 {
 	dprintf("Load services list from lamedb\n");
 	char path[BOUQUET_NAME_SIZE * 2];
@@ -1135,6 +1325,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, BOUQUET_LAMEDB_FILENAME);
 		return;
 	}
+
 	do {
 		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
@@ -1154,49 +1345,28 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 			break;
 		}
 		do {
-			uint32_t name_space;
-			uint32_t ts_id;
-			uint32_t n_id;
-			if(sscanf(buf, "%x:%x:%x\n", &name_space, &ts_id, &n_id) != 3) {
+			transpounder_t tspElement;
+			if (sscanf(buf, "%x:%x:%x\n",&tspElement.data.name_space, &tspElement.data.transport_stream_id, &tspElement.data.network_id) != 3){
 				break;
 			}
-
-			list_element_t *cur_element;
-			transponder_t *element;
-
-			if(head_ts_list == NULL) {
-				cur_element = head_ts_list = allocate_element(sizeof(transponder_t));
-			} else {
-				cur_element = append_new_element(head_ts_list, sizeof(transponder_t));
-			}
-			if(cur_element == NULL) {
+			if (fgets(buf, BUFFER_SIZE, fd) == NULL){
 				break;
 			}
-
-			element = (transponder_t *)cur_element->data;
-			element->transpounder_id.name_space = name_space;
-			element->transpounder_id.ts_id = ts_id;
-			element->transpounder_id.n_id = n_id;
-
-			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
-				break;
-			}
-
 			switch(buf[1]) {
 				case 's': {
 					uint32_t freq, sym_rate, polarization, FEC_inner, orbital_position, inversion/*0 - auto, 1 - on, 2 - off*/, system/*0 - DVB-C, 1 DVB-C ANNEX C*/, modulation, rolloff, pilot;
 
-					element->media.type = serviceMediaDVBS;
+					tspElement.media.type = serviceMediaDVBS;
 					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d\n",
 						   &freq, &sym_rate, &polarization, &FEC_inner, &orbital_position, &inversion, &system, &modulation, &rolloff, &pilot);
 
-					element->media.frequency = freq;
-					element->media.dvb_s.frequency = freq;
-					element->media.dvb_s.symbol_rate = sym_rate;
-					element->media.dvb_s.polarization = polarization;
-					element->media.dvb_s.FEC_inner = FEC_inner;
-					element->media.dvb_s.orbital_position = orbital_position;
-					element->media.dvb_s.inversion = (inversion == 2 ? 0 : 1);
+					tspElement.media.frequency = freq;
+					tspElement.media.dvb_s.frequency = freq;
+					tspElement.media.dvb_s.symbol_rate = sym_rate;
+					tspElement.media.dvb_s.polarization = polarization;
+					tspElement.media.dvb_s.FEC_inner = FEC_inner;
+					tspElement.media.dvb_s.orbital_position = orbital_position;
+					tspElement.media.dvb_s.inversion = (inversion == 2 ? 0 : 1);
 					//system
 					//modulation
 					//rolloff
@@ -1206,42 +1376,43 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 				case 'c': {
 					uint32_t freq, sym_rate, inversion, mod, fec_inner, flag, system;
 
-					element->media.type = serviceMediaDVBC;
+					tspElement.media.type = serviceMediaDVBC;
 					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d\n",
 						   &freq, &sym_rate, &inversion, &mod, &fec_inner, &flag, &system);
 
-					element->media.type = serviceMediaDVBC;
-					element->media.frequency = freq * 1000;
-					element->media.dvb_c.frequency = freq * 1000;
-					element->media.dvb_c.symbol_rate = sym_rate;
-					element->media.dvb_c.modulation = mod;
-					element->media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
+					tspElement.media.type = serviceMediaDVBC;
+					tspElement.media.frequency = freq * 1000;
+					tspElement.media.dvb_c.frequency = freq * 1000;
+					tspElement.media.dvb_c.symbol_rate = sym_rate;
+					tspElement.media.dvb_c.modulation = mod;
+					tspElement.media.dvb_c.inversion = (inversion == 2 ? 0 : 1);
 					break;
 				}
 				case 't': {
 					uint32_t freq, bandwidth, code_rate_HP, code_rate_LP, modulation, transmission_mode, guard_interval, hierarchy, inversion, flags, system, plpid;
 
-					element->media.type = serviceMediaDVBT;
+					tspElement.media.type = serviceMediaDVBT;
 					sscanf(buf + 3, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
 						   &freq, &bandwidth, &code_rate_HP, &code_rate_LP, &modulation, &transmission_mode, &guard_interval, &hierarchy, &inversion, &flags, &system, &plpid);
 
-					element->media.frequency = freq;
-					element->media.dvb_t.centre_frequency = freq;
-					element->media.dvb_t.bandwidth = bandwidth;
-					element->media.dvb_t.code_rate_HP_stream = code_rate_HP;
-					element->media.dvb_t.code_rate_LP_stream = code_rate_LP;
+					tspElement.media.frequency = freq;
+					tspElement.media.dvb_t.centre_frequency = freq;
+					tspElement.media.dvb_t.bandwidth = bandwidth;
+					tspElement.media.dvb_t.code_rate_HP_stream = code_rate_HP;
+					tspElement.media.dvb_t.code_rate_LP_stream = code_rate_LP;
 					//modulation
-					element->media.dvb_t.transmission_mode = transmission_mode;
-					element->media.dvb_t.guard_interval = guard_interval;
-					element->media.dvb_t.hierarchy_information = hierarchy;
-					element->media.dvb_t.inversion = (inversion == 2 ? 0 : 1);
+					tspElement.media.dvb_t.transmission_mode = transmission_mode;
+					tspElement.media.dvb_t.guard_interval = guard_interval;
+					tspElement.media.dvb_t.hierarchy_information = hierarchy;
+					tspElement.media.dvb_t.inversion = (inversion == 2 ? 0 : 1);
 					//flags
 					//system
-					element->media.dvb_t.plp_id = plpid;
+					tspElement.media.dvb_t.plp_id = plpid;
 					break;
 				}
 
 			}
+			bouquets_addTranspounderData(listHead, &tspElement);
 
 			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
@@ -1253,6 +1424,7 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 				break;
 			}
 		} while(strncasecmp(buf, "end", 3) != 0);
+
 		//------ start parse services list -----//
 		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
@@ -1263,24 +1435,28 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 		if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 			break;
 		}
-		do {
-			uint32_t service_id;
-			uint32_t name_space;
-			uint32_t transport_stream_id;
-			uint32_t original_network_id;
-			uint32_t serviceType;
-			uint32_t hmm;
 
-			if(sscanf(buf, "%x:%x:%x:%x:%x:%x\n", &service_id, &name_space, &transport_stream_id, &original_network_id, &serviceType, &hmm) != 6) {
+		do {
+			lamedb_data_t lamedb_data;
+
+			if (sscanf(buf, "%x:%x:%x:%x:%x:%x\n",
+					   &lamedb_data.service_id,
+					   &lamedb_data.data.name_space,
+					   &lamedb_data.data.transport_stream_id,
+					   &lamedb_data.data.network_id,
+					   &lamedb_data.serviceType,
+					   &lamedb_data.hmm) != 6){
 				break;
 			}
 			//parse channels name
+
 			char service_name[MAX_TEXT];
 			if(fgets(service_name, BUFFER_SIZE, fd) == NULL) {
 				break;
 			}
-
 			service_name[strlen(service_name) - 1] = '\0';
+			sprintf(lamedb_data.channelsName, "%s", service_name);
+
 			//parese bouquet pName
 			char bouqName[CHANNEL_BUFFER_NAME];
 			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
@@ -1296,105 +1472,40 @@ void bouquet_loadLamedb(char *bouquet_file, list_element_t **services)
 			if((strlen(bouqName) < 1) && (strncasecmp(pName, bouqName, strlen((pName))) != 0)) {
 				continue;
 			}
-
-			EIT_common_t	common;
-			common.service_id = service_id;
-			common.transport_stream_id = transport_stream_id;
-			common.media_id  = original_network_id;
-
-			transponder_t *element_tr;
-			element_tr = found_transpounder(&common, name_space);
-			if(element_tr == NULL) {
-				continue;
-			}
-
-			EIT_service_t *element;
-			list_element_t *service_element;
-			service_element = found_list(&common, &*services);
-
-			if(service_element != NULL) {
-				element = (EIT_service_t *)service_element->data;
-				if(element->media.type == serviceMediaDVBC && element_tr->media.type == serviceMediaDVBC &&
-						element->media.dvb_c.frequency == element_tr->media.dvb_c.frequency &&
-						element->media.dvb_c.symbol_rate == element_tr->media.dvb_c.symbol_rate &&
-						element->media.dvb_c.modulation == element_tr->media.dvb_c.modulation &&
-						element->media.dvb_c.inversion == element_tr->media.dvb_c.inversion) {
-					continue;
-				}
-				if(element->media.type == serviceMediaDVBS && element_tr->media.type == serviceMediaDVBS &&
-						element->media.dvb_s.frequency == element_tr->media.dvb_s.frequency &&
-						element->media.dvb_s.symbol_rate == element_tr->media.dvb_s.symbol_rate &&
-						element->media.dvb_s.polarization == element_tr->media.dvb_s.polarization &&
-						//element->media.dvb_s.FEC_inner == element_tr->media.dvb_s.FEC_inner &&
-						//element->media.dvb_s.orbital_position == element_tr->media.dvb_s.orbital_position &&
-						element->media.dvb_s.inversion == element_tr->media.dvb_s.inversion) {
-					continue;
-				}
-				if(element->media.type == serviceMediaDVBT && element_tr->media.type == serviceMediaDVBT &&
-						element->media.dvb_t.centre_frequency == element_tr->media.dvb_t.centre_frequency &&
-						element->media.dvb_t.bandwidth == element_tr->media.dvb_t.bandwidth &&
-						element->media.dvb_t.inversion == element_tr->media.dvb_t.inversion) {
-					continue;
-				}
-				remove_element(&*services, service_element);
-			}
-			list_element_t *cur_element = NULL;
-			if(*services == NULL) {
-				*services = cur_element = allocate_element(sizeof(EIT_service_t));
-			} else {
-				cur_element = append_new_element(*services, sizeof(EIT_service_t));
-			}
-
-			if(!cur_element) {
-				break;
-			}
-			element = (EIT_service_t *)cur_element->data;
-
-			element->common.service_id = common.service_id;
-			element->common.transport_stream_id = common.transport_stream_id;
-			element->common.media_id  = common.media_id;
-			element->original_network_id = common.media_id;
-			element->service_descriptor.service_type = serviceType;
-
-			memcpy(&element->service_descriptor.service_name, &service_name, strlen(service_name));
-
-			if(element_tr->media.type == serviceMediaDVBC) {
-				element->media.type = element_tr->media.type;
-				element->media.dvb_c.frequency = element_tr->media.dvb_c.frequency;
-				element->media.dvb_c.symbol_rate = element_tr->media.dvb_c.symbol_rate;
-				element->media.dvb_c.modulation = element_tr->media.dvb_c.modulation;
-			}
-			if(element_tr->media.type == serviceMediaDVBS) {
-				element->media.type = element_tr->media.type;
-				element->media.frequency = element_tr->media.frequency;
-				element->media.dvb_s.frequency = element_tr->media.dvb_s.frequency;
-				element->media.dvb_s.symbol_rate = element_tr->media.dvb_s.symbol_rate;
-				element->media.dvb_s.polarization = element_tr->media.dvb_s.polarization;
-				element->media.dvb_s.FEC_inner = element_tr->media.dvb_s.FEC_inner;
-				element->media.dvb_s.orbital_position = element_tr->media.dvb_s.orbital_position;
-				element->media.dvb_s.inversion = element_tr->media.dvb_s.inversion;
-			}
-			if(element_tr->media.type == serviceMediaDVBT) {
-				element->media.type = element_tr->media.type;
-				element->media.frequency = element_tr->media.frequency;
-				element->media.dvb_t.centre_frequency = element_tr->media.dvb_t.centre_frequency;
-				element->media.dvb_t.bandwidth = element_tr->media.dvb_t.bandwidth;
-				element->media.dvb_t.code_rate_HP_stream = element_tr->media.dvb_t.code_rate_HP_stream;
-				element->media.dvb_t.code_rate_LP_stream = element_tr->media.dvb_t.code_rate_LP_stream;
-				element->media.dvb_t.constellation = element_tr->media.dvb_t.constellation;
-				element->media.dvb_t.generation = element_tr->media.dvb_t.generation;
-				element->media.dvb_t.guard_interval = element_tr->media.dvb_t.guard_interval;
-				element->media.dvb_t.hierarchy_information = element_tr->media.dvb_t.hierarchy_information;
-				element->media.dvb_t.inversion = element_tr->media.dvb_t.inversion;
-				element->media.dvb_t.plp_id = element_tr->media.dvb_t.plp_id;
-				element->media.dvb_t.transmission_mode = element_tr->media.dvb_t.transmission_mode;
-				element->media.dvb_t.other_frequency_flag = element_tr->media.dvb_t.other_frequency_flag;
-			}
+			bouquets_addlamedbData(listHead, &lamedb_data);
 		} while(strncasecmp(buf, "end", 3) != 0);
 	} while(0);
 
 	free_elements(&head_ts_list);
 	fclose(fd);
+}
+
+static void bouquets_addlamedbData(struct list_head *listHead, lamedb_data_t *lamedbElement)
+{
+	struct list_head *pos;
+	list_for_each(pos, &digitalBouquet.channelsList) {
+		bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
+
+		if((memcmp(&(element->data), &lamedbElement->data, sizeof(bouquetCommonData_t)) == 0) &&
+				(element->service_id == lamedbElement->service_id)) {
+			memcpy(&element->lamedbData, lamedbElement, sizeof(lamedb_data_t));
+			return ;
+		}
+	}
+}
+
+
+static void bouquets_addTranspounderData(struct list_head *listHead, transpounder_t *tspElement)
+{
+	struct list_head *pos;
+	list_for_each(pos, &digitalBouquet.channelsList) {
+		bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
+
+		if(memcmp(&(element->data), &tspElement->data, sizeof(bouquetCommonData_t)) == 0) {
+			memcpy(&element->transpounder, tspElement, sizeof(transpounder_t));
+		}
+	}
+
 }
 
 int bouquet_file()
@@ -1432,6 +1543,19 @@ void bouquet_downloadFileWithServices(char *filename)
 }
 
 #endif // ENABLE_DVB
+
+bouquet_element_list_t *digitalList_add(struct list_head *listHead)
+{
+	bouquet_element_list_t *new = malloc(sizeof(bouquet_element_list_t));
+	if(new == NULL) {
+		eprintf("%s()[%d]: Error allocating memory!\n", __func__, __LINE__);
+		return NULL;
+	}
+	memset(new, 0, sizeof(bouquet_element_list_t));
+	list_add_tail(&(new->channelsList), listHead);
+
+	return new;
+}
 
 int32_t strList_add(struct list_head *listHead, const char *str)
 {

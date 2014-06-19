@@ -68,29 +68,29 @@ typedef struct {
 } service_index_data_t;
 
 typedef struct {
-	EIT_common_t	common;
-    bouquet_data_t  bouquet_data;
+	EIT_common_t	     common;
+	bouquet_data_t       bouquet_data;
+	uint8_t              flag;
 	service_index_data_t data;
-	EIT_service_t	*service;
+	EIT_service_t	    *service;
 
 	/* First EPG event which fit to current timeline.
 	Updated on each call to offair_initEPGRecordMenu. */
-	list_element_t	*first_event;
+	list_element_t	    *first_event;
 
 	//lists
-	struct list_head	orderNone;
+	struct list_head	 orderNone;
 } service_index_t;
 
 #ifdef ENABLE_DVB
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
-int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible);
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag);
 int32_t dvbChannel_remove(service_index_t *srvIdx);
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
-int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data);
-int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible);
+int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data, uint8_t flag);
 service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header);
 int dvbChannel_findNumberService(service_index_t *srv_id);
 

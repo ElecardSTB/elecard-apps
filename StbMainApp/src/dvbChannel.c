@@ -263,12 +263,13 @@ service_index_t *dvbChannel_add(void)
 	return new;
 }
 
-int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data)
+int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data, uint8_t flag)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
-		new->common = *common;
-		new->data = *data;
+		memcpy(&new->common, &common ,sizeof(EIT_common_t));
+		memcpy(&new->data, &data ,sizeof(service_index_data_t));
+		new->flag = flag;
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -277,33 +278,19 @@ int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_
 	return 0;
 }
 
-int32_t dvbChannel_addBouquetData(EIT_common_t *common, bouquet_data_t *bouquet_data, uint16_t visible)
-{
-	service_index_t *new = dvbChannel_add();
-	if(new) {
-		new->common = *common;
-		new->bouquet_data = *bouquet_data;
-		new->data.visible = visible;
-	} else {
-		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
-		return -1;
-	}
-	return 0;
-}
-
-int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible)
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->service = service;
-		new->common = service->common;
+		memcpy(&new->common, &service->common ,sizeof(EIT_common_t));
 		new->data.visible = visible;
+		new->flag = flag;
 		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen((char *)service->service_descriptor.service_name));
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -370,7 +357,7 @@ static int32_t dvbChannel_readOrderConfig()
 				data.audio_track = objGetInt(subitem, "audio_track", 0);
 				data.visible = objGetInt(subitem, "visible", 1);
 				data.parent_control = objGetInt(subitem, "parent_control", 0);
-				dvbChannel_addServiceIndexDate(&common, &data);
+				dvbChannel_addServiceIndexDate(&common, &data, 0);
 			}
 		}
 	}
@@ -505,10 +492,8 @@ static int32_t dvbChannel_update(void)
 	if (check_playlist()) {
 		return 0;
 	}
+
 	playlist_editor_cleanup(eBouquet_digital);
-	if (bouquet_enable()) {
-		bouquet_loadDigitalBouquetsList(0);
-	}
 
 	list_element_t		*service_element;
     struct list_head    *pos;
@@ -520,9 +505,6 @@ static int32_t dvbChannel_update(void)
 		dvbChannel_invalidateServices();
 	}
 
-	if (bouquet_enable()) {
-		bouquet_loadBouquets(&dvb_services);
-	}
 	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
@@ -532,15 +514,23 @@ static int32_t dvbChannel_update(void)
 			if (strlen(p_srvIdx->data.channelsName) == 0) {
 				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen((char *)p_srvIdx->service->service_descriptor.service_name));
 			}
+		} else {
+			curService->common.media_id = curService->original_network_id;
+			dvbChannel_addService(curService, 1, 0);
 		}
+	}
+	if (bouquet_enable()) {
+		bouquet_LoadingBouquet(eBouquet_digital);
+		bouquet_GetBouquetData(eBouquet_digital, &g_dvb_channels.orderNoneHead);
 	}
 	//remove elements without service pointer
 	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		if(srvIdx->service == NULL) {
+		if(srvIdx->flag == 0) {
 			dvbChannel_remove(srvIdx);
 		}
 	}
+
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 #if (defined STSDK)
 		elcdRpcType_t type;
