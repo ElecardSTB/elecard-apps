@@ -54,7 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define BOUQUET_CONFIG_DIR               CONFIG_DIR "/bouquet"
 #define BOUQUET_CONFIG_DIR_ANALOG        CONFIG_DIR "/analog"
 #define BOUQUET_ANALOG_MAIN_FILE         "analog.json"
-#define BOUQUET_CONFIG_FILE              "bouquet.conf"
+#define BOUQUET_CONFIG_FILE              "bouquet.list"
 #define BOUQUET_CONFIG_FILE_ANALOG       "analog.list"
 #define BOUQUET_NAME                     "bouquets"
 //#define BOUQUET_STANDARD_NAME            "" //"Elecard playlist"
@@ -153,8 +153,7 @@ static void bouquets_addTranspounderData(struct list_head *listHead, transpounde
 static void bouquets_addlamedbData(struct list_head *listHead, lamedb_data_t *lamedbElement);
 static void bouquet_loadLamedb( const char *bouquet_file, struct list_head *listHead);
 static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element);
-
-
+static void bouquet_revomeFile(char *bouquetName);
 
 static void get_bouquets_file_name(struct list_head *listHead, char *bouquet_file);
 static void get_bouquets_list(struct list_head *listHead, char *bouquet_file);
@@ -162,7 +161,7 @@ static void get_bouquets_list(struct list_head *listHead, char *bouquet_file);
 static void bouquet_saveBouquets(char *fileName, char *typeName);
 static void bouquet_saveBouquetsConf(char *fileName, char *typeName);
 static void bouquet_saveLamedb(char *fileName);
-static int32_t bouquet_saveBouquetsList(struct list_head *listHead);
+static int32_t bouquet_saveBouquetsList(void);
 static int32_t bouquet_downloadDigitalConfigList(char *path);
 static int32_t bouquet_downloadAnalogConfigList(void);
 static void bouquet_parseBouquetsList(struct list_head *listHead, const char *path);
@@ -174,6 +173,17 @@ static int32_t bouquet_isExist(char *bouquetsFile);
 /*******************************************************************
 * FUNCTION IMPLEMENTATION                                          *
 ********************************************************************/
+void bouquet_revomeFile(char *bouquetName)
+{
+	char buffName[64];
+	//remove dir
+	sprintf(buffName, "rm -r %s/%s/", BOUQUET_CONFIG_DIR, bouquetName);
+	dbg_cmdSystem(buffName);
+	//remove offair
+	bouquet_getDigitalName(CONFIG_DIR, buffName, bouquetName);
+	remove(buffName);
+}
+
 void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead)
 {
 	switch (type)
@@ -301,28 +311,35 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 void bouquet_LoadingBouquet(typeBouquet_t type)
 {
 	char fileName[1024];
+
 	switch (type)
 	{
 		case eBouquet_digital:
 		{
-			if (digitalBouquet.name == NULL)
+			char *bouquetName;
+			bouquetName = bouquet_getDigitalBouquetName();
+			if (bouquetName == NULL)
 				break;
-			dprintf("loading bouquet name: %s\n",digitalBouquet.name);
+
+			strList_release(&digitalBouquet.name_tv);
+			strList_release(&digitalBouquet.name_radio);
+			digitalList_release(&digitalBouquet.channelsList);
+			dprintf("loading bouquet name: %s\n",bouquetName);
 
 			bouquet_loadDigitalBouquetsList(1/*download list with server and parser*/);
-			snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, BOUQUET_NAME, "tv");
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, bouquetName, BOUQUET_NAME, "tv");
 			get_bouquets_file_name(&digitalBouquet.name_tv, fileName);
-			snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, BOUQUET_NAME, "radio");
+			snprintf(fileName, sizeof(fileName), "%s/%s/%s.%s", BOUQUET_CONFIG_DIR, bouquetName, BOUQUET_NAME, "radio");
 			get_bouquets_file_name(&digitalBouquet.name_radio, fileName);
 			if(!list_empty(&digitalBouquet.name_tv)) {
-				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, strList_get(&digitalBouquet.name_tv, 0));
+				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&digitalBouquet.name_tv, 0));
 				get_bouquets_list(&digitalBouquet.channelsList, fileName/*tv*/);
 			}
 			if(!list_empty(&digitalBouquet.name_radio)) {
-				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, strList_get(&digitalBouquet.name_radio, 0));
+				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&digitalBouquet.name_radio, 0));
 				get_bouquets_list(&digitalBouquet.channelsList, fileName/*radio*/);
 			}
-			bouquet_loadLamedb(digitalBouquet.name, &digitalBouquet.channelsList);
+			bouquet_loadLamedb(bouquetName, &digitalBouquet.channelsList);
 			break;
 		}
 		case eBouquet_analog:
@@ -455,7 +472,6 @@ int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg)
 int bouquet_updateDigitalBouquetList(interfaceMenu_t *pMenu, void *pArg)
 {
 	bouquet_loadDigitalBouquetsList(1);
-	bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
 	return 0;
 }
 
@@ -481,7 +497,10 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 
 void bouquet_setDigitalBouquetName(const char *name)
 {
-	sprintf(digitalBouquet.name, "%s", name);
+	if (name != NULL)
+		sprintf(digitalBouquet.name, "%s", name);
+	else
+		memset(digitalBouquet.name, '\0', strlen(digitalBouquet.name));
 }
 
 void bouquet_setAnalogBouquetName(const char *name)
@@ -502,14 +521,14 @@ void bouquet_setNewBouquetName(char *name)
 	if (status == 0) {
 		sprintf(digitalBouquet.name, "%s", name);
 		strList_add(&digitalBouquet.NameDigitalList, name);
-		bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
+		bouquet_saveBouquetsList();
 	}
 	interface_hideMessageBox();
 }
 
 char *bouquet_getDigitalBouquetName(void)
 {
-	if(bouquet_enable()) {
+	if(bouquet_enable() && (strlen(digitalBouquet.name) > 0)) {
 		return digitalBouquet.name;
 	}
 	return NULL;
@@ -944,17 +963,17 @@ int bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-	dprintf("%s\n", bouquetName);
 
 	if(bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-		char cmd[1024];
-		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUQUET_CONFIG_DIR, bouquetName);
-		dbg_cmdSystem(cmd);
+		bouquet_revomeFile(bouquetName);
 		interface_hideMessageBox();
 		strList_remove(&digitalBouquet.NameDigitalList, bouquetName);
+		bouquet_saveBouquetsList();
 		bouquet_loadDigitalBouquetsList(1);
+		bouquet_setDigitalBouquetName(NULL);
 	}
+	dvbChannel_terminate();
 	free_services(&dvb_services);
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 #if (defined STSDK)
@@ -964,7 +983,6 @@ int bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 	cJSON_Delete(result);
 #endif //#if (defined STSDK)
 
-	dvbChannel_terminate();
 	dvbChannel_writeOrderConfig();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
@@ -1103,7 +1121,6 @@ void bouquet_saveAnalogBouquet(void)
 int bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	bouquet_loadDigitalBouquetsList(1);
-	bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
 	bouquet_saveAllBouquet();
 	bouquet_sendBouquet();
 	offair_fillDVBTMenu();
@@ -1209,7 +1226,7 @@ void bouquet_terminate(void)
 }
 
 
-static int32_t bouquet_saveBouquetsList(struct list_head *listHead)
+static int32_t bouquet_saveBouquetsList(void)
 {
 	FILE *fd;
 	char buffName[256];
@@ -1222,7 +1239,7 @@ static int32_t bouquet_saveBouquetsList(struct list_head *listHead)
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, buffName);
 		return -1;
 	}
-	while((name = strList_get(listHead, num)) != NULL) {
+	while((name = strList_get(&digitalBouquet.NameDigitalList, num)) != NULL) {
 		fprintf(fd, "#BOUQUETS_NAME=%s\n", name);
 		num++;
 	}
@@ -1265,6 +1282,10 @@ void bouquet_loadDigitalBouquetsList(int download)
 	}
 	sprintf(path, "%s/%s", BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE);
 	bouquet_parseBouquetsList(&digitalBouquet.NameDigitalList, path);
+
+	if (download == 1) {
+		bouquet_saveBouquetsList();
+	}
 }
 
 void bouquet_loadAnalogBouquetsList(int force)
@@ -1574,6 +1595,7 @@ int32_t strList_add(struct list_head *listHead, const char *str)
 		free(newName);
 		return -3;
 	}
+	dprintf("%s: %s\n", __func__, str);
 	list_add_tail(&newName->list, listHead);
 
 	return 0;
