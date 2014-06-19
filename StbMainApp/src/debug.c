@@ -314,8 +314,8 @@ int dbg_getDebag(char *cmd)
 	return 0;
 }
 
-int  dbg_cmdSystem(char *cmd)
+int  dbg_cmdSystem2(const char *cmd, const char *func, int32_t line)
 {
-	dprintf("cmd: %s\n", cmd);
+	dprintf("%s()[%d]: cmd: '%s'\n", func, line, cmd);
 	return system(cmd);
 }

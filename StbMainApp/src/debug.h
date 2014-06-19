@@ -42,7 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DEBUG_MESSAGE         "DEBUG"
 #define DEBUG_BOUQUET "BOUQUET"
 
-#define dprintf(...)	DPRINT(errorLevelDebug, __VA_ARGS__)
+#define dprintf(...)        DPRINT(errorLevelDebug, __VA_ARGS__)
+#define dbg_cmdSystem(cmd)  dbg_cmdSystem2(cmd, __func__, __LINE__)
 
 #ifdef TRACE
 	#define TRACEE printf("ENTER: %s\n", __FUNCTION__);
@@ -84,7 +85,7 @@ void *dbg_realloc(void *ptr, size_t size, const char *location);
 int  dbg_ThreadInit(void);
 void  dbg_ThreadStop(void);
 int  dbg_getDebag(char *);
-int  dbg_cmdSystem(char *);
+int  dbg_cmdSystem2(const char *cmd, const char *func, int32_t line);
 
 #ifdef __cplusplus
 };
