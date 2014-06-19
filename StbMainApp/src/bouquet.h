@@ -90,11 +90,19 @@ typedef struct {
 	struct list_head	channelsList;
 } bouquet_element_list_t;
 
+typedef struct {
+	char name[64];
+	struct list_head	NameDigitalList;
+	struct list_head	name_tv;
+	struct list_head	name_radio;
+	struct list_head	channelsList;
+} bouquetDigital_t;
+
 
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-extern struct list_head bouquetNameDigitalList;
+extern bouquetDigital_t digitalBouquet;
 extern struct list_head bouquetNameAnalogList;
 
 /******************************************************************
@@ -112,6 +120,7 @@ void bouquet_LoadingBouquet(typeBouquet_t type);
 void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead);
 int32_t  digitalList_release(struct list_head *listHead);
 bouquet_element_list_t *digitalList_add(struct list_head *listHead);
+int32_t bouquet_updateDigitalBouquetList(interfaceMenu_t *pMenu, void *pArg);
 
 void bouquet_loadChannelsFile(void);
 int32_t bouquets_getNumberPlaylist(void);

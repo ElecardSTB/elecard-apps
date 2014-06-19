@@ -116,13 +116,7 @@ typedef struct {
 	struct list_head    list;
 } voidList_t;
 
-typedef struct {
-	char name[64];
-	struct list_head	NameDigitalList;
-	struct list_head	name_tv;
-	struct list_head	name_radio;
-	struct list_head	channelsList;
-} bouquetDigital_t;
+
 
 
 bouquetDigital_t digitalBouquet = {
@@ -137,7 +131,6 @@ bouquetDigital_t digitalBouquet = {
 /******************************************************************
 * DATA                                                            *
 *******************************************************************/
-LIST_HEAD(bouquetNameDigitalList);
 LIST_HEAD(bouquetNameAnalogList);
 
 /******************************************************************
@@ -150,7 +143,6 @@ static list_element_t *head_ts_list = NULL;
 static list_element_t *bouquets_list = NULL;
 static int bouquets_coun_list = 0;
 static int bouquets_enable = 0;
-static char bouquetDigitalName[CHANNEL_BUFFER_NAME];
 static char bouquetAnalogName[CHANNEL_BUFFER_NAME];
 static char pName[CHANNEL_BUFFER_NAME];
 
@@ -309,8 +301,6 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 void bouquet_LoadingBouquet(typeBouquet_t type)
 {
 	char fileName[1024];
-	struct list_head *pos;
-
 	switch (type)
 	{
 		case eBouquet_digital:
@@ -332,18 +322,7 @@ void bouquet_LoadingBouquet(typeBouquet_t type)
 				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, digitalBouquet.name, strList_get(&digitalBouquet.name_radio, 0));
 				get_bouquets_list(&digitalBouquet.channelsList, fileName/*radio*/);
 			}
-
-			list_for_each(pos, &digitalBouquet.channelsList) {
-				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
-			}
-
 			bouquet_loadLamedb(digitalBouquet.name, &digitalBouquet.channelsList);
-
-
-			list_for_each(pos, &digitalBouquet.channelsList) {
-				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
-			}
-
 			break;
 		}
 		case eBouquet_analog:
@@ -414,7 +393,7 @@ static int bouquet_sendBouquet(void)
 		return 1;
 	}
 	fprintf(fd, "-mkdir %s/../bouquet/%s.STB/\n -put %s/%s/* %s/../bouquet/%s.STB/\n -put %s/%s %s/../bouquet/",
-			serverDir,    bouquetDigitalName,      BOUQUET_CONFIG_DIR, bouquetDigitalName, serverDir, bouquetDigitalName,  BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE, serverDir);
+			serverDir,    digitalBouquet.name,      BOUQUET_CONFIG_DIR, digitalBouquet.name, serverDir, digitalBouquet.name,  BOUQUET_CONFIG_DIR, BOUQUET_CONFIG_FILE, serverDir);
 	fclose(fd);
 
 	snprintf(cmd, sizeof(cmd), "sftp -b %s -i /var/etc/garb/.ssh/id_rsa %s@%s", TMP_BATCH_FILE, loginName, serverName);
@@ -473,6 +452,13 @@ int bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg)
 	return 0;
 }
 
+int bouquet_updateDigitalBouquetList(interfaceMenu_t *pMenu, void *pArg)
+{
+	bouquet_loadDigitalBouquetsList(1);
+	bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
+	return 0;
+}
+
 int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	(void)pMenu;
@@ -481,12 +467,12 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 	number = CHANNEL_INFO_GET_CHANNEL(pArg);
 	name = bouquet_getDigitalBouquetName();
 	if((name != NULL) &&
-			(strcasecmp(name, strList_get(&bouquetNameDigitalList, number)) == 0)) {
+			(strcasecmp(name, strList_get(&digitalBouquet.NameDigitalList, number)) == 0)) {
 		return 0;
 	}
 	dvbChannel_terminate();
 	free_services(&dvb_services);
-	bouquet_setDigitalBouquetName(strList_get(&bouquetNameDigitalList, number));
+	bouquet_setDigitalBouquetName(strList_get(&digitalBouquet.NameDigitalList, number));
 	saveAppSettings();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
@@ -495,7 +481,6 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 
 void bouquet_setDigitalBouquetName(const char *name)
 {
-	sprintf(bouquetDigitalName, "%s", name);
 	sprintf(digitalBouquet.name, "%s", name);
 }
 
@@ -512,13 +497,13 @@ void bouquet_setNewBouquetName(char *name)
 
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, name);
-	sprintf(bouquetDigitalName, "%s", name);
+	sprintf(digitalBouquet.name, "%s", name);
 	if(bouquet_getDigitalBouquetName() == NULL) {
-		strList_add(&bouquetNameDigitalList, name);
+		strList_add(&digitalBouquet.NameDigitalList, name);
 
 		snprintf(cmd, sizeof(cmd), "mkdir -p %s", buffName);
 		dbg_cmdSystem(cmd);
-		bouquet_saveBouquetsList(&bouquetNameDigitalList);
+		bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
 	}
 	interface_hideMessageBox();
 }
@@ -526,7 +511,7 @@ void bouquet_setNewBouquetName(char *name)
 char *bouquet_getDigitalBouquetName(void)
 {
 	if(bouquet_enable()) {
-		return bouquetDigitalName;
+		return digitalBouquet.name;
 	}
 	return NULL;
 }
@@ -963,7 +948,7 @@ int bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 		snprintf(cmd, sizeof(cmd), "rm -r %s/%s/", BOUQUET_CONFIG_DIR, bouquetName);
 		dbg_cmdSystem(cmd);
 		interface_hideMessageBox();
-		strList_remove(&bouquetNameDigitalList, bouquetName);
+		strList_remove(&digitalBouquet.NameDigitalList, bouquetName);
 		bouquet_loadDigitalBouquetsList(1);
 	}
 	free_services(&dvb_services);
@@ -1114,7 +1099,7 @@ void bouquet_saveAnalogBouquet(void)
 int bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	bouquet_loadDigitalBouquetsList(1);
-	bouquet_saveBouquetsList(&bouquetNameDigitalList);
+	bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
 	bouquet_saveAllBouquet();
 	bouquet_sendBouquet();
 	offair_fillDVBTMenu();
@@ -1208,7 +1193,6 @@ void bouquet_terminate(void)
 
 	strList_release(&bouquet_name_tv);
 	strList_release(&bouquet_name_radio);
-	strList_release(&bouquetNameDigitalList);
 	strList_release(&bouquetNameAnalogList);
 
 
@@ -1234,17 +1218,10 @@ static int32_t bouquet_saveBouquetsList(struct list_head *listHead)
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, buffName);
 		return -1;
 	}
-
-/*	struct list_head *pos;
-	list_for_each(pos, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		fprintf(fd, "#BOUQUETS_NAME=%s\n", el->str);
-	}*/
 	while((name = strList_get(listHead, num)) != NULL) {
 		fprintf(fd, "#BOUQUETS_NAME=%s\n", name);
 		num++;
 	}
-
 	fclose(fd);
 	return 0;
 }
