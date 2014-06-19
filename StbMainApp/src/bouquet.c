@@ -335,8 +335,6 @@ void bouquet_LoadingBouquet(typeBouquet_t type)
 
 			list_for_each(pos, &digitalBouquet.channelsList) {
 				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
-				printf("%s: %d %d\n",__func__, element->service_id, element->data.name_space);
-
 			}
 
 			bouquet_loadLamedb(digitalBouquet.name, &digitalBouquet.channelsList);
@@ -344,8 +342,6 @@ void bouquet_LoadingBouquet(typeBouquet_t type)
 
 			list_for_each(pos, &digitalBouquet.channelsList) {
 				bouquet_element_list_t *element = list_entry(pos, bouquet_element_list_t, channelsList);
-				printf("%s: %s %d\n",__func__, element->lamedbData.channelsName, element->data.name_space);
-
 			}
 
 			break;
@@ -1214,6 +1210,14 @@ void bouquet_terminate(void)
 	strList_release(&bouquet_name_radio);
 	strList_release(&bouquetNameDigitalList);
 	strList_release(&bouquetNameAnalogList);
+
+
+	strList_release(&digitalBouquet.NameDigitalList);
+	strList_release(&digitalBouquet.name_tv);
+	strList_release(&digitalBouquet.name_radio);
+	digitalList_release(&digitalBouquet.channelsList);
+
+
 }
 
 
@@ -1556,6 +1560,19 @@ bouquet_element_list_t *digitalList_add(struct list_head *listHead)
 
 	return new;
 }
+
+int32_t  digitalList_release(struct list_head *listHead)
+{
+	struct list_head *pos;
+	struct list_head *n;
+	list_for_each_safe(pos, n, listHead) {
+		bouquet_element_list_t *el = list_entry(pos, bouquet_element_list_t, channelsList);
+		list_del(pos);
+		free(el);
+	}
+	return 0;
+}
+
 
 int32_t strList_add(struct list_head *listHead, const char *str)
 {

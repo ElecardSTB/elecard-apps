@@ -110,6 +110,7 @@ const char *strList_get(struct list_head *listHead, uint32_t number);
 
 void bouquet_LoadingBouquet(typeBouquet_t type);
 void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead);
+int32_t  digitalList_release(struct list_head *listHead);
 bouquet_element_list_t *digitalList_add(struct list_head *listHead);
 
 void bouquet_loadChannelsFile(void);
