@@ -126,9 +126,9 @@ void playlist_editor_cleanup(typeBouquet_t index)
 		free_elements(&playListEditorDigital);
 	if (index == 0 || index == 2)
 		free_elements(&playListEditorAnalog);*/
-	if (index == eBouquet_full || index == eBouquet_digital)
+	if (index == eBouquet_all || index == eBouquet_digital)
 		free_elements(&playListEditorDigital);
-	if (index == eBouquet_full || index == eBouquet_analog)
+	if (index == eBouquet_all || index == eBouquet_analog)
 		free_elements(&playListEditorAnalog);
 }
 

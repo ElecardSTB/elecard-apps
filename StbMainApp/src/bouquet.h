@@ -48,9 +48,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED TYPEDEFS                            *
 ************************************************/
 typedef enum {
-	eBouquet_full = 0,
-	eBouquet_analog,
+	eBouquet_analog = 0,
 	eBouquet_digital,
+	eBouquet_all,
 } typeBouquet_t;
 
 /***********************************************
@@ -70,13 +70,13 @@ const char *strList_get(struct list_head *listHead, uint32_t number);
 
 #ifdef ENABLE_DVB
 
+//not used anywhere
 void bouquet_loadChannelsFile(void);
-
 int32_t bouquets_getNumberPlaylist(void);
 void bouquets_setNumberPlaylist(int32_t num);
 
 void bouquet_loadBouquet(typeBouquet_t index, const char *name);
-void bouquet_stashBouquet(typeBouquet_t index, const char *name);
+void bouquet_stashBouquet(typeBouquet_t index, const char *name);//local
 
 int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
@@ -84,7 +84,6 @@ int32_t bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg
 void bouquet_loadDigitalBouquetsList(int force);
 void bouquet_loadAnalogBouquetsList(int force);
 void bouquet_addScanChannels(void);
-int32_t bouquet_getFolder(char *bouquetsFile);
 int32_t bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
 
 void bouquet_saveAnalogBouquet(void);
