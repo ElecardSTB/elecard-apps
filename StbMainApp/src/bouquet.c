@@ -493,16 +493,15 @@ void bouquet_setAnalogBouquetName(const char *name)
 void bouquet_setNewBouquetName(char *name)
 {
 	char buffName[64];
-	char cmd[1024];
+	int status;
 
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, name);
-	sprintf(digitalBouquet.name, "%s", name);
-	if(bouquet_getDigitalBouquetName() == NULL) {
-		strList_add(&digitalBouquet.NameDigitalList, name);
 
-		snprintf(cmd, sizeof(cmd), "mkdir -p %s", buffName);
-		dbg_cmdSystem(cmd);
+	status = mkdir(buffName, 0777);
+	if (status == 0) {
+		sprintf(digitalBouquet.name, "%s", name);
+		strList_add(&digitalBouquet.NameDigitalList, name);
 		bouquet_saveBouquetsList(&digitalBouquet.NameDigitalList);
 	}
 	interface_hideMessageBox();
@@ -929,7 +928,12 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg)
 	}
 	dvbChannel_terminate();
 	free_services(&dvb_services);
-	bouquet_setNewBouquetName(value);
+	bouquet_loadDigitalBouquetsList(1);
+	if (strList_isExist(&digitalBouquet.NameDigitalList, value)) {
+		bouquet_setDigitalBouquetName(value);
+	} else {
+		bouquet_setNewBouquetName(value);
+	}
 	saveAppSettings();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
