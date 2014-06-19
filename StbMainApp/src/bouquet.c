@@ -144,6 +144,7 @@ static int32_t bouquet_downloadAnalogConfigList(void);
 static void bouquet_parseBouquetsList(struct list_head *listHead, const char *path);
 
 static void bouquet_getAnalogJsonName(char *fname, const char *name);
+static int32_t bouquet_isExist(char *bouquetsFile);
 
 
 /*******************************************************************
@@ -546,16 +547,12 @@ int bouquet_getFile(char *fileName)
 	return false;
 }
 
-int bouquet_getFolder(char *bouquetsFile)
+static int32_t bouquet_isExist(char *bouquetsFile)
 {
 	char buffName[256];
 	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, bouquetsFile);
-	struct stat sb;
 
-	if(stat(buffName, &sb) == 0 && S_ISDIR(sb.st_mode)) {
-		return 1;
-	}
-	return 0;
+	return helperCheckDirectoryExsists(buffName);
 }
 
 void bouquet_saveLamedb(char *fileName)
@@ -927,7 +924,7 @@ void bouquet_loadBouquets(list_element_t **services)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-	if(bouquetName != NULL && bouquet_getFolder(bouquetName)) {
+	if(bouquet_isExist(bouquetName)) {
 		char fileName[1024];
 		strList_release(&bouquet_name_tv);
 		strList_release(&bouquet_name_radio);

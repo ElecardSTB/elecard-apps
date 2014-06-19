@@ -54,15 +54,13 @@ int helperFileExists(const char* filename)
 
 int32_t helperCheckDirectoryExsists(const char *path)
 {
-	DIR *d;
+	struct stat st;
 
-	d = opendir(path);
-	if(d == NULL) {
-		return 0;
+	if(path && (stat(path, &st) == 0) && S_ISDIR(st.st_mode)) {
+		return 1;
 	}
-	closedir(d);
 
-	return 1;
+	return 0;
 }
 
 int32_t getParam(const char *path, const char *param, const char *defaultValue, char *output)
