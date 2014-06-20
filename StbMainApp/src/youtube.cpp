@@ -556,7 +556,10 @@ static int youtube_streamChange(interfaceMenu_t *pMenu, void *pArg)
 	// Trim everything except url_encoded_fmt_stream_map
 	video_info.erase(0, video_info.find("url_encoded_fmt_stream_map="));
 	video_info.erase(0, 27);
-	video_info.erase(video_info.find('&'));
+	size_t found = video_info.find('&');
+	if (found != std::string::npos) {
+		video_info.erase(found);
+	}
 
 	size_t info_length = video_info.length()+1;
 	char buffer[info_length];
