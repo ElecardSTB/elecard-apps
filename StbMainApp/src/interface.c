@@ -6037,7 +6037,7 @@ static void interface_displayPlayControl()
 
 				if (value < 1.0f)
 				{
-					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "slider_inactive.png", rect.x, rect.y, rect.w, rect.h, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "progress_inactive.png", rect.x, rect.y, rect.w, rect.h, 1, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
 				}
 				if (interfacePlayControl.sliderPos > 0)
 				{
@@ -6045,7 +6045,7 @@ static void interface_displayPlayControl()
 					clip.y = 0;
 					clip.w = rect.w*value;
 					clip.h = rect.h;
-					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "slider_active.png", rect.x, rect.y, rect.w, rect.h, 1, &clip, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
+					interface_drawImage(DRAWING_SURFACE, IMAGE_DIR "progress_active.png", rect.x, rect.y, rect.w, rect.h, 1, &clip, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTop|interfaceAlignLeft, NULL, NULL);
 				}
 
 				if (interfaceInfo.inputFocus == inputFocusSlider || interfaceInfo.inputFocus == inputFocusSliderMoving)
