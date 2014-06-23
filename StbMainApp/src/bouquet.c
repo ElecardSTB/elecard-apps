@@ -973,10 +973,10 @@ int bouquet_updateAnalogBouquet(interfaceMenu_t *pMenu, void *pArg)
 int bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
-	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 
 	bouquet_loadDigitalBouquetsList(1);
 	bouquetName = bouquet_getDigitalBouquetName();
+	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	if(bouquetName != NULL) {
 		char serverName[16];
 		char serverDir[256];
