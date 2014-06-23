@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "analogtv.h"
 #include "playlist_editor.h"
 #include "list.h"
+#include "gfx.h"
 
 #include "stsdk.h"
 #include <cJSON.h>
@@ -504,6 +505,7 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 			(strcasecmp(name, strList_get(&digitalBouquet.NameDigitalList, number)) == 0)) {
 		return 0;
 	}
+	gfx_stopVideoProvider(screenMain, 1, 1);
 	dvbChannel_terminate();
 	dvb_clearServiceList(1);
 	bouquet_setDigitalBouquetName(strList_get(&digitalBouquet.NameDigitalList, number));
@@ -902,6 +904,7 @@ int bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg)
 	if(value == NULL) {
 		return 0;
 	}
+	gfx_stopVideoProvider(screenMain, 1, 1);
 	dvbChannel_terminate();
 	dvb_clearServiceList(1);
 	bouquet_loadDigitalBouquetsList(1);
@@ -920,7 +923,7 @@ int bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
 	bouquetName = bouquet_getDigitalBouquetName();
-
+	gfx_stopVideoProvider(screenMain, 1, 1);
 	if(bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		bouquet_revomeFile(bouquetName);
@@ -974,7 +977,7 @@ int bouquet_updateAnalogBouquet(interfaceMenu_t *pMenu, void *pArg)
 int bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	char *bouquetName;
-
+	gfx_stopVideoProvider(screenMain, 1, 1);
 	bouquet_loadDigitalBouquetsList(1);
 	bouquetName = bouquet_getDigitalBouquetName();
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
