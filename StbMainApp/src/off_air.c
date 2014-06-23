@@ -1567,16 +1567,25 @@ void offair_startVideo(int which)
 		return;
 	}
 	service = srvIdx->service;
-	printf("start video:\n");
-	printf(" name: %s\n",service->service_descriptor.service_name);
-	printf(" media_id: %d\n",service->common.media_id);
-	printf(" service_id %d:\n",service->common.service_id);
-	printf(" transport_stream_id: %d\n",service->common.transport_stream_id);
-	printf(" original_network_id: %d\n",service->original_network_id);
-	printf(" frequency: %d\n",service->media.frequency);
+	dprintf("start video:\n");
+	dprintf(" name: %s\n",service->service_descriptor.service_name);
+	dprintf(" media_id: %d\n",service->common.media_id);
+	dprintf(" service_id %d:\n",service->common.service_id);
+	dprintf(" transport_stream_id: %d\n",service->common.transport_stream_id);
+	dprintf(" original_network_id: %d\n",service->original_network_id);
+	dprintf(" frequency: %d\n",service->media.frequency);
 	if (service->media.type == serviceMediaDVBS) {
-		printf(" polarization: %d\n",service->media.dvb_s.polarization);
-		printf(" symbol_rate: %d\n",service->media.dvb_s.symbol_rate);
+		dprintf(" polarization: %d\n",service->media.dvb_s.polarization);
+		dprintf(" symbol_rate: %d\n",service->media.dvb_s.symbol_rate);
+	}
+	if (service->media.type == serviceMediaDVBC) {
+		dprintf(" modulation: %d\n",service->media.dvb_c.modulation);
+		dprintf(" symbol_rate: %d\n",service->media.dvb_c.symbol_rate);
+		dprintf(" inversion: %d\n",service->media.dvb_c.inversion);
+	}
+	if (service->media.type == serviceMediaDVBT) {
+		dprintf(" bandwidth: %d\n",service->media.dvb_t.bandwidth);
+		dprintf(" inversion: %d\n",service->media.dvb_t.inversion);
 	}
 	if(offair_findCapableTuner(service, &appControlInfo.dvbInfo.adapter) != 0) {
 		eprintf("%s: Failed to find tuner matching type %d\n", __FUNCTION__, service->media.type);
