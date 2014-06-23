@@ -3177,6 +3177,7 @@ void cleanup()
 
 	gfx_terminate();
 	bouquet_terminate();
+	bouquet_terminateDigitalList(eBouquet_all);
 #ifdef STSDK
 	st_terminate();
 #endif

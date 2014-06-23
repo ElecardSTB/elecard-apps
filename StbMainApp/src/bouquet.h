@@ -53,49 +53,13 @@ typedef enum {
 	eBouquet_all,
 } typeBouquet_t;
 
-typedef struct _bouquetCommonData_t {
-	uint32_t transport_stream_id;
-	uint32_t network_id;
-	uint32_t name_space;
-} bouquetCommonData_t;
-
-
-typedef struct _transpounder_t {
-	bouquetCommonData_t data;
-	EIT_media_config_t media;
-} transpounder_t;
-
-
-typedef struct _lamedb_data {
-	uint32_t service_id;
-	uint32_t serviceType;
-	uint32_t hmm;
-	bouquetCommonData_t data;
-	char channelsName[64];
-	char transponderName[64];
-} lamedb_data_t;
-
-typedef struct {
-	uint32_t type;
-	uint32_t flags;
-	uint32_t serviceType;
-	uint32_t service_id;
-	uint32_t index_8;
-	uint32_t index_9;
-	uint32_t index_10;
-	bouquetCommonData_t data;
-	transpounder_t transpounder;
-	lamedb_data_t lamedbData;
-
-	struct list_head	channelsList;
-} bouquet_element_list_t;
-
 typedef struct {
 	char name[64];
 	struct list_head	NameDigitalList;
 	struct list_head	name_tv;
 	struct list_head	name_radio;
 	struct list_head	channelsList;
+	struct list_head	transponderList;
 } bouquetDigital_t;
 
 
@@ -118,11 +82,10 @@ const char *strList_get(struct list_head *listHead, uint32_t number);
 
 void bouquet_LoadingBouquet(typeBouquet_t type);
 void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead);
-int32_t  digitalList_release(struct list_head *listHead);
-bouquet_element_list_t *digitalList_add(struct list_head *listHead);
+int32_t  digitalList_release(void);
+void bouquet_terminateDigitalList(typeBouquet_t index);
 int32_t bouquet_updateDigitalBouquetList(interfaceMenu_t *pMenu, void *pArg);
 
-void bouquet_loadChannelsFile(void);
 int32_t bouquets_getNumberPlaylist(void);
 void bouquets_setNumberPlaylist(int32_t num);
 
@@ -132,7 +95,7 @@ void bouquet_stashBouquet(typeBouquet_t index, const char *name);//local
 int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg);
-void bouquet_loadDigitalBouquetsList(int force);
+
 void bouquet_loadAnalogBouquetsList(int force);
 void bouquet_addScanChannels(void);
 int32_t bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
@@ -145,11 +108,11 @@ int32_t bouquet_updateAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_updateAnalogBouquetList(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg);
 int32_t bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_enable(void);
+int32_t bouquet_getEnableStatus(void);
 void bouquet_init(void);
 void bouquet_terminate(void);
-void bouquet_setEnable(int32_t i);
-void bouquet_getDigitalName(char *dir, char *fname, char *name);
+void bouquet_setEnableStatus(int32_t i);
+void bouquet_getOffairDigitalName(char *dir, char *fname, char *name);
 char *bouquet_getDigitalBouquetName(void);
 char *bouquet_getAnalogBouquetName(void);
 char *bouquet_getNameBouquetList(list_element_t **head, int32_t number);
@@ -157,23 +120,19 @@ void bouquet_setDigitalBouquetName(const char *name);
 void bouquet_setAnalogBouquetName(const char *name);
 void bouquet_loadBouquets(list_element_t **services);
 
-//int32_t bouquet_file(void);
-//int32_t bouquet_getFile(void);
-void bouquet_downloadFileWithServices(char *filename);
-void  bouquet_dump(char *filename);
+
 list_element_t *get_bouquet_list(void);
 
-int32_t bouquets_compare(list_element_t **);
 EIT_service_t *bouquet_findService(EIT_common_t *header);
 #else // ENABLE_DVB
 
 #define bouquet_init()
 #define bouquet_setDigitalBouquetName(name)
 #define bouquet_setAnalogBouquetName(name)
-#define bouquet_setEnable(n)
+#define bouquet_setEnableStatus(n)
 #define bouquet_getDigitalBouquetName()		""
 #define bouquet_getAnalogBouquetName()		""
-#define bouquet_enable()					0
+#define bouquet_getEnableStatus()					0
 #define bouquet_createNewBouquet			NULL
 #define bouquet_enableControl				NULL
 

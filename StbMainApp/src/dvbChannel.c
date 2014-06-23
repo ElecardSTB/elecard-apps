@@ -316,7 +316,7 @@ static int32_t dvbChannel_readOrderConfig()
 	char *data;
 	long len;
 	char fname[BUFFER_SIZE];
-	bouquet_getDigitalName(CONFIG_DIR, fname, bouquetName);
+	bouquet_getOffairDigitalName(CONFIG_DIR, fname, bouquetName);
 	dprintf("read file %s\n", fname);
 	fd = fopen(fname, "r");
 	if(fd == NULL) {
@@ -368,6 +368,7 @@ static int32_t dvbChannel_readOrderConfig()
 
 int32_t dvbChannel_writeOrderConfig(void)
 {
+	dprintf("%s[%d]\n", __func__, __LINE__);
 	cJSON* format;
 	cJSON* root;
 	char *render;
@@ -414,7 +415,7 @@ int32_t dvbChannel_writeOrderConfig(void)
 	if(render) {
 		FILE *fd = NULL;
 		char fname[BUFFER_SIZE];
-		bouquet_getDigitalName(CONFIG_DIR, fname, bouquetName);
+		bouquet_getOffairDigitalName(CONFIG_DIR, fname, bouquetName);
 		fd = fopen(fname, "w");
 		if (fd) {
 			fwrite(render, strlen(render), 1, fd);
@@ -485,10 +486,12 @@ void dvbChannel_terminate(void)
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		dvbChannel_remove(srvIdx);
 	}
+	digitalList_release();
 }
 
 static int32_t dvbChannel_update(void)
 {
+	dprintf("%s[%d]\n", __func__, __LINE__);
 	if (check_playlist()) {
 		return 0;
 	}
@@ -516,28 +519,35 @@ static int32_t dvbChannel_update(void)
 			}
 		} else {
 			curService->common.media_id = curService->original_network_id;
+			dprintf("%s[%d] add %s\n", __func__, __LINE__, curService->service_descriptor.service_name);
 			dvbChannel_addService(curService, 1, 0);
 		}
 	}
-	if (bouquet_enable()) {
+
+
+	if (bouquet_getEnableStatus() && (list_empty(&digitalBouquet.channelsList))) {
+		dprintf("%s[%d]\n", __func__, __LINE__);
 		bouquet_LoadingBouquet(eBouquet_digital);
 		bouquet_GetBouquetData(eBouquet_digital, &g_dvb_channels.orderNoneHead);
-	}
-	//remove elements without service pointer
-	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
-		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		if(srvIdx->flag == 0) {
-			dvbChannel_remove(srvIdx);
-		}
-	}
-
-	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 #if (defined STSDK)
 		elcdRpcType_t type;
 		cJSON *result = NULL;
 		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
 		cJSON_Delete(result);
 #endif //#if (defined STSDK)
+	}
+	//remove elements without service pointer
+	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+		if(srvIdx->service == NULL || srvIdx->flag == 0) {
+			dprintf("%s[%d] remove %s\n", __func__, __LINE__, srvIdx->data.channelsName);
+			dvbChannel_remove(srvIdx);
+		}
+	}
+
+
+
 
 	dvbChannel_writeOrderConfig();
 	return 0;

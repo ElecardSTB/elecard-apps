@@ -122,10 +122,6 @@ static void set_unLockColor(void)
 
 void playlist_editor_cleanup(typeBouquet_t index)
 {
-/*	if (index == 0 || index == 1)
-		free_elements(&playListEditorDigital);
-	if (index == 0 || index == 2)
-		free_elements(&playListEditorAnalog);*/
 	if (index == eBouquet_all || index == eBouquet_digital)
 		free_elements(&playListEditorDigital);
 	if (index == eBouquet_all || index == eBouquet_analog)
