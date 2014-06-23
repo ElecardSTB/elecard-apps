@@ -1587,6 +1587,7 @@ void offair_startVideo(int which)
 		dprintf(" bandwidth: %d\n",service->media.dvb_t.bandwidth);
 		dprintf(" inversion: %d\n",service->media.dvb_t.inversion);
 		dprintf(" generation: %d\n",service->media.dvb_t.generation);
+		dprintf(" plp_id: %d\n",service->media.dvb_t.plp_id);
 	}
 	if(offair_findCapableTuner(service, &appControlInfo.dvbInfo.adapter) != 0) {
 		eprintf("%s: Failed to find tuner matching type %d\n", __FUNCTION__, service->media.type);

@@ -82,13 +82,11 @@ typedef struct {
 	uint32_t name_space;
 } bouquetCommonData_t;
 
-
 typedef struct {
 	bouquetCommonData_t data;
 	EIT_media_config_t media;
 	struct list_head	transponderList;
 } transpounder_t;
-
 
 typedef struct _lamedb_data {
 	uint32_t service_id;
@@ -113,7 +111,6 @@ typedef struct {
 
 	struct list_head	channelsList;
 } bouquet_element_list_t;
-
 
 typedef struct {
 	uint32_t s_id;                   //Services_ID
@@ -1305,16 +1302,9 @@ void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 					//flags
 					//system
 					tspElement.media.dvb_t.plp_id = plpid;
-					if (plpid == 0) {
-						tspElement.media.dvb_t.generation = 0;
-					} else {
-						tspElement.media.dvb_t.generation = 2;
-					}
-
-
+					tspElement.media.dvb_t.generation = 2;
 					break;
 				}
-
 			}
 			bouquets_addTranspounderData(&tspElement);
 
@@ -1398,7 +1388,6 @@ static void bouquets_addlamedbData(struct list_head *listHead, lamedb_data_t *la
 	}
 }
 
-
 static void bouquets_addTranspounderData(transpounder_t *tspElement)
 {
 	struct list_head *pos;
@@ -1472,7 +1461,6 @@ int32_t  digitalList_release(void)
 	strList_release(&digitalBouquet.name_radio);
 	return 0;
 }
-
 
 int32_t strList_add(struct list_head *listHead, const char *str)
 {
