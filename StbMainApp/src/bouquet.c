@@ -250,7 +250,8 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 				if(srvIdx->service->media.type == serviceMediaDVBT && element->transpounder.media.type == serviceMediaDVBT &&
 						srvIdx->service->media.dvb_t.centre_frequency == element->transpounder.media.dvb_t.centre_frequency &&
 						srvIdx->service->media.dvb_t.bandwidth == element->transpounder.media.dvb_t.bandwidth &&
-						srvIdx->service->media.dvb_t.inversion == element->transpounder.media.dvb_t.inversion) {
+						srvIdx->service->media.dvb_t.inversion == element->transpounder.media.dvb_t.inversion &&
+						srvIdx->service->media.dvb_t.plp_id == element->transpounder.media.dvb_t.plp_id) {
 					return 0;
 				}
 				memset(srvIdx->service, 0, sizeof(EIT_service_t));
@@ -1301,6 +1302,13 @@ void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 					//flags
 					//system
 					tspElement.media.dvb_t.plp_id = plpid;
+					if (plpid == 0) {
+						tspElement.media.dvb_t.generation = 0;
+					} else {
+						tspElement.media.dvb_t.generation = 2;
+					}
+
+
 					break;
 				}
 
