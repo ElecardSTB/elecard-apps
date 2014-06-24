@@ -492,7 +492,7 @@ void dvbChannel_terminate(void)
 static int32_t dvbChannel_update(void)
 {
 	dprintf("%s[%d]\n", __func__, __LINE__);
-	if (check_playlist()) {
+	if (swap_playlistEditor()) {
 		return 0;
 	}
 

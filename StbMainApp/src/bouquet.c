@@ -136,6 +136,7 @@ bouquetDigital_t digitalBouquet = {
 	.name_radio	        = LIST_HEAD_INIT(digitalBouquet.name_radio),
 	.channelsList	    = LIST_HEAD_INIT(digitalBouquet.channelsList),
 	.transponderList	= LIST_HEAD_INIT(digitalBouquet.transponderList),
+	.editorList	        = LIST_HEAD_INIT(digitalBouquet.editorList),
 };
 
 #ifdef ENABLE_DVB
@@ -163,6 +164,7 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element);
 static void bouquet_revomeFile(char *bouquetName);
 static void bouquet_loadDigitalBouquetsList(int download);
 static bouquet_element_list_t *digitalList_add(struct list_head *listHead);
+
 static void get_bouquets_file_name(struct list_head *listHead, char *bouquet_file);
 static void get_bouquets_list(struct list_head *listHead, char *bouquet_file);
 
@@ -176,6 +178,7 @@ static int32_t bouquet_downloadAnalogConfigList(void);
 static void bouquet_parseBouquetsList(struct list_head *listHead, const char *path);
 
 static void bouquet_getAnalogJsonName(char *fname, const char *name);
+static int32_t bouquet_isExist(char *bouquetsFile);
 
 
 /*******************************************************************
@@ -506,6 +509,10 @@ int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 	dvbChannel_terminate();
 	dvb_clearServiceList(1);
 	bouquet_setDigitalBouquetName(strList_get(&digitalBouquet.NameDigitalList, number));
+	name = bouquet_getDigitalBouquetName();
+	if (name != NULL && !(bouquet_isExist(name))) {
+		bouquet_updateDigitalBouquet(NULL, NULL);
+	}
 	saveAppSettings();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
@@ -686,6 +693,14 @@ int bouquet_getEnableStatus(void)
 void bouquet_setEnableStatus(int i)
 {
 	bouquets_enable = i;
+}
+
+static int32_t bouquet_isExist(char *bouquetsFile)
+{
+	char buffName[256];
+	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, bouquetsFile);
+
+	return helperCheckDirectoryExsists(buffName);
 }
 
 void bouquet_saveLamedb(char *fileName)
@@ -882,6 +897,7 @@ void bouquet_loadBouquet(typeBouquet_t index, const char *name)
 
 int bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg)
 {
+	dvbChannel_terminate();
 	if(bouquet_getEnableStatus()) {
 		bouquet_setEnableStatus(0);
 		bouquet_loadBouquet(eBouquet_analog, NULL);
@@ -890,7 +906,6 @@ int bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg)
 		bouquet_stashBouquet(eBouquet_analog, NULL);
 	}
 	saveAppSettings();
-	dvbChannel_terminate();
 	offair_fillDVBTMenu();
 	output_redrawMenu(pMenu);
 	return 1;
@@ -977,6 +992,7 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 	gfx_stopVideoProvider(screenMain, 1, 1);
 	bouquet_loadDigitalBouquetsList(1);
 	bouquetName = bouquet_getDigitalBouquetName();
+	dvbChannel_terminate();
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	if(bouquetName != NULL) {
 		char serverName[16];
@@ -1130,7 +1146,6 @@ void bouquet_init(void)
 void bouquet_terminate(void)
 {
 	free_elements(&head_ts_list);
-
 	digitalList_release();
 }
 
@@ -1417,6 +1432,11 @@ void bouquet_downloadFileFromServer(char *shortname, char *fullname)
 }
 #endif // ENABLE_DVB
 
+/*************************************************************
+****                                                      ****
+****              FUNCTIONS FOR CONTROLLING LIST          ****
+****                                                      ****
+*************************************************************/
 bouquet_element_list_t *digitalList_add(struct list_head *listHead)
 {
 	bouquet_element_list_t *new = malloc(sizeof(bouquet_element_list_t));
@@ -1436,7 +1456,50 @@ void bouquet_terminateDigitalList(typeBouquet_t index)
 		strList_release(&digitalBouquet.NameDigitalList);
 	}
 	if (index == eBouquet_all || index == eBouquet_analog)
-			strList_release(&bouquetNameAnalogList);
+		strList_release(&bouquetNameAnalogList);
+}
+
+editorDigital_t *editorList_add(struct list_head *listHead)
+{
+	editorDigital_t *element;
+	element = malloc(sizeof(editorDigital_t));
+	if(!element) {
+		eprintf("%s(): Allocation error!\n", __func__);
+		return NULL;
+	}
+	list_add_tail(&element->editorList, listHead);
+
+	return element;
+}
+
+void editorList_release(void)
+{
+	struct list_head *pos;
+	list_for_each(pos, &digitalBouquet.editorList) {
+		editorDigital_t *el = list_entry(pos, editorDigital_t, editorList);
+		if(!list_empty(&el->editorList)) {
+			list_del(&el->editorList);
+		}
+		free(el);
+	}
+}
+
+editorDigital_t *editorList_get(struct list_head *listHead, uint32_t number)
+{
+	struct list_head *pos;
+	uint32_t id = 0;
+	if(!listHead) {
+		eprintf("%s(): Wrong argument!\n", __func__);
+		return NULL;
+	}
+	list_for_each(pos, listHead) {
+		if(id == number) {
+			editorDigital_t *el = list_entry(pos, editorDigital_t, editorList);
+			return el;
+		}
+		id++;
+	}
+	return NULL;
 }
 
 int32_t  digitalList_release(void)

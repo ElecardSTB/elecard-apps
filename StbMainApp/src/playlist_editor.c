@@ -2,6 +2,7 @@
 
 #ifdef ENABLE_DVB
 #include "dvbChannel.h"
+#include "debug.h"
 #include "output.h"
 #include "bouquet.h"
 #include "analogtv.h"
@@ -12,12 +13,7 @@
 #include "l10n.h"
 #include "md5.h"
 
-typedef struct {
-	int radio;
-	int scrambled;
-	service_index_t *service_index;
-	service_index_data_t data;
-} playListEditorDigital_t;
+
 
 typedef struct {
 	uint32_t frequency;
@@ -26,7 +22,6 @@ typedef struct {
 } playListEditorAnalog_t;
 
 static int channelNumber = -1;
-list_element_t *playListEditorDigital = NULL;
 list_element_t *playListEditorAnalog = NULL;
 static int update_list = false;
 static int color_save = -1;
@@ -66,10 +61,15 @@ static void load_Analog_channels(list_element_t *curListEditor)
 	}
 }
 
-static void load_digital_channels(list_element_t *curListEditor)
+static void load_digital_channels(struct list_head *listHead)
 {
 	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
+	editorDigital_t*element;
+	if(!listHead) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return;
+	}
 
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
@@ -77,18 +77,8 @@ static void load_digital_channels(list_element_t *curListEditor)
 		if(srvIdx == NULL)
 			continue;
 
-		list_element_t      *cur_element;
-		playListEditorDigital_t    *element;
+		element = editorList_add(listHead);
 
-		if (playListEditorDigital == NULL) {
-			cur_element = playListEditorDigital = allocate_element(sizeof(playListEditorDigital_t));
-		} else {
-			cur_element = append_new_element(playListEditorDigital, sizeof(playListEditorDigital_t));
-		}
-		if (!cur_element)
-			break;
-
-		element = (playListEditorDigital_t *)cur_element->data;
 		element->service_index = srvIdx;
 		element->data.visible = srvIdx->data.visible;
 		element->data.parent_control = srvIdx->data.parent_control;
@@ -97,6 +87,8 @@ static void load_digital_channels(list_element_t *curListEditor)
 			(dvb_hasMediaType(srvIdx->service, mediaTypeAudio) && !dvb_hasMediaType(srvIdx->service, mediaTypeVideo)))
 		{
 			element->radio = 1;
+		} else {
+			element->radio = 0;
 		}
 		element->scrambled = dvb_getScrambled(srvIdx->service);
 		snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
@@ -122,10 +114,13 @@ static void set_unLockColor(void)
 
 void playlist_editor_cleanup(typeBouquet_t index)
 {
-	if (index == eBouquet_all || index == eBouquet_digital)
-		free_elements(&playListEditorDigital);
-	if (index == eBouquet_all || index == eBouquet_analog)
+
+	if (index == eBouquet_all || index == eBouquet_digital) {
+		editorList_release();
+	}
+	if (index == eBouquet_all || index == eBouquet_analog) {
 		free_elements(&playListEditorAnalog);
+	}
 }
 
 int getChannelEditor(void)
@@ -143,23 +138,22 @@ int get_statusLockPlaylist()
 void playList_saveName(int num, char *prev_name, char *new_name)
 {
 	int i = 0;
-	list_element_t *cur_element;
+	editorDigital_t *element;
 
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
-		playListEditorDigital_t *element;
-		for(cur_element = playListEditorDigital; cur_element != NULL; cur_element = cur_element->next) {
-			element = (playListEditorDigital_t*)cur_element->data;
-			if(element == NULL)
-				continue;
-			if (num == i && strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))){
-				snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
-				return;
-			}
-			i++;
+
+		element = editorList_get(&digitalBouquet.editorList, num);
+		if (element == NULL)
+			return;
+
+		if (strncasecmp(element->data.channelsName, prev_name, strlen(prev_name))) {
+			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", new_name);
+			return;
 		}
 		return;
 	}
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
+		list_element_t *cur_element;
 		playListEditorAnalog_t *element;
 		for(cur_element = playListEditorAnalog; cur_element != NULL; cur_element = cur_element->next) {
 			element = (playListEditorAnalog_t*)cur_element->data;
@@ -186,33 +180,29 @@ void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count)
 	list_element_t *cur_element;
 
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
-		playListEditorDigital_t *element;
-		for(cur_element = playListEditorDigital; cur_element != NULL; cur_element = cur_element->next) {
-			element = (playListEditorDigital_t*)cur_element->data;
-			if(element == NULL)
-				continue;
-			if (count == i){
-				char desc[20];
-				if(element->data.visible) {
-					if(element->data.parent_control) {
-						element->data.parent_control = false;
-						element->data.visible = false;
-						snprintf(desc, sizeof(desc), "INVISIBLE");
-					} else {
-						element->data.parent_control = true;
-						snprintf(desc, sizeof(desc), "PARENT");
-					}
-				} else {
-					element->data.visible = true;
-					snprintf(desc, sizeof(desc), "VISIBLE");
-				}
-				interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
-				interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
-				interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
-				return;
+		editorDigital_t *element;
+
+		element = editorList_get(&digitalBouquet.editorList, count);
+		if (element == NULL)
+			return;
+
+		char desc[20];
+		if(element->data.visible) {
+			if(element->data.parent_control) {
+				element->data.parent_control = false;
+				element->data.visible = false;
+				snprintf(desc, sizeof(desc), "INVISIBLE");
+			} else {
+				element->data.parent_control = true;
+				snprintf(desc, sizeof(desc), "PARENT");
 			}
-			i++;
+		} else {
+			element->data.visible = true;
+			snprintf(desc, sizeof(desc), "VISIBLE");
 		}
+		interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+		interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
+		interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
 		return;
 	}
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
@@ -241,34 +231,37 @@ void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int count)
 	}
 }
 
-int push_playlist()
+void merge_digitalLists(void)
 {
-	if ((playListEditorDigital == NULL &&  playListEditorAnalog == NULL) || update_list == false)
-		return false;
+	if ((list_empty(&digitalBouquet.editorList) &&  playListEditorAnalog == NULL) || update_list == false)
+		return;
 	update_list = false;
 	int first = 0;
 	int i = 0;
 	list_element_t		*service_element;
 
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
-		service_element = playListEditorDigital;
-		while (service_element != NULL) {
-			playListEditorDigital_t *curElement = (playListEditorDigital_t *)service_element->data;
-			if (curElement->service_index != NULL) {
-				curElement->service_index->data.visible        = curElement->data.visible;
-				curElement->service_index->data.parent_control = curElement->data.parent_control;
-				snprintf(curElement->service_index->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", curElement->data.channelsName);
+		struct list_head *pos;
+		int i = 0;
+		list_for_each(pos, &digitalBouquet.editorList) {
+			editorDigital_t *element = list_entry(pos, editorDigital_t, editorList);
+			if(element == NULL)
+				continue;
+
+			if (element->service_index != NULL) {
+				element->service_index->data.visible        = element->data.visible;
+				element->service_index->data.parent_control = element->data.parent_control;
+				snprintf(element->service_index->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", element->data.channelsName);
 			}
-			first = dvbChannel_findNumberService(curElement->service_index);
+			printf("%s[%d] %s\n",__func__, __LINE__, element->service_index->data.channelsName);
+			first = dvbChannel_findNumberService(element->service_index);
 			if ( i > first)
 				dvbChannel_swapServices(first, i);
 			else
 				dvbChannel_swapServices(i, first);
 
 			i++;
-			service_element = service_element->next;
 		}
-		return true;
 	}
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
 		service_element = playListEditorAnalog;
@@ -289,9 +282,7 @@ int push_playlist()
 		}
 		analogtv_saveConfigFile();
 		bouquet_saveAnalogBouquet();
-		return true;
 	}
-	return -1;
 }
 
 int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
@@ -321,7 +312,7 @@ int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* p
 	fclose(pass_file);
 
 	if(strncmp(out_hex, pass, 32) == 0) {
-		push_playlist();
+		merge_digitalLists();
 		dvbChannel_applyUpdates();
 	}
 	else {
@@ -332,26 +323,28 @@ int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* p
 	return 0;
 }
 
-int check_playlist()
+int swap_playlistEditor(void)
 {
-	if ((playListEditorDigital == NULL && playListEditorAnalog == NULL) || update_list == false)
+	if ((list_empty(&digitalBouquet.editorList) && playListEditorAnalog == NULL) || update_list == false)
 		return false;
 	extern interfaceListMenu_t InterfacePlaylistEditorDigital;
 
-	list_element_t		*service_element = playListEditorDigital;
-	while (service_element != NULL) {
-		playListEditorDigital_t *curElement = (playListEditorDigital_t *)service_element->data;
-		if (curElement->service_index != NULL) {
-			if((!curElement->data.parent_control) && (curElement->service_index->data.parent_control)) {
+	struct list_head *pos;
+	list_for_each(pos, &digitalBouquet.editorList) {
+		editorDigital_t *element = list_entry(pos, editorDigital_t, editorList);
+		if(element == NULL)
+			continue;
+
+
+		if (element->service_index != NULL) {
+			if((!element->data.parent_control) && (element->service_index->data.parent_control)) {
 				const char *mask = "\\d{6}";
 				interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, NULL);
 				return true;
 			}
 		}
-		service_element = service_element->next;
 	}
-
-	push_playlist();
+	merge_digitalLists();
 	dvbChannel_applyUpdates();
 	return true;
 }
@@ -372,44 +365,42 @@ int playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
 	return 0;
 }
 
-void playlist_switchElementwithNext(int source){
-	list_element_t *curList;
-	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
-		curList = playListEditorDigital;
-	}
+void playlist_switchElementwithNext(int source)
+{
+	printf("%s[%d] =int = %d\n", __func__, __LINE__, source);
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
-		curList = playListEditorAnalog;
-	}
-	if (curList == NULL)
 		return;
-	int i = 0;
+		//	curList = playListEditorAnalog;
+	}
 
-	list_element_t *rec;
-	list_element_t *last = NULL;
-	while(curList != NULL) {
-		if (i == source){
-			if(last == NULL) {
-				list_element_t *tmpList;
-				tmpList = curList->next;
-				curList->next = tmpList->next;
-				tmpList->next = curList;
-				if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
-					playListEditorDigital = tmpList;
-				}
-				if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
-					playListEditorAnalog = tmpList;
-				}
-			} else {
-				rec = curList->next;
-				last->next = rec;
-				curList->next = rec->next;
-				rec->next = curList;
+	editorDigital_t *firstElement = NULL;
+	struct list_head *srvIdx_beforeFirst;
+	struct list_head *srvIdx_beforeSecond;
+	int i = 0;
+	struct list_head *pos;
+	list_for_each(pos, &digitalBouquet.editorList) {
+		editorDigital_t *secElement = list_entry(pos, editorDigital_t, editorList);
+		if(secElement == NULL)
+			continue;
+
+		if (firstElement != NULL) {
+			srvIdx_beforeFirst = firstElement->editorList.prev;
+			srvIdx_beforeSecond = secElement->editorList.prev;
+
+			if(&firstElement->editorList != srvIdx_beforeSecond) {
+				printf("line = %d\n",__LINE__);
+				list_del(&firstElement->editorList);
+				list_add(&firstElement->editorList, srvIdx_beforeSecond);
 			}
+			list_del(&secElement->editorList);
+			list_add(&secElement->editorList, srvIdx_beforeFirst);
 			break;
 		}
+
+		if (i == source) {
+			firstElement = secElement;
+		}
 		i++;
-		last = curList;
-		curList = curList->next;
 	}
 }
 void playlist_editor_removeElement(void)
@@ -541,23 +532,22 @@ int enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
 
 int enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
 {
-	if (playListEditorDigital != NULL)
+	if (!(list_empty(&digitalBouquet.editorList)))
 		return 0;
-	list_element_t *cur_element;
-	playListEditorDigital_t *element;
+
 	interfaceMenu_t *channelMenu = interfaceMenu;
+	struct list_head *pos;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 	int32_t i = 0;
-	cur_element = playListEditorDigital;
 
-	load_digital_channels(playListEditorDigital);
+	load_digital_channels(&digitalBouquet.editorList);
 	interface_clearMenuEntries(channelMenu);
 
-	for(cur_element = playListEditorDigital ; cur_element != NULL; cur_element = cur_element->next) {
-		element = (playListEditorDigital_t*)cur_element->data;
+	list_for_each(pos, &digitalBouquet.editorList) {
+		editorDigital_t *element = list_entry(pos, editorDigital_t, editorList);
+
 		if(element == NULL)
 			continue;
-
 
 		snprintf(channelEntry, sizeof(channelEntry), "%s. %s", offair_getChannelNumberPrefix(i), element->data.channelsName);
 		interface_addMenuEntry(channelMenu, channelEntry, playList_editorChannel, CHANNEL_INFO_SET(screenMain, i), element->data.visible ?

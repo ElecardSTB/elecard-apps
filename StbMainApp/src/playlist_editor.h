@@ -26,7 +26,7 @@ int32_t getChannelEditor(void);
 void playlist_switchElement(int32_t , int32_t );
 void playlist_editor_cleanup(typeBouquet_t);
 int32_t get_statusLockPlaylist(void);
-int32_t check_playlist(void);
+int32_t swap_playlistEditor(void);
 
 #else //#ifdef ENABLE_DVB
 
