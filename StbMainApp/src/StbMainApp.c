@@ -1966,9 +1966,7 @@ void * fusion_threadCreepline(void * param)
 			gettimeofday(&tv, NULL);
 			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 			eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
-
-			FusionObject.positionCreep = 0; // test
-			FusionObject.deltaTime = 0; // test
+			FusionObject.deltaTime = 0;
 		}
 		else if (result == FUSION_SAME_CREEP && FusionObject.creepShown)
 		{
