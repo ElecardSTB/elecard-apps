@@ -278,13 +278,14 @@ int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_
 	return 0;
 }
 
-int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag)
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag, uint16_t parent_control)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->service = service;
 		memcpy(&new->common, &service->common ,sizeof(EIT_common_t));
 		new->data.visible = visible;
+		new->data.parent_control = parent_control;
 		new->flag = flag;
 		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen((char *)service->service_descriptor.service_name));
 	} else {
@@ -519,7 +520,7 @@ static int32_t dvbChannel_update(void)
 			}
 		} else {
 			curService->common.media_id = curService->original_network_id;
-			dvbChannel_addService(curService, 1, 0);
+			dvbChannel_addService(curService, 1, 0, 0);
 		}
 	}
 

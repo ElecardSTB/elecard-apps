@@ -86,7 +86,7 @@ typedef struct {
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
-int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag);
+int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag, uint16_t parent_control);
 int32_t dvbChannel_remove(service_index_t *srvIdx);
 service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
