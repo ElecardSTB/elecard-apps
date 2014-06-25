@@ -499,8 +499,8 @@ static int32_t dvbChannel_update(void)
 	playlist_editor_cleanup(eBouquet_digital);
 
 	list_element_t		*service_element;
-    struct list_head    *pos;
-    struct list_head    *n;
+	struct list_head    *pos;
+	struct list_head    *n;
 
 	if(list_empty(&g_dvb_channels.orderNoneHead)) {
 		dvbChannel_readOrderConfig();
@@ -519,14 +519,11 @@ static int32_t dvbChannel_update(void)
 			}
 		} else {
 			curService->common.media_id = curService->original_network_id;
-			dprintf("%s[%d] add %s\n", __func__, __LINE__, curService->service_descriptor.service_name);
 			dvbChannel_addService(curService, 1, 0);
 		}
 	}
 
-
 	if (bouquet_getEnableStatus() && (list_empty(&digitalBouquet.channelsList))) {
-		dprintf("%s[%d]\n", __func__, __LINE__);
 		bouquet_LoadingBouquet(eBouquet_digital);
 		bouquet_GetBouquetData(eBouquet_digital, &g_dvb_channels.orderNoneHead);
 		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
@@ -541,13 +538,9 @@ static int32_t dvbChannel_update(void)
 	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->service == NULL || srvIdx->flag == 0) {
-			dprintf("%s[%d] remove %s\n", __func__, __LINE__, srvIdx->data.channelsName);
 			dvbChannel_remove(srvIdx);
 		}
 	}
-
-
-
 
 	dvbChannel_writeOrderConfig();
 	return 0;

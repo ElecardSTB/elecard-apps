@@ -2348,6 +2348,16 @@ uint16_t dvb_getAudioPid(EIT_service_t *service, int audio)
 	return stream->elementary_PID;
 }
 
+uint16_t dvb_getVideoPid(EIT_service_t *service)
+{
+	PID_info_t* stream = dvb_getVideoStream(service);
+	if( stream == NULL )
+	{
+		return -1;
+	}
+	return stream->elementary_PID;
+}
+
 int dvb_getAudioCount(EIT_service_t *service)
 {
 	PID_info_t* stream;

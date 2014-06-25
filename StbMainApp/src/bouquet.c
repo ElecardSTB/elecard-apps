@@ -92,6 +92,8 @@ typedef struct _lamedb_data {
 	uint32_t service_id;
 	uint32_t serviceType;
 	uint32_t hmm;
+	uint16_t audioPID;
+	uint16_t videoPID;
 	bouquetCommonData_t data;
 	char channelsName[64];
 	char transponderName[64];
@@ -707,6 +709,10 @@ void bouquet_saveLamedb(char *fileName)
 {
 	dprintf("Save services list in lamedb\n");
 	char dirName[BUFFER_SIZE];
+	char buf[BUFFER_SIZE];
+	char bufPID[BUFFER_SIZE];
+	uint16_t elPID;
+	uint16_t flagPID;
 	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 	FILE *fd;
@@ -758,7 +764,6 @@ void bouquet_saveLamedb(char *fileName)
 	}
 	fprintf(fd, "end\n");
 
-
 	fprintf(fd, "services\n");
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
@@ -766,7 +771,24 @@ void bouquet_saveLamedb(char *fileName)
 		element = found_transpounder(srvIdx);
 		fprintf(fd, "%04x:%08x:%04x:%04x:%d:0\n", srvIdx->common.service_id, element->data.name_space, element->data.transport_stream_id, element->data.network_id, srvIdx->service->service_descriptor.service_type);
 		fprintf(fd, "%s\n", srvIdx->data.channelsName);
-		fprintf(fd, "p:%s,f:40\n", fileName);
+		sprintf(buf, "p:%s,", fileName);
+		flagPID = 40;
+		if(dvb_hasMediaType(srvIdx->service, mediaTypeVideo)) {
+			elPID = dvb_getVideoPid(srvIdx->service);
+			sprintf(bufPID, "c:00%04x,", elPID);
+			strcat(buf,bufPID);
+			flagPID = 44;
+		}
+		if(dvb_hasMediaType(srvIdx->service, mediaTypeAudio)) {
+			elPID = dvb_getAudioPid(srvIdx->service, srvIdx->data.audio_track);
+			sprintf(bufPID, "c:01%04x,", elPID);
+			strcat(buf,bufPID);
+			flagPID = 44;
+		}
+		elPID = dvb_getVideoPid(srvIdx->service);
+		sprintf(bufPID, "f:%d", flagPID);
+		strcat(buf,bufPID);
+		fprintf(fd, "%s\n", buf);
 	}
 	fprintf(fd, "end\n");
 	free_elements(&head_ts_list);
@@ -1367,19 +1389,48 @@ void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 			sprintf(lamedb_data.channelsName, "%s", service_name);
 
 			//parese bouquet pName
-			char bouqName[CHANNEL_BUFFER_NAME];
-			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
-				break;
-			}
-			memset(bouqName, 0, strlen(bouqName));
-			sscanf(buf, "p:%s\n", bouqName);
-
+			char bouquetBuf[CHANNEL_BUFFER_NAME];
 			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
 			}
 
-			if((strlen(bouqName) < 1) && (strncasecmp(pName, bouqName, strlen((pName))) != 0)) {
-				continue;
+			memset(bouquetBuf, 0, strlen(bouquetBuf));
+			char *buffer;
+			uint32_t videoPID;
+			uint32_t audioPID;
+
+			if (strncasecmp(buf, "p:", 2) == 0) {
+				buffer = strchr(buf, ',');
+				if (buffer != NULL) {
+					strncpy(lamedb_data.transponderName, buf + 2, buffer - buf - 2);
+					buffer = buf + 3 + strlen(lamedb_data.transponderName);
+				}
+			}
+			if (strncasecmp(buffer, "c:00", 4) == 0) {
+				sscanf(buffer + 4, "%04x",&videoPID);
+				buffer = buffer + 9;
+
+			}
+			if (strncasecmp(buffer, "c:01", 4) == 0) {
+				sscanf(buffer + 4, "%04x",&audioPID);
+				buffer = buffer + 9;
+			}
+			if (strncasecmp(buffer, "c:02", 4) == 0) {
+				buffer = buffer + 9;
+			}
+			if (strncasecmp(buffer, "c:03", 4) == 0) {
+				buffer = buffer + 9;
+			}
+			if (strncasecmp(buffer, "c:04", 4) == 0) {
+				buffer = buffer + 9;
+			}
+			if (strncasecmp(buffer, "f:44", 4) == 0) {
+				lamedb_data.audioPID = audioPID;
+				lamedb_data.videoPID = videoPID;
+			}
+
+			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
+				break;
 			}
 			bouquets_addlamedbData(listHead, &lamedb_data);
 		} while(strncasecmp(buf, "end", 3) != 0);

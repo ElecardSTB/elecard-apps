@@ -391,6 +391,7 @@ int dvb_getAudioCount(EIT_service_t *service);
  *   @return Audio track PID or -1 on error
  */
 uint16_t dvb_getAudioPid(EIT_service_t *service, int audio);
+uint16_t dvb_getVideoPid(EIT_service_t *service);
 
 /**  @ingroup dvb_service
  *   @brief Function used to get audio type of specified track of a given channel
