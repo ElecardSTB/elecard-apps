@@ -465,7 +465,7 @@ int enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 	snprintf(channelEntry, sizeof(channelEntry), "%s: %s", _T("PLAYLIST_NOW_SELECT"), bouquet_getDigitalBouquetName());
 	interface_addMenuEntryDisabled(channelMenu, channelEntry, 0);
 	interface_addMenuEntry(channelMenu, _T("PLAYLIST_UPDATE_LIST"), bouquet_updateDigitalBouquetList, NULL, settings_interface);
-	interface_addMenuEntryDisabled(channelMenu, "List of analog channels:", 0);
+	interface_addMenuEntryDisabled(channelMenu, "List of digital channels:", 0);
 
 	while ((name = strList_get(&digitalBouquet.NameDigitalList, i) )!= NULL) {
 		snprintf(channelEntry, sizeof(channelEntry), "%02d %s",i + 1, name);
