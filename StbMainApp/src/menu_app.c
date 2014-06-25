@@ -178,7 +178,7 @@ void menu_buildMainMenu()
 {
 	char *str = NULL;
 	int main_icons[4] = { 0, 0, 0,
-#if (defined ENABLE_FAVORITES) && !(defined ENABLE_VIDIMAX)
+#if (defined ENABLE_FAVORITES) && !(defined ENABLE_VIDIMAX) && !(defined ENABLE_FUSION)
 		statusbar_f4_favorites
 #else
 		0

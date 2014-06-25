@@ -1871,6 +1871,25 @@ int fusion_getCommandOutput (char * cmd, char * result)
 	return 0;
 }
 
+void * fusion_threadFlipCreep (void * param)
+{
+	int needUpdate;
+	while (1)
+	{
+		needUpdate = 0;
+		if (FusionObject.creepline){
+			needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
+		}
+
+		if (needUpdate){
+			interface_displayCreepline();
+		}
+		fusion_wait(10);
+	}
+	pthread_exit((void *)&gStatus);
+	return (void*)NULL;
+}
+
 void * fusion_threadCheckReboot (void * param)
 {
 	time_t now;
@@ -1880,10 +1899,7 @@ void * fusion_threadCheckReboot (void * param)
 	{
 		if (strlen(FusionObject.firmware) && strlen(FusionObject.reboottime))
 		{
-			char localTimestamp[32] = {0};
-			char remoteTimestamp[32] = {0};
-			fusion_getCommandOutput ("cat /firmwareDesc | grep \"pack name:\" | tr -s ' ' | cut -d'.' -f3", localTimestamp);  // eg. 201406111921
-			//eprintf ("%s(%d): localTimestamp = %s\n", __FUNCTION__, __LINE__, localTimestamp);
+			char remoteTimestamp[FUSION_FIRMWARE_VER_LEN] = {0};
 
 			// get datetime of remote firmware
 			char * ptrDev = strstr(FusionObject.firmware, "dev");
@@ -1899,7 +1915,7 @@ void * fusion_threadCheckReboot (void * param)
 				}
 			}
 
-			if (strlen (remoteTimestamp) && strcmp(localTimestamp, remoteTimestamp))
+			if (strlen (remoteTimestamp) && strcmp(FusionObject.localFirmwareVer, remoteTimestamp))
 			{
 				time (&now);
 				nowDate = *localtime (&now);
@@ -1950,6 +1966,9 @@ void * fusion_threadCreepline(void * param)
 			gettimeofday(&tv, NULL);
 			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 			eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
+
+			FusionObject.positionCreep = 0; // test
+			FusionObject.deltaTime = 0; // test
 		}
 		else if (result == FUSION_SAME_CREEP && FusionObject.creepShown)
 		{
@@ -1958,6 +1977,7 @@ void * fusion_threadCreepline(void * param)
 			gettimeofday(&tv, NULL);
 			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 			FusionObject.creepShown = 0;
+			FusionObject.deltaTime = 0;
 		}
 		fusion_wait(FusionObject.checktime * 1000);
 	}
@@ -2090,11 +2110,9 @@ int fusion_refreshDtmfEvent(void *pArg)
 int fusion_refreshViewEvent(void *pArg)
 {
 	int needUpdate = 0;
-	pthread_mutex_lock(&FusionObject.mutexCreep);
 	if (FusionObject.creepline){
 		needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
 	}
-	pthread_mutex_unlock(&FusionObject.mutexCreep);
 
 	if (needUpdate){
 // 		interface_displayMenu(1);
@@ -2150,8 +2168,14 @@ int fusion_removeFirmwareFormFlash()
 		sprintf (command, "rm %s/*.efp", g_usbRoot);
 		system (command);
 	}
-
 	return result;
+}
+
+void fusion_getLocalFirmwareVer()
+{
+	FusionObject.localFirmwareVer[0] = '\0';
+	fusion_getCommandOutput ("cat /firmwareDesc | grep \"pack name:\" | tr -s ' ' | cut -d'.' -f3", FusionObject.localFirmwareVer);  // eg. 201406111921
+	eprintf ("%s(%d): local firmware version = %s\n", __FUNCTION__, __LINE__, FusionObject.localFirmwareVer);
 }
 
 void fusion_startup()
@@ -2164,17 +2188,19 @@ void fusion_startup()
 
 	fusion_getSecret();
 	fusion_removeFirmwareFormFlash();
+	fusion_getLocalFirmwareVer();
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
 	pthread_mutex_init(&FusionObject.mutexDtmf, NULL);
 
-	interface_addEvent(fusion_refreshViewEvent, (void*)NULL, 10, 1);
+	//interface_addEvent(fusion_refreshViewEvent, (void*)NULL, 10, 1);		// test, was here
 	interface_addEvent(fusion_refreshDtmfEvent, (void*)NULL, FUSION_REFRESH_DTMF_MS, 1);
 	FusionObject.currentDtmfDigit = '_';
 
 	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
 	pthread_create(&FusionObject.threadCheckReboot, NULL, fusion_threadCheckReboot, (void*)NULL);
+	pthread_create(&FusionObject.threadFlipCreep, NULL, fusion_threadFlipCreep, (void*)NULL);
 
 	return;
 }
@@ -2212,13 +2238,23 @@ int fusion_getSecret ()
 }
 
 static char fusion_curlError[CURL_ERROR_SIZE];
-int fusion_streamPos; 
+int fusion_streamPos;
+int fusion_videoStreamPos;
 
 size_t fusion_curlCallback(char * data, size_t size, size_t nmemb, void * stream)
 {
 	int writtenBytes = size * nmemb;
 	memcpy ((char*)stream + fusion_streamPos, data, writtenBytes);
 	fusion_streamPos += writtenBytes;
+	return writtenBytes;
+}
+
+size_t fusion_curlCallbackVideo(char * data, size_t size, size_t nmemb, void * stream)
+{
+	int writtenBytes = size * nmemb;
+	FILE * f = (FILE*)stream;
+	fwrite(data, 1, writtenBytes, f);
+	fusion_videoStreamPos += writtenBytes;
 	return writtenBytes;
 }
 
@@ -2247,17 +2283,18 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 
-	eprintf ("%s: rq: %s\n", __FUNCTION__, url);
+	//eprintf ("%s: rq: %s\n", __FUNCTION__, url);
 
 	retCode = curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 	curl = NULL;
-#ifdef FUSION_TEST
+/*#ifdef FUSION_TEST
 	char cuttedStream[256];
 	snprintf (cuttedStream, 256, "%s", curlStream);
 	eprintf ("ans: %s ...\n", cuttedStream);
 	//eprintf ("ans: %s\n", playlistBuffer);
 #endif
+*/
 
 	if (retCode != CURLE_OK && retCode != CURLE_WRITE_ERROR)
 	{
@@ -2456,9 +2493,176 @@ long fusion_getRemoteFileSize(char * url)
 	}
 	curl_easy_cleanup(curl);
 
-	eprintf ("%s: RemoteFileSize = %ld for %s...\n", __FUNCTION__, (long)remoteFileSize, url);
+	//eprintf ("%s: RemoteFileSize = %ld for %s...\n", __FUNCTION__, (long)remoteFileSize, url);
 	return (long)remoteFileSize;
 }
+
+int fusion_checkFileIsDownloaded(char * remotePath, char * localPath)
+{
+	long int localFileSize = 0;
+	int remoteSize = 0;
+	if (!remotePath || !localPath) return 0;
+
+	// get local size
+	FILE * f = fopen(localPath, "rb");
+	if (!f) return 0;
+	fseek(f, 0, SEEK_END);
+	localFileSize = ftell(f);
+	fclose(f);
+	if (localFileSize == 0) return 0;
+
+	// get remote size
+	remoteSize = fusion_getRemoteFileSize(remotePath);
+
+	//eprintf ("%s: remoteFileSize = %ld, localFileSize = %ld\n", __FUNCTION__, remoteSize, localFileSize);
+	if (remoteSize == localFileSize) return 1;
+	return 0;
+}
+
+int fusion_createMarksDirectory(char * folderPath)
+{
+	if (!folderPath) return -1;
+	if (fusion_checkDirectory("/tmp/fusionmarks") != 1){
+		system ("mkdir /tmp/fusionmarks");
+		sprintf (folderPath, "/tmp/fusionmarks");
+		eprintf ("%s(%d): Created folderToSaveMarks = %s.\n", __FUNCTION__, __LINE__, folderPath);
+	}
+	return 0;
+}
+
+CURLcode fusion_getVideoByCurl (char * url, void * fsink/*char * curlStream*/, int * pStreamLen, curlWriteCB cb)
+{
+	CURLcode retCode = CURLE_OK;
+	CURL * curl = NULL;
+
+	if (!url || !strlen(url)) return -1;
+
+	curl = curl_easy_init();
+	if (!curl) return -1;
+
+	*pStreamLen = 0;
+	fusion_videoStreamPos = 0;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, fusion_curlError);
+	//curl_easy_setopt(curl, CURLOPT_WRITEDATA, curlStream);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fsink);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60);  // 15
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60);  // 15
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
+	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+
+	//eprintf ("%s: rq: %s\n", __FUNCTION__, url);
+
+	retCode = curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
+	curl = NULL;
+
+	if (retCode != CURLE_OK && retCode != CURLE_WRITE_ERROR)
+	{
+		eprintf ("%s: ERROR! %s\n", __FUNCTION__, fusion_curlError);
+		return retCode;
+	}
+	*pStreamLen = fusion_videoStreamPos;
+	return CURLE_OK;
+}
+
+int fusion_downloadMarkFile(int index, char * folderPath)
+{
+	char url[PATH_MAX];
+	char localTsPath[PATH_MAX];
+	char localPathInProgress[PATH_MAX];
+	char symlinkPath[PATH_MAX];
+	char command[PATH_MAX];
+	int buflen = 0;
+	char * ptr, *ptrSlash;
+	FILE * f;
+
+	if (index < 0 || index > FUSION_MAX_MARKS) return -1;
+	if (!strlen(FusionObject.marks[index].link)) return 0;
+
+	// make filename from url
+	sprintf (url, "%s", FusionObject.marks[index].link);
+	ptr = strstr(url, "http:");
+	if (ptr == NULL) return -1;
+	ptr += 7;
+
+	// replace / with _
+	while ((ptrSlash = strchr(ptr, '/')) != NULL){
+		ptrSlash[0] = '_';
+	}
+
+	sprintf (localTsPath, "%s/%s", folderPath, ptr);
+	sprintf (symlinkPath, "%s/%d_%d.ts", folderPath, index, FusionObject.marks[index].duration);
+	//eprintf ("%s(%d): localTsPath is %s.\n", __FUNCTION__, __LINE__, localTsPath);
+	if (fusion_checkFileIsDownloaded(FusionObject.marks[index].link, localTsPath) != 1)  // file is ok
+	{
+		// make name with *.part to indicate that it is not ready
+		snprintf (localPathInProgress, "%s.part", localTsPath);
+		f = fopen (localPathInProgress, "wb");
+		if (!f){
+			eprintf ("%s(%d): ERROR! Couldn't open file %s for writing.\n", __FUNCTION__, __LINE__, localPathInProgress);
+			return -1;
+		}
+		fusion_getVideoByCurl(FusionObject.marks[index].link, (void*)f, &buflen, (curlWriteCB)fusion_curlCallbackVideo);
+		eprintf ("%s(%d): Got %s file of size %d.\n", __FUNCTION__, __LINE__, FusionObject.marks[index].link, buflen);
+		fclose (f);
+		// rename file to indicate it is ready
+		snprintf (command, PATH_MAX, "mv %s %s", localPathInProgress, localTsPath);
+	}
+
+	// create symlink, remove old one if exists
+	//eprintf ("%s(%d): create new symlink %s to %s.\n", __FUNCTION__, __LINE__, symlinkPath, localTsPath);
+	sprintf (command, "ln -sf %s %s", localTsPath, symlinkPath);
+	system (command);
+	return 0;
+}
+
+
+int fusion_removeOldMarkVideo(char * folderPath)
+{
+	DIR *d;
+	int i;
+	struct dirent *dir;
+	if (!folderPath) return -1;
+
+	d = opendir(folderPath);
+	if (!d) return -1;
+
+	while ((dir = readdir(d)) != NULL)
+	{
+		if (dir->d_type == DT_REG && strstr(dir->d_name, ".ts"))
+		{
+			char filepath [PATH_MAX];
+			sprintf (filepath, "%s/%s", folderPath, dir->d_name);
+
+			// find index from dir->d_name
+			char * ptrTs = strstr(dir->d_name, ".ts");
+			if (ptrTs){
+				char indexString[PATH_MAX];
+				int index;
+				snprintf (indexString, (int)(ptrTs - dir->d_name + 1), "%s", dir->d_name);
+				//eprintf ("%s(%d): TS found: %s\n", __FUNCTION__, __LINE__, indexString);
+				index = atoi(indexString);
+				if ((index > 0) && (index < FUSION_MAX_MARKS)){
+					if (FusionObject.marks[index].duration == 0)
+					{
+						char cmd[PATH_MAX];
+						snprintf (cmd, PATH_MAX, "rm -f %s", filepath);
+						eprintf ("%s(%d): Remove %s\n", __FUNCTION__, __LINE__, cmd);
+						system (cmd);
+					}
+				}
+			}
+		}
+	}
+	closedir(d);
+
+	return 0;
+}
+
 
 int fusion_getCreepAndLogo ()
 {
@@ -2620,7 +2824,7 @@ int fusion_getCreepAndLogo ()
 			else continue;
 
 			sprintf (FusionObject.logos[i].url, "%s", jsonItem->valuestring);
-			eprintf ("%s(%d): logo[%d] = %s\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].url);
+			//eprintf ("%s(%d): logo[%d] = %s\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].url);
 
 			long logoFileSize = fusion_getRemoteFileSize(FusionObject.logos[i].url);
 
@@ -2641,8 +2845,8 @@ int fusion_getCreepAndLogo ()
 				eprintf ("%s(%d): WARNING! Incorrect logo url\n", __FUNCTION__, __LINE__); 
 				FusionObject.logos[i].filepath[0] = '\0';
 			}
-			eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
-				i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
+			//eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
+			//	i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
 			
 			// get local file size and compare
 			// dont donwload if we have logo on flash
@@ -2674,7 +2878,6 @@ int fusion_getCreepAndLogo ()
 		int allCreepsLen = 0;
 		int allCreepsWithSpaceLen = 0;
 		char * allCreeps;
-		eprintf ("%s(%d): creepCount = %d\n", __FUNCTION__, __LINE__, creepCount);
 		for (i=0; i<creepCount; i++){
 			cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
 			if (!jsonItem) continue;
@@ -2716,22 +2919,25 @@ int fusion_getCreepAndLogo ()
 			if (allCreeps[k] == '\n' || allCreeps[k] == '\r') allCreeps[k] = ' ';
 		}
 
-		pthread_mutex_lock(&FusionObject.mutexCreep);
 		if (!FusionObject.creepline){
 			result = FUSION_NEW_CREEP;
+
+			pthread_mutex_lock(&FusionObject.mutexCreep);
 			FusionObject.creepline = (char*)malloc(allCreepsWithSpaceLen);
 			if (!FusionObject.creepline) {
 				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
 				cJSON_Delete(root);
+				pthread_mutex_unlock(&FusionObject.mutexCreep);
 				return FUSION_SAME_CREEP;
 			}
 			FusionObject.creepline[0] = '\0';
-
 			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
-			eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+			pthread_mutex_unlock(&FusionObject.mutexCreep);
+			//eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
 		}
 		else if (strcmp(FusionObject.creepline, allCreeps)) {
 			result = FUSION_NEW_CREEP;
+			pthread_mutex_lock(&FusionObject.mutexCreep);
 			if (FusionObject.creepline) {
 				free (FusionObject.creepline);
 				FusionObject.creepline = NULL;
@@ -2740,14 +2946,61 @@ int fusion_getCreepAndLogo ()
 			if (!FusionObject.creepline) {
 				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
 				cJSON_Delete(root);
+				pthread_mutex_unlock(&FusionObject.mutexCreep);
 				return FUSION_SAME_CREEP;
 			}
 			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
-			eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+			pthread_mutex_unlock(&FusionObject.mutexCreep);
+			//eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
 		}
 		pgfx_font->GetStringWidth(pgfx_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
 		pthread_mutex_unlock(&FusionObject.mutexCreep);
 	}
+
+	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
+	if (jsonMarks){
+		char folderToSaveMarks[PATH_MAX];
+		fusion_createMarksDirectory(folderToSaveMarks);
+
+		int markCount = cJSON_GetArraySize(jsonMarks);
+		for (i=0; i<markCount; i++)
+		{
+			cJSON * jsonItem = cJSON_GetArrayItem(jsonMarks, i);
+			if (jsonItem){
+				long fileIndex = -1;
+				cJSON * jsonMarkLink = cJSON_GetObjectItem(jsonItem, "link");
+				cJSON * jsonMarkDuration = cJSON_GetObjectItem(jsonItem, "duration");
+
+				if (jsonItem->string){
+					char * err;
+					fileIndex = strtol(jsonItem->string, &err, 10);
+					if ((*err) || (fileIndex < 0) || (fileIndex > FUSION_MAX_MARKS)){
+						eprintf ("%s(%d): WARNING! file index in marks is incorrect: %s.\n", __FUNCTION__, __LINE__, jsonItem->string);
+						continue;
+					}
+					fileIndex = fileIndex - 1; // because it starts from 1
+				}
+
+				if (jsonMarkDuration && jsonMarkDuration->valuestring){
+					int markIndex = atoi(jsonMarkDuration->valuestring);
+					if (markIndex > 0){
+						FusionObject.marks[fileIndex].duration = markIndex;
+					}
+					else FusionObject.marks[fileIndex].duration = 0;
+				}
+
+				if (jsonMarkLink && jsonMarkLink->valuestring){
+					if (strcmp(FusionObject.marks[fileIndex].link, jsonMarkLink->valuestring))
+					{
+						sprintf (FusionObject.marks[fileIndex].link, "%s", jsonMarkLink->valuestring);
+						fusion_downloadMarkFile(fileIndex, folderToSaveMarks);
+					}
+				}
+			}
+		}
+		//fusion_removeOldMarkVideo(folderToSaveMarks);		// todo : remove symlinks and old video more correct
+	} // if (jsonMarks)
+
 	cJSON_Delete(root);
 	return result;
 }
@@ -2761,6 +3014,10 @@ void fusion_cleanup()
 	if (FusionObject.threadCheckReboot){
 		pthread_cancel(FusionObject.threadCheckReboot);
 		pthread_join(FusionObject.threadCheckReboot, NULL);
+	}
+	if (FusionObject.threadFlipCreep){
+		pthread_cancel(FusionObject.threadFlipCreep);
+		pthread_join(FusionObject.threadFlipCreep, NULL);
 	}
 	if (FusionObject.creepline) {
 		free (FusionObject.creepline);

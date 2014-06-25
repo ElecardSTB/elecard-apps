@@ -943,11 +943,14 @@ typedef struct
 #define FUSION_NEW_CREEP  (2)
 
 #define FUSION_DATETIME_LEN (64)
+#define FUSION_FIRMWARE_VER_LEN (32)
 
 #define FUSION_MODE_UNDEF (0)
 #define FUSION_MODE_FILES (1)
 #define FUSION_MODE_HLS   (2)
 #define FUSION_MODE_TV    (3)
+
+#define FUSION_MAX_MARKS 100
 
 typedef enum {
 	FUSION_TOP_LEFT = 0,
@@ -961,6 +964,11 @@ typedef struct {
 	char filepath[PATH_MAX];
 	fusion_position_t position;
 } fusion_logo_t;
+
+typedef struct {
+	char link[PATH_MAX];
+	int duration;
+} fusion_mark_t;
 
 typedef struct _interfaceFusionObject_t {
 	unsigned char secret[64];
@@ -977,6 +985,7 @@ typedef struct _interfaceFusionObject_t {
 
 	pthread_t threadCreepHandle;
 	pthread_t threadCheckReboot;
+	pthread_t threadFlipCreep;
 	int checktime;
 
 	unsigned long long creepStartTime;
@@ -997,8 +1006,12 @@ typedef struct _interfaceFusionObject_t {
 	long lastModified;
 	char firmware[PATH_MAX];
 	char reboottime[FUSION_DATETIME_LEN];
+	char localFirmwareVer[FUSION_FIRMWARE_VER_LEN];
 
 	char demoUrl[PATH_MAX];
+	fusion_mark_t marks[FUSION_MAX_MARKS];
+
+	double deltaTime;
 
 } interfaceFusionObject_t;
 #endif
