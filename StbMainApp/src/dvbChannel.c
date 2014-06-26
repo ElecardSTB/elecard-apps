@@ -263,7 +263,7 @@ service_index_t *dvbChannel_add(void)
 	return new;
 }
 
-int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_t *data, uint8_t flag)
+int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_t *data, uint8_t flag)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
@@ -278,14 +278,13 @@ int32_t dvbChannel_addServiceIndexDate(EIT_common_t *common, service_index_data_
 	return 0;
 }
 
-int32_t dvbChannel_addService(EIT_service_t *service, uint16_t visible, uint8_t flag, uint16_t parent_control)
+int32_t dvbChannel_addService(EIT_service_t *service, service_index_data_t *data, uint8_t flag)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->service = service;
 		memcpy(&new->common, &service->common ,sizeof(EIT_common_t));
-		new->data.visible = visible;
-		new->data.parent_control = parent_control;
+		memcpy(&new->data, &data ,sizeof(service_index_data_t));
 		new->flag = flag;
 		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen((char *)service->service_descriptor.service_name));
 	} else {
@@ -358,7 +357,7 @@ static int32_t dvbChannel_readOrderConfig()
 				data.audio_track = objGetInt(subitem, "audio_track", 0);
 				data.visible = objGetInt(subitem, "visible", 1);
 				data.parent_control = objGetInt(subitem, "parent_control", 0);
-				dvbChannel_addServiceIndexDate(&common, &data, 0);
+				dvbChannel_addServiceIndexData(&common, &data, 0);
 			}
 		}
 	}
@@ -519,8 +518,11 @@ static int32_t dvbChannel_update(void)
 				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen((char *)p_srvIdx->service->service_descriptor.service_name));
 			}
 		} else {
+			service_index_data_t data;
 			curService->common.media_id = curService->original_network_id;
-			dvbChannel_addService(curService, 1, 0, 0);
+			data.visible = 1;
+			data.parent_control = 0;
+			dvbChannel_addService(curService, &data, 0);
 		}
 	}
 
