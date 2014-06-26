@@ -126,7 +126,7 @@ int32_t bouquet_getEnableStatus(void);
 void bouquet_init(void);
 void bouquet_terminate(void);
 void bouquet_setEnableStatus(int32_t i);
-void bouquet_getOffairDigitalName(char *dir, char *fname, char *name);
+void bouquet_getOffairDigitalName(char *name, size_t size);
 char *bouquet_getDigitalBouquetName(void);
 char *bouquet_getAnalogBouquetName(void);
 char *bouquet_getNameBouquetList(list_element_t **head, int32_t number);

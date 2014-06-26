@@ -308,15 +308,14 @@ int32_t dvbChannel_remove(service_index_t *srvIdx)
 
 static int32_t dvbChannel_readOrderConfig()
 {
-	char *bouquetName;
-	bouquetName = bouquet_getDigitalBouquetName();
 	FILE *fd = NULL;
 	cJSON *root;
 	cJSON *format;
 	char *data;
 	long len;
 	char fname[BUFFER_SIZE];
-	bouquet_getOffairDigitalName(CONFIG_DIR, fname, bouquetName);
+
+	bouquet_getOffairDigitalName(fname, sizeof(fname));
 	dprintf("read file %s\n", fname);
 	fd = fopen(fname, "r");
 	if(fd == NULL) {
@@ -362,7 +361,7 @@ static int32_t dvbChannel_readOrderConfig()
 		}
 	}
 	cJSON_Delete(root);
-	dprintf("%s imported services: %s\n", __FUNCTION__, bouquetName);
+	dprintf("%s imported services: %s\n", __func__, fname);
 	return 0;
 }
 
@@ -374,8 +373,6 @@ int32_t dvbChannel_writeOrderConfig(void)
 	char *render;
 	struct list_head *pos;
 	uint32_t i = 0;
-	char *bouquetName;
-	bouquetName = bouquet_getDigitalBouquetName();
 
 	format = cJSON_CreateArray();
 	if(!format) {
@@ -415,7 +412,8 @@ int32_t dvbChannel_writeOrderConfig(void)
 	if(render) {
 		FILE *fd = NULL;
 		char fname[BUFFER_SIZE];
-		bouquet_getOffairDigitalName(CONFIG_DIR, fname, bouquetName);
+
+		bouquet_getOffairDigitalName(fname, sizeof(fname));
 		fd = fopen(fname, "w");
 		if (fd) {
 			fwrite(render, strlen(render), 1, fd);
@@ -492,15 +490,15 @@ void dvbChannel_terminate(void)
 static int32_t dvbChannel_update(void)
 {
 	dprintf("%s[%d]\n", __func__, __LINE__);
-	if (swap_playlistEditor()) {
+	if(swap_playlistEditor()) {
 		return 0;
 	}
 
 	playlist_editor_cleanup(eBouquet_digital);
 
-	list_element_t		*service_element;
-	struct list_head    *pos;
-	struct list_head    *n;
+	list_element_t   *service_element;
+	struct list_head *pos;
+	struct list_head *n;
 
 	if(list_empty(&g_dvb_channels.orderNoneHead)) {
 		dvbChannel_readOrderConfig();

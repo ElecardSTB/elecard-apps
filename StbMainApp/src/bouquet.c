@@ -165,7 +165,7 @@ static void bouquets_addTranspounderData(transpounder_t *tspElement);
 static void bouquets_addlamedbData(struct list_head *listHead, lamedb_data_t *lamedbElement);
 static void bouquet_loadLamedb( const char *bouquet_file, struct list_head *listHead);
 static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element);
-static void bouquet_revomeFile(char *bouquetName);
+static void bouquet_removeFile(char *bouquetName);
 static void bouquet_loadDigitalBouquetsList(int download);
 static bouquet_element_list_t *digitalList_add(struct list_head *listHead);
 
@@ -191,14 +191,14 @@ static int32_t bouquet_createDirectory(const char *bouquetName);
 /*******************************************************************
 * FUNCTION IMPLEMENTATION                                          *
 ********************************************************************/
-void bouquet_revomeFile(char *bouquetName)
+void bouquet_removeFile(char *bouquetName)
 {
-	char buffName[64];
+	char buffName[256];
 	//remove dir
 	sprintf(buffName, "rm -r %s/%s/", BOUQUET_CONFIG_DIR, bouquetName);
 	dbg_cmdSystem(buffName);
 	//remove offair
-	bouquet_getOffairDigitalName(CONFIG_DIR, buffName, bouquetName);
+	bouquet_getOffairDigitalName(buffName, sizeof(buffName));
 	remove(buffName);
 }
 
@@ -569,9 +569,14 @@ char *bouquet_getAnalogBouquetName(void)
 }
 
 
-void bouquet_getOffairDigitalName(char *dir, char *fname, char *name)
+void bouquet_getOffairDigitalName(char *name, size_t size)
 {
-	sprintf(fname, "%s/offair.%s%s", dir, (name == NULL ? "" : name), (name == NULL ? "conf" : ".conf"));
+	char *bouquetName = bouquet_getDigitalBouquetName();
+	if(bouquetName) {
+		snprintf(name, size, CONFIG_DIR "/offair.%s.conf", bouquetName);
+	} else {
+		snprintf(name, size, CONFIG_DIR "/offair.conf");
+	}
 }
 
 static void bouquet_getAnalogJsonName(char *fname, const char *name)
@@ -1039,7 +1044,7 @@ int bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 	gfx_stopVideoProvider(screenMain, 1, 1);
 	if(bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-		bouquet_revomeFile(bouquetName);
+		bouquet_removeFile(bouquetName);
 		interface_hideMessageBox();
 		strList_remove(&digitalBouquet.NameDigitalList, bouquetName);
 		bouquet_saveBouquetsList();
