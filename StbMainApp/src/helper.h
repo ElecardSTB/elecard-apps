@@ -23,6 +23,17 @@
 #define TABLE_INT_INT_END_VALUE		{ TABLE_INT_END_VALUE, TABLE_INT_END_VALUE }
 #define TABLE_INT_STR_END_VALUE		{ TABLE_INT_END_VALUE, TABLE_STR_END_VALUE }
 
+
+#define dbg_printf(fmt, args...) \
+	{ \
+		struct timeval tv; \
+		if(gettimeofday(&tv, NULL) == 0) { \
+			fprintf(stderr, "%09d.%06d: ", (int32_t)tv.tv_sec, (int32_t)tv.tv_usec); \
+		} \
+		fprintf(stderr, "%s:%s()[%d]: " fmt, __FILE__, __func__, __LINE__, ##args); \
+	}
+
+
 /******************************************************************
 * EXPORTED TYPEDEFS                            [for headers only] *
 *******************************************************************/
