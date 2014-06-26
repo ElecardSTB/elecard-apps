@@ -1016,6 +1016,16 @@ typedef struct _interfaceFusionObject_t {
 } interfaceFusionObject_t;
 #endif
 
+struct __toggleEntryArg_t;
+typedef int32_t (*toggleCallback_t)(struct __toggleEntryArg_t *);
+typedef struct __toggleEntryArg_t {
+	const char            *name;
+	const table_IntStr_t  *map;
+	int32_t               *pValue;
+	toggleCallback_t       pCallback;
+} toggleEntryArg_t;
+
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
@@ -1035,6 +1045,8 @@ extern wchar_t keypad_local[8][16];
 
 extern wchar_t keypad[KEYPAD_MAX_ROWS][KEYPAD_MAX_CELLS];
 #endif
+
+extern table_IntStr_t toggleOnOffMap[];
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -1345,6 +1357,8 @@ static inline int  interface_addMenuEntry(interfaceMenu_t *pMenu, const char *te
 {
 	return interface_addMenuEntry2(pMenu, text, 1, pActivate, pArg, thumbnail);
 }
+
+int32_t interface_addToggleMenuEntry(interfaceMenu_t *pMenu, const toggleEntryArg_t *arg);
 
 static inline int interface_setMenuEntryLabel(interfaceMenuEntry_t *menuEntry, const char *label)
 {

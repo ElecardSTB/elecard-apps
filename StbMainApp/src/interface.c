@@ -333,6 +333,12 @@ char keypad[KEYPAD_MAX_ROWS][KEYPAD_MAX_CELLS] = {
 };
 #endif
 
+table_IntStr_t toggleOnOffMap[] = {
+	{0, NULL},
+	{1, NULL},
+	TABLE_INT_STR_END_VALUE
+};
+
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
@@ -7168,9 +7174,13 @@ void interface_init()
 	err = pthread_create (&interfaceEventThread, NULL,
 						  interface_EventThread,
 						  NULL);
-	if (err)
+	if(err) {
 		eprintf("%s: failed to create event thread: %s\n", __FUNCTION__, strerror(err));
+	}
 	pthread_detach(interfaceEventThread);
+
+	toggleOnOffMap[0].value = _T("OFF");
+	toggleOnOffMap[1].value = _T("ON");
 
 	//dprintf("%s: dimensions: %dx%d\n", __FUNCTION__, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
 }
@@ -8755,3 +8765,68 @@ static int interface_editTimeDisplay(interfaceMenu_t* pMenu, DFBRectangle *rect,
 
 	return 0;
 }
+
+
+static int32_t interface_toggleMenuEntry(interfaceMenu_t *pMenu, void* pArg)
+{
+	toggleEntryArg_t *arg = (toggleEntryArg_t *)pArg;
+	const char *str = NULL;
+	int32_t i;
+	int32_t savedKey;
+
+	savedKey = *(arg->pValue);
+	for(i = 0; arg->map[i].value != TABLE_STR_END_VALUE; i++) {
+		if(arg->map[i].key == savedKey) {
+			int32_t nextI;
+			if(arg->map[i + 1].value != TABLE_STR_END_VALUE) {
+				nextI = i + 1;
+			} else {
+				nextI = 0;
+			}
+			*(arg->pValue) = arg->map[nextI].key;
+			str = arg->map[nextI].value;
+			break;
+		}
+	}
+	if(!str) {
+		eprintf("%s()[%d]: ERROR: Cant map value=%d!\n", __func__, __LINE__, *(arg->pValue));
+		str = "(unknown)";
+	}
+
+	if(arg->pCallback) {
+		if(arg->pCallback(pArg) != 0) {
+			eprintf("%s()[%d]: ERROR: Callback error!\n", __func__, __LINE__);
+			*(arg->pValue) = savedKey;
+			return 0;
+		}
+	}
+
+	snprintf(pMenu->menuEntry[pMenu->selectedItem].info, sizeof(pMenu->menuEntry[pMenu->selectedItem].info),
+			 "%s: %s", _T(arg->name), str);
+
+
+//	pMenu->pActivatedAction(pMenu, pMenu->pArg);
+	interface_displayMenu(1);
+	return 0;
+}
+
+int32_t interface_addToggleMenuEntry(interfaceMenu_t *pMenu, const toggleEntryArg_t *arg)
+{
+	char buf[128];
+	const char *str;
+
+	if(!arg || !arg->name || !arg->map) {
+		eprintf("%s()[%d]: ERROR: Bad arguments!\n", __func__, __LINE__);
+		return -1;
+	}
+	str = table_IntStrLookup(arg->map, *(arg->pValue), NULL);
+	if(!str) {
+		eprintf("%s()[%d]: ERROR: Cant map default value!\n", __func__, __LINE__);
+		return -2;
+	}
+	snprintf(buf, sizeof(buf), "%s: %s", _T(arg->name), str);
+	interface_addMenuEntry(pMenu, buf, interface_toggleMenuEntry, (void *)arg, thumbnail_configure);
+
+	return 0;
+}
+
