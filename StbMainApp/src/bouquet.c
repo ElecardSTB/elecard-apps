@@ -184,7 +184,8 @@ static int32_t bouquet_downloadAnalogConfigList(void);
 static void bouquet_parseBouquetsList(struct list_head *listHead, const char *path);
 
 static void bouquet_getAnalogJsonName(char *fname, const char *name);
-static int32_t bouquet_isExist(char *bouquetsFile);
+static int32_t bouquet_isExist(const char *bouquetName);
+static int32_t bouquet_createDirectory(const char *bouquetName);
 
 
 /*******************************************************************
@@ -203,8 +204,7 @@ void bouquet_revomeFile(char *bouquetName)
 
 void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead)
 {
-	switch (type)
-	{
+	switch(type) {
 		case eBouquet_digital:
 		{
 			struct list_head *pos;
@@ -229,16 +229,18 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 	struct list_head *pos;
 	service_index_t *srvIdx;
 	extern dvb_channels_t g_dvb_channels;
+	EIT_service_t *el = NULL;
 
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		srvIdx = list_entry(pos, service_index_t, orderNone);
-		if (srvIdx->common.service_id == element->service_id &&
-				srvIdx->common.transport_stream_id == element->data.transport_stream_id &&
-				srvIdx->common.media_id == element->data.network_id) {
+		if((srvIdx->common.service_id == element->service_id)
+			&& (srvIdx->common.transport_stream_id == element->data.transport_stream_id)
+			&& (srvIdx->common.media_id == element->data.network_id))
+		{
 			srvIdx->flag = 1;
 			srvIdx->data.parent_control = element->parent_control;
 
-			if (srvIdx->service != NULL) {
+			if(srvIdx->service != NULL) {
 				if(srvIdx->service->media.type == serviceMediaDVBC && element->transpounder.media.type == serviceMediaDVBC &&
 						srvIdx->service->media.dvb_c.frequency == element->transpounder.media.dvb_c.frequency &&
 						srvIdx->service->media.dvb_c.symbol_rate == element->transpounder.media.dvb_c.symbol_rate &&
@@ -263,12 +265,16 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 					return 0;
 				}
 				memset(srvIdx->service, 0, sizeof(EIT_service_t));
+			} else {
+				eprintf("ERROR: service not allocated!!!");
+				return -1;
 			}
+			el = srvIdx->service;
 			break;
 		}
 	}
-	EIT_service_t *el;
-	if (pos == &g_dvb_channels.orderNoneHead) {
+
+	if(el == NULL) {
 		list_element_t *cur_element = NULL;
 		if(dvb_services == NULL) {
 			dvb_services = cur_element = allocate_element(sizeof(EIT_service_t));
@@ -288,8 +294,6 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 		data.visible = 1;
 		data.parent_control = element->parent_control;
 		dvbChannel_addService(el, &data, 1);
-	} else {
-		el = srvIdx->service;
 	}
 
 	if(element->transpounder.media.type == serviceMediaDVBC) {
@@ -377,15 +381,14 @@ void bouquet_LoadingBouquet(typeBouquet_t type)
 static void bouquet_saveAllBouquet(void)
 {
 	char *bouquetName;
-	char buffName[128];
-	struct stat sb;
 
 	bouquetName = bouquet_getDigitalBouquetName();
-	if (bouquetName == NULL)
+	if(bouquetName == NULL) {
 		return;
-	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, bouquetName);
-	if(!(stat(buffName, &sb) == 0 && S_ISDIR(sb.st_mode))) {
-		mkdir(buffName, 0777);
+	}
+
+	if(!bouquet_isExist(bouquetName)) {
+		bouquet_createDirectory(bouquetName);
 	}
 
 	bouquet_saveBouquets(bouquetName, "tv");
@@ -499,20 +502,20 @@ int bouquet_updateDigitalBouquetList(interfaceMenu_t *pMenu, void *pArg)
 int bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	(void)pMenu;
-	char *name;
+	const char *oldBouquetName;
+	const char *newBouquetName;
 	int number;
 	number = CHANNEL_INFO_GET_CHANNEL(pArg);
-	name = bouquet_getDigitalBouquetName();
-	if((name != NULL) &&
-			(strcasecmp(name, strList_get(&digitalBouquet.NameDigitalList, number)) == 0)) {
+	oldBouquetName = bouquet_getDigitalBouquetName();
+	newBouquetName = strList_get(&digitalBouquet.NameDigitalList, number);
+	if(oldBouquetName && newBouquetName && (strcasecmp(oldBouquetName, newBouquetName) == 0)) {
 		return 0;
 	}
 	gfx_stopVideoProvider(screenMain, 1, 1);
 	dvbChannel_terminate();
 	dvb_clearServiceList(1);
-	bouquet_setDigitalBouquetName(strList_get(&digitalBouquet.NameDigitalList, number));
-	name = bouquet_getDigitalBouquetName();
-	if (name != NULL && !(bouquet_isExist(name))) {
+	bouquet_setDigitalBouquetName(newBouquetName);
+	if(newBouquetName && !(bouquet_isExist(newBouquetName))) {
 		bouquet_updateDigitalBouquet(NULL, NULL);
 	}
 	saveAppSettings();
@@ -537,14 +540,11 @@ void bouquet_setAnalogBouquetName(const char *name)
 
 void bouquet_setNewBouquetName(char *name)
 {
-	char buffName[64];
 	int status;
 
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, name);
-
-	status = mkdir(buffName, 0777);
-	if (status == 0) {
+	status = bouquet_createDirectory(name);
+	if(status == 0) {
 		sprintf(digitalBouquet.name, "%s", name);
 		strList_add(&digitalBouquet.NameDigitalList, name);
 		bouquet_saveBouquetsList();
@@ -730,12 +730,26 @@ void bouquet_setEnableStatus(int i)
 	bouquets_enable = i;
 }
 
-static int32_t bouquet_isExist(char *bouquetsFile)
+static int32_t bouquet_isExist(const char *bouquetName)
 {
 	char buffName[256];
-	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, bouquetsFile);
+	if(bouquetName == NULL) {
+		return 0;
+	}
+	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, bouquetName);
 
 	return helperCheckDirectoryExsists(buffName);
+}
+
+static int32_t bouquet_createDirectory(const char *bouquetName)
+{
+	char buffName[256];
+	if(bouquetName == NULL) {
+		return -1;
+	}
+	sprintf(buffName, "%s/%s", BOUQUET_CONFIG_DIR, bouquetName);
+
+	return mkdir(buffName, 0777);
 }
 
 void bouquet_saveLamedb(char *fileName)
@@ -1084,7 +1098,6 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 	if(bouquetName != NULL) {
 		char serverName[16];
 		char serverDir[256];
-		char filename[256];
 		char loginName[32];
 		char cmd[1024];
 		snprintf(cmd, sizeof(cmd), "mv %s/%s/ %s/%s_temp", BOUQUET_CONFIG_DIR, bouquetName, BOUQUET_CONFIG_DIR, bouquetName);
@@ -1096,14 +1109,12 @@ int bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg)
 		snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s.%s %s/%s", loginName, serverName, serverDir, bouquetName, "STB", BOUQUET_CONFIG_DIR, bouquetName);
 		dbg_cmdSystem(cmd);
 
-		sprintf(filename , "%s/%s", BOUQUET_CONFIG_DIR, bouquetName);
-		struct stat sb;
-		if(!(stat(filename, &sb) == 0 || S_ISDIR(sb.st_mode))) {
+		if(!bouquet_isExist(bouquetName)) {
 			snprintf(cmd, sizeof(cmd), "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/../bouquet/%s %s/%s", loginName, serverName, serverDir, bouquetName, BOUQUET_CONFIG_DIR, bouquetName);
 			dbg_cmdSystem(cmd);
 		}
 
-		if(!(stat(filename, &sb) == 0  || S_ISDIR(sb.st_mode))) {
+		if(!bouquet_isExist(bouquetName)) {
 			snprintf(cmd, sizeof(cmd), "mv %s/%s_temp/ %s/%s", BOUQUET_CONFIG_DIR, bouquetName, BOUQUET_CONFIG_DIR, bouquetName);
 		} else {
 			snprintf(cmd, sizeof(cmd), "rm -r %s/%s_temp/", BOUQUET_CONFIG_DIR, bouquetName);
@@ -1220,12 +1231,11 @@ static int32_t bouquet_downloadDigitalConfigList(char *path)
 
 void bouquet_init(void)
 {
-	struct stat sb;
-	if(!(stat(BOUQUET_CONFIG_DIR, &sb) == 0 && S_ISDIR(sb.st_mode))) {
+	if(!helperCheckDirectoryExsists(BOUQUET_CONFIG_DIR)) {
 		mkdir(BOUQUET_CONFIG_DIR, 0777);
 	}
 
-	if(!(stat(BOUQUET_CONFIG_DIR_ANALOG, &sb) == 0 && S_ISDIR(sb.st_mode))) {
+	if(!helperCheckDirectoryExsists(BOUQUET_CONFIG_DIR_ANALOG)) {
 		mkdir(BOUQUET_CONFIG_DIR_ANALOG, 0777);
 	}
 }

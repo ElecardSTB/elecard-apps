@@ -141,6 +141,7 @@ EIT_service_t *bouquet_findService(EIT_common_t *header);
 #else // ENABLE_DVB
 
 #define bouquet_init()
+#define bouquet_terminate()
 #define bouquet_setDigitalBouquetName(name)
 #define bouquet_setAnalogBouquetName(name)
 #define bouquet_setEnableStatus(n)
