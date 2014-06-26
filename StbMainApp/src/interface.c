@@ -2195,6 +2195,7 @@ void interface_displayCreepline(void)
 				0, 1);
 				*/
 				draw_string(copyCreep, interfaceInfo.screenWidth - position, interfaceInfo.screenHeight - 40);
+				free(copyCreep);
 		}
 		interface_flipStatusbarSurface();
 	}
