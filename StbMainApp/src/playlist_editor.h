@@ -8,34 +8,22 @@
 #include "interface.h"
 #include "bouquet.h"
 
+/******************************************************************
+* EXPORTED DATA                                [for headers only] *
+*******************************************************************/
+extern interfaceListMenu_t InterfacePlaylistMain;
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
 #ifdef ENABLE_DVB
-int32_t enterPlaylistDigitalSelect(interfaceMenu_t *pMenu, void* pArg);
-int32_t enterPlaylistAnalogSelect(interfaceMenu_t *pMenu, void* pArg);
-int32_t enterPlaylistEditorDigital(interfaceMenu_t *pMenu, void* pArg);
-int32_t enterPlaylistEditorAnalog(interfaceMenu_t *pMenu, void* pArg);
-void playList_saveName(int32_t ,char* , char*);
-void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int32_t count);
-void playlist_switchElementwithNext(int32_t source);
-void playlist_editor_removeElement(void);
-void playlist_editor_setupdate(void);
-int32_t getChannelEditor(void);
-void playlist_switchElement(int32_t , int32_t );
+
+int32_t playlistEditor_init(void);
+int32_t playlistEditor_terminate(void);
+
+
 void playlist_editor_cleanup(typeBouquet_t);
-int32_t get_statusLockPlaylist(void);
 int32_t swap_playlistEditor(void);
-
-#else //#ifdef ENABLE_DVB
-
-#define get_statusLockPlaylist()	0
-#define playList_saveName(...)
-#define playlist_editor_setupdate()
-#define playlist_switchElementwithNext(source)
-#define playList_nextChannelState(...)
-
 
 #endif //#ifdef ENABLE_DVB
 

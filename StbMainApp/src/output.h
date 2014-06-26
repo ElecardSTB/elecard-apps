@@ -92,11 +92,8 @@ extern interfaceListMenu_t OutputMenu;
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
-interfaceMenu_t *output_getPlaylistEditorMenu();
-char *output_getSelectedNamePlaylistEditor();
 void output_redrawMenu(interfaceMenu_t *pMenu);
-int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu);
-int enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu);
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -168,6 +165,8 @@ int output_setInput(interfaceMenu_t *pMenu, void* pArg);
 
 void output_onUpdate(int found);
 #endif
+
+int show_info(interfaceMenu_t* pMenu, void* pArg);
 
 #ifdef __cplusplus
 }

@@ -368,9 +368,6 @@ static int output_toggleVoipBuzzer(interfaceMenu_t* pMenu, void* pArg);
 #ifdef ENABLE_DVB
 static int output_enterDVBMenu(interfaceMenu_t *pMenu, void* notused);
 static int output_enterDiseqcMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistDigital(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistAnalog(interfaceMenu_t *pMenu, void* notused);
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbBandwidth(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDvbPolarization(interfaceMenu_t *pMenu, void* pArg);
@@ -462,13 +459,6 @@ void output_redrawMenu(interfaceMenu_t *pMenu)
 *******************************************************************/
 
 #ifdef ENABLE_DVB
-static interfaceListMenu_t InterfacePlaylistSelectDigital;
-static interfaceListMenu_t InterfacePlaylistSelectAnalog;
-interfaceListMenu_t InterfacePlaylistEditorDigital;
-interfaceListMenu_t InterfacePlaylistEditorAnalog;
-static interfaceListMenu_t InterfacePlaylistMain;
-static interfaceListMenu_t InterfacePlaylistAnalog;
-static interfaceListMenu_t InterfacePlaylistDigital;
 static interfaceListMenu_t DVBSubMenu;
 static interfaceListMenu_t DiSEqCMenu;
 
@@ -6173,42 +6163,6 @@ int output_toggleDhcpServer(interfaceMenu_t *pMenu, void* pForce)
 }
 #endif // ENABLE_LAN || ENABLE_WIFI
 
-interfaceMenu_t *output_getPlaylistEditorMenu(void) {
-	if (enablePlayListEditorMenu(interfaceInfo.currentMenu))
-		return interfaceInfo.currentMenu;
-	return NULL;
-}
-
-char *output_getSelectedNamePlaylistEditor(void)
-{
-	interfaceMenu_t  *baseMenu;
-	baseMenu = output_getPlaylistEditorMenu();
-	if (baseMenu != NULL)
-		return baseMenu->menuEntry[baseMenu->selectedItem].info;
-	return NULL;
-}
-
-int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
-{
-#ifdef ENABLE_DVB
-	if (!memcmp(interfaceMenu, &InterfacePlaylistEditorDigital.baseMenu, sizeof(interfaceListMenu_t)))
-		return 1;
-	if (!memcmp(interfaceMenu, &InterfacePlaylistEditorAnalog.baseMenu, sizeof(interfaceListMenu_t)))
-		return 2;
-#endif
-	return false;
-}
-int enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu)
-{
-#ifdef ENABLE_DVB
-	if (!memcmp(interfaceMenu, &InterfacePlaylistSelectDigital.baseMenu, sizeof(interfaceListMenu_t)))
-		return 1;
-	if (!memcmp(interfaceMenu, &InterfacePlaylistSelectAnalog.baseMenu, sizeof(interfaceListMenu_t)))
-		return 2;
-#endif
-	return false;
-}
-
 int output_ping(char *value)
 {
 	char cmd[256];
@@ -6281,121 +6235,6 @@ int output_enterInterfaceMenu(interfaceMenu_t *interfaceMenu, void* notused)
 #endif
 	return 0;
 }
-
-#ifdef ENABLE_DVB
-static int output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
-{
-	unsigned char out[16];
-	char out_hex[32];
-	if((value == NULL) || (strlen(value) < 4)) {
-		return -1;
-	}
-
-	md5((unsigned char*)value, strlen(value), out);
-	for (int i=0;i<16;i++) {
-		sprintf(&out_hex[i*2], "%02hhx", out[i]);
-	}
-	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "w");
-	if(pass_file == NULL) {
-		return 0;
-	}
-	fwrite(out_hex, 32, 1, pass_file);
-	fclose(pass_file);
-
-	return 0;
-}
-
-static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
-{
-	if(value == NULL) {
-		return 0;
-	}
-	unsigned char out[16];
-	char out_hex[32];
-	char pass[32];
-	md5((unsigned char*)value, strlen(value), out);
-	for (int i=0;i<16;i++) {
-		sprintf(&out_hex[i*2], "%02hhx", out[i]);
-	}
-	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
-	if(pass_file == NULL) {
-		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
-		if(pass_file == NULL) {
-			return 0;
-		}
-	}
-	fread(pass, 32, 1, pass_file);
-	fclose(pass_file);
-
-	if(strncmp(out_hex, pass, 32) == 0) {
-		const char *mask = "\\d{6}";
-		interface_getText(pMenu, _T("ENTER_NEW_PASSWORD"), mask, output_saveParentControlPass, NULL, inputModeDirect, &pArg);
-		return 1;
-	}
-
-	return 0;
-}
-
-static int output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
-{
-	const char *mask = "\\d{6}";
-	interface_getText(pMenu, _T("ENTER_CURRENT_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
-	return 0;
-}
-
-static int output_changeCreateNewBouquet(interfaceMenu_t* pMenu, void* pArg)
-{
-	interface_getText(pMenu, _T("ENTER_BOUQUET_NAME"), "\\w+", bouquet_createNewBouquet, NULL, inputModeABC, &pArg);
-	return 0;
-}
-
-int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
-{
-	char str[MENU_ENTRY_INFO_LENGTH];
-	interface_clearMenuEntries(interfaceMenu);
-	snprintf(str, sizeof(str), "%s: %s", _T("PLAYLIST_ENABLE"), bouquet_getEnableStatus()? "ON" : "OFF");
-	interface_addMenuEntry(interfaceMenu, str, bouquet_enableControl, NULL, settings_interface);
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_ANALOG"), interface_menuActionShowMenu, &InterfacePlaylistAnalog, settings_interface);
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_DIGITAL"), interface_menuActionShowMenu, &InterfacePlaylistDigital, settings_interface);
-	return 0;
-}
-
-int output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
-{
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	interface_clearMenuEntries(interfaceMenu);
-	if (bouquet_getEnableStatus()) {
-		snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_SELECT"), bouquet_getAnalogBouquetName());
-		interface_addMenuEntry(interfaceMenu, buf, interface_menuActionShowMenu, &InterfacePlaylistSelectAnalog, settings_interface);
-	}
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditorAnalog, settings_interface);	
-	if (bouquet_getEnableStatus()) {
-		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_UPDATE"), bouquet_updateAnalogBouquet, NULL, settings_interface);
-		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_SAVE_BOUQUETS"), bouquet_saveAnalogMenuBouquet, NULL, settings_interface);
-	}
-	return 0;
-}
-
-int output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
-{
-	char buf[MENU_ENTRY_INFO_LENGTH];
-	interface_clearMenuEntries(interfaceMenu);
-
-	if (bouquet_getEnableStatus()) {
-		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_NEW_BOUQUETS"), output_changeCreateNewBouquet, NULL, settings_interface);
-		snprintf(buf, sizeof(buf), "%s: %s", _T("PLAYLIST_SELECT"), bouquet_getDigitalBouquetName());
-		interface_addMenuEntry(interfaceMenu, buf, interface_menuActionShowMenu, &InterfacePlaylistSelectDigital, settings_interface);
-	}
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_EDITOR"), interface_menuActionShowMenu, &InterfacePlaylistEditorDigital, settings_interface);
-	if (bouquet_getEnableStatus()) {
-		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_SAVE_BOUQUETS"), bouquet_saveDigitalBouquet, NULL, settings_interface);
-		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_UPDATE"), bouquet_updateDigitalBouquet, NULL, settings_interface);
-	}
-	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_REMOVE"), bouquet_removeBouquet, NULL, settings_interface);
-	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
-	return 0;
-}
-#endif //#ifdef ENABLE_DVB
 
 int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 {
@@ -6581,6 +6420,7 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
 	createListMenu(&DiSEqCMenu, "DiSEqC", settings_dvb, NULL, _M &DVBSubMenu,
 		interfaceListMenuIconThumbnail, output_enterDiseqcMenu, NULL, NULL);
+	playlistEditor_init();
 #endif // ENABLE_DVB
 	createListMenu(&NetworkSubMenu, _T("NETWORK_CONFIG"), settings_network, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterNetworkMenu, output_leaveNetworkMenu, NULL);
@@ -6604,30 +6444,6 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&InterfaceMenu, _T("INTERFACE"), settings_interface, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterInterfaceMenu, NULL, NULL);
-
-#ifdef ENABLE_DVB
-	createListMenu(&InterfacePlaylistMain, _T("PLAYLIST_MAIN"), settings_interface, NULL, _M &OutputMenu,
-        interfaceListMenuIconThumbnail, output_enterPlaylistMenu, NULL, NULL);
-
-	createListMenu(&InterfacePlaylistAnalog, _T("PLAYLIST_ANALOG"), settings_interface, NULL, _M &InterfacePlaylistMain,
-		interfaceListMenuIconThumbnail, output_enterPlaylistAnalog, NULL, NULL);
-
-	createListMenu(&InterfacePlaylistDigital, _T("PLAYLIST_DIGITAL"), settings_interface, NULL, _M &InterfacePlaylistMain,
-		interfaceListMenuIconThumbnail, output_enterPlaylistDigital, NULL, NULL);
-
-	createListMenu(&InterfacePlaylistSelectDigital, _T("PLAYLIST_SELECT"), settings_interface, NULL, _M &InterfacePlaylistDigital,
-		interfaceListMenuIconThumbnail, enterPlaylistDigitalSelect, NULL, NULL);
-
-	createListMenu(&InterfacePlaylistSelectAnalog, _T("PLAYLIST_SELECT"), settings_interface, NULL, _M &InterfacePlaylistAnalog,
-		interfaceListMenuIconThumbnail, enterPlaylistAnalogSelect, NULL, NULL);
-
-	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, statusbar_f3_edit, 0};
-	createListMenu(&InterfacePlaylistEditorDigital, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylistDigital,
-		interfaceListMenuIconThumbnail, enterPlaylistEditorDigital, NULL, NULL);
-
-	createListMenu(&InterfacePlaylistEditorAnalog, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylistAnalog,
-		interfaceListMenuIconThumbnail, enterPlaylistEditorAnalog, NULL, NULL);
-#endif //#ifdef ENABLE_DVB
 
 	createListMenu(&PlaybackMenu, _T("PLAYBACK"), thumbnail_loading, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterPlaybackMenu, NULL, NULL);
