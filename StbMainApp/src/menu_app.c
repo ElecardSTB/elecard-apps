@@ -319,9 +319,6 @@ void menu_buildMainMenu()
 #endif // #ifdef SHOW_CARD_MENU
 	{
 		output_buildMenu(_M &interfaceMainMenu);
-#ifdef ENABLE_STATS
-		stats_buildMenu(_M &OutputMenu);
-#endif
 		str = _T("SETTINGS");
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
 	}
@@ -420,9 +417,6 @@ void menu_buildMainMenu()
 #endif
 	{
 		output_buildMenu(_M &interfaceMainMenu);
-#ifdef ENABLE_STATS
-		stats_buildMenu(_M &OutputMenu);
-#endif
 		str = _T("SETTINGS");
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
 	}

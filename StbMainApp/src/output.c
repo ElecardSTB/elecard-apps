@@ -6594,8 +6594,8 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&BlankingMenu, _T("TV_BLANKING"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, NULL, NULL, NULL);
-
 #endif
+
 	createListMenu(&GraphicsModeMenu, _T("INTERFACE_SIZE"), settings_video, NULL, _M &VideoSubMenu,
 		interfaceListMenuIconThumbnail, output_enterGraphicsModeMenu, NULL, NULL);
 
@@ -6696,6 +6696,10 @@ void output_buildMenu(interfaceMenu_t *pParent)
 #endif
 	output_fillOutputMenu();
 	output_fillTimeZoneMenu();
+
+#ifdef ENABLE_STATS
+	stats_buildMenu(_M &OutputMenu);
+#endif
 }
 
 void output_cleanupMenu(void)
