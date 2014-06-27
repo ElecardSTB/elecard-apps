@@ -15,10 +15,11 @@
 #include "dvb.h"
 #include "off_air.h"
 #include "l10n.h"
-#include "md5.h"
 
 
-
+/******************************************************************
+* LOCAL TYPEDEFS                                                  *
+*******************************************************************/
 typedef struct {
 	uint32_t frequency;
 	//analog_service_t *service_index;
@@ -34,11 +35,11 @@ interfaceListMenu_t InterfacePlaylistMain;
 /******************************************************************
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
 *******************************************************************/
-static int channelNumber = -1;
+static int32_t channelNumber = -1;
 static list_element_t *playListEditorAnalog = NULL;
-static int update_list = false;
-static int color_save = -1;
-static int swapMenu;
+static int32_t update_list = false;
+static int32_t color_save = -1;
+static int32_t swapMenu;
 static interfaceListMenu_t InterfacePlaylistAnalog;
 static interfaceListMenu_t InterfacePlaylistDigital;
 static interfaceListMenu_t InterfacePlaylistSelectDigital;
@@ -49,11 +50,11 @@ static interfaceListMenu_t InterfacePlaylistEditorAnalog;
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
-static int output_enterPlaylistMenu(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistDigital(interfaceMenu_t *pMenu, void* notused);
-static int output_enterPlaylistAnalog(interfaceMenu_t *pMenu, void* notused);
+static int32_t output_enterPlaylistMenu(interfaceMenu_t *pMenu, void* notused);
+static int32_t output_enterPlaylistDigital(interfaceMenu_t *pMenu, void* notused);
+static int32_t output_enterPlaylistAnalog(interfaceMenu_t *pMenu, void* notused);
 static void playList_saveName(int32_t num, char *prev_name, char *new_name);
-static int get_statusLockPlaylist(void);
+static int32_t get_statusLockPlaylist(void);
 static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int32_t count);
 // static void playlist_editor_removeElement(void);
 static void playlist_editor_setupdate(void);
@@ -61,17 +62,17 @@ static void playlist_editor_setupdate(void);
 static void playlist_switchElementwithNext(int32_t source);
 static interfaceMenu_t *output_getPlaylistEditorMenu(void);
 static char *output_getSelectedNamePlaylistEditor(void);
-static int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu);
-// static int enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu);
+static int32_t enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu);
+// static int32_t enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu);
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>_<Word>+    *
 *******************************************************************/
-void setColor(int color) {
+void setColor(int32_t color) {
 	color_save = color;
 }
 
-int getColor() {
+int32_t getColor() {
 	return color_save;
 }
 
@@ -79,8 +80,8 @@ static void load_Analog_channels(list_element_t *curListEditor)
 {
 	extern analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
 	//analogtv_parseConfigFile(1);
-	int analogtv_channelCount = analogtv_getChannelCount(1);
-	int i;
+	int32_t analogtv_channelCount = analogtv_getChannelCount(1);
+	int32_t i;
 	for(i = 0; i < analogtv_channelCount; i++) {
 		list_element_t      *cur_element;
 		playListEditorAnalog_t    *element;
@@ -162,12 +163,12 @@ void playlist_editor_cleanup(typeBouquet_t index)
 	}
 }
 
-/*static int getChannelEditor(void)
+/*static int32_t getChannelEditor(void)
 {
 	return channelNumber;
 }*/
 
-static int get_statusLockPlaylist(void)
+static int32_t get_statusLockPlaylist(void)
 {
 	if (channelNumber == -1)
 		return false;
@@ -191,7 +192,7 @@ static char *output_getSelectedNamePlaylistEditor(void)
 	return NULL;
 }
 
-static int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
+static int32_t enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
 {
 	if((int32_t)interfaceMenu == (int32_t)&InterfacePlaylistEditorDigital.baseMenu) {
 		return 1;
@@ -202,7 +203,7 @@ static int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
 	return false;
 }
 
-/*static int enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu)
+/*static int32_t enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu)
 {
 	if (!memcmp(interfaceMenu, &InterfacePlaylistSelectDigital.baseMenu, sizeof(interfaceListMenu_t)))
 		return 1;
@@ -215,7 +216,7 @@ static int enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu)
 
 static void playList_saveName(int32_t num, char *prev_name, char *new_name)
 {
-	int i = 0;
+	int32_t i = 0;
 	editorDigital_t *element;
 
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
@@ -254,7 +255,7 @@ static void playlist_editor_setupdate(void)
 
 static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int32_t count)
 {
-	int i = 0;
+	int32_t i = 0;
 	list_element_t *cur_element;
 
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
@@ -314,13 +315,13 @@ void merge_digitalLists(void)
 	if ((list_empty(&digitalBouquet.editorList) &&  playListEditorAnalog == NULL) || update_list == false)
 		return;
 	update_list = false;
-	int first = 0;
-	int i = 0;
+	int32_t first = 0;
+	int32_t i = 0;
 	list_element_t		*service_element;
 
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
 		struct list_head *pos;
-		int i = 0;
+		int32_t i = 0;
 		list_for_each(pos, &digitalBouquet.editorList) {
 			editorDigital_t *element = list_entry(pos, editorDigital_t, editorList);
 			if(element == NULL)
@@ -344,7 +345,7 @@ void merge_digitalLists(void)
 	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
 		service_element = playListEditorAnalog;
 		extern analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
-		int index;
+		int32_t index;
 		while (service_element != NULL) {
 			playListEditorAnalog_t *curElement = (playListEditorAnalog_t *)service_element->data;
 			service_element = service_element->next;
@@ -363,37 +364,14 @@ void merge_digitalLists(void)
 	}
 }
 
-int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	unsigned char out[16];
-	char out_hex[32];
-	char pass[32];
-	if(value == NULL) {
-		return 0;
-	}
-
-	md5((unsigned char *)value, strlen(value), out);
-	for (int i=0;i<16;i++) {
-		sprintf(&out_hex[i*2], "%02hhx", out[i]);
-	}
-	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
-	if(pass_file == NULL) {
-		char cmd[256];
-		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
-		if(pass_file == NULL) {
-			return 0;
-		}
-		snprintf(cmd, sizeof(cmd), "cp %s %s", PARENT_CONTROL_DEFAULT_FILE, PARENT_CONTROL_FILE);
-		system(cmd);
-	}
-	fread(pass, 32, 1, pass_file);
-	fclose(pass_file);
-
-	if(strncmp(out_hex, pass, 32) == 0) {
+	(void)pMenu;
+	(void)pArg;
+	if(parentControl_checkPass(value) == 0) {
 		merge_digitalLists();
 		dvbChannel_applyUpdates();
-	}
-	else {
+	} else {
 		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
 		return 1;
 	}
@@ -401,7 +379,7 @@ int playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* p
 	return 0;
 }
 
-int swap_playlistEditor(void)
+int32_t swap_playlistEditor(void)
 {
 	if ((list_empty(&digitalBouquet.editorList) && playListEditorAnalog == NULL) || update_list == false)
 		return false;
@@ -426,7 +404,7 @@ int swap_playlistEditor(void)
 	return true;
 }
 
-int playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
+int32_t playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
 {
 	if (channelNumber == -1) {
 		swapMenu = CHANNEL_INFO_GET_CHANNEL(pArg);
@@ -453,7 +431,7 @@ static void playlist_switchElementwithNext(int32_t source)
 	editorDigital_t *firstElement = NULL;
 	struct list_head *srvIdx_beforeFirst;
 	struct list_head *srvIdx_beforeSecond;
-	int i = 0;
+	int32_t i = 0;
 	struct list_head *pos;
 	list_for_each(pos, &digitalBouquet.editorList) {
 		editorDigital_t *secElement = list_entry(pos, editorDigital_t, editorList);
@@ -492,10 +470,10 @@ static void playlist_switchElementwithNext(int32_t source)
 
 }*/
 
-int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
+int32_t enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	interfaceMenu_t *channelMenu;
-	int i = 0;
+	int32_t i = 0;
 	const char *name;
 	char *bouquets_name;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
@@ -530,10 +508,10 @@ int enterPlaylistAnalogSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 	return 0;
 }
 
-int enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
+int32_t enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	interfaceMenu_t *channelMenu;
-	int i = 0;
+	int32_t i = 0;
 	const char *name;
 	char *bouquets_name;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
@@ -568,7 +546,7 @@ int enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 
 }
 
-int enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
+int32_t enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	if (playListEditorAnalog != NULL)
 		return 0;
@@ -609,7 +587,7 @@ int enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
 	return 0;
 }
 
-int enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
+int32_t enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
 {
 	if (!(list_empty(&digitalBouquet.editorList)))
 		return 0;
@@ -651,51 +629,19 @@ int enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
 	return 0;
 }
 
-static int output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+
+static int32_t output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	unsigned char out[16];
-	char out_hex[32];
-	if((value == NULL) || (strlen(value) < 4)) {
+	if(parentControl_savePass(value) != 0) {
+		interface_showMessageBox(_T("PARENTCONTROLL_CANT_SAVE_PASS"), thumbnail_error, 3000);
 		return -1;
 	}
-
-	md5((unsigned char*)value, strlen(value), out);
-	for (int i=0;i<16;i++) {
-		sprintf(&out_hex[i*2], "%02hhx", out[i]);
-	}
-	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "w");
-	if(pass_file == NULL) {
-		return 0;
-	}
-	fwrite(out_hex, 32, 1, pass_file);
-	fclose(pass_file);
-
 	return 0;
 }
 
-static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+static int32_t output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void *pArg)
 {
-	if(value == NULL) {
-		return 0;
-	}
-	unsigned char out[16];
-	char out_hex[32];
-	char pass[32];
-	md5((unsigned char*)value, strlen(value), out);
-	for (int i=0;i<16;i++) {
-		sprintf(&out_hex[i*2], "%02hhx", out[i]);
-	}
-	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
-	if(pass_file == NULL) {
-		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
-		if(pass_file == NULL) {
-			return 0;
-		}
-	}
-	fread(pass, 32, 1, pass_file);
-	fclose(pass_file);
-
-	if(strncmp(out_hex, pass, 32) == 0) {
+	if(parentControl_checkPass(value) == 0) {
 		const char *mask = "\\d{6}";
 		interface_getText(pMenu, _T("ENTER_NEW_PASSWORD"), mask, output_saveParentControlPass, NULL, inputModeDirect, &pArg);
 		return 1;
@@ -704,20 +650,20 @@ static int output_checkParentControlPass(interfaceMenu_t *pMenu, char *value, vo
 	return 0;
 }
 
-static int output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
+static int32_t output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
 {
 	const char *mask = "\\d{6}";
 	interface_getText(pMenu, _T("ENTER_CURRENT_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
 	return 0;
 }
 
-static int output_changeCreateNewBouquet(interfaceMenu_t* pMenu, void* pArg)
+static int32_t output_changeCreateNewBouquet(interfaceMenu_t* pMenu, void* pArg)
 {
 	interface_getText(pMenu, _T("ENTER_BOUQUET_NAME"), "\\w+", bouquet_createNewBouquet, NULL, inputModeABC, &pArg);
 	return 0;
 }
 
-int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
+int32_t output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 {
 	char str[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
@@ -728,7 +674,7 @@ int output_enterPlaylistMenu(interfaceMenu_t *interfaceMenu, void* notused)
 	return 0;
 }
 
-int output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
+int32_t output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
@@ -744,7 +690,7 @@ int output_enterPlaylistAnalog(interfaceMenu_t *interfaceMenu, void* notused)
 	return 0;
 }
 
-int output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
+int32_t output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
 {
 	char buf[MENU_ENTRY_INFO_LENGTH];
 	interface_clearMenuEntries(interfaceMenu);
@@ -764,7 +710,7 @@ int output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notused)
 	return 0;
 }
 
-static char* interface_getChannelCaption(int dummy, void* pArg)
+static char* interface_getChannelCaption(int32_t dummy, void* pArg)
 {
 	(void)dummy;
 	char * ptr = strstr(output_getSelectedNamePlaylistEditor(), ". ");
@@ -775,7 +721,7 @@ static char* interface_getChannelCaption(int dummy, void* pArg)
 	return NULL;
 }
 
-static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* pArg)
+static int32_t interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void* pArg)
 {
 	if(pStr == NULL) {
 		return -1;
@@ -785,7 +731,7 @@ static int interface_saveChannelCaption(interfaceMenu_t *pMenu, char* pStr, void
 /*
     if((DVBTMenu.baseMenu.selectedItem - 2) < dvbChannel_getCount()) {
         EIT_service_t *service;
-        int channelNumber;
+        int32_t channelNumber;
 
         channelNumber = CHANNEL_INFO_GET_CHANNEL(pArg);
         service = dvbChannel_getService(channelNumber);
@@ -880,7 +826,7 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 
 int32_t playlistEditor_init(void)
 {
-	int playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, statusbar_f3_edit, 0};
+	int32_t playlistEditor_icons[4] = { statusbar_f1_cancel, statusbar_f2_ok, statusbar_f3_edit, 0};
 
 	createListMenu(&InterfacePlaylistMain, _T("PLAYLIST_MAIN"), settings_interface, NULL, _M &OutputMenu,
         interfaceListMenuIconThumbnail, output_enterPlaylistMenu, NULL, NULL);

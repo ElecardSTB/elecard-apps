@@ -111,7 +111,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/un.h>
 #include <linux/input.h>
 
-#include "../../src/md5.h"
+#include "md5.h"
 
 /***********************************************
 * LOCAL MACROS                                 *

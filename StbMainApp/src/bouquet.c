@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "playlist_editor.h"
 #include "list.h"
 #include "gfx.h"
+#include "md5.h"
 
 #include "stsdk.h"
 #include <cJSON.h>
@@ -72,6 +73,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define GARB_CONFIG                      GARB_DIR "/config"
 
 #define TMP_BATCH_FILE                   "/tmp/cmd_bouquet"
+
+#define PARENT_CONTROL_FILE              CONFIG_DIR "/parentcontrol.hash"
 
 /***********************************************
 * LOCAL TYPEDEFS                               *
@@ -1773,3 +1776,60 @@ const char *strList_get(struct list_head *listHead, uint32_t number)
 	}
 	return NULL;
 }
+
+int32_t parentControl_savePass(const char *value)
+{
+	unsigned char out[16];
+	char out_hex[32];
+	int32_t i;
+
+	if((value == NULL) || (strlen(value) < 4)) {
+		eprintf("%s(): Error: wrong argument\n", __func__);
+		return -1;
+	}
+
+	md5((unsigned char*)value, strlen(value), out);
+	for(i = 0; i < 16; i++) {
+		sprintf(&out_hex[i*2], "%02hhx", out[i]);
+	}
+	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "w");
+	if(pass_file == NULL) {
+		eprintf("%s(): Error while oppening file=%s: %m\n", __func__, PARENT_CONTROL_FILE);
+		return -1;
+	}
+	fwrite(out_hex, 32, 1, pass_file);
+	fclose(pass_file);
+
+	return 0;
+}
+
+int32_t parentControl_checkPass(const char *value)
+{
+	int32_t i;
+	uint8_t out[16];
+	char    out_hex[32];
+	char    pass[32];
+	FILE *pass_file;
+
+	if(value == NULL) {
+		eprintf("%s(): Error: wrong argument\n", __func__);
+		return -1;
+	}
+	md5((uint8_t *)value, strlen(value), out);
+	for(i = 0; i < 16; i++) {
+		sprintf(&out_hex[i * 2], "%02hhx", out[i]);
+	}
+	pass_file = fopen(PARENT_CONTROL_FILE, "r");
+	if(pass_file == NULL) {
+		eprintf("%s(): Error while oppening file=%s: %m\n", __func__, PARENT_CONTROL_FILE);
+		return -2;
+	}
+	fread(pass, 32, 1, pass_file);
+	fclose(pass_file);
+
+	if(strncmp(out_hex, pass, 32) == 0) {
+		return 0;
+	}
+	return 1;
+}
+

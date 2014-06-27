@@ -61,7 +61,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "teletext.h"
 #include "stsdk.h"
 #include "analogtv.h"
-#include "md5.h"
 
 #ifdef STBPNX
 #include <phStbRpc_Common.h>
@@ -1642,41 +1641,13 @@ void offair_startVideo(int which)
 
 static int offair_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
-	unsigned char out[16];
-	char out_hex[32];
-	char pass[32];
-	offair_confDvbStart_t *start = (offair_confDvbStart_t *)pArg;
-	if(value == NULL) {
-		if ((appControlInfo.offairInfo.previousChannel) && (appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel())) {
-			offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
-		}
-		return 0;
-	}
-
-	md5((unsigned char *)value, strlen(value), out);
-	for (int i=0;i<16;i++) {
-		sprintf(&out_hex[i*2], "%02hhx", out[i]);
-	}
-	FILE *pass_file = fopen(PARENT_CONTROL_FILE, "r");
-	if(pass_file == NULL) {
-		char cmd[256];
-		pass_file = fopen(PARENT_CONTROL_DEFAULT_FILE, "r");
-		if(pass_file == NULL) {
-			return 0;
-		}
-		snprintf(cmd, sizeof(cmd), "cp %s %s", PARENT_CONTROL_DEFAULT_FILE, PARENT_CONTROL_FILE);
-		system(cmd);
-	}
-	fread(pass, 32, 1, pass_file);
-	fclose(pass_file);
-
-	if(strncmp(out_hex, pass, 32) == 0) {
+	if(parentControl_checkPass(value) == 0) {
+		offair_confDvbStart_t *start = (offair_confDvbStart_t *)pArg;
 		offair_startDvbVideo(start->which, &start->pParam, start->audio_type, start->video_type);
-		
 		interface_showMenu(0, 1);
-	}
-	else {
-		if ((appControlInfo.offairInfo.previousChannel) && (appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel())) {
+	} else {
+		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
+		if((appControlInfo.offairInfo.previousChannel) && (appControlInfo.offairInfo.previousChannel != offair_getCurrentChannel())) {
 			offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
 		}
 	}
@@ -1697,8 +1668,7 @@ static void offair_checkParentControl(int which, DvbParam_t *pParam, int audio_t
 		start.audio_type = audio_type;
 		start.video_type = video_type;
 		interface_getText(pMenu, _T("ENTER_PASSWORD"), mask, offair_checkParentControlPass, NULL, inputModeDirect, &start);
-	}
-	else {
+	} else {
 		offair_startDvbVideo(which, pParam, audio_type, video_type);
 	}
 }

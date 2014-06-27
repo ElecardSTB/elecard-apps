@@ -152,4 +152,9 @@ EIT_service_t *bouquet_findService(EIT_common_t *header);
 #define bouquet_enableControl				NULL
 
 #endif // ENABLE_DVB
+
+//Parent control API
+int32_t parentControl_savePass(const char *value);
+int32_t parentControl_checkPass(const char *value);
+
 #endif // BOUQUET_H
