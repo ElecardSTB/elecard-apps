@@ -267,13 +267,24 @@ int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
-		memcpy(&new->common, &common ,sizeof(EIT_common_t));
-		memcpy(&new->data, &data ,sizeof(service_index_data_t));
+		memcpy(&new->common, common ,sizeof(EIT_common_t));
+		memcpy(&new->data, data ,sizeof(service_index_data_t));
 		new->flag = flag;
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
 	}
+
+	return 0;
+}
+
+int32_t dvbChannel_setName(service_index_t *srvIdx, const char *name)
+{
+	if(!srvIdx || !name) {
+		return -1;
+	}
+	strncpy(srvIdx->data.channelsName, name, sizeof(srvIdx->data.channelsName));
+	srvIdx->data.channelsName[sizeof(srvIdx->data.channelsName) - 1] = 0;
 
 	return 0;
 }
@@ -286,7 +297,7 @@ int32_t dvbChannel_addService(EIT_service_t *service, service_index_data_t *data
 		memcpy(&new->common, &service->common ,sizeof(EIT_common_t));
 		memcpy(&new->data, &data ,sizeof(service_index_data_t));
 		new->flag = flag;
-		strncpy(new->data.channelsName, (char *)service->service_descriptor.service_name, strlen((char *)service->service_descriptor.service_name));
+		dvbChannel_setName(new, (char *)service->service_descriptor.service_name);
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -298,8 +309,7 @@ int32_t dvbChannel_remove(service_index_t *srvIdx)
 {
 	list_del(&srvIdx->orderNone);
 	g_dvb_channels.totalCount--;
-	if(!list_empty(&srvIdx->orderNone)) {
-		list_del(&srvIdx->orderNone);
+	if(srvIdx->data.visible) {
 		g_dvb_channels.viewedCount--;
 	}
 	free(srvIdx);
@@ -352,6 +362,7 @@ static int32_t dvbChannel_readOrderConfig()
 				common.service_id = objGetInt(subitem, "service_id", 0);
 				common.transport_stream_id = objGetInt(subitem, "transport_stream_id", 0);
 				// data
+				memset(&data, 0, sizeof(data));
 				strncpy(data.channelsName, objGetString(subitem, "channels_name", ""), sizeof(data.channelsName));
 				data.audio_track = objGetInt(subitem, "audio_track", 0);
 				data.visible = objGetInt(subitem, "visible", 1);
@@ -367,7 +378,6 @@ static int32_t dvbChannel_readOrderConfig()
 
 int32_t dvbChannel_writeOrderConfig(void)
 {
-	dprintf("%s[%d]\n", __func__, __LINE__);
 	cJSON* format;
 	cJSON* root;
 	char *render;
@@ -390,6 +400,7 @@ int32_t dvbChannel_writeOrderConfig(void)
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->common.media_id || srvIdx->common.service_id || srvIdx->common.transport_stream_id) {
 			cJSON* fld;
+
 			fld = cJSON_CreateObject();
 			if (fld) {
 				cJSON_AddNumberToObject(fld, "service", i);
@@ -517,7 +528,9 @@ static int32_t dvbChannel_update(void)
 			}
 		} else {
 			service_index_data_t data;
+
 			curService->common.media_id = curService->original_network_id;
+			memset(&data, 0, sizeof(data));
 			data.visible = 1;
 			data.parent_control = 0;
 			dvbChannel_addService(curService, &data, 0);

@@ -93,6 +93,7 @@ service_index_t *dvbChannel_getServiceIndex(uint32_t id);
 service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id);
 service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header);
 int dvbChannel_findNumberService(service_index_t *srv_id);
+int32_t dvbChannel_setName(service_index_t *srvIdx, const char *name);
 
 struct list_head *dvbChannel_getSortList(void);
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);

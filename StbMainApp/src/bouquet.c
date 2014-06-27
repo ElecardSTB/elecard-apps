@@ -458,8 +458,8 @@ void bouquet_addScanChannels(void)
 		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
 		if(p_srvIdx) {
 			p_srvIdx->service = curService;
-			if (strlen(p_srvIdx->data.channelsName) == 0) {
-				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen((char *)p_srvIdx->service->service_descriptor.service_name));
+			if(strlen(p_srvIdx->data.channelsName) == 0) {
+				dvbChannel_setName(p_srvIdx, (char *)p_srvIdx->service->service_descriptor.service_name);
 			}
 		} else {
 			service_index_data_t data;
