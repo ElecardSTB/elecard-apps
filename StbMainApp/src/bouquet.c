@@ -143,7 +143,6 @@ bouquetDigital_t digitalBouquet = {
 	.name_radio	        = LIST_HEAD_INIT(digitalBouquet.name_radio),
 	.channelsList	    = LIST_HEAD_INIT(digitalBouquet.channelsList),
 	.transponderList	= LIST_HEAD_INIT(digitalBouquet.transponderList),
-	.editorList	        = LIST_HEAD_INIT(digitalBouquet.editorList),
 };
 
 #ifdef ENABLE_DVB
@@ -1606,48 +1605,6 @@ void bouquet_terminateDigitalList(typeBouquet_t index)
 		strList_release(&bouquetNameAnalogList);
 }
 
-editorDigital_t *editorList_add(struct list_head *listHead)
-{
-	editorDigital_t *element;
-	element = malloc(sizeof(editorDigital_t));
-	if(!element) {
-		eprintf("%s(): Allocation error!\n", __func__);
-		return NULL;
-	}
-	list_add_tail(&element->editorList, listHead);
-
-	return element;
-}
-
-void editorList_release(void)
-{
-	struct list_head *pos;
-	list_for_each(pos, &digitalBouquet.editorList) {
-		editorDigital_t *el = list_entry(pos, editorDigital_t, editorList);
-		if(!list_empty(&el->editorList)) {
-			list_del(&el->editorList);
-		}
-		free(el);
-	}
-}
-
-editorDigital_t *editorList_get(struct list_head *listHead, uint32_t number)
-{
-	struct list_head *pos;
-	uint32_t id = 0;
-	if(!listHead) {
-		eprintf("%s(): Wrong argument!\n", __func__);
-		return NULL;
-	}
-	list_for_each(pos, listHead) {
-		if(id == number) {
-			editorDigital_t *el = list_entry(pos, editorDigital_t, editorList);
-			return el;
-		}
-		id++;
-	}
-	return NULL;
-}
 
 int32_t  digitalList_release(void)
 {

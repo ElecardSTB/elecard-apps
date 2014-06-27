@@ -1782,8 +1782,6 @@ int  interface_enterTextGetValue( interfaceEnterTextInfo_t *field );
  */
 int  interface_enterTextShow( interfaceEnterTextInfo_t *field, size_t bufLength, char *buf );
 
-void interface_switchMenuEntryCustom(interfaceMenu_t *pMenu, int source, int receiver);
-
 void interface_disableBackground(void);
 
 void interface_setBackground(int r, int g, int b, int a, const char *image);

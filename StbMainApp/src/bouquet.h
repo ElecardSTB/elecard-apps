@@ -54,21 +54,12 @@ typedef enum {
 } typeBouquet_t;
 
 typedef struct {
-	int radio;
-	int scrambled;
-	service_index_t *service_index;
-	service_index_data_t data;
-	struct list_head	editorList;
-} editorDigital_t;
-
-typedef struct {
 	char name[64];
 	struct list_head	NameDigitalList;
 	struct list_head	name_tv;
 	struct list_head	name_radio;
 	struct list_head	channelsList;
 	struct list_head	transponderList;
-	struct list_head	editorList;
 } bouquetDigital_t;
 
 
@@ -91,10 +82,6 @@ const char *strList_get(struct list_head *listHead, uint32_t number);
 
 void bouquet_LoadingBouquet(typeBouquet_t type);
 void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead);
-// function for editor list
-editorDigital_t *editorList_get(struct list_head *listHead, uint32_t number);
-editorDigital_t *editorList_add(struct list_head *listHead);
-void  editorList_release(void);
 
 int32_t  digitalList_release(void);
 void bouquet_terminateDigitalList(typeBouquet_t index);

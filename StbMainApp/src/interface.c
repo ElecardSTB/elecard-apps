@@ -5417,25 +5417,6 @@ int  interface_setMenuCapacity(interfaceMenu_t *pMenu, int newCapacity)
 #endif
 }
 
-void interface_switchMenuEntryCustom(interfaceMenu_t *pMenu, int source, int receiver)
-{
-	char ch = '.';
-	char *ptr;
-	interfaceMenuEntry_t cur;
-	memcpy(&cur, &pMenu->menuEntry[source], sizeof(interfaceMenuEntry_t));
-	memcpy(&pMenu->menuEntry[source], &pMenu->menuEntry[receiver], sizeof(interfaceMenuEntry_t));
-	memcpy(&pMenu->menuEntry[receiver], &cur, sizeof(interfaceMenuEntry_t));
-
-	ptr = strchr(pMenu->menuEntry[source].info, ch);
-
-	snprintf(pMenu->menuEntry[source].info, MENU_ENTRY_INFO_LENGTH, "%s%s", offair_getChannelNumberPrefix(source), ptr);
-	ptr = strchr(pMenu->menuEntry[receiver].info, ch);
-	snprintf(pMenu->menuEntry[receiver].info, MENU_ENTRY_INFO_LENGTH, "%s%s", offair_getChannelNumberPrefix(receiver), ptr);
-
-	pMenu->menuEntry[receiver].pArg = pMenu->menuEntry[source].pArg;
-	pMenu->menuEntry[source].pArg = cur.pArg;
-}
-
 int interface_addMenuEntryCustom(interfaceMenu_t *pMenu, 
 							interfaceMenuEntryType_t type, 
 							const void *data, 
