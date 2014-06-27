@@ -627,7 +627,7 @@ int32_t enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
 static int32_t output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	if(parentControl_savePass(value) != 0) {
-		interface_showMessageBox(_T("PARENTCONTROLL_CANT_SAVE_PASS"), thumbnail_error, 3000);
+		interface_showMessageBox(_T("PARENTCONTROL_CANT_SAVE_PASS"), thumbnail_error, 3000);
 		return -1;
 	}
 	return 0;
@@ -637,7 +637,7 @@ static int32_t output_checkParentControlPass(interfaceMenu_t *pMenu, char *value
 {
 	if(parentControl_checkPass(value) == 0) {
 		const char *mask = "\\d{6}";
-		interface_getText(pMenu, _T("ENTER_NEW_PASSWORD"), mask, output_saveParentControlPass, NULL, inputModeDirect, &pArg);
+		interface_getText(pMenu, _T("PARENTCONTROL_ENTER_NEW_PASSWORD"), mask, output_saveParentControlPass, NULL, inputModeDirect, &pArg);
 		return 1;
 	}
 
@@ -647,7 +647,7 @@ static int32_t output_checkParentControlPass(interfaceMenu_t *pMenu, char *value
 static int32_t output_changeParentControlPass(interfaceMenu_t* pMenu, void* pArg)
 {
 	const char *mask = "\\d{6}";
-	interface_getText(pMenu, _T("ENTER_CURRENT_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
+	interface_getText(pMenu, _T("PARENTCONTROL_CHECK_PASSWORD"), mask, output_checkParentControlPass, NULL, inputModeDirect, &pArg);
 	return 0;
 }
 
@@ -700,7 +700,7 @@ int32_t output_enterPlaylistDigital(interfaceMenu_t *interfaceMenu, void* notuse
 		interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_UPDATE"), bouquet_updateDigitalBouquet, NULL, settings_interface);
 	}
 	interface_addMenuEntry(interfaceMenu, _T("PLAYLIST_REMOVE"), bouquet_removeBouquet, NULL, settings_interface);
-	interface_addMenuEntry(interfaceMenu, _T("PARENT_CONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
+	interface_addMenuEntry(interfaceMenu, _T("PARENTCONTROL_CHANGE"), output_changeParentControlPass, NULL, settings_interface);
 	return 0;
 }
 
@@ -878,6 +878,7 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 	if(cmd->command == interfaceCommandGreen) {
 		playlist_editor_setupdate();
 		offair_fillDVBTMenu();
+		interface_showMessageBox(_T("SAVE"), thumbnail_error, 3000);
 		return 0;
 	} else if(cmd->command == interfaceCommandRight) {
 		int32_t n = pMenu->selectedItem;
