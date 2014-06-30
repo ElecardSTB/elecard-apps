@@ -251,8 +251,8 @@ int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
-		memcpy(&new->common, common ,sizeof(EIT_common_t));
-		memcpy(&new->data, data ,sizeof(service_index_data_t));
+		memcpy(&new->common, common, sizeof(EIT_common_t));
+		memcpy(&new->data, data, sizeof(service_index_data_t));
 		new->flag = flag;
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
@@ -278,8 +278,8 @@ int32_t dvbChannel_addService(EIT_service_t *service, service_index_data_t *data
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		new->service = service;
-		memcpy(&new->common, &service->common ,sizeof(EIT_common_t));
-		memcpy(&new->data, &data ,sizeof(service_index_data_t));
+		memcpy(&new->common, &service->common, sizeof(EIT_common_t));
+		memcpy(&new->data, data, sizeof(service_index_data_t));
 		new->flag = flag;
 		dvbChannel_setName(new, (char *)service->service_descriptor.service_name);
 	} else {
