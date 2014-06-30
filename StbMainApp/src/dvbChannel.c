@@ -149,32 +149,16 @@ int32_t dvbChannel_getIndex(EIT_service_t *service)
 	return -1;
 }
 
-service_index_t *dvbChannel_getServiceIndex(uint32_t id)
+service_index_t *dvbChannel_getServiceIndexVisible(uint32_t id, uint32_t visible)
 {
 	struct list_head *pos;
 	uint32_t i = 0;
 
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
-		if(!srv->data.visible) {
+		if(visible && !srv->data.visible) {
 			continue;
 		}
-		if(i == id) {
-			return srv;
-		}
-		i++;
-	}
-	return NULL;
-}
-
-service_index_t *dvbChannel_getServiceIndexnoVisible(uint32_t id)
-{
-	struct list_head *pos;
-	uint32_t i = 0;
-
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-		service_index_t *srv = list_entry(pos, service_index_t, orderNone);
-		
 		if(i == id) {
 			return srv;
 		}
@@ -207,8 +191,8 @@ int32_t dvbChannel_swapServices(uint32_t first, uint32_t second)
 	struct list_head *srvIdx_beforeFirst;
 	struct list_head *srvIdx_beforeSecond;
 
-	srvIdx_first = dvbChannel_getServiceIndexnoVisible(first);
-	srvIdx_second = dvbChannel_getServiceIndexnoVisible(second);
+	srvIdx_first = dvbChannel_getServiceIndexVisible(first, 0);
+	srvIdx_second = dvbChannel_getServiceIndexVisible(second, 0);
 
 	if(!srvIdx_first || !srvIdx_second) {
 		return -1;
