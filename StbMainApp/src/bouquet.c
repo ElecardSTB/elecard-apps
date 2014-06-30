@@ -230,10 +230,9 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 {
 	struct list_head *pos;
 	service_index_t *srvIdx;
-	extern dvb_channels_t g_dvb_channels;
 	EIT_service_t *el = NULL;
 
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+	list_for_each(pos, dvbChannel_getSortList()) {
 		srvIdx = list_entry(pos, service_index_t, orderNone);
 		if((srvIdx->common.service_id == element->service_id)
 			&& (srvIdx->common.transport_stream_id == element->data.transport_stream_id)
@@ -767,7 +766,6 @@ void bouquet_saveLamedb(char *fileName)
 	char bufPID[BUFFER_SIZE];
 	uint16_t elPID;
 	uint16_t flagPID;
-	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 	FILE *fd;
 
@@ -819,7 +817,7 @@ void bouquet_saveLamedb(char *fileName)
 	fprintf(fd, "end\n");
 
 	fprintf(fd, "services\n");
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+	list_for_each(pos, dvbChannel_getSortList()) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		transpounder_t *element;
 		element = found_transpounder(srvIdx);
@@ -851,11 +849,10 @@ void bouquet_saveLamedb(char *fileName)
 
 void bouquet_createTransponderList(void)
 {
-	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 	int32_t nameSP = NAME_SPACE + 1;
 
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+	list_for_each(pos, dvbChannel_getSortList()) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		transpounder_t *element;
 		element = found_transpounder(srvIdx);
@@ -910,7 +907,6 @@ void bouquet_saveBouquetsConf(char *fileName)
 	FILE *fdBlack;
 	FILE *fd;
 	char bouquet_file[BUFFER_SIZE];
-	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 
 	sprintf(bouquet_file, "%s/%s/userbouquet.%s.%s", BOUQUET_CONFIG_DIR, fileName, fileName, "tv");
@@ -936,7 +932,7 @@ void bouquet_saveBouquetsConf(char *fileName)
 		return;
 	}
 
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+	list_for_each(pos, dvbChannel_getSortList()) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(srvIdx->data.visible) {
 			if (srvIdx->service->service_descriptor.service_type  == 0) {
