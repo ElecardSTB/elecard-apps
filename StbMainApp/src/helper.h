@@ -10,6 +10,7 @@
 /******************************************************************
 * INCLUDE FILES                                                   *
 *******************************************************************/
+#include "list.h"
 #include <stdint.h>
 
 /******************************************************************
@@ -51,6 +52,10 @@ typedef struct {
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int32_t helperFileExists(const char* filename);
 int32_t helperCheckDirectoryExsists(const char *path);
 
@@ -62,5 +67,15 @@ int32_t	table_IntStrLookupR(const table_IntStr_t table[], char *value, int32_t d
 int32_t	table_IntIntLookup(const table_IntInt_t table[], int32_t key, int32_t defaultValue);
 int32_t	table_IntIntLookupR(const table_IntInt_t table[], int32_t value, int32_t defaultValue);
 
+//String list API
+int32_t strList_add    (struct list_head *listHead, const char *str);
+int32_t strList_remove (struct list_head *listHead, const char *str);
+int32_t strList_isExist(struct list_head *listHead, const char *str);
+int32_t strList_release(struct list_head *listHead);
+const char *strList_get(struct list_head *listHead, uint32_t number);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //#if !(define __HELPER_H__)

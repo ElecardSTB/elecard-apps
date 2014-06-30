@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "interface.h"
 #include "defines.h"
 #include "dvbChannel.h"
+#include "helper.h"
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -72,11 +73,9 @@ extern struct list_head bouquetNameAnalogList;
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
-int32_t strList_add    (struct list_head *listHead, const char *str);
-int32_t strList_remove (struct list_head *listHead, const char *str);
-int32_t strList_isExist(struct list_head *listHead, const char *str);
-int32_t strList_release(struct list_head *listHead);
-const char *strList_get(struct list_head *listHead, uint32_t number);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef ENABLE_DVB
 
@@ -143,5 +142,9 @@ EIT_service_t *bouquet_findService(EIT_common_t *header);
 //Parent control API
 int32_t parentControl_savePass(const char *value);
 int32_t parentControl_checkPass(const char *value);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // BOUQUET_H

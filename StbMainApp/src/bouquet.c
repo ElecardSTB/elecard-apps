@@ -131,11 +131,6 @@ typedef struct {
 	uint32_t f;                     //f - ?
 } services_t;
 
-typedef struct {
-	char               *str;
-	struct list_head    list;
-} strList_t;
-
 bouquetDigital_t digitalBouquet = {
 	.name               = "",
 	.NameDigitalList	= LIST_HEAD_INIT(digitalBouquet.NameDigitalList),
@@ -1623,111 +1618,6 @@ int32_t  digitalList_release(void)
 	strList_release(&digitalBouquet.name_tv);
 	strList_release(&digitalBouquet.name_radio);
 	return 0;
-}
-
-int32_t strList_add(struct list_head *listHead, const char *str)
-{
-	strList_t *newName;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return -1;
-	}
-
-	newName = malloc(sizeof(strList_t));
-	if(!newName) {
-		eprintf("%s(): Allocation error!\n", __func__);
-		return -2;
-	}
-	newName->str = strdup(str);
-	if(!newName->str) {
-		eprintf("%s(): Cat duplicate str=%s!\n", __func__, str);
-		free(newName);
-		return -3;
-	}
-	dprintf("%s: %s\n", __func__, str);
-	list_add_tail(&newName->list, listHead);
-
-	return 0;
-}
-
-int32_t strList_remove(struct list_head *listHead, const char *str)
-{
-	struct list_head *pos;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return -1;
-	}
-	list_for_each(pos, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		if(strcasecmp(el->str, str) == 0) {
-			dprintf("%s: %s\n", __func__, str);
-			list_del(pos);
-			if(el->str) {
-				free(el->str);
-			} else {
-				eprintf("%s(): Something wrong, element has no str!\n", __func__);
-			}
-			free(el);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int32_t strList_isExist(struct list_head *listHead, const char *str)
-{
-	struct list_head *pos;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return 0;
-	}
-	list_for_each(pos, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		//CHECK: is there need to ignore case???
-		if(strcasecmp(el->str, str) == 0) {
-			dprintf("%s: %s\n", __func__, str);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int32_t strList_release(struct list_head *listHead)
-{
-	struct list_head *pos;
-	struct list_head *n;
-	list_for_each_safe(pos, n, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-
-		list_del(pos);
-		if(el->str) {
-			free(el->str);
-		} else {
-			eprintf("%s(): Something wrong, element has no str!\n", __func__);
-		}
-		free(el);
-	}
-	return 0;
-}
-
-const char *strList_get(struct list_head *listHead, uint32_t number)
-{
-	struct list_head *pos;
-	uint32_t id = 0;
-	if(!listHead) {
-		eprintf("%s(): Wrong argument!\n", __func__);
-		return NULL;
-	}
-	list_for_each(pos, listHead) {
-		if(id == number) {
-			strList_t *el = list_entry(pos, strList_t, list);
-			return el->str;
-		}
-		id++;
-	}
-	return NULL;
 }
 
 int32_t parentControl_savePass(const char *value)
