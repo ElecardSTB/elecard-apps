@@ -45,7 +45,6 @@ interfaceListMenu_t InterfacePlaylistMain;
 *******************************************************************/
 static int32_t channelNumber = -1;
 static list_element_t *playListEditorAnalog = NULL;
-static int32_t update_list = false;
 static int32_t color_save = -1;
 static int32_t swapMenu;
 static interfaceListMenu_t InterfacePlaylistAnalog;
@@ -67,22 +66,19 @@ static void playList_saveName(int32_t num, char *prev_name, char *new_name);
 static int32_t get_statusLockPlaylist(void);
 static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int32_t count);
 // static void playlist_editor_removeElement(void);
-static void playlist_editor_setupdate(void);
 // static int32_t getChannelEditor(void);
 static void playlistEditor_moveElement(int32_t sourceNum, int32_t move);
 static interfaceMenu_t *output_getPlaylistEditorMenu(void);
 static char *output_getSelectedNamePlaylistEditor(void);
 static int32_t enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu);
 // static int32_t enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu);
+static int32_t fillPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg);
+static int32_t swap_playlistEditor(typeBouquet_t editorType);
 
 // function for editor list
 editorDigital_t *editorList_get(struct list_head *listHead, uint32_t number);
 editorDigital_t *editorList_add(struct list_head *listHead);
 void  editorList_release(void);
-
-static int32_t fillPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg);
-
-
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>_<Word>+    *
@@ -122,7 +118,6 @@ static void load_Analog_channels(list_element_t *curListEditor)
 
 static void load_digital_channels(struct list_head *listHead)
 {
-	extern dvb_channels_t g_dvb_channels;
 	struct list_head *pos;
 	editorDigital_t*element;
 	if(!listHead) {
@@ -130,7 +125,7 @@ static void load_digital_channels(struct list_head *listHead)
 		return;
 	}
 
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+	list_for_each(pos, dvbChannel_getSortList()) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 
 		if(srvIdx == NULL)
@@ -142,8 +137,8 @@ static void load_digital_channels(struct list_head *listHead)
 		element->data.visible = srvIdx->data.visible;
 		element->data.parent_control = srvIdx->data.parent_control;
 
-		if(	(srvIdx->service->service_descriptor.service_type == 2) ||
-			(dvb_hasMediaType(srvIdx->service, mediaTypeAudio) && !dvb_hasMediaType(srvIdx->service, mediaTypeVideo)))
+		if(service_isRadio(srvIdx->service)
+			|| (dvb_hasMediaType(srvIdx->service, mediaTypeAudio) && !dvb_hasMediaType(srvIdx->service, mediaTypeVideo)))
 		{
 			element->radio = 1;
 		} else {
@@ -267,17 +262,12 @@ static void playList_saveName(int32_t num, char *prev_name, char *new_name)
 	}
 }
 
-static void playlist_editor_setupdate(void)
-{
-	update_list = true;
-}
-
 static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int32_t count)
 {
 	int32_t i = 0;
 	list_element_t *cur_element;
 
-	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
+	if(enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
 		editorDigital_t *element;
 
 		element = editorList_get(&editor_playList, count);
@@ -329,43 +319,46 @@ static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, int32_t 
 	}
 }
 
-void merge_digitalLists(void)
+void merge_digitalLists(typeBouquet_t editorType)
 {
-	if ((list_empty(&editor_playList) &&  playListEditorAnalog == NULL) || update_list == false)
-		return;
-	update_list = false;
-	int32_t first = 0;
 	int32_t i = 0;
-	list_element_t		*service_element;
 
-	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 1) {
+	if(editorType == eBouquet_digital) {
 		struct list_head *pos;
 		int32_t i = 0;
 		list_for_each(pos, &editor_playList) {
+			int32_t first = 0;
 			editorDigital_t *element = list_entry(pos, editorDigital_t, list);
-			if(element == NULL)
-				continue;
 
-			if (element->service_index != NULL) {
+			if(element == NULL) {
+				continue;
+			}
+
+			if(element->service_index != NULL) {
 				element->service_index->data.visible        = element->data.visible;
 				element->service_index->data.parent_control = element->data.parent_control;
 				snprintf(element->service_index->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", element->data.channelsName);
 			}
 			printf("%s[%d] %s\n",__func__, __LINE__, element->service_index->data.channelsName);
 			first = dvbChannel_findNumberService(element->service_index);
-			if ( i > first)
+			if(i > first) {
 				dvbChannel_swapServices(first, i);
-			else
+			} else {
 				dvbChannel_swapServices(i, first);
+			}
 
 			i++;
 		}
-	}
-	if (enablePlayListEditorMenu(interfaceInfo.currentMenu) == 2) {
-		service_element = playListEditorAnalog;
-		extern analog_service_t 	analogtv_channelParam[MAX_ANALOG_CHANNELS];
+	} else if(editorType == eBouquet_analog) {
+		list_element_t *service_element = playListEditorAnalog;
 		int32_t index;
-		while (service_element != NULL) {
+
+		extern analog_service_t analogtv_channelParam[MAX_ANALOG_CHANNELS];
+
+		if(service_element == NULL) {
+			return;
+		}
+		while(service_element != NULL) {
 			playListEditorAnalog_t *curElement = (playListEditorAnalog_t *)service_element->data;
 			service_element = service_element->next;
 			index = analogtv_findOnFrequency(curElement->frequency);
@@ -383,12 +376,12 @@ void merge_digitalLists(void)
 	}
 }
 
-int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
+int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void *pArg)
 {
 	(void)pMenu;
-	(void)pArg;
+
 	if(parentControl_checkPass(value) == 0) {
-		merge_digitalLists();
+		merge_digitalLists((typeBouquet_t)pArg);
 		dvbChannel_applyUpdates();
 	} else {
 		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
@@ -398,29 +391,40 @@ int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, voi
 	return 0;
 }
 
-int32_t swap_playlistEditor(void)
+static int32_t swap_playlistEditor(typeBouquet_t editorType)
 {
-	if ((list_empty(&editor_playList) && playListEditorAnalog == NULL) || update_list == false)
-		return false;
+	if(editorType == eBouquet_digital) {
+		if(list_empty(&editor_playList)) {
+			return -1;
+		}
 
-	struct list_head *pos;
-	list_for_each(pos, &editor_playList) {
-		editorDigital_t *element = list_entry(pos, editorDigital_t, list);
-		if(element == NULL)
-			continue;
+		struct list_head *pos;
+		list_for_each(pos, &editor_playList) {
+			editorDigital_t *element = list_entry(pos, editorDigital_t, list);
+			if(element == NULL) {
+				continue;
+			}
 
-
-		if (element->service_index != NULL) {
-			if((!element->data.parent_control) && (element->service_index->data.parent_control)) {
-				const char *mask = "\\d{6}";
-				interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, NULL);
-				return true;
+			if(element->service_index != NULL) {
+				if(element->data.parent_control != element->service_index->data.parent_control) {
+					const char *mask = "\\d{6}";
+					interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, (void *)editorType);
+					return 0;
+				}
 			}
 		}
+	} else if(editorType == eBouquet_digital) {
+		if(playListEditorAnalog == NULL) {
+			return -1;
+		}
+	} else {
+		eprintf("%s(): Error, unknown playlist editor editorType=%d\n", __func__, editorType);
+		return -1;
 	}
-	merge_digitalLists();
+
+	merge_digitalLists(editorType);
 	dvbChannel_applyUpdates();
-	return true;
+	return 0;
 }
 
 int32_t playList_editorChannel(interfaceMenu_t *pMenu, void* pArg)
@@ -777,7 +781,7 @@ static void playlistEditor_moveElement(int32_t elementId, int32_t move)
 					move++;
 				}
 				if(newPos == &editor_playList) {
-					eprintf("%s(): Warning, something wrong!!!\n", __func__);
+//					eprintf("%s(): Warning, something wrong!!!\n", __func__);
 					break;
 				}
 			}
@@ -876,9 +880,10 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 	}
 
 	if(cmd->command == interfaceCommandGreen) {
-		playlist_editor_setupdate();
+		typeBouquet_t editorType = (typeBouquet_t)pMenu->pArg;
+		swap_playlistEditor(editorType);
 		offair_fillDVBTMenu();
-		interface_showMessageBox(_T("SAVE"), thumbnail_error, 3000);
+		interface_showMessageBox(_T("SAVE"), thumbnail_info, 3000);
 		return 0;
 	} else if(cmd->command == interfaceCommandRight) {
 		int32_t n = pMenu->selectedItem;

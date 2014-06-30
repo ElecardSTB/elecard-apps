@@ -472,8 +472,9 @@ static void dvbChannel_sortOrderRecheck(void)
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		if(dvbChannel_isServiceEnabled(srvIdx->service)) {
-			if (srvIdx->data.visible == 1)
-			g_dvb_channels.viewedCount++;
+			if(srvIdx->data.visible == 1) {
+				g_dvb_channels.viewedCount++;
+			}
 		} else {
 			srvIdx->data.visible = 0;
 		}
@@ -500,10 +501,6 @@ void dvbChannel_terminate(void)
 
 static int32_t dvbChannel_update(void)
 {
-	dprintf("%s[%d]\n", __func__, __LINE__);
-	if(swap_playlistEditor()) {
-		return 0;
-	}
 
 	playlist_editor_cleanup(eBouquet_digital);
 

@@ -23,7 +23,6 @@ int32_t playlistEditor_terminate(void);
 
 
 void playlist_editor_cleanup(typeBouquet_t);
-int32_t swap_playlistEditor(void);
 
 #endif //#ifdef ENABLE_DVB
 
