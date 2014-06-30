@@ -34,6 +34,11 @@ typedef struct {
 	struct list_head      list;
 } editorDigital_t;
 
+typedef struct {
+	typeBouquet_t  type;
+	int32_t        isChanged;
+	void          *data;
+} playlistEditorMenuParam_t;
 
 /******************************************************************
 * GLOBAL DATA                                                     *
@@ -56,6 +61,9 @@ static interfaceListMenu_t InterfacePlaylistEditorAnalog;
 
 static struct list_head editor_playList = LIST_HEAD_INIT(editor_playList);
 
+static playlistEditorMenuParam_t playlistEditorMenu_digitalParam = {eBouquet_digital, 0, NULL};
+static playlistEditorMenuParam_t playlistEditorMenu_analogParam = {eBouquet_analog, 0, NULL};
+
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
@@ -73,7 +81,7 @@ static char *output_getSelectedNamePlaylistEditor(void);
 static int32_t enablePlayListEditorMenu(interfaceMenu_t *interfaceMenu);
 // static int32_t enablePlayListSelectMenu(interfaceMenu_t *interfaceMenu);
 static int32_t fillPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg);
-static int32_t swap_playlistEditor(typeBouquet_t editorType);
+static int32_t playlistEditor_save(playlistEditorMenuParam_t *pParam);
 
 // function for editor list
 editorDigital_t *editorList_get(struct list_head *listHead, uint32_t number);
@@ -376,13 +384,25 @@ void merge_digitalLists(typeBouquet_t editorType)
 	}
 }
 
-int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void *pArg)
+static int32_t playlistEditor_saveInternal(playlistEditorMenuParam_t *pParam)
+{
+	merge_digitalLists(pParam->type);
+	dvbChannel_applyUpdates();
+	if(pParam->type == eBouquet_digital) {
+		offair_fillDVBTMenu();
+	}
+	interface_showMessageBox(_T("SAVE"), thumbnail_info, 3000);
+	pParam->isChanged = 0;
+
+	return 0;
+}
+
+static int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void *pArg)
 {
 	(void)pMenu;
 
 	if(parentControl_checkPass(value) == 0) {
-		merge_digitalLists((typeBouquet_t)pArg);
-		dvbChannel_applyUpdates();
+		playlistEditor_saveInternal(pArg);
 	} else {
 		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
 		return 1;
@@ -391,9 +411,9 @@ int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, voi
 	return 0;
 }
 
-static int32_t swap_playlistEditor(typeBouquet_t editorType)
+static int32_t playlistEditor_save(playlistEditorMenuParam_t *pParam)
 {
-	if(editorType == eBouquet_digital) {
+	if(pParam->type == eBouquet_digital) {
 		if(list_empty(&editor_playList)) {
 			return -1;
 		}
@@ -408,22 +428,22 @@ static int32_t swap_playlistEditor(typeBouquet_t editorType)
 			if(element->service_index != NULL) {
 				if(element->data.parent_control != element->service_index->data.parent_control) {
 					const char *mask = "\\d{6}";
-					interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, (void *)editorType);
+					interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, (void *)pParam);
 					return 0;
 				}
 			}
 		}
-	} else if(editorType == eBouquet_digital) {
+	} else if(pParam->type == eBouquet_analog) {
 		if(playListEditorAnalog == NULL) {
 			return -1;
 		}
 	} else {
-		eprintf("%s(): Error, unknown playlist editor editorType=%d\n", __func__, editorType);
+		eprintf("%s(): Error, unknown playlist editor editorType=%d\n", __func__, pParam->type);
 		return -1;
 	}
 
-	merge_digitalLists(editorType);
-	dvbChannel_applyUpdates();
+	playlistEditor_saveInternal(pParam);
+
 	return 0;
 }
 
@@ -530,16 +550,18 @@ int32_t enterPlaylistDigitalSelect(interfaceMenu_t *interfaceMenu, void* pArg)
 
 }
 
-int32_t enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void* pArg)
+int32_t enterPlaylistEditorAnalog(interfaceMenu_t *interfaceMenu, void *pArg)
 {
-	if (playListEditorAnalog != NULL)
-		return 0;
-
+//	playlistEditorMenuParam_t *pParam = (playlistEditorMenuParam_t *)pArg;
 	list_element_t *cur_element = playListEditorAnalog;
 	interfaceMenu_t *channelMenu = interfaceMenu;
 	playListEditorAnalog_t *element;
 	char channelEntry[MENU_ENTRY_INFO_LENGTH];
 	int32_t i = 0;
+
+	if(playListEditorAnalog != NULL) {
+		return 0;
+	}
 
 	interface_clearMenuEntries(channelMenu);
 	load_Analog_channels(cur_element);// fixed pointer on list
@@ -610,9 +632,9 @@ static int32_t fillPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* p
 	return 0;
 }
 
-int32_t enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
+int32_t enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void *pArg)
 {
-
+//	playlistEditorMenuParam_t *pParam = (playlistEditorMenuParam_t *)pArg;
 	if(!(list_empty(&editor_playList))) {
 		return 0;
 	}
@@ -627,6 +649,35 @@ int32_t enterPlaylistEditorDigital(interfaceMenu_t *interfaceMenu, void* pArg)
 	return 0;
 }
 
+
+static int32_t playlistEditor_wantSaveConfirm(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	switch(cmd->command) {
+		case interfaceCommandGreen:
+		case interfaceCommandEnter:
+		case interfaceCommandOk:
+			playlistEditor_save(pArg);
+			break;
+		case interfaceCommandRed:
+		case interfaceCommandExit:
+		case interfaceCommandLeft:
+		default:
+			return 0;
+			break;
+	}
+	return 1;
+}
+
+int32_t exitPlaylistEditor(interfaceMenu_t *interfaceMenu, void* pArg)
+{
+	playlistEditorMenuParam_t *pParam = (playlistEditorMenuParam_t *)pArg;
+
+	if(pParam->isChanged) {
+		interface_showConfirmationBox(_T("BOUQUET_NOT_SAVED"), thumbnail_warning, playlistEditor_wantSaveConfirm, pArg);
+	}
+
+	return 0;
+}
 
 static int32_t output_saveParentControlPass(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
@@ -838,6 +889,7 @@ static int32_t interface_switchMenuEntryCustom(interfaceMenu_t *pMenu, int32_t s
 
 static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd)
 {
+	playlistEditorMenuParam_t *pParam = (playlistEditorMenuParam_t *)pMenu->pArg;
 
 	if(get_statusLockPlaylist()) {
 		switch(cmd->command) {
@@ -858,8 +910,8 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 				interface_listMenuGetItemInfo((interfaceListMenu_t *)pMenu, &itemHeight, &maxVisibleItems);
 
 				table_IntInt_t moves[] = {
-					{interfaceCommandUp,        -1},
-					{interfaceCommandDown,       1},
+					{interfaceCommandUp,       -1},
+					{interfaceCommandDown,      1},
 					{interfaceCommandPageUp,   -maxVisibleItems},
 					{interfaceCommandPageDown,  maxVisibleItems},
 					TABLE_INT_INT_END_VALUE
@@ -868,6 +920,7 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 				if(interface_switchMenuEntryCustom(pMenu, pMenu->selectedItem, table_IntIntLookup(moves, cmd->command, 0)) != 0) {
 					return 1;
 				}
+				pParam->isChanged = 1;
 				break;
 			}
 			case interfaceCommandEnter:
@@ -884,16 +937,14 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 	}
 
 	if(cmd->command == interfaceCommandGreen) {
-		typeBouquet_t editorType = (typeBouquet_t)pMenu->pArg;
-		swap_playlistEditor(editorType);
-		offair_fillDVBTMenu();
-		interface_showMessageBox(_T("SAVE"), thumbnail_info, 3000);
+		playlistEditor_save(pMenu->pArg);
 		return 0;
 	} else if(cmd->command == interfaceCommandRight) {
 		int32_t n = pMenu->selectedItem;
 		if((n >= 0) && (n < interface_getMenuEntryCount(pMenu))) {
 			playList_nextChannelState(&pMenu->menuEntry[n], n);
 			interface_displayMenu(1);
+			pParam->isChanged = 1;
 			return 1;
 		}
 	}
@@ -923,10 +974,10 @@ int32_t playlistEditor_init(void)
 		interfaceListMenuIconThumbnail, enterPlaylistAnalogSelect, NULL, NULL);
 
 	createListMenu(&InterfacePlaylistEditorDigital, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylistDigital,
-		interfaceListMenuIconThumbnail, enterPlaylistEditorDigital, NULL, NULL);
+		interfaceListMenuIconThumbnail, enterPlaylistEditorDigital, exitPlaylistEditor, (void *)&playlistEditorMenu_digitalParam);
 
 	createListMenu(&InterfacePlaylistEditorAnalog, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylistAnalog,
-		interfaceListMenuIconThumbnail, enterPlaylistEditorAnalog, NULL, NULL);
+		interfaceListMenuIconThumbnail, enterPlaylistEditorAnalog, exitPlaylistEditor, (void *)&playlistEditorMenu_analogParam);
 
 	InterfacePlaylistEditorDigital.baseMenu.processCommand = playlistEditor_processCommand;
 	InterfacePlaylistEditorAnalog.baseMenu.processCommand = playlistEditor_processCommand;
