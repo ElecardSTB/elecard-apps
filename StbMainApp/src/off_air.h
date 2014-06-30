@@ -235,7 +235,8 @@ static inline int offair_getServiceIndex(EIT_service_t *service)
 	return dvbChannel_getIndex(service);
 }
 
-static inline int service_isRadio(const EIT_service_t *service) {
+static inline int service_isRadio(const EIT_service_t *service)
+{
 	return service->service_descriptor.service_type == 2;
 }
 

@@ -853,11 +853,15 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 			case interfaceCommandPageUp:
 			case interfaceCommandPageDown:
 			{
-				const table_IntInt_t moves[] = {
+				int32_t itemHeight;
+				int32_t maxVisibleItems;
+				interface_listMenuGetItemInfo((interfaceListMenu_t *)pMenu, &itemHeight, &maxVisibleItems);
+
+				table_IntInt_t moves[] = {
 					{interfaceCommandUp,        -1},
 					{interfaceCommandDown,       1},
-					{interfaceCommandPageUp,   -10},
-					{interfaceCommandPageDown,  10},
+					{interfaceCommandPageUp,   -maxVisibleItems},
+					{interfaceCommandPageDown,  maxVisibleItems},
 					TABLE_INT_INT_END_VALUE
 				};
 
