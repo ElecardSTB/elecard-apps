@@ -677,6 +677,7 @@ typedef struct __stb810_controlInfo
 #ifdef ENABLE_VIDIMAX
 	stb810_vidimaxInfo  vidimaxInfo;
 #endif
+	uint32_t	            youtubeSearchNumber;
 } stb810_controlInfo;
 
 typedef struct _stbTimeZoneDesc_t

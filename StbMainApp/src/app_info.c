@@ -552,6 +552,9 @@ int loadAppSettings()
 			//dprintf("%s: Analog TV file with channel names %s\n", __FUNCTION__, appControlInfo.tvInfo.channelNamesFile );
 		}
 #endif
+		else if (sscanf(buf, "YOUTUBE_SEARCH_NUM=%d", &appControlInfo.youtubeSearchNumber ) == 1)
+		{
+		}
 		else if (sscanf(buf, "DEBUG=%d", &gdbDebug ) == 1)
 		{
 		}
@@ -887,6 +890,7 @@ int saveAppSettings()
 	fprintf(fd, "ATVAUDIOMODE=%d\n",         	appControlInfo.tvInfo.audioMode);
 	fprintf(fd, "ATVCHANNELNAMESFILE=%s\n",         	appControlInfo.tvInfo.channelNamesFile);
 #endif
+	fprintf(fd, "YOUTUBE_SEARCH_NUM=%d\n",           appControlInfo.youtubeSearchNumber);
 	extern int32_t gdbDebug;
 	extern int32_t gdbBouquet;
 	fprintf(fd, "DEBUG=%d\n",         	gdbDebug);
@@ -1127,6 +1131,8 @@ void appInfo_init(void)
 	interfaceInfo.highlightColor                  = 0;
 	interfacePlayControl.showTimeout              = 5;
 	interfacePlayControl.showOnStart              = 1;
+
+	appControlInfo.youtubeSearchNumber            = 5;
 
 	loadAppSettings();
 	loadVoipSettings();
