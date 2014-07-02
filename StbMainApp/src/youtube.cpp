@@ -46,6 +46,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "l10n.h"
 #include "media.h"
 #include "playlist.h"
+#include "helper.h"
+#include "list.h"
 
 #ifdef ENABLE_EXPAT
 #include <expat.h>
@@ -89,7 +91,7 @@ typedef struct
 	size_t search_offset;/** Current page of search results */
 	bool youtube_canceled;
 	int last_selected;
-	char **last_search;
+	strList_t last_search;
 
 	pthread_t search_thread;
 } youtubeInfo_t;
@@ -149,6 +151,9 @@ static void youtube_menuDisplay(interfaceMenu_t *pMenu);
 /** @param pArg Must be &YoutubeMenu */
 static void *youtube_MenuVideoSearchThread(void* pArg);
 static void youtube_runSearch(void* pArg);
+static int youtubeSearchHist_save();
+static int youtubeSearchHist_load();
+static int youtubeSearchHist_check(char* search);
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -733,10 +738,7 @@ void youtube_buildMenu(interfaceMenu_t* pParent)
 #endif
 		0 };
 
-	youtubeInfo.last_search = (char**)malloc(appControlInfo.youtubeSearchNumber*sizeof(char*));
-	for(int i = 0; i < appControlInfo.youtubeSearchNumber; i++) {
-		youtubeInfo.last_search[i] = (char*)malloc(MAX_FIELD_PATTERN_LENGTH*sizeof(char));
-	}
+	youtubeInfo.last_search.list = LIST_HEAD_INIT(youtubeInfo.last_search.list);
 
 	createListMenu(&YoutubeMenu, "YouTube", thumbnail_youtube, youtube_icons, pParent,
 		interfaceListMenuIconThumbnail, youtube_fillFirstMenu, youtube_exitMenu, SET_NUMBER(1));
@@ -866,24 +868,7 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 
 	if (youtubeInfo.search_offset == YOUTUBE_NEW_SEARCH)
 	{
-		FILE *fd = fopen(YOUTUBE_SEARCH_FILE, "r");
-		if(fd != NULL) {
-			int i = 0;
-			while(!feof(fd)) {
-				char buf[MAX_FIELD_PATTERN_LENGTH];
-				if(fgets(buf, sizeof(buf), fd) != NULL) {
-					memset(youtubeInfo.last_search[i], 0, sizeof(youtubeInfo.last_search[i]));
-					strncpy(youtubeInfo.last_search[i], buf, sizeof(buf));
-					youtubeInfo.last_search[i][strlen(youtubeInfo.last_search[i])-1] = '\0';
-
-					i++;
-					if(i == appControlInfo.youtubeSearchNumber)
-						break;
-				}
-			}
-			fclose(fd);
-		}
-
+		youtubeSearchHist_load();
 		youtubeInfo.search_offset = 0;
 		//TODO: Change to new interface
 		interface_getText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
@@ -969,26 +954,62 @@ static void youtube_runSearch(void *pArg)
 	pthread_create(&youtubeInfo.search_thread, NULL, youtube_MenuVideoSearchThread, pArg);
 }
 
-static int youtube_saveSearch()
+static int youtubeSearchHist_load()
+{
+	FILE *fd = fopen(YOUTUBE_SEARCH_FILE, "r");
+	strList_release(&youtubeInfo.last_search.list);
+	if(fd != NULL) {
+		int i = 0;
+		while(!feof(fd)) {
+			char buf[MAX_FIELD_PATTERN_LENGTH];
+			if(fgets(buf, sizeof(buf), fd) != NULL) {
+				char *str = cutEnterInStr(buf);
+				strList_add(&youtubeInfo.last_search.list, str);
+				free(str);
+				i++;
+				if(i == appControlInfo.youtubeSearchNumber)
+					break;
+			}
+		}
+		fclose(fd);
+	}
+}
+
+static int youtubeSearchHist_save()
 {
 	int fd = open(YOUTUBE_SEARCH_FILE, O_WRONLY | O_CREAT | O_TRUNC);
 	if(fd == NULL) {
 		eprintf("File with searches can't open!\n");
 		return -1;
 	}
-	
-	for(int i = 0; i < appControlInfo.youtubeSearchNumber; i++) {
-		if(youtubeInfo.last_search[i][0] != 0) {
-			write(fd, youtubeInfo.last_search[i], strlen(youtubeInfo.last_search[i]));
+	list_head *pos;
+	list_for_each(pos, &youtubeInfo.last_search.list) {
+		strList_t *el = list_entry(pos, strList_t, list);
+		if(el->str) {
+			write(fd, el->str, strlen(el->str));
 			write(fd, "\n", 1);
 		}
 	}
 
 	close(fd);
-
+	strList_release(&youtubeInfo.last_search.list);
 	return 0;
 }
 
+static int youtubeSearchHist_check(char* search)
+{
+	int newSearchIndex = strList_find(&youtubeInfo.last_search.list, search);
+	if(newSearchIndex == -1) {
+		if(strList_count(&youtubeInfo.last_search.list) == appControlInfo.youtubeSearchNumber) {
+			strList_remove_last(&youtubeInfo.last_search.list);
+		}
+		strList_add_head(&youtubeInfo.last_search.list, search);
+	} else if(newSearchIndex >= 0) {
+		strList_remove(&youtubeInfo.last_search.list, search);
+		strList_add_head(&youtubeInfo.last_search.list, search);
+	}
+	return 0;
+}
 static int youtube_startVideoSearch(interfaceMenu_t *pMenu, char *value, void* pArg)
 {
 	(void)pArg;
@@ -1012,21 +1033,9 @@ static int youtube_startVideoSearch(interfaceMenu_t *pMenu, char *value, void* p
 		}
 		buf[search_length] = 0;
 		strncpy(youtubeInfo.search, buf, search_length+1);
-		int newSearchIndex = appControlInfo.youtubeSearchNumber-1;
-		for(int i = 0; i < appControlInfo.youtubeSearchNumber; i++) {
-			if(strcasecmp(youtubeInfo.search, youtubeInfo.last_search[i]) == 0) {
-				newSearchIndex = i;
-				break;
-			}
-		}
-		for(int i = newSearchIndex; i > 0; i--) {
-			memset(youtubeInfo.last_search[i], 0, sizeof(youtubeInfo.last_search[i]));
-			strncpy(youtubeInfo.last_search[i], youtubeInfo.last_search[i-1], strlen(youtubeInfo.last_search[i-1]));
-		}
-		memset(youtubeInfo.last_search[0], 0, sizeof(youtubeInfo.last_search[0]));
-		strncpy(youtubeInfo.last_search[0], buf, search_length+1);
 
-		youtube_saveSearch();
+		youtubeSearchHist_check(youtubeInfo.search);
+		youtubeSearchHist_save();
 		youtube_runSearch(pMenu);
 	} else {
 		youtubeInfo.search[0] = 0;

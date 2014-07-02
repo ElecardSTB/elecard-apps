@@ -48,6 +48,11 @@ typedef struct {
 	int32_t value;
 } table_IntInt_t;
 
+typedef struct {
+	char               *str;
+	struct list_head    list;
+} strList_t;
+
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -67,11 +72,18 @@ int32_t	table_IntStrLookupR(const table_IntStr_t table[], char *value, int32_t d
 int32_t	table_IntIntLookup(const table_IntInt_t table[], int32_t key, int32_t defaultValue);
 int32_t	table_IntIntLookupR(const table_IntInt_t table[], int32_t value, int32_t defaultValue);
 
+//Cut "Enters" from string
+char * cutEnterInStr(const char *str);
+
 //String list API
 int32_t strList_add    (struct list_head *listHead, const char *str);
+int32_t strList_add_head    (struct list_head *listHead, const char *str);
 int32_t strList_remove (struct list_head *listHead, const char *str);
+int32_t strList_remove_last (struct list_head *listHead);
 int32_t strList_isExist(struct list_head *listHead, const char *str);
 int32_t strList_release(struct list_head *listHead);
+int32_t strList_count(struct list_head *listHead);
+int32_t strList_find(struct list_head *listHead, const char *str);
 const char *strList_get(struct list_head *listHead, uint32_t number);
 
 #ifdef __cplusplus

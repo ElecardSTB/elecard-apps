@@ -30,10 +30,6 @@
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
-typedef struct {
-	char               *str;
-	struct list_head    list;
-} strList_t;
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>_<Word>+    *
@@ -175,6 +171,23 @@ int32_t setParam(const char *path, const char *param, const char *value)
 	return 0;
 }
 
+char *cutEnterInStr(const char *str) {
+	if(!str) {
+		eprintf("%s(): Wrong argument!\n", __func__);
+		return NULL;
+	}
+	char *strRes = strdup(str);
+	char *ch;
+	if((ch = strchr(strRes, '\r')) != NULL) {
+		ch[0] = '\0';
+	}
+	if((ch = strchr(strRes, '\n')) != NULL) {
+		ch[0] = '\0';
+	}
+
+	return strRes;
+}
+
 const char *table_IntStrLookup(const table_IntStr_t table[], int32_t key, char *defaultValue)
 {
 	int32_t i;
@@ -227,6 +240,30 @@ int32_t table_IntIntLookupR(const table_IntInt_t table[], int32_t value, int32_t
 	return defaultValue;
 }
 
+int32_t strList_add_head(struct list_head *listHead, const char *str)
+{
+	strList_t *newName;
+	if(!listHead || !str) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return -1;
+	}
+
+	newName = malloc(sizeof(strList_t));
+	if(!newName) {
+		eprintf("%s(): Allocation error!\n", __func__);
+		return -2;
+	}
+	newName->str = strdup(str);
+	if(!newName->str) {
+		eprintf("%s(): Cat duplicate str=%s!\n", __func__, str);
+		free(newName);
+		return -3;
+	}
+	dprintf("%s: %s\n", __func__, str);
+	list_add(&newName->list, listHead);
+
+	return 0;
+}
 
 int32_t strList_add(struct list_head *listHead, const char *str)
 {
@@ -278,6 +315,30 @@ int32_t strList_remove(struct list_head *listHead, const char *str)
 	return 0;
 }
 
+int32_t strList_remove_last(struct list_head *listHead)
+{
+	struct list_head *pos;
+	if(!listHead) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return -1;
+	}
+	list_for_each(pos, listHead) {
+		if(listHead == pos->next) {
+			strList_t *el = list_entry(pos, strList_t, list);
+			list_del(pos);
+			if(el->str) {
+				free(el->str);
+			} else {
+				eprintf("%s(): Something wrong, element has no str!\n", __func__);
+			}
+			free(el);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 int32_t strList_isExist(struct list_head *listHead, const char *str)
 {
 	struct list_head *pos;
@@ -313,6 +374,38 @@ int32_t strList_release(struct list_head *listHead)
 		free(el);
 	}
 	return 0;
+}
+
+int32_t strList_count(struct list_head *listHead)
+{
+	struct list_head *pos;
+	uint32_t id = 0;
+	if(!listHead) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return -1;
+	}
+	list_for_each(pos, listHead) {
+		id++;
+	}
+	return id;
+}
+
+int32_t strList_find(struct list_head *listHead, const char *str)
+{
+	struct list_head *pos;
+	uint32_t id = 0;
+	if(!listHead || !str) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return -2;
+	}
+	list_for_each(pos, listHead) {
+		strList_t *el = list_entry(pos, strList_t, list);
+		if(strcasecmp(el->str, str) == 0) {
+			return id;
+		}
+		id++;
+	}
+	return -1;
 }
 
 const char *strList_get(struct list_head *listHead, uint32_t number)
