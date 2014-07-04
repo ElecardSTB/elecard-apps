@@ -427,7 +427,9 @@ static int32_t playlistEditor_save(playlistEditorMenuParam_t *pParam)
 				}
 			}
 		}
+		playlistEditor_saveInternal(pParam);
 	} else if(pParam->type == eBouquet_analog) {
+		//TODO
 		if(playListEditorAnalog == NULL) {
 			return -1;
 		}
@@ -435,8 +437,7 @@ static int32_t playlistEditor_save(playlistEditorMenuParam_t *pParam)
 		eprintf("%s(): Error, unknown playlist editor editorType=%d\n", __func__, pParam->type);
 		return -1;
 	}
-
-	playlistEditor_saveInternal(pParam);
+	bouquet_save(pParam->type, bouquet_getCurrentName(pParam->type));
 
 	return 0;
 }

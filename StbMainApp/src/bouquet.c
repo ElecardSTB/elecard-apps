@@ -36,7 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "dvbChannel.h"
 #include "debug.h"
-#include "off_air.h"
 #include "l10n.h"
 #include "analogtv.h"
 #include "list.h"
@@ -395,7 +394,7 @@ static int32_t bouquet_runSftpBatchFile(const char *fileName)
 	return WEXITSTATUS(ret);
 }
 
-int32_t bouquet_copyServer(int32_t isFrom, const char *from, const char *to)
+static int32_t bouquet_copyServer(int32_t isFrom, const char *from, const char *to)
 {
 	char serverName[16];
 	char serverDir[256];
@@ -426,7 +425,7 @@ int32_t bouquet_copyFromServer(const char *remoteFile, const char *localFile)
 
 int32_t bouquet_copyToServer(const char *localFile, const char *dest)
 {
-	return bouquet_copyServer(1, localFile, dest);
+	return bouquet_copyServer(0, localFile, dest);
 }
 
 static int32_t bouquet_uploadDigitalBouquet(const char *curBouquetName)
