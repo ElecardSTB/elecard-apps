@@ -62,6 +62,7 @@ extern "C" {
 #endif
 
 int32_t helperFileExists(const char* filename);
+int32_t helperFileIsSymlink(const char* filename);
 int32_t helperCheckDirectoryExsists(const char *path);
 
 int32_t	getParam(const char *path, const char *param, const char *defaultValue, char *output);

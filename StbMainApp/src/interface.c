@@ -34,7 +34,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 
 #include "interface.h"
-#include "playlist_editor.h"
 
 #include "debug.h"
 #include "app_info.h"

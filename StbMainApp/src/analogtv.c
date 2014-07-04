@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gfx.h"
 #include "off_air.h"
 #include "playlist_editor.h"
+#include "bouquet.h"
 
 #include <cJSON.h>
 #include <sys/stat.h>

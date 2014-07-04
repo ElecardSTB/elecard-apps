@@ -51,7 +51,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "stsdk.h"
 #include "media.h"
 #include "playlist_editor.h"
-#include "bouquet.h"
 
 #include "dvb.h"
 #include "analogtv.h"
@@ -2732,16 +2731,21 @@ static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg)
 
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
-	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit || cmd->command == interfaceCommandLeft)
-	{
-		return 0;
-	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
-		offair_clearServiceList(1);
-		dvbChannel_terminate();
-		output_redrawMenu(pMenu);
-		return 0;
+	switch(cmd->command) {
+		case interfaceCommandRed:
+		case interfaceCommandExit:
+		case interfaceCommandLeft:
+			return 0;
+		case interfaceCommandGreen:
+		case interfaceCommandEnter:
+		case interfaceCommandOk:
+			offair_clearServiceList(1);
+			output_redrawMenu(pMenu);
+			return 0;
+		default:
+			break;
 	}
+
 	return 1;
 }
 
@@ -2758,7 +2762,6 @@ static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEv
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
 			dvbChannel_sort(serviceSortNone);
-			offair_fillDVBTMenu();
 			ret = 0;
 			break;
 		default:
@@ -2791,7 +2794,8 @@ static int output_toggleDvbTuner(interfaceMenu_t *pMenu, void* pArg)
 static int output_toggleDvbShowScrambled(interfaceMenu_t *pMenu, void* pArg)
 {
 	appControlInfo.offairInfo.dvbShowScrambled = (appControlInfo.offairInfo.dvbShowScrambled + 1) % 3;
-	offair_fillDVBTMenu();
+	dvbChannel_changed();
+
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
@@ -6520,6 +6524,9 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 void output_cleanupMenu(void)
 {
+#ifdef ENABLE_DVB
+	playlistEditor_terminate();
+#endif
 #ifdef ENABLE_WIFI
 	wireless_cleanupMenu();
 #endif

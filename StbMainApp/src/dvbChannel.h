@@ -38,14 +38,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "defines.h"
 
 #include "dvb.h"
-#include "interface.h"
 #include "list.h"
 
+/******************************************************************
+* EXPORTED MACROS                              [for headers only] *
+*******************************************************************/
 #define dvbChannel_getServiceIndex(id) dvbChannel_getServiceIndexVisible(id, 1)
 
-/*******************
-* EXPORTED DATA    *
-********************/
+/******************************************************************
+* EXPORTED TYPEDEFS                            [for headers only] *
+*******************************************************************/
 typedef struct {
 	struct list_head	orderNoneHead;
 
@@ -83,10 +85,12 @@ typedef struct {
 	struct list_head	 orderNone;
 } service_index_t;
 
+typedef int32_t changeCallback_t(void *pArg);
+
+/******************************************************************
+* EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
+*******************************************************************/
 #ifdef ENABLE_DVB
-/********************************
-* EXPORTED FUNCTIONS PROTOTYPES *
-*********************************/
 int32_t dvbChannel_addService(EIT_service_t *service, service_index_data_t *data, uint8_t flag);
 //int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_t *data, uint8_t flag);
 int32_t dvbChannel_remove(service_index_t *srvIdx);
@@ -97,9 +101,7 @@ int32_t dvbChannel_setName(service_index_t *srvIdx, const char *name);
 
 struct list_head *dvbChannel_getSortList(void);
 int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);
-int32_t dvbChannel_writeOrderConfig(void);
 int32_t dvbChannel_sort(serviceSort_t sortType);
-int32_t dvbChannel_initServices(void);
 int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
 
 int32_t dvbChannel_hasSchedule( uint32_t channelNumber );
@@ -111,6 +113,16 @@ int32_t dvbChannel_getCount(void);
 //int32_t dvbChannel_invalidateServicess(void);
 int32_t dvbChannel_hasAnyEPG(void);
 int32_t dvbChannel_applyUpdates(void);
+
+
+int32_t dvbChannel_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg);
+int32_t dvbChannel_changed(void);
+
+int32_t dvbChannel_load(void);
+int32_t dvbChannel_save(void);
+int32_t dvbChannel_clear(void);
+
+void dvbChannel_init(void);
 void dvbChannel_terminate(void);
 #endif // ENABLE_DVB
 #endif // DVBCHANNEL_H

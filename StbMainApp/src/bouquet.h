@@ -36,10 +36,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ************************************************/
 #include <stdint.h>
 
-#include "interface.h"
 #include "defines.h"
-#include "dvbChannel.h"
-#include "helper.h"
+#include "list.h"
+#include <service.h>
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -54,21 +53,9 @@ typedef enum {
 	eBouquet_all,
 } typeBouquet_t;
 
-typedef struct {
-	char name[64];
-	struct list_head	NameDigitalList;
-	struct list_head	name_tv;
-	struct list_head	name_radio;
-	struct list_head	channelsList;
-	struct list_head	transponderList;
-} bouquetDigital_t;
-
-
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-extern bouquetDigital_t digitalBouquet;
-extern struct list_head bouquetNameAnalogList;
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -79,63 +66,43 @@ extern "C" {
 
 #ifdef ENABLE_DVB
 
-void bouquet_LoadingBouquet(typeBouquet_t type);
-void bouquet_GetBouquetData(typeBouquet_t type, struct list_head *listHead);
-
-int32_t  digitalList_release(void);
-void bouquet_terminateDigitalList(typeBouquet_t index);
-int32_t bouquet_updateDigitalBouquetList(interfaceMenu_t *pMenu, void *pArg);
-
-int32_t bouquets_getNumberPlaylist(void);
-void bouquets_setNumberPlaylist(int32_t num);
-
-void bouquet_loadBouquet(typeBouquet_t index, const char *name);
-void bouquet_stashBouquet(typeBouquet_t index, const char *name);//local
-
-int32_t bouquets_setDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquets_setAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_createNewBouquet(interfaceMenu_t *pMenu, char *value, void *pArg);
-
-void bouquet_loadAnalogBouquetsList(int force);
 void bouquet_addScanChannels(void);
-int32_t bouquet_saveDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
-
 void bouquet_saveAnalogBouquet(void);
-int32_t bouquet_saveAnalogMenuBouquet(interfaceMenu_t *pMenu, void *pArg);
 
-int32_t bouquet_updateDigitalBouquet(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_updateAnalogBouquet(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_updateAnalogBouquetList(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_enableControl(interfaceMenu_t *pMenu, void *pArg);
-int32_t bouquet_getEnableStatus(void);
+
+int32_t bouquet_isEnable(void);
+void bouquet_setEnable(int32_t enable);
+
+//Name list
+struct list_head *bouquet_getNameList(typeBouquet_t btype);
+
+const char *bouquet_getCurrentName(typeBouquet_t btype);
+void        bouquet_setCurrentName(typeBouquet_t btype, const char *name);
+
+int32_t bouquet_isDownloaded   (typeBouquet_t btype, const char *name);
+int32_t bouquet_open           (typeBouquet_t btype, const char *name, int32_t force);
+int32_t bouquet_create         (typeBouquet_t btype, const char *name);
+int32_t bouquet_save           (typeBouquet_t btype, const char *name);
+int32_t bouquet_remove         (typeBouquet_t btype, const char *name);
+
+//work with server
+int32_t bouquet_updateNameList (typeBouquet_t btype, int32_t isDownload);
+int32_t bouquet_update         (typeBouquet_t btype, const char *name);
+int32_t bouquet_upload         (typeBouquet_t btype, const char *name);
+
 void bouquet_init(void);
 void bouquet_terminate(void);
-void bouquet_setEnableStatus(int32_t i);
-void bouquet_getOffairDigitalName(char *name, size_t size);
-char *bouquet_getDigitalBouquetName(void);
-char *bouquet_getAnalogBouquetName(void);
-char *bouquet_getNameBouquetList(list_element_t **head, int32_t number);
-void bouquet_setDigitalBouquetName(const char *name);
-void bouquet_setAnalogBouquetName(const char *name);
-void bouquet_loadBouquets(list_element_t **services);
 
-
-list_element_t *get_bouquet_list(void);
-
-EIT_service_t *bouquet_findService(EIT_common_t *header);
 #else // ENABLE_DVB
+
+#define bouquet_isEnable()          0
+#define bouquet_setEnable(...)
+
+#define bouquet_getCurrentName(...) NULL
+#define bouquet_setCurrentName(...)
 
 #define bouquet_init()
 #define bouquet_terminate()
-#define bouquet_setDigitalBouquetName(name)
-#define bouquet_setAnalogBouquetName(name)
-#define bouquet_setEnableStatus(n)
-#define bouquet_getDigitalBouquetName()		""
-#define bouquet_getAnalogBouquetName()		""
-#define bouquet_getEnableStatus()					0
-#define bouquet_createNewBouquet			NULL
-#define bouquet_enableControl				NULL
 
 #endif // ENABLE_DVB
 

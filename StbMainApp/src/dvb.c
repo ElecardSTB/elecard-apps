@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "stsdk.h"
 #include "helper.h"
 #include "dvb-fe.h"
+#include "bouquet.h"
 //#include "elcd-rpc.h"
 
 #include <fcntl.h>
@@ -2229,9 +2230,8 @@ int dvb_getServiceIndex( EIT_service_t* service )
 
 char* dvb_getServiceName(EIT_service_t *service)
 {
-	if(service)
-	{
-		return (char*)&service->service_descriptor.service_name[0];
+	if(service) {
+		return (char*)service->service_descriptor.service_name;
 	}
 	return NULL;
 }
@@ -3005,15 +3005,12 @@ void dvb_init(void)
 	dprintf("%s: in\n", __FUNCTION__);
 
 	dvbfe_init();
+	dvbChannel_init();
+	bouquet_init();
 
 	mysem_create(&dvb_semaphore);
 	mysem_create(&scan_semaphore);
 	mysem_create(&dvb_filter_semaphore);
-
-	if(helperFileExists(appControlInfo.dvbCommonInfo.channelConfigFile)){
-		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
-		dprintf("%s: loaded %d services\n", __FUNCTION__, dvb_getNumberOfServices());
-	}
 
 	dprintf("%s: out\n", __FUNCTION__);
 }
@@ -3021,6 +3018,7 @@ void dvb_init(void)
 void dvb_terminate(void)
 {
 	int i;
+
 	for(i = 0; i < MAX_ADAPTER_SUPPORTED; i++) {
 		dvb_stopDVB(i, 1);
 	}
@@ -3030,7 +3028,9 @@ void dvb_terminate(void)
 	mysem_destroy(dvb_semaphore);
 	mysem_destroy(scan_semaphore);
 	mysem_destroy(dvb_filter_semaphore);
-	
+
+	bouquet_terminate();
+	dvbChannel_terminate();
 	dvbfe_terminate();
 }
 

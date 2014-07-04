@@ -57,6 +57,17 @@ int helperFileExists(const char* filename)
 	return ret;
 }
 
+int32_t helperFileIsSymlink(const char* filename)
+{
+	struct stat st;
+
+	if(filename && (lstat(filename, &st) == 0) && S_ISLNK(st.st_mode)) {
+		return 1;
+	}
+
+	return 0;
+}
+
 int32_t helperCheckDirectoryExsists(const char *path)
 {
 	struct stat st;
@@ -362,6 +373,10 @@ int32_t strList_release(struct list_head *listHead)
 {
 	struct list_head *pos;
 	struct list_head *n;
+	if(!listHead) {
+		eprintf("%s(): Wrong argument!\n", __func__);
+		return -1;
+	}
 	list_for_each_safe(pos, n, listHead) {
 		strList_t *el = list_entry(pos, strList_t, list);
 

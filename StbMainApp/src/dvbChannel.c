@@ -33,14 +33,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * INCLUDE FILES                                *
 ************************************************/
 #include "dvbChannel.h"
-#include "playlist_editor.h"
 
 #include "debug.h"
 #include "off_air.h"
-#include "bouquet.h"
 
-#include "stsdk.h"
 #include <cJSON.h>
+#include <elcd-rpc.h>
+
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
@@ -48,6 +47,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
+typedef struct {
+	changeCallback_t *pCallback;
+	void             *pArg;
+} registeredChangeCallback_t;
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -60,6 +63,11 @@ dvb_channels_t g_dvb_channels = {
     .totalCount		= 0,
     .sortOrderType	= serviceSortNone,
 //	.initialized	= 0,
+};
+
+registeredChangeCallback_t changeCallbacks[2] = {
+	{NULL, NULL},
+	{NULL, NULL},
 };
 #endif // ENABLE_DVB
 
@@ -207,6 +215,8 @@ int32_t dvbChannel_swapServices(uint32_t first, uint32_t second)
 	list_del(&srvIdx_second->orderNone);
 	list_add(&srvIdx_second->orderNone, srvIdx_beforeFirst);
 
+	dvbChannel_changed();
+
 	return 0;
 }
 
@@ -296,6 +306,7 @@ int32_t dvbChannel_remove(service_index_t *srvIdx)
 	if(srvIdx->data.visible) {
 		g_dvb_channels.viewedCount--;
 	}
+
 	free(srvIdx);
 	return 0;
 }
@@ -307,13 +318,10 @@ static int32_t dvbChannel_readOrderConfig()
 	cJSON *format;
 	char *data;
 	long len;
-	char fname[BUFFER_SIZE];
 
-	bouquet_getOffairDigitalName(fname, sizeof(fname));
-	dprintf("read file %s\n", fname);
-	fd = fopen(fname, "r");
+	fd = fopen(OFFAIR_SERVICES_FILENAME, "r");
 	if(fd == NULL) {
-		dprintf("Error opening %s\n", fname);
+		eprintf("%s(): Error opening %s: %m\n", __func__, OFFAIR_SERVICES_FILENAME);
 		//Is this need still
 		return -1;
 	}
@@ -327,7 +335,7 @@ static int32_t dvbChannel_readOrderConfig()
 	root = cJSON_Parse(data);
 	free(data);
 	if(!root) {
-		printf("Error before: [%s]\n", cJSON_GetErrorPtr());
+		eprintf("Error before: [%s]\n", cJSON_GetErrorPtr());
 		return -1;
 	}
 
@@ -356,11 +364,11 @@ static int32_t dvbChannel_readOrderConfig()
 		}
 	}
 	cJSON_Delete(root);
-	dprintf("%s imported services: %s\n", __func__, fname);
+	dprintf("%s imported services: %s\n", __func__, OFFAIR_SERVICES_FILENAME);
 	return 0;
 }
 
-int32_t dvbChannel_writeOrderConfig(void)
+static int32_t dvbChannel_writeOrderConfig(void)
 {
 	cJSON* format;
 	cJSON* root;
@@ -370,13 +378,13 @@ int32_t dvbChannel_writeOrderConfig(void)
 
 	format = cJSON_CreateArray();
 	if(!format) {
-		dprintf("Memory error!\n");
+		eprintf("%s(): Memory error!\n", __func__);
 		return -1;
 	}
 	root = cJSON_CreateObject();
 	if(!root) {
 		cJSON_Delete(format);
-		dprintf("Memory error!\n");
+		eprintf("%s(): Memory error!\n", __func__);
 		return -1;
 	}
 	cJSON_AddItemToObject(root, "digital TV channels", format);
@@ -406,15 +414,13 @@ int32_t dvbChannel_writeOrderConfig(void)
 
 	if(render) {
 		FILE *fd = NULL;
-		char fname[BUFFER_SIZE];
 
-		bouquet_getOffairDigitalName(fname, sizeof(fname));
-		fd = fopen(fname, "w");
+		fd = fopen(OFFAIR_SERVICES_FILENAME, "w");
 		if (fd) {
 			fwrite(render, strlen(render), 1, fd);
 			fclose(fd);
 		} else {
-			dprintf("Error opening %s\n", fname);
+			eprintf("%s(): Error opening %s: %m\n", __func__, OFFAIR_SERVICES_FILENAME);
 		}
 		free(render);
 	}
@@ -463,81 +469,17 @@ static void dvbChannel_sortOrderRecheck(void)
 			srvIdx->data.visible = 0;
 		}
 	}
+	dvbChannel_changed();
 }
 
 int32_t dvbChannel_applyUpdates(void)
 {
 	dvbChannel_sortOrderRecheck();
-	dvbChannel_writeOrderConfig();
+	dvbChannel_save();
+
+	//TODO: is it need here?
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
-	return 0;
-}
-
-void dvbChannel_terminate(void)
-{
-	struct list_head *pos;
-	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		dvbChannel_remove(srvIdx);
-	}
-	digitalList_release();
-}
-
-static int32_t dvbChannel_update(void)
-{
-
-	playlist_editor_cleanup(eBouquet_digital);
-
-	list_element_t   *service_element;
-	struct list_head *pos;
-	struct list_head *n;
-
-	if(list_empty(&g_dvb_channels.orderNoneHead)) {
-		dvbChannel_readOrderConfig();
-	} else {
-		dvbChannel_invalidateServices();
-	}
-
-	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
-		service_index_t *p_srvIdx;
-		EIT_service_t *curService = (EIT_service_t *)service_element->data;
-		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
-		if(p_srvIdx) {
-			p_srvIdx->service = curService;
-			if (strlen(p_srvIdx->data.channelsName) == 0) {
-				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen((char *)p_srvIdx->service->service_descriptor.service_name));
-			}
-		} else {
-			service_index_data_t data;
-
-			curService->common.media_id = curService->original_network_id;
-			memset(&data, 0, sizeof(data));
-			data.visible = 1;
-			data.parent_control = 0;
-			dvbChannel_addService(curService, &data, 0);
-		}
-	}
-
-	if (bouquet_getEnableStatus() && (list_empty(&digitalBouquet.channelsList))) {
-		bouquet_LoadingBouquet(eBouquet_digital);
-		bouquet_GetBouquetData(eBouquet_digital, &g_dvb_channels.orderNoneHead);
-		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
-#if (defined STSDK)
-		elcdRpcType_t type;
-		cJSON *result = NULL;
-		st_rpcSync(elcmd_dvbclearservices, NULL, &type, &result);
-		cJSON_Delete(result);
-#endif //#if (defined STSDK)
-	}
-	//remove elements without service pointer
-	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
-		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		if(srvIdx->service == NULL || srvIdx->flag == 0) {
-			dvbChannel_remove(srvIdx);
-		}
-	}
-
-	dvbChannel_writeOrderConfig();
+	
 	return 0;
 }
 
@@ -633,7 +575,58 @@ int32_t dvbChannel_sort(serviceSort_t sortType)
 	return 0;
 }
 
-int32_t dvbChannel_initServices(void)
+struct list_head *dvbChannel_getSortList(void)
+{
+	return &g_dvb_channels.orderNoneHead;
+}
+
+
+static int32_t dvbChannel_update(void)
+{
+	list_element_t   *service_element;
+	struct list_head *pos;
+	struct list_head *n;
+
+	if(list_empty(&g_dvb_channels.orderNoneHead)) {
+		dvbChannel_readOrderConfig();
+	} else {
+		dvbChannel_invalidateServices();
+	}
+
+	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+		service_index_t *p_srvIdx;
+		EIT_service_t *curService = (EIT_service_t *)service_element->data;
+		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
+		if(p_srvIdx) {
+			p_srvIdx->service = curService;
+			if (strlen(p_srvIdx->data.channelsName) == 0) {
+				strncpy(p_srvIdx->data.channelsName, (char *)p_srvIdx->service->service_descriptor.service_name, strlen((char *)p_srvIdx->service->service_descriptor.service_name));
+			}
+		} else {
+			service_index_data_t data;
+
+			curService->common.media_id = curService->original_network_id;
+			memset(&data, 0, sizeof(data));
+			data.visible = 1;
+			data.parent_control = 0;
+
+			dvbChannel_addService(curService, &data, 0);
+		}
+	}
+
+	//remove elements without service pointer
+	list_for_each_safe(pos, n, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+		if(srvIdx->service == NULL/* || srvIdx->flag == 0*/) {
+			dvbChannel_remove(srvIdx);
+		}
+	}
+
+	return 0;
+}
+
+
+static int32_t dvbChannel_initServices(void)
 {
 	dvbChannel_update();
 	offair_sortSchedule();
@@ -646,9 +639,79 @@ int32_t dvbChannel_initServices(void)
 	return 0;
 }
 
-struct list_head *dvbChannel_getSortList(void)
+
+int32_t dvbChannel_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg)
 {
-	return &g_dvb_channels.orderNoneHead;
+	uint32_t i = 0;
+	
+	while(changeCallbacks[i].pCallback) {
+		i++;
+		if((i >= ARRAY_SIZE(changeCallbacks))) {
+			return -1;
+		}
+	}
+	changeCallbacks[i].pCallback = pCallback;
+	changeCallbacks[i].pArg = pArg;
+
+	return 0;
 }
+
+int32_t dvbChannel_changed(void)
+{
+	uint32_t i = 0;
+	
+	while(changeCallbacks[i].pCallback) {
+		changeCallbacks[i].pCallback(changeCallbacks[i].pArg);
+		i++;
+		if((i >= ARRAY_SIZE(changeCallbacks))) {
+			return 0;
+		}
+	}
+
+	return 0;
+}
+
+int32_t dvbChannel_load(void)
+{
+	dvbChannel_clear();
+
+	if(helperFileExists(appControlInfo.dvbCommonInfo.channelConfigFile)) {
+		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
+		dprintf("%s(): loaded %d services\n", __func__, dvb_getNumberOfServices());
+	} else {
+		dvb_clearServiceList(0);
+	}
+	dvbChannel_initServices();
+	return 0;
+}
+
+int32_t dvbChannel_save(void)
+{
+	dvbChannel_writeOrderConfig();
+
+	return 0;
+}
+
+int32_t dvbChannel_clear(void)
+{
+	struct list_head *pos;
+	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);dbg_printf("\n");
+		dvbChannel_remove(srvIdx);
+	}
+	dvbChannel_changed();
+	return 0;
+}
+
+void dvbChannel_init(void)
+{
+// 	dvbChannel_initServices();
+}
+
+void dvbChannel_terminate(void)
+{
+	dvbChannel_clear();
+}
+
 
 #endif // ENABLE_DVB

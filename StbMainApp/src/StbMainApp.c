@@ -39,8 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include "StbMainApp.h"
-#include "playlist_editor.h"
-#include "bouquet.h"
 
 #include "debug.h"
 #include "rtp.h"
@@ -1148,19 +1146,16 @@ void *testServerThread(void *pArg)
 
 					ptr = ibuf+strlen("dvbclear ");
 
-					while (*ptr != 0 && *ptr == ' ')
-					{
+					while(*ptr != 0 && *ptr == ' ') {
 						ptr++;
 					}
 
 					todo = atoi(ptr);
 
-					if (todo > 0)
-					{
+					if(todo > 0) {
 						offair_clearServiceList(0);
 						sprintf(obuf, "DVB Service list cleared\r\n");
-					} else
-					{
+					} else {
 						sprintf(obuf, "ERROR: Incorrect value %d\r\n", todo);
 					}
 				} else if (strstr(ibuf, "dvbscan ") == ibuf)
@@ -3056,8 +3051,6 @@ void initialize(int argc, char *argv[])
 	st_init();
 #endif
 
-	bouquet_init();
-
 #ifdef ENABLE_DVB
 	dvb_init();
 #endif
@@ -3172,12 +3165,9 @@ void cleanup()
 #ifdef ENABLE_DLNA
 	dlna_stop();
 #endif
-
 	dprintf("%s: terminate gfx\n", __FUNCTION__);
 
 	gfx_terminate();
-	bouquet_terminate();
-	bouquet_terminateDigitalList(eBouquet_all);
 #ifdef STSDK
 	st_terminate();
 #endif
@@ -3186,7 +3176,6 @@ void cleanup()
 #endif
 
 	dprintf("%s: terminate interface\n", __FUNCTION__);
-
 	interface_destroy();
 
 #ifdef ENABLE_PVR
@@ -3196,8 +3185,6 @@ void cleanup()
 #ifdef ENABLE_DVB
 	dprintf("%s: terminate dvb\n", __FUNCTION__);
 	dvb_terminate();
-	dvbChannel_terminate();
-	playlist_editor_cleanup(eBouquet_all);
 #endif
 
 #ifdef ENABLE_VIDIMAX
