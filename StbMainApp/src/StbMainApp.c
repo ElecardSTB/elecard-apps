@@ -1868,18 +1868,12 @@ int fusion_getCommandOutput (char * cmd, char * result)
 
 void * fusion_threadFlipCreep (void * param)
 {
-	int needUpdate;
 	while (1)
 	{
-		needUpdate = 0;
-		if (FusionObject.creepline){
-			needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
+		if (FusionObject.creepline && strlen(FusionObject.creepline)){
+			interface_updateFusionCreepSurface();
 		}
-
-		if (needUpdate){
-			interface_displayCreepline();
-		}
-		fusion_wait(10);
+		fusion_wait(20);
 	}
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
@@ -1965,7 +1959,7 @@ void * fusion_threadCreepline(void * param)
 		}
 		else if (result == FUSION_SAME_CREEP && FusionObject.creepShown)
 		{
-			eprintf ("%s(%d): creepShown got. Wait pause and start again.\n", __FUNCTION__, __LINE__);
+			//eprintf ("%s(%d): creepShown got. Wait pause and start again.\n", __FUNCTION__, __LINE__);
 			fusion_wait(FusionObject.pause * 1000);
 			gettimeofday(&tv, NULL);
 			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
@@ -2100,21 +2094,6 @@ int fusion_refreshDtmfEvent(void *pArg)
 	return 0;
 }
 
-int fusion_refreshViewEvent(void *pArg)
-{
-	int needUpdate = 0;
-	if (FusionObject.creepline){
-		needUpdate = (strlen(FusionObject.creepline) > 0) ? 1:0;
-	}
-
-	if (needUpdate){
-// 		interface_displayMenu(1);
-		interface_displayCreepline();
-	}
-	interface_addEvent(fusion_refreshViewEvent, (void*)NULL, 10, 1);
-	return 0;
-}
-
 #define USB_ROOT "/mnt/"
 static char g_usbRoot[PATH_MAX] = {0};
 static char g_efpPath[PATH_MAX] = {0};
@@ -2187,8 +2166,7 @@ void fusion_startup()
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
 	pthread_mutex_init(&FusionObject.mutexDtmf, NULL);
 
-	//interface_addEvent(fusion_refreshViewEvent, (void*)NULL, 10, 1);		// test, was here
-	interface_addEvent(fusion_refreshDtmfEvent, (void*)NULL, FUSION_REFRESH_DTMF_MS, 1);
+	//interface_addEvent(fusion_refreshDtmfEvent, (void*)NULL, FUSION_REFRESH_DTMF_MS, 1);
 	FusionObject.currentDtmfDigit = '_';
 
 	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
@@ -2946,8 +2924,52 @@ int fusion_getCreepAndLogo ()
 			pthread_mutex_unlock(&FusionObject.mutexCreep);
 			//eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
 		}
-		pgfx_font->GetStringWidth(pgfx_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
-		pthread_mutex_unlock(&FusionObject.mutexCreep);
+		fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
+
+		if (FusionObject.creepWidth && (result == FUSION_NEW_CREEP)){
+
+			int surfaceHeight = FUSION_FONT_HEIGHT * 2;
+			int surfaceWidth = FusionObject.creepWidth + interfaceInfo.screenWidth;
+
+			pthread_mutex_lock(&FusionObject.mutexDtmf);
+			if (FusionObject.preallocSurface){
+				free (FusionObject.preallocSurface);
+				FusionObject.preallocSurface = NULL;
+			}
+			//eprintf ("%s(%d): malloc preallocSurface of size %d bytes...\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * interfaceInfo.screenHeight * 4);
+			FusionObject.preallocSurface = malloc (surfaceWidth * surfaceHeight * 4);
+			if (FusionObject.preallocSurface)
+			{
+				DFBSurfaceDescription fusion_desc;
+				fusion_desc.flags = DSDESC_PREALLOCATED | DSDESC_PIXELFORMAT | DSDESC_WIDTH | DSDESC_HEIGHT;
+				//fusion_desc.caps = DSCAPS_SYSTEMONLY | DSCAPS_STATIC_ALLOC | DSCAPS_DOUBLE | DSCAPS_FLIPPING;
+				fusion_desc.caps = DSCAPS_NONE;
+				fusion_desc.pixelformat = DSPF_ARGB;
+				fusion_desc.width = surfaceWidth;
+				fusion_desc.height = surfaceHeight;
+
+				fusion_desc.preallocated[0].data = FusionObject.preallocSurface;
+				fusion_desc.preallocated[0].pitch = fusion_desc.width * 4;
+				fusion_desc.preallocated[1].data = NULL;
+				fusion_desc.preallocated[1].pitch = 0;
+
+				if (fusion_surface){
+					fusion_surface->Release(fusion_surface);
+					fusion_surface = NULL;
+				}
+
+				DFBCHECK (pgfx_dfb->CreateSurface (pgfx_dfb, &fusion_desc, &fusion_surface));
+				fusion_surface->GetSize (fusion_surface, &fusion_desc.width, &fusion_desc.height);
+
+				int x = 0;
+				int y = FUSION_FONT_HEIGHT;
+				gfx_drawText(fusion_surface, fusion_font, 255, 255, 255, 255, x, y, FusionObject.creepline, 0, 1);
+			}
+			else {
+				eprintf("%s(%d): ERROR malloc %d bytes\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * surfaceHeight * 4);
+			}
+			pthread_mutex_unlock(&FusionObject.mutexDtmf);
+		}
 	}
 
 	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
@@ -3016,6 +3038,18 @@ void fusion_cleanup()
 		free (FusionObject.creepline);
 		FusionObject.creepline = NULL;
 	}
+
+	if (fusion_surface){
+		fusion_surface->Release(fusion_surface);
+		fusion_surface = NULL;
+	}
+
+	pthread_mutex_lock(&FusionObject.mutexDtmf);
+	if (FusionObject.preallocSurface){
+		free(FusionObject.preallocSurface);
+		FusionObject.preallocSurface = 0;
+	}
+	pthread_mutex_unlock(&FusionObject.mutexDtmf);
 
 	pthread_mutex_destroy(&FusionObject.mutexCreep);
 	pthread_mutex_destroy(&FusionObject.mutexLogo);

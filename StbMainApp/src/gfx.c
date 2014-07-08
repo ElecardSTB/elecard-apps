@@ -314,6 +314,11 @@ IDirectFBSurface *pgfx_helperFrameBuffer = NULL;
 /* The font that we use to write text. */
 IDirectFBFont *pgfx_font = NULL;
 
+#ifdef ENABLE_FUSION
+IDirectFBFont * fusion_font = NULL;
+IDirectFBSurface *fusion_surface = NULL;
+#endif
+
 /* The font that we use to write description text. */
 IDirectFBFont *pgfx_smallfont = NULL;
 
@@ -3638,11 +3643,7 @@ void gfx_flipSurface (IDirectFBSurface *pSurface)
 			eprintf ("%s: - pthread_mutex_timedlock failed. errno = %d\n", __FUNCTION__, errno);
 		}
 		else {  
-#ifdef ENABLE_FUSION
-			DFBCHECKLABEL (pSurface->Flip(pSurface, &rect, 0), finish_flip );
-#else
 			DFBCHECKLABEL (pSurface->Flip(pSurface, NULL, 0), finish_flip );
-#endif	/*ENABLE_FUSION*/
 			pthread_mutex_unlock(&flipMutex);
 		}
 	}
@@ -4193,6 +4194,16 @@ finish_attr_init:;
 	pthread_detach(dimensionsThread);
 #endif
 
+
+#ifdef ENABLE_FUSION
+	// fusion font, large for creepline
+	fontDesc.flags = DFDESC_HEIGHT;
+	fontDesc.height = FUSION_FONT_HEIGHT;
+	strcpy(buf, globalFontDir);
+	strcat(buf, globalFont);
+	DFBCHECK (pgfx_dfb->CreateFont (pgfx_dfb, buf, &fontDesc, &fusion_font));
+	dprintf ("%s(%d): Fusion font = %p\n", __FUNCTION__, __LINE__, fusion_font);
+#endif
 	dprintf("%s[%d]: %s done\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
@@ -4286,6 +4297,14 @@ void gfx_terminate(void)
 		pgfx_frameBuffer->Release(pgfx_frameBuffer);
 		pgfx_frameBuffer = NULL;
 	}
+
+#ifdef ENABLE_FUSION
+	if (fusion_surface)
+	{
+		fusion_surface->Release(fusion_surface);
+		fusion_surface = NULL;
+	}
+#endif
 
 #ifdef GFX_USE_HELPER_SURFACE
 	if (pgfx_helperFrameBuffer)

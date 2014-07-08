@@ -783,15 +783,9 @@ void interface_flipStatusbarSurface()
 {
 	DFBRegion region;
 	region.x1 = 0;
-	/*region.y1 = interfaceInfo.screenHeight - 80;
+	region.y1 = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT*2;
 	region.x2 = interfaceInfo.screenWidth;
-	region.y2 = interfaceInfo.screenHeight;*/
-
-	region.y1 = interfaceInfo.screenHeight - 38 - 22;  // eg., 22 - font height
-	region.x2 = interfaceInfo.screenWidth;
-	region.y2 = interfaceInfo.screenHeight - 30;
-
-	//DFBCHECK(DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_WAITFORSYNC));
+	region.y2 = interfaceInfo.screenHeight;
 	DFBCHECK(DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_NONE));
 }
 
@@ -2119,94 +2113,57 @@ void interface_displayDtmf(void)
 }
 #endif
 
-
-void draw_string (char * str, int x, int y)
+void interface_updateFusionCreepSurface()
 {
-	DRAWING_SURFACE->SetFont(DRAWING_SURFACE, pgfx_font);
-	//showAccelerated( DFXL_DRAWSTRING, NULL )
+	int positionDst, positionSrc;
+	DFBRectangle srcRect;
+	DFBRegion region;
+	int dstX, dstY;
 
-	// black shadow
-	//DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX);
-	DRAWING_SURFACE->SetColor(DRAWING_SURFACE, 0, 0, 0, 0xFF);
-	DRAWING_SURFACE->DrawString(DRAWING_SURFACE, str, strlen(str), x+1, y+1, DSTF_LEFT);
-
-	// white text
-	//DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND);      
-	DRAWING_SURFACE->SetColor (DRAWING_SURFACE, 0xFF, 0xFF, 0xFF, 0xFF);
-	DRAWING_SURFACE->DrawString(DRAWING_SURFACE, str, -1, x, y, DSTF_LEFT);
-	//DRAWING_SURFACE->DrawString(DRAWING_SURFACE, str, strlen(str), x, y, DSTF_LEFT);
-
-	//DRAWING_SURFACE->SetDrawingFlags (DRAWING_SURFACE, DSDRAW_NOFX);
-	return;
-}
-
-void interface_displayCreepline(void)
-{
-#ifdef ENABLE_FUSION
 	if (!FusionObject.creepline) return;
-	mysem_get(interface_semaphore);
-	// top left
-	if (FusionObject.creepStartTime > 0){
-		//struct timeval tv;
-		//gettimeofday(&tv, NULL);
-		//unsigned long long millisecondsSinceEpoch = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
-		//unsigned long long deltaTime = millisecondsSinceEpoch - FusionObject.creepStartTime;
+	if (FusionObject.creepStartTime <= 0) return;
 
-		double ratio = 1.0;
-		int timeForCreepSlice = 25*1000; // time that 1 letter follows from right to left 
-		double timeForAllCreep;
-
-		ratio = FusionObject.creepWidth / (double)interfaceInfo.screenWidth;
-		timeForAllCreep = timeForCreepSlice * ratio;
-		//int position = (int)(FusionObject.creepWidth * ((double)deltaTime / timeForAllCreep));
-
-		FusionObject.deltaTime += 40; // test : 20 was ok, but slow
-		int position = (int)(FusionObject.creepWidth * (FusionObject.deltaTime / timeForAllCreep));
-
-//eprintf("%s(%d): creepWidth = %d, timeForAllCreep = %f, deltaTime = %llu, position = %d\n", 
-//	__FUNCTION__, __LINE__, FusionObject.creepWidth, timeForAllCreep, deltaTime, position);
-
-		if ((position > interfaceInfo.screenWidth) && ((abs(interfaceInfo.screenWidth - position)) > FusionObject.creepWidth))
-		{ // creepline is shown completely
+	FusionObject.deltaTime += 1;
+	positionDst = interfaceInfo.screenWidth - FusionObject.deltaTime;
+	positionSrc = 0;
+	if (positionDst < 0){
+		positionSrc = - positionDst;
+		positionDst = 0;
+		if (positionSrc > FusionObject.creepWidth){ // all creep is shown
 			FusionObject.creepShown = 1;
 			FusionObject.creepStartTime = 0;
 			FusionObject.deltaTime = 0;
+			return;
 		}
-
-		// clear rect
-		gfx_drawRectangle(DRAWING_SURFACE, 0x0, 0x0, 0x0, 0x0, 
-			((interfaceInfo.screenWidth - position) > 0) ? (interfaceInfo.screenWidth - position) : 0, 
-			interfaceInfo.screenHeight - 38 - 22, 
-			((interfaceInfo.screenWidth - position) > 0) ? position : interfaceInfo.screenWidth,
-			28);
-		/*if (interfaceInfo.showMenu) {
-			interface_displayStatusbar();
-		}*/
-
-		pthread_mutex_lock(&FusionObject.mutexCreep);
-		char * copyCreep = malloc(strlen(FusionObject.creepline));
-		if (copyCreep){
-			sprintf (copyCreep, "%s", FusionObject.creepline);
-		}
-		pthread_mutex_unlock(&FusionObject.mutexCreep);
-		if (copyCreep){
-			/*gfx_drawText(DRAWING_SURFACE, pgfx_font,
-				INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN,
-				INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-				interfaceInfo.screenWidth - position, 
-				interfaceInfo.screenHeight - 40,
-				//FusionObject.creepline, 
-				copyCreep, 
-				0, 1);
-				*/
-				draw_string(copyCreep, interfaceInfo.screenWidth - position, interfaceInfo.screenHeight - 40);
-				free(copyCreep);
-		}
-		interface_flipStatusbarSurface();
 	}
-	
-	mysem_release(interface_semaphore);
-#endif
+
+	srcRect.x = positionSrc;
+	srcRect.y = 0;
+	srcRect.w = min(interfaceInfo.screenWidth - positionDst, FusionObject.creepWidth - positionSrc);
+	srcRect.h = FUSION_FONT_HEIGHT * 2;
+
+	if ((positionSrc > 0) && (srcRect.w < interfaceInfo.screenWidth)){
+		srcRect.w = interfaceInfo.screenWidth;
+	}
+
+	dstX = positionDst;
+	dstY = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
+
+	region.x1 = 0;
+	region.x2 = interfaceInfo.screenWidth;
+	region.y1 = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
+	region.y2 = interfaceInfo.screenHeight;
+
+
+	mysem_get(interface_semaphore); // test
+
+	pthread_mutex_lock(&FusionObject.mutexDtmf);
+	DFBCHECK (pgfx_frameBuffer->Blit(pgfx_frameBuffer, fusion_surface, &srcRect, dstX, dstY));  // Blit is faster than StretchBlit
+	pthread_mutex_unlock(&FusionObject.mutexDtmf);
+
+	DFBCHECK (pgfx_frameBuffer->Flip(pgfx_frameBuffer, &region, DSFLIP_ONSYNC));
+
+	mysem_release(interface_semaphore);	// test
 	return;
 }
 
@@ -2246,7 +2203,6 @@ void interface_displayMenu(int flipFB)
 
 static void interface_animateMenu(int flipFB, int animate)
 {
-
 #ifdef SCREEN_TRACE
 	unsigned long long cur, start;
 #endif
@@ -7579,7 +7535,7 @@ int interface_enterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandE
 	unsigned char tmp[10];
 	memset(tmp,0,sizeof(tmp));
 	i= utf8_wctomb(tmp, cmd->command, 10);
-	eprintf("%s: symbol: '%s' (%d)\n", __FUNCTION__, tmp, i);
+	dprintf("%s: symbol: '%s' (%d)\n", __FUNCTION__, tmp, i);
 #endif
 #endif
 

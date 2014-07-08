@@ -159,6 +159,11 @@ extern IDirectFBSurface *pgfx_helperFrameBuffer;
 /* The font that we use to write text. */
 extern IDirectFBFont *pgfx_font;
 
+#ifdef ENABLE_FUSION
+extern IDirectFBSurface * fusion_surface;
+extern IDirectFBFont * fusion_font;
+#endif
+
 /* The font that we use to write description text. */
 extern IDirectFBFont *pgfx_smallfont;
 
@@ -635,6 +640,10 @@ void gfx_stopEventThread(void);
 
 #if (defined STSDK)
 socketClient_t* gfx_stSocket(void);
+#endif
+
+#ifdef ENABLE_FUSION
+#define FUSION_FONT_HEIGHT 34
 #endif
 
 #ifdef __cplusplus

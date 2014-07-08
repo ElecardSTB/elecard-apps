@@ -1013,6 +1013,8 @@ typedef struct _interfaceFusionObject_t {
 
 	double deltaTime;
 
+	char * preallocSurface;
+
 } interfaceFusionObject_t;
 #endif
 
@@ -1884,8 +1886,6 @@ int  interface_changeMenuEntryThumbnail(interfaceMenuEntry_t *pMenuEntry, int th
 void interface_displayClock(int detached);
 
 const char *interface_commandName(interfaceCommand_t cmd);
-
-void interface_displayCreepline(void);
 
 #ifdef STB225
 #undef inline
