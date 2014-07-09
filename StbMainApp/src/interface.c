@@ -779,6 +779,7 @@ static void interface_animateSurface()
 }
 #endif // STB82
 
+#ifdef ENABLE_FUSION
 void interface_flipStatusbarSurface()
 {
 	DFBRegion region;
@@ -788,6 +789,7 @@ void interface_flipStatusbarSurface()
 	region.y2 = interfaceInfo.screenHeight;
 	DFBCHECK(DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_NONE));
 }
+#endif
 
 void interface_flipSurface()
 {
@@ -2113,6 +2115,7 @@ void interface_displayDtmf(void)
 }
 #endif
 
+#ifdef ENABLE_FUSION
 void interface_updateFusionCreepSurface()
 {
 	int positionDst, positionSrc;
@@ -2166,6 +2169,7 @@ void interface_updateFusionCreepSurface()
 	mysem_release(interface_semaphore);	// test
 	return;
 }
+#endif
 
 static void interface_displayAll(void)
 {
