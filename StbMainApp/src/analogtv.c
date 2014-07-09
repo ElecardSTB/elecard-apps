@@ -306,6 +306,8 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	char buf[256];
 	uint32_t from_freq, to_freq;
 
+	offair_stopVideo(screenMain, 1);
+
 	sprintf(buf, "%s", _T("SCANNING_ANALOG_CHANNELS"));
 	interface_showMessageBox(buf, thumbnail_info, 0);
 	
@@ -361,8 +363,7 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 
 void analogtv_stop(void)
 {
-	/// TODO
-	gfx_stopVideoProvider(0, 0, 0);
+	offair_stopVideo(screenMain, 1);
 	appControlInfo.tvInfo.active = 0;
 }
 
