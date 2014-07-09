@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "dvb.h"
 #include "list.h"
+#include "app_info.h"
 
 /******************************************************************
 * EXPORTED MACROS                              [for headers only] *
@@ -84,8 +85,6 @@ typedef struct {
 	//lists
 	struct list_head	 orderNone;
 } service_index_t;
-
-typedef int32_t changeCallback_t(void *pArg);
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *

@@ -21,9 +21,6 @@ extern interfaceListMenu_t InterfacePlaylistMain;
 int32_t playlistEditor_init(void);
 int32_t playlistEditor_terminate(void);
 
-
-void playlist_editor_cleanup(typeBouquet_t);
-
 #endif //#ifdef ENABLE_DVB
 
 #endif // PLAYLIST_EDITOR_H

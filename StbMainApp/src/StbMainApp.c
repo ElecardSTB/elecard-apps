@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include "StbMainApp.h"
+#include "analogtv.h"
 
 #include "debug.h"
 #include "rtp.h"
@@ -3085,6 +3086,10 @@ void initialize(int argc, char *argv[])
 	st_init();
 #endif
 
+#ifdef ENABLE_ANALOGTV
+	analogtv_init();
+#endif
+
 #ifdef ENABLE_DVB
 	dvb_init();
 #endif
@@ -3214,6 +3219,10 @@ void cleanup()
 
 #ifdef ENABLE_PVR
 	pvr_cleanup();
+#endif
+
+#ifdef ENABLE_ANALOGTV
+	analogtv_terminate();
 #endif
 
 #ifdef ENABLE_DVB

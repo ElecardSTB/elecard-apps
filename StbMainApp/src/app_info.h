@@ -686,6 +686,13 @@ typedef struct _stbTimeZoneDesc_t
 	char                 desc[128];
 } stbTimeZoneDesc_t;
 
+typedef int32_t changeCallback_t(void *pArg);
+
+typedef struct {
+	changeCallback_t *pCallback;
+	void             *pArg;
+} registeredChangeCallback_t;
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/

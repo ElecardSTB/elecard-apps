@@ -177,12 +177,9 @@ static void bouquet_saveLamedb(const char *bouquetName);
 static int32_t bouquet_saveNameListIntoFile(typeBouquet_t btype);
 static int32_t bouquet_parseNameListFile(typeBouquet_t btype, const char *path);
 
-static void bouquet_getAnalogJsonName(char *fname, const char *name);
-static int32_t bouquet_createDirectory(const char *bouquetName);
+static int32_t bouquet_createDirectory(typeBouquet_t btype, const char *bouquetName);
 
 static int32_t digitalList_release(void);
-static void bouquet_loadBouquet(typeBouquet_t index, const char *name);
-static void bouquet_stashBouquet(typeBouquet_t index, const char *name);
 
 static int32_t bouquet_uploadDigitalBouquet(const char *bouquetName);
 static int32_t bouquet_uploadAnalogBouquet(const char *bouquetName);
@@ -490,8 +487,6 @@ static int32_t bouquet_uploadAnalogBouquet(const char *bouquetName)
 		return -1;
 	}
 
-	bouquet_stashBouquet(eBouquet_analog, bouquetName);
-
 	{//Make batch file for scp
 		FILE *fd;
 		char serverDir[256];
@@ -553,15 +548,6 @@ void bouquet_addScanChannels(void)
 	dvbChannel_changed();
 	dvbChannel_save();
 
-}
-
-static void bouquet_getAnalogJsonName(char *fname, const char *name)
-{
-	if(name == NULL) {
-		sprintf(fname, "analog.json");
-	} else {
-		sprintf(fname, "analog.%s.json", name);
-	}
 }
 
 static void bouquet_loadNamesFromFile(struct list_head *listHead, char *bouquet_file)
@@ -714,11 +700,9 @@ void bouquet_setEnable(int32_t enable)
 	//TODO: Make with this something more clear
 	bouquets_enable = 1;//this need for working bouquet_getCurrentName() in bouquet_open()
 	if(enable) {
-		bouquet_stashBouquet(eBouquet_analog, NULL);
 		bouquet_open(eBouquet_digital, bouquet_getCurrentName(eBouquet_digital), 0);
 		bouquet_open(eBouquet_analog, bouquet_getCurrentName(eBouquet_analog), 0);
 	} else {
-		bouquet_loadBouquet(eBouquet_analog, NULL);
 		bouquet_open(eBouquet_digital, NULL, 0);
 		bouquet_open(eBouquet_analog, NULL, 0);
 	}
@@ -726,7 +710,7 @@ void bouquet_setEnable(int32_t enable)
 
 }
 
-static int32_t bouquet_createDirectory(const char *bouquetName)
+static int32_t bouquet_createDirectory(typeBouquet_t btype, const char *bouquetName)
 {
 	char buffName[256];
 
@@ -734,9 +718,16 @@ static int32_t bouquet_createDirectory(const char *bouquetName)
 		return 0;
 	}
 
-	sprintf(buffName, BOUQUET_CONFIG_DIR "/%s", bouquetName);
-	if(!helperCheckDirectoryExsists(buffName)) {
-		return mkdir(buffName, 0777);
+	if(btype == eBouquet_digital) {
+		sprintf(buffName, BOUQUET_CONFIG_DIR "/%s", bouquetName);
+		if(!helperCheckDirectoryExsists(buffName)) {
+			return mkdir(buffName, 0777);
+		}
+	} else if(btype == eBouquet_analog) {
+		sprintf(buffName, BOUQUET_CONFIG_DIR_ANALOG "/analog.%s.json", bouquetName);
+		if(!helperFileExists(buffName)) {
+			return creat(buffName, 0644);
+		}
 	}
 
 	return 0;
@@ -956,39 +947,12 @@ void bouquet_saveBouquetsConf(const char *bouquetName)
 	fclose(fdRadio);
 	fclose(fdBlack);
 }
-static void bouquet_stashBouquet(typeBouquet_t index, const char *name)
-{
-	char cmd[256];
-	char fname[256];
-	if(index == eBouquet_analog) {
-		bouquet_getAnalogJsonName(fname , name);
-		snprintf(cmd, sizeof(cmd), "cp %s/../%s %s/%s", BOUQUET_CONFIG_DIR_ANALOG, BOUQUET_ANALOG_MAIN_FILE,
-				 BOUQUET_CONFIG_DIR_ANALOG, fname);
-		dbg_cmdSystem(cmd);
-	}
-
-}
-
-static void bouquet_loadBouquet(typeBouquet_t index, const char *name)
-{
-	char cmd[256];
-	char fname[256];
-	if(index == eBouquet_analog) {
-		bouquet_getAnalogJsonName(fname , name);
-		analogtv_removeServiceList(0);
-		snprintf(cmd, sizeof(cmd), "cp %s/%s %s/../%s", BOUQUET_CONFIG_DIR_ANALOG, fname,
-				 BOUQUET_CONFIG_DIR_ANALOG, BOUQUET_ANALOG_MAIN_FILE);
-		dbg_cmdSystem(cmd);
-	}
-
-}
 
 void bouquet_saveAnalogBouquet(void)
 {
 	char cmd[1024];
 	char fname[BUFFER_SIZE];
 
-	bouquet_stashBouquet(eBouquet_analog, bouquet_getCurrentName(eBouquet_analog));
 	snprintf(cmd, sizeof(cmd), "cp %s/../analog.json %s", BOUQUET_CONFIG_DIR_ANALOG, fname);
 	dbg_cmdSystem(cmd);
 
@@ -1253,25 +1217,24 @@ void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 					buffer = buf + 3 + strlen(lamedb_data.transponderName);
 				}
 			}
-			if (strncasecmp(buffer, "c:00", 4) == 0) {
+			if (buffer != NULL && strncasecmp(buffer, "c:00", 4) == 0) {
 				sscanf(buffer + 4, "%04x",&videoPID);
 				buffer = buffer + 9;
-
 			}
-			if (strncasecmp(buffer, "c:01", 4) == 0) {
+			if (buffer != NULL && strncasecmp(buffer, "c:01", 4) == 0) {
 				sscanf(buffer + 4, "%04x",&audioPID);
 				buffer = buffer + 9;
 			}
-			if (strncasecmp(buffer, "c:02", 4) == 0) {
+			if (buffer != NULL && strncasecmp(buffer, "c:02", 4) == 0) {
 				buffer = buffer + 9;
 			}
-			if (strncasecmp(buffer, "c:03", 4) == 0) {
+			if (buffer != NULL && strncasecmp(buffer, "c:03", 4) == 0) {
 				buffer = buffer + 9;
 			}
-			if (strncasecmp(buffer, "c:04", 4) == 0) {
+			if (buffer != NULL && strncasecmp(buffer, "c:04", 4) == 0) {
 				buffer = buffer + 9;
 			}
-			if (strncasecmp(buffer, "f:44", 4) == 0) {
+			if (buffer != NULL && strncasecmp(buffer, "f:44", 4) == 0) {
 				lamedb_data.audioPID = audioPID;
 				lamedb_data.videoPID = videoPID;
 			}
@@ -1408,7 +1371,19 @@ static int32_t bouquet_updateLinks(typeBouquet_t btype, const char *name)
 			}
 			break;
 		case eBouquet_analog:
-			//TODO
+			if(helperFileIsSymlink(ANALOG_CHANNEL_FILE_NAME)) {
+				unlink(ANALOG_CHANNEL_FILE_NAME);
+			} else if(helperFileExists(ANALOG_CHANNEL_FILE_NAME)) {
+				rename(ANALOG_CHANNEL_FILE_NAME, CONFIG_DIR "/analog.default.json");
+			}
+
+			if(name) {
+				snprintf(fileName, sizeof(fileName), "analog/analog.%s.json", name);
+				symlink(fileName, ANALOG_CHANNEL_FILE_NAME);
+			} else {
+				symlink("analog.default.json", ANALOG_CHANNEL_FILE_NAME);
+			}
+
 			break;
 		default:
 			break;
@@ -1451,12 +1426,9 @@ int32_t bouquet_open(typeBouquet_t btype, const char *name, int32_t force)
 			cJSON_Delete(result);
 #endif //#if (defined STSDK)
 		}
-
 		dvbChannel_save();
 	} else if(btype == eBouquet_analog) {
-		if(name) {
-			bouquet_loadBouquet(eBouquet_analog, name);
-		}
+		analogtv_load();
 	} else {
 		return -2;
 	}
@@ -1561,17 +1533,10 @@ int32_t bouquet_create(typeBouquet_t btype, const char *name)
 	if(name == NULL) {
 		return -1;
 	}
-
-	if(btype == eBouquet_digital) {
-		int status;
-		status = bouquet_createDirectory(name);
-		if(status != 0) {
-			return -2;
-		}
-	} else if(btype == eBouquet_analog) {
-		//TODO
-	} else {
-		return -3;
+	int status;
+	status = bouquet_createDirectory(btype, name);
+	if(status == -1) {
+		return -2;
 	}
 	strList_add(bouquet_getNameList(btype), name);
 	bouquet_saveNameListIntoFile(btype);
@@ -1612,7 +1577,7 @@ int32_t bouquet_save(typeBouquet_t btype, const char *name)
 	}
 
 	if(btype == eBouquet_digital) {
-		bouquet_createDirectory(name);
+		bouquet_createDirectory(btype, name);
 
 		bouquet_saveBouquets(name, "tv");
 		bouquet_saveBouquets(name, "radio");

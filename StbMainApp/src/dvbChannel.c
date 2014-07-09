@@ -47,10 +47,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
-typedef struct {
-	changeCallback_t *pCallback;
-	void             *pArg;
-} registeredChangeCallback_t;
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -65,7 +61,7 @@ dvb_channels_t g_dvb_channels = {
 //	.initialized	= 0,
 };
 
-registeredChangeCallback_t changeCallbacks[2] = {
+static registeredChangeCallback_t changeCallbacks[2] = {
 	{NULL, NULL},
 	{NULL, NULL},
 };
@@ -580,7 +576,6 @@ struct list_head *dvbChannel_getSortList(void)
 	return &g_dvb_channels.orderNoneHead;
 }
 
-
 static int32_t dvbChannel_update(void)
 {
 	list_element_t   *service_element;
@@ -625,7 +620,6 @@ static int32_t dvbChannel_update(void)
 	return 0;
 }
 
-
 static int32_t dvbChannel_initServices(void)
 {
 	dvbChannel_update();
@@ -638,7 +632,6 @@ static int32_t dvbChannel_initServices(void)
 
 	return 0;
 }
-
 
 int32_t dvbChannel_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg)
 {

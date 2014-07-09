@@ -621,9 +621,6 @@ stbTimeZoneDesc_t timezones[] = {
 	{"Etc/GMT-12", "(GMT +12:00) Auckland, Wellington, Fiji, Kamchatka"}
 };
 
-extern int8_t services_edit_able;
-extern char channel_names_file_full[256];
-
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
 *                          tm[<layer>]<Module>[_<Word>+] for exported functions*
@@ -4524,32 +4521,15 @@ static int analogtv_changeAnalogAudio(interfaceMenu_t *pMenu, void* pArg)
 
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
-
-static int analogtv_setServiceFileName(interfaceMenu_t *pMenu, char* pStr, void* pArg)
-{
-	(void)pArg;
-	if (pStr == NULL) {
-		return 0;
-	}
-	sprintf(channel_names_file_full, "/tmp/%s.txt", pStr);
-	strncpy(appControlInfo.tvInfo.channelNamesFile, pStr, sizeof(appControlInfo.tvInfo.channelNamesFile));
-	analogtv_updateFoundServiceFile();
-
-	return output_saveAndRedraw(saveAppSettings(), pMenu);
-}
-
-static int analogtv_changeServiceFileName(interfaceMenu_t *pMenu, void* pArg)
-{
-	return interface_getText(pMenu, _T("ANALOGTV_SET_CHANNEL_FILE_NAME"), "\\w+", analogtv_setServiceFileName, NULL, inputModeABC, pArg);
-}
-
+/*
 static int analogtv_sendToServer(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showMessageBox(_T("ANALOGTV_SENDING_CHFILE"), thumbnail_info, 0);
 	interface_hideMessageBox();
 	return 0;
 }
-
+*/
+/*
 static int analogtv_downloadFromServer(interfaceMenu_t *pMenu, void* pArg)
 {
 	interface_showMessageBox(_T("ANALOGTV_DOWNLOADING_CHFILE"), thumbnail_info, 0);
@@ -4557,7 +4537,7 @@ static int analogtv_downloadFromServer(interfaceMenu_t *pMenu, void* pArg)
 
 	return 0;
 }
-
+*/
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	interfaceMenu_t * tvMenu = &AnalogTvSubMenu.baseMenu;
@@ -4583,15 +4563,6 @@ static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 
 	sprintf(buf, "%s: %s", _T("ANALOGTV_AUDIO_MODE"), analogtv_audioName[appControlInfo.tvInfo.audioMode]);
 	interface_addMenuEntry(tvMenu, buf, analogtv_changeAnalogAudio, NULL, thumbnail_configure);
-	if (services_edit_able)
-	{
-		sprintf(buf, "%s: %s", _T("ANALOGTV_SET_CHANNEL_FILE_NAME"), appControlInfo.tvInfo.channelNamesFile);
-		interface_addMenuEntry(tvMenu,buf , analogtv_changeServiceFileName, NULL, thumbnail_configure);
-		
-		interface_addMenuEntry(tvMenu, _T("ANALOGTV_DOWNLOAD_CHFILE"), analogtv_downloadFromServer, NULL, thumbnail_configure);
-		
-		interface_addMenuEntry(tvMenu, _T("ANALOGTV_SEND_CHFILE"), analogtv_sendToServer, NULL, thumbnail_configure);//garb_sendToServer
-	}
 
 	sprintf(buf, "%s (%d)", _T("ANALOGTV_CLEAR"), analogtv_getChannelCount(0)); //analogtv_service_count
 	interface_addMenuEntry(tvMenu, buf, analogtv_clearServiceList, (void *)1, thumbnail_scan);

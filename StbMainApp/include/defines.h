@@ -480,6 +480,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define RTP_ENGINE	(2)
 
 /***********************************************************
+* ANALOG Options
+***********************************************************/
+/** Default ANALOG channel file which contains available channel list
+ */
+#ifndef ANALOG_CHANNEL_FILE_NAME
+	#define ANALOG_CHANNEL_FILE_NAME   CONFIG_DIR "/analog.json"
+#endif
+
+/***********************************************************
 * DVB Options
 ***********************************************************/
 

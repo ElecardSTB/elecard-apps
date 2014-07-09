@@ -62,9 +62,10 @@ typedef struct {
 	uint16_t customNumber;
 	uint16_t visible;
 	uint16_t parent_control;
-	char customCaption[256];
+	char customCaption[MENU_ENTRY_INFO_LENGTH];
 	char sysEncode[16];
 	char audio[16];
+	struct list_head	channelList;
 } analog_service_t;
 
 typedef enum {
@@ -83,7 +84,7 @@ typedef enum {
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-extern int analogtv_service_count;
+
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -117,47 +118,36 @@ int analogtv_serviceScan (interfaceMenu_t *pMenu, void* pArg);
  *   @param[in]  filename  Channel file name
  */
 
-void analogtv_stop();
-int32_t analogtv_saveConfigFile(void);
-int32_t analogtv_parseConfigFile(int visible);
+int32_t analogtv_hasTuner(void);
 
-int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
+void analogtv_stop(void);
+void analogtv_load(void);
 
-int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
-int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
-
+int32_t analogtv_setChannelsData(char *, int, int);
+int32_t analogtv_applyUpdates(void);
+int32_t analogtv_findOnFrequency(uint32_t frequency);
+int32_t analogtv_swapService(int, int);
+struct list_head *analogtv_getChannelList(void);
 const char *analogtv_getServiceName(uint32_t index);
-int analogtv_getServiceDescription(uint32_t index, char *buf, size_t size);
-int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
-
-int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg);
-
-int32_t analogtv_updateName(uint32_t chanIndex, char* str);
-void analogtv_removeServiceList(int permanent);
-
-void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
-int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
-
-void analogtv_initMenu(interfaceMenu_t *pParent);
 uint32_t analogtv_getChannelCount(int visible);
 
+int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg);
 int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg);
+int analogtv_changeAnalogLowFreq(interfaceMenu_t * pMenu, void *pArg);
+int analogtv_changeAnalogHighFreq(interfaceMenu_t * pMenu, void *pArg);
+int analogtv_getServiceDescription(uint32_t index, char *buf);
+int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
+void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 
-int32_t analogtv_fillFoundServList(void);
-int32_t analogtv_updateFoundServiceFile(void);
-int32_t analogtv_findOnFrequency(uint32_t frequency);
-void analogtv_swapService(int x, int y);
-void analogtv_removeService(int index);
+int32_t analogtv_changed(void);
+int32_t analogtv_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg);
 
-
-int32_t analogtv_hasTuner(void);
 #else /* ENABLE_ANALOGTV */
 
 static inline int32_t analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg) { return 0; }
 const char *analogtv_getServiceName(uint32_t index) { return NULL; }
 static inline uint32_t analogtv_getChannelCount(void) { return 0; }
 static inline void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex) { return ; }
-static inline int32_t analogtv_updateName(uint32_t chanIndex, char* str) { return 0; }
 static inline int32_t analogtv_getServiceDescription(uint32_t index, char *buf, size_t size) { buf[0] = 0; return -1; }
 static inline int32_t menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index) { return 0; }
 

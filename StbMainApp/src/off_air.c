@@ -1475,12 +1475,12 @@ static int offair_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *
 			default:;
 		}
 	}
-
+/*
 	if(appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV &&
 	   analogtv_playControlProcessCommand(cmd, pArg) == 0) {
 		return 0;
 	}
-
+*/
 	switch (cmd->command)
 	{
 		case interfaceCommandUp:
@@ -1999,7 +1999,7 @@ char *offair_getChannelNumberPrefix(uint32_t id)
 		"%03d",
 	};
 
-	serviceCount = dvbChannel_getCount() + analogtv_getChannelCount(0);
+	serviceCount = dvbChannel_getCount() + analogtv_getChannelCount(1);
 	if(serviceCount < 10) {
 		format = formats[0];
 	} else if(serviceCount < 100) {
@@ -2132,7 +2132,7 @@ int offair_enterDVBTMenu(interfaceMenu_t *pMenu, void* pArg)
 		needRefill = 0;
 	}
 
-	if((dvbChannel_getCount() == 0) && (analogtv_getChannelCount(0) == 0)) {
+	if((dvbChannel_getCount() == 0) && (analogtv_getChannelCount(1) == 0)) {
 		output_showDVBMenu(pMenu, NULL);
 		interface_showConfirmationBox( _T("DVB_NO_CHANNELS"), thumbnail_dvb, offair_confirmAutoScan, NULL);
 		return 1;
@@ -3222,7 +3222,7 @@ void offair_fillDVBTMenu(void)
 		offair_addDVBChannelsToMenu();
 	}
 
-	if(analogtv_getChannelCount(0) > 0) {
+	if(analogtv_getChannelCount(1) > 0) {
 		analogtv_addChannelsToMenu(dvbtMenu, dvbChannel_getCount());
 	}
 
@@ -3808,6 +3808,9 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 
 	//Register callback on dvbChannels chanched
 	dvbChannel_registerCallbackOnChange(offair_dvbChannelsChangeCallback, NULL);
+	//Register callback on analog chanched
+	analogtv_registerCallbackOnChange(offair_dvbChannelsChangeCallback, NULL);
+
 	createListMenu(&DVBTMenu, _T("DVB_CHANNELS"), thumbnail_dvb, NULL, pParent,
 		interfaceListMenuIconThumbnail, offair_enterDVBTMenu, NULL, NULL);
 
@@ -3827,7 +3830,7 @@ void offair_buildDVBTMenu(interfaceMenu_t *pParent)
 	interface_setCustomKeysCallback((interfaceMenu_t*)&EPGMenu, offair_EPGMenuKeyCallback);
 
 #ifdef ENABLE_ANALOGTV
-	analogtv_initMenu((interfaceMenu_t *)&DVBTMenu);
+	//analogtv_initMenu((interfaceMenu_t *)&DVBTMenu);
 #endif
 
 	wizard_init();
@@ -4129,7 +4132,7 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			if(menu_entryIsAnalogTv(pMenu, pMenu->selectedItem)) {
-				analogtv_getServiceDescription(channelNumber, URL, sizeof(URL));
+				analogtv_getServiceDescription(channelNumber, URL);
 			} else {
 				dvb_getServiceDescription(service, URL);
 			}
