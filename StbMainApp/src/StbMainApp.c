@@ -1887,52 +1887,35 @@ void * fusion_threadCheckReboot (void * param)
 
 	while (1)
 	{
-		if (strlen(FusionObject.firmware) && strlen(FusionObject.reboottime))
+		if (strlen(FusionObject.reboottime) && (strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN) != 0))
 		{
-			char remoteTimestamp[FUSION_FIRMWARE_VER_LEN] = {0};
+			time (&now);
+			nowDate = *localtime (&now);
 
-			// get datetime of remote firmware
-			char * ptrDev = strstr(FusionObject.firmware, "dev");
-			if (ptrDev){
-				char * ptrFirstDot = strchr(ptrDev, '.');
-				if (ptrFirstDot){
-					ptrFirstDot ++;
-					char * ptrLastDot = strchr(ptrFirstDot, '.');
-					if (ptrLastDot){
-						snprintf (remoteTimestamp, min(32, (int)(ptrLastDot - ptrFirstDot + 1)), ptrFirstDot);
-						//eprintf ("%s(%d): remoteTimestamp = %s\n", __FUNCTION__, __LINE__, remoteTimestamp);
-					}
-				}
-			}
-
-			if (strlen (remoteTimestamp) && strcmp(FusionObject.localFirmwareVer, remoteTimestamp))
-			{
-				time (&now);
-				nowDate = *localtime (&now);
-
-				rebootDate.tm_year = nowDate.tm_year;
-				rebootDate.tm_mon = nowDate.tm_mon;
-				rebootDate.tm_mday = nowDate.tm_mday;
-				sscanf(FusionObject.reboottime, "%02d:%02d:%02d", &rebootDate.tm_hour, &rebootDate.tm_min, &rebootDate.tm_sec);
+			rebootDate.tm_year = nowDate.tm_year;
+			rebootDate.tm_mon = nowDate.tm_mon;
+			rebootDate.tm_mday = nowDate.tm_mday;
+			sscanf(FusionObject.reboottime, "%02d:%02d:%02d", &rebootDate.tm_hour, &rebootDate.tm_min, &rebootDate.tm_sec);
 /*
-				eprintf ("%s(%d): Reboot date is %04d-%02d-%02d %02d:%02d:%02d, now = %02d:%02d:%02d %02d:%02d:%02d, checktime = %d\n", 
-							  __FUNCTION__, __LINE__, 
-							rebootDate.tm_year, rebootDate.tm_mon, rebootDate.tm_mday,
-							rebootDate.tm_hour, rebootDate.tm_min, rebootDate.tm_sec,
-							nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday,
-							nowDate.tm_hour, nowDate.tm_min, nowDate.tm_sec, 
-							FusionObject.checktime);
+			eprintf ("%s(%d): Reboot date is %04d-%02d-%02d %02d:%02d:%02d, now = %02d:%02d:%02d %02d:%02d:%02d, checktime = %d\n", 
+						  __FUNCTION__, __LINE__, 
+						rebootDate.tm_year, rebootDate.tm_mon, rebootDate.tm_mday,
+						rebootDate.tm_hour, rebootDate.tm_min, rebootDate.tm_sec,
+						nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday,
+						nowDate.tm_hour, nowDate.tm_min, nowDate.tm_sec, 
+						FusionObject.checktime);
 */
-				double diff = difftime(mktime(&rebootDate), mktime(&nowDate));
-				//eprintf ("%s(%d): diff = %f\n", __FUNCTION__, __LINE__, diff);
-				if ((diff > 0) && (diff <= 60)){
-					eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
-					system ("reboot");
-				}
+			double diff = difftime(mktime(&rebootDate), mktime(&nowDate));
+			//eprintf ("%s(%d): diff = %f\n", __FUNCTION__, __LINE__, diff);
+			if ((diff > 0) && (diff <= 60)){
+				eprintf ("%s(%d): remoteTimestamp = %s, localTimestamp = %s, compare res = %d\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer, FusionObject.localFirmwareVer,
+					strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN));
+				eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
+				system ("reboot");
 			}
 		}
-		fusion_wait(10 * 1000);
 	}
+	fusion_wait(20 * 1000);
 
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
@@ -2146,8 +2129,10 @@ int fusion_removeFirmwareFormFlash()
 
 void fusion_getLocalFirmwareVer()
 {
-	FusionObject.localFirmwareVer[0] = '\0';
+	//FusionObject.localFirmwareVer[0] = '\0';
+	memset(FusionObject.localFirmwareVer, '\0', FUSION_FIRMWARE_VER_LEN);
 	fusion_getCommandOutput ("cat /firmwareDesc | grep \"pack name:\" | tr -s ' ' | cut -d'.' -f3", FusionObject.localFirmwareVer);  // eg. 201406111921
+	FusionObject.localFirmwareVer[strlen (FusionObject.localFirmwareVer)-1] = '\0';
 	eprintf ("%s(%d): local firmware version = %s\n", __FUNCTION__, __LINE__, FusionObject.localFirmwareVer);
 }
 
@@ -2763,6 +2748,21 @@ int fusion_getCreepAndLogo ()
 			system("hwconfigManager s 0 UPNET 1");	// check remote firmware every reboot
 			sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
 			system (cmd);
+
+			// get datetime of remote firmware
+			memset(FusionObject.remoteFirmwareVer, '\0', FUSION_FIRMWARE_VER_LEN);
+			char * ptrDev = strstr(FusionObject.firmware, "dev");
+			if (ptrDev){
+				char * ptrFirstDot = strchr(ptrDev, '.');
+				if (ptrFirstDot){
+					ptrFirstDot ++;
+					char * ptrLastDot = strchr(ptrFirstDot, '.');
+					if (ptrLastDot){
+						snprintf (FusionObject.remoteFirmwareVer, min(32, (int)(ptrLastDot - ptrFirstDot + 1)), ptrFirstDot);
+						eprintf ("%s(%d): remoteTimestamp = %s\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer);
+					}
+				}
+			}
 		}
 	}else {
 		FusionObject.firmware[0] = '\0';

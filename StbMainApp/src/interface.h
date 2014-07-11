@@ -1007,6 +1007,7 @@ typedef struct _interfaceFusionObject_t {
 	char firmware[PATH_MAX];
 	char reboottime[FUSION_DATETIME_LEN];
 	char localFirmwareVer[FUSION_FIRMWARE_VER_LEN];
+	char remoteFirmwareVer[FUSION_FIRMWARE_VER_LEN];
 
 	char demoUrl[PATH_MAX];
 	fusion_mark_t marks[FUSION_MAX_MARKS];
