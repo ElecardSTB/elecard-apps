@@ -2965,6 +2965,8 @@ int fusion_getCreepAndLogo ()
 				int x = 0;
 				int y = FUSION_FONT_HEIGHT;
 				gfx_drawText(fusion_surface, fusion_font, 255, 255, 255, 255, x, y, FusionObject.creepline, 0, 1);
+				// clear fusion_surface after creep tail
+				gfx_drawRectangle(fusion_surface, 0x0, 0x0, 0x0, 0x0, x+FusionObject.creepWidth, 0, fusion_desc.width - (x + FusionObject.creepWidth), fusion_desc.height);
 			}
 			else {
 				eprintf("%s(%d): ERROR malloc %d bytes\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * surfaceHeight * 4);

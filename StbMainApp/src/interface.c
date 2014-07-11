@@ -2139,10 +2139,16 @@ void interface_updateFusionCreepSurface()
 			return;
 		}
 	}
-
+/*
 	srcRect.x = positionSrc;
 	srcRect.y = 0;
 	srcRect.w = min(interfaceInfo.screenWidth - positionDst, FusionObject.creepWidth - positionSrc);
+	srcRect.h = FUSION_FONT_HEIGHT * 2;
+*/
+
+	srcRect.x = positionSrc;
+	srcRect.y = 0;
+	srcRect.w = FusionObject.creepWidth + 10;//min(interfaceInfo.screenWidth - positionDst, FusionObject.creepWidth - positionSrc);
 	srcRect.h = FUSION_FONT_HEIGHT * 2;
 
 	if ((positionSrc > 0) && (srcRect.w < interfaceInfo.screenWidth)){
@@ -2152,11 +2158,10 @@ void interface_updateFusionCreepSurface()
 	dstX = positionDst;
 	dstY = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
 
-	region.x1 = 0;
-	region.x2 = interfaceInfo.screenWidth;
+	region.x1 = dstX;
+	region.x2 = dstX + FusionObject.creepWidth;
 	region.y1 = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
 	region.y2 = interfaceInfo.screenHeight;
-
 
 	mysem_get(interface_semaphore); // test
 
