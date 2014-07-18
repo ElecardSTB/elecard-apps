@@ -198,6 +198,8 @@ static int interface_displayPosterBox(void);
 
 static int interface_hideMessageBoxEvent(void *pArg);
 
+static int interface_hideListBoxEvent(void *pArg);
+
 static void interface_enterChannelList(void);
 
 static void interface_reinitializeListMenu(interfaceMenu_t *pMenu);
@@ -224,7 +226,7 @@ static inline int PlayControlSliderIsVisible(void)
 }
 
 static int interface_enterTextCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-
+static int interface_listBoxEnterTextCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 static int interface_sliderCallback   (interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 
 static int interface_hideSliderControl(void *pArg);
@@ -2189,6 +2191,7 @@ static void interface_displayAll(void)
 	interface_displaySoundControl();
 	interface_displaySliderControl();
 	interface_displayMessageBox();
+	interface_displayListBox();
 	interface_displayVirtualKeypad();
 	interface_displayCall();
 	if (teletext_isEnable())
@@ -3581,8 +3584,20 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		{
 			interface_hideMessageBox();
 		}
-	} else 
-	if ( interfaceInfo.messageBox.type == interfaceMessageBoxScrolling ||
+	} else if ( interfaceInfo.messageList.type == interfaceMessageListCallback )
+	{
+		if (cmd->command == interfaceCommandYellow && cmd != &mycmd && appControlInfo.inputMode == inputModeABC)
+		{
+			interfaceInfo.keypad.enable = !interfaceInfo.keypad.enable;
+			interfaceInfo.keypad.shift = 0;
+			interface_displayMenu(1);
+		} else if (interfaceInfo.messageList.pCallback == NULL ||
+			interfaceInfo.messageList.pCallback(interfaceInfo.currentMenu, cmd, interfaceInfo.messageList.pArg) == 0)
+		{
+			interface_hideListBox();
+		}
+	} else
+	if ( interfaceInfo.messageBox.type == interfaceMessageBoxScrolling || 
 	     interfaceInfo.messageBox.type == interfaceMessageBoxPoster)
 	{
 		if (interfaceInfo.messageBox.pCallback == NULL ||
@@ -3630,9 +3645,95 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 					interface_hideMessageBox();
 			}
 		}
+	} else if ( interfaceInfo.messageList.type == interfaceMessageList)
+	{
+		if (interfaceInfo.messageList.pCallback == NULL ||
+			interfaceInfo.messageList.pCallback(interfaceInfo.currentMenu, cmd, interfaceInfo.messageList.pArg) != 0)
+		{
+			switch ( cmd->command )
+			{
+				case interfaceCommandUp:
+					if(interfaceInfo.messageList.scrolling.shift > 0) {
+						if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
+						  (interfaceInfo.messageList.scrolling.offset > 0)) {
+							interfaceInfo.messageList.scrolling.offset--;
+						}
+						else {
+							interfaceInfo.messageList.scrolling.shift--;
+						}
+						interfaceInfo.messageList.entrySelected--;
+						interface_displayMenu(1);
+					}
+					break;
+				case interfaceCommandDown:
+					if(interfaceInfo.messageList.scrolling.shift + interfaceInfo.messageList.scrolling.offset < interfaceInfo.messageList.entryCount - 1) {
+						if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
+						  (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount)) {
+							interfaceInfo.messageList.scrolling.offset++;
+						}
+						else {
+							interfaceInfo.messageList.scrolling.shift++;
+						}
+						interfaceInfo.messageList.entrySelected++;
+						interface_displayMenu(1);
+					}
+					break;
+				case interfaceCommandPageUp:
+					if ( interfaceInfo.messageList.scrolling.offset > 0 )
+					{
+						interfaceInfo.messageList.scrolling.offset -= interfaceInfo.messageList.scrolling.visibleLines - 1;
+						interfaceInfo.messageList.entrySelected -= interfaceInfo.messageList.scrolling.visibleLines - 1;
+						if (interfaceInfo.messageList.scrolling.offset < 0 )
+						{
+							interfaceInfo.messageList.scrolling.offset = 0;
+						}
+						if (interfaceInfo.messageList.entrySelected < 0 )
+						{
+							interfaceInfo.messageList.entrySelected = 0;
+							interfaceInfo.messageList.scrolling.shift = 0;
+						}
+						interface_displayMenu(1);
+					}
+					break;
+				case interfaceCommandPageDown:
+					if ( interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ )
+					{
+						interfaceInfo.messageList.scrolling.offset += interfaceInfo.messageList.scrolling.visibleLines - 1;
+						interfaceInfo.messageList.entrySelected += interfaceInfo.messageList.scrolling.visibleLines - 1;
+						if (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines >= interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ )
+						{
+							interfaceInfo.messageList.scrolling.offset = interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ - interfaceInfo.messageList.scrolling.visibleLines;
+						}
+						if (interfaceInfo.messageList.entrySelected >= interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ )
+						{
+							interfaceInfo.messageList.entrySelected = interfaceInfo.messageList.entryCount - 1;
+							interfaceInfo.messageList.scrolling.shift = interfaceInfo.messageList.scrolling.visibleLines - 1;
+						}
+						interface_displayMenu(1);
+					}
+					break;
+				case interfaceCommandOk:
+				case interfaceCommandEnter:
+				case interfaceCommandGreen:
+					{
+						if((interfaceInfo.messageList.entrySelected >= 0) &&
+						  (interfaceInfo.messageList.entrySelected < interfaceInfo.messageList.entryCount) && 
+						  (interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].pCallback != NULL)) {
+							interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].pCallback(interfaceInfo.currentMenu, cmd, interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
+						}
+						interface_hideListBox();
+					}
+					break;
+				default:
+					interface_hideListBox();
+			}
+		  }
 	} else if ( interfaceInfo.messageBox.type != interfaceMessageBoxNone )
 	{
 		interface_hideMessageBox();
+	} else if ( interfaceInfo.messageList.type != interfaceMessageBoxNone )
+	{
+		interface_hideListBox();
 	} else if (interfaceInfo.showSliderControl == 2)
 	{
 		interface_sliderCallback(interfaceInfo.currentMenu, cmd, interfaceSlider.pArg);
@@ -6604,6 +6705,23 @@ void messageBox_setDefaultColors(void)
 	interfaceInfo.messageBox.colors.title.G = INTERFACE_BORDER_GREEN;
 	interfaceInfo.messageBox.colors.title.B = INTERFACE_BORDER_BLUE;
 	interfaceInfo.messageBox.colors.title.A = INTERFACE_BORDER_ALPHA;
+	
+	interfaceInfo.messageList.colors.text.R = INTERFACE_BOOKMARK_RED;
+	interfaceInfo.messageList.colors.text.G = INTERFACE_BOOKMARK_GREEN;
+	interfaceInfo.messageList.colors.text.B = INTERFACE_BOOKMARK_BLUE;
+	interfaceInfo.messageList.colors.text.A = INTERFACE_BOOKMARK_ALPHA;
+	interfaceInfo.messageList.colors.background.R = INTERFACE_MESSAGE_BOX_RED;
+	interfaceInfo.messageList.colors.background.G = INTERFACE_MESSAGE_BOX_GREEN;
+	interfaceInfo.messageList.colors.background.B = INTERFACE_MESSAGE_BOX_BLUE;
+	interfaceInfo.messageList.colors.background.A = INTERFACE_MESSAGE_BOX_ALPHA;
+	interfaceInfo.messageList.colors.border.R = INTERFACE_MESSAGE_BOX_BORDER_RED;
+	interfaceInfo.messageList.colors.border.G = INTERFACE_MESSAGE_BOX_BORDER_GREEN;
+	interfaceInfo.messageList.colors.border.B = INTERFACE_MESSAGE_BOX_BORDER_BLUE;
+	interfaceInfo.messageList.colors.border.A = INTERFACE_MESSAGE_BOX_BORDER_ALPHA;
+	interfaceInfo.messageList.colors.title.R = INTERFACE_BORDER_RED;
+	interfaceInfo.messageList.colors.title.G = INTERFACE_BORDER_GREEN;
+	interfaceInfo.messageList.colors.title.B = INTERFACE_BORDER_BLUE;
+	interfaceInfo.messageList.colors.title.A = INTERFACE_BORDER_ALPHA;
 }
 
 void interface_showConfirmationBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
@@ -8044,7 +8162,7 @@ void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFun
 	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
 
 	maxWidth = interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH - ( icon > 0 ? interfaceInfo.thumbnailSize + interfaceInfo.paddingSize : 0 );
-	interface_formatTextWW(text, pgfx_font, maxWidth, interfaceInfo.clientHeight - 2*interfaceInfo.paddingSize, sizeof(interfaceInfo.messageBox.message), interfaceInfo.messageBox.message, &interfaceInfo.messageBox.scrolling.lineCount, &interfaceInfo.messageBox.scrolling.visibleLines);
+	interface_formatTextWW(text, pgfx_font, maxWidth, h - 2*interfaceInfo.paddingSize, sizeof(interfaceInfo.messageBox.message), interfaceInfo.messageBox.message, &interfaceInfo.messageBox.scrolling.lineCount, &interfaceInfo.messageBox.scrolling.visibleLines);
 
 	interfaceInfo.messageBox.scrolling.maxOffset = interfaceInfo.messageBox.scrolling.lineCount - interfaceInfo.messageBox.scrolling.visibleLines;
 	if ( interfaceInfo.messageBox.scrolling.maxOffset < 0 )
@@ -8657,5 +8775,995 @@ int32_t interface_addToggleMenuEntry(interfaceMenu_t *pMenu, const toggleEntryAr
 	interface_addMenuEntry(pMenu, buf, interface_toggleMenuEntry, (void *)arg, thumbnail_configure);
 
 	return 0;
+}
+void interface_displayTextListBoxColor( int targetX, int targetY, char *message, const char *icon,
+                                          int fixedWidth, DFBRectangle *resultingBox,
+                                          int fixedHeight, const int *icons,
+                                          int br, int bg, int bb, int ba,
+                                          int r, int g, int b, int a,
+                                          IDirectFBFont *pFont, int lineOffset, int visibleLines,
+                                             int lineCount)
+{
+	DFBRectangle rectangle, rect;
+	int x,y,w,h,iw,ih,maxWidth,n,i,icons_w = 0;
+	size_t len;
+	char *ptr, *pos, tmp = 0;
+	IDirectFBSurface *pIcon;
+
+	/* fixed width does not include padding - it's size of client area */
+	maxWidth = fixedWidth == 0 ?
+		interfaceInfo.clientWidth-interfaceInfo.paddingSize*3-interfaceInfo.thumbnailSize :
+		fixedWidth;
+
+	memset(&rectangle, 0, sizeof(DFBRectangle));
+
+	pIcon = NULL;
+	iw = ih = 0;
+	if ( icon != NULL )
+	{
+		pIcon = gfx_decodeImage(icon, interfaceInfo.thumbnailSize, interfaceInfo.thumbnailSize, 0);
+		if ( pIcon != NULL )
+		{
+			pIcon->GetSize(pIcon, &iw, &ih);
+			iw += interfaceInfo.paddingSize*2;
+		}
+	}
+
+	maxWidth -= iw;
+
+	rectangle.x = rectangle.y = rectangle.w = rectangle.h;
+
+	rectangle.w = fixedWidth;
+	rectangle.h = fixedHeight;
+	if ( icons != NULL )
+	{
+		rectangle.h += interfaceInfo.paddingSize + INTERFACE_STATUSBAR_ICON_HEIGHT;
+	}
+
+	if (fixedWidth > 0)
+	{
+		rectangle.w = fixedWidth-iw;
+	}
+
+	if ( icons != NULL )
+	{
+		n = 0;
+		for ( i = 0; i < 4; i++)
+		{
+			if ( icons[i] > 0)
+			{
+				n++;
+			}
+		}
+		icons_w = n * INTERFACE_STATUSBAR_ICON_WIDTH + (n-1)*3*interfaceInfo.paddingSize;
+		if ( icons_w > rectangle.w && fixedWidth == 0 )
+		{
+			rectangle.w = icons_w;
+		}
+	}
+
+	//dprintf("%s: load icon\n", __FUNCTION__);
+
+	ih = (ih > rectangle.h ? ih : rectangle.h) + fixedHeight;
+	{
+		x = targetX-(rectangle.w+iw)/2-interfaceInfo.paddingSize;
+		y = targetY-(ih)/2-interfaceInfo.paddingSize;
+	}
+	w = rectangle.w+iw+interfaceInfo.paddingSize*2;
+	h = rectangle.h;
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+	if ( a > 0)
+	{
+		gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y, w, h);
+	}
+	if (ba > 0)
+	{
+		interface_drawOuterBorder(DRAWING_SURFACE, br, bg, bb, ba, x, y, w, h, interfaceInfo.borderWidth, interfaceBorderSideAll);
+	}
+
+	if ( pIcon != NULL )
+	{
+		//dprintf("%s: draw icon\n", __FUNCTION__);
+		interface_drawImage(DRAWING_SURFACE, icon,
+		                    x+interfaceInfo.paddingSize, y+interfaceInfo.paddingSize,
+		                    interfaceInfo.thumbnailSize, interfaceInfo.thumbnailSize,
+		                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
+		                    interfaceAlignTopLeft, 0, 0);
+	}
+	// helper icons
+	if (icons != NULL)
+	{
+		x = (interfaceInfo.screenWidth - icons_w) / 2;
+		y = y + h - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT;
+		for ( i = 0; i < 4; i++)
+		{
+			if ( icons[i] > 0)
+			{
+				interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icons[i]],
+				                    x, y, INTERFACE_STATUSBAR_ICON_WIDTH, INTERFACE_STATUSBAR_ICON_HEIGHT,
+				                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
+				                    interfaceAlignTopLeft, 0, 0);
+				x += INTERFACE_STATUSBAR_ICON_WIDTH + interfaceInfo.paddingSize * 3;
+			}
+		}
+	}
+
+	{
+		x = targetX-(rectangle.w)/2+iw/2;
+		y = targetY-(ih)/2;
+	}
+
+	int scrollY = y;
+	if (message[0] != 0)
+	{
+		ptr = message;
+		do
+		{
+			pos = strchr(ptr, '\n');
+			if (pos != NULL)
+			{
+				tmp = *pos;
+				*pos = 0;
+			}
+			len = getMaxStringLengthForFont(pFont, ptr, maxWidth);
+			if (pos != NULL)
+			{
+				*pos = tmp;
+			}
+			if ( pos != NULL )
+			{
+				if ((size_t)(pos-ptr) > len)
+				{
+					pos = &ptr[len];
+					while (pos > ptr && *pos != ' ')
+					{
+						pos--;
+					}
+					if (pos > ptr)
+					{
+						len = pos-ptr;
+						//pos++;
+					} else
+					{
+						pos = &ptr[len];
+					}
+				}
+				tmp = *pos;
+				*pos = 0;
+			} else if (strlen(ptr) > len)
+			{
+				pos = &ptr[len];
+				while (pos > ptr && *pos != ' ')
+				{
+					pos--;
+				}
+				if (pos > ptr)
+				{
+					len = pos-ptr;
+					//pos++;
+				} else
+				{
+					pos = &ptr[len];
+				}
+				tmp = *pos;
+				*pos = 0;
+			}
+			DFBCHECK( pFont->GetStringExtents(pFont, ptr, -1, &rect, NULL) );
+
+			gfx_drawText(DRAWING_SURFACE, pFont, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
+				      x-rect.x, y-rect.y, ptr, 0, 0);
+			y += rect.h;
+
+			if ( pos != NULL )
+			{
+				*pos = tmp;
+				ptr = pos+(tmp=='\n' || tmp==' ' ? 1 : 0);
+			} else
+			{
+				ptr += len;
+			}
+			//pos = strchr(ptr, '\n');
+		} while ( pos != NULL );
+	}
+	int fh;
+	pgfx_font->GetHeight(pgfx_font, &fh);
+	y += fh;
+
+	for(int i = lineOffset; i < interfaceInfo.messageList.entryCount && i < lineOffset + visibleLines; i++) {
+		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
+			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
+			
+			if((i - lineOffset) == interfaceInfo.messageList.scrolling.shift) {
+				interface_drawSelectionRectangle0(x, y - interfaceInfo.paddingSize, 
+				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
+			}
+			
+			gfx_drawText(DRAWING_SURFACE, pgfx_font,
+				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
+				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+				             x, y + rect.h/2 + interfaceInfo.paddingSize, interfaceInfo.messageList.entry[i].text, 0, 0);
+			y += rect.h;
+		}
+	}
+	
+	interface_drawScrollingBar(DRAWING_SURFACE,
+			                           x + w - 2*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
+			                           scrollY,
+			                           INTERFACE_SCROLLBAR_WIDTH,
+			                           h - 2*interfaceInfo.paddingSize,
+			                           interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+}
+
+
+int interface_setListCapacity(int newCapacity)
+{
+	if (newCapacity == interfaceInfo.messageList.entryCapacity)
+		return newCapacity;
+	if (newCapacity < interfaceInfo.messageList.entryCount) {
+		eprintf("%s: can't set capacity to %d while there are %d entries used\n", __FUNCTION__, newCapacity, interfaceInfo.messageList.entryCount);
+		return -2;
+	}
+	interfaceMessageListEntry_t *newEntries = realloc(interfaceInfo.messageList.entry, newCapacity*sizeof(interfaceMessageListEntry_t));
+	if (!newEntries) {
+		eprintf("%s: can't change capacity from %d to %d\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity, newCapacity);
+		return -1;
+	}
+	interfaceInfo.messageList.entry         = newEntries;
+	interfaceInfo.messageList.entryCapacity = newCapacity;
+	return newCapacity;
+}
+
+int interface_addToListBox(const char *message, menuConfirmFunction pFunc, void *pArg)
+{
+	if (interfaceInfo.messageList.entryCount == interfaceInfo.messageList.entryCapacity &&
+	    interface_setListCapacity(interfaceInfo.messageList.entryCapacity + MENU_CAPACITY_INCREMENT) < 0)
+	  return -1;
+
+	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].text = strdup(message);
+	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pArg = pArg;
+
+	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pCallback = pFunc;
+
+	interfaceInfo.messageList.entryCount++;
+	interfaceInfo.messageList.scrolling.maxOffset = interfaceInfo.messageList.entryCount - interfaceInfo.messageList.scrolling.visibleLines;
+	if ( interfaceInfo.messageList.scrolling.maxOffset < 0 )
+	{
+		interfaceInfo.messageList.scrolling.maxOffset = 0;
+	}
+
+	return interfaceInfo.messageList.entryCount;
+}
+// void interface_displayCustomScrollingTextBox2( int x, int y, int w, int h,
+//                                               const char *label, const int *icons,
+//                                               int lineOffset, int visibleLines, int lineCount, int icon)
+// {
+// 	DFBRectangle rectangle, rect;
+// 	int fh, i,maxWidth,tx,ty;
+// 	const char *ptr;
+// 	char *pos, tmp = 0;
+// 
+// 	memset(&rectangle, 0, sizeof(DFBRectangle));
+// 
+// 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+// 
+// 	tx = x + interfaceInfo.paddingSize;
+// 	ty = y + interfaceInfo.paddingSize;
+// 	maxWidth = w - 2*interfaceInfo.paddingSize;
+// 	if ( icon > 0 )
+// 	{
+// 		//dprintf("%s: draw icon\n", __FUNCTION__);
+// 		interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icon],
+// 		                    x+interfaceInfo.paddingSize, y+interfaceInfo.paddingSize,
+// 		                    interfaceInfo.thumbnailSize, interfaceInfo.thumbnailSize,
+// 		                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
+// 		tx       += interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
+// 		maxWidth -= interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
+// 	}
+// 
+// 	//dprintf("%s: draw text\n", __FUNCTION__);
+// 	pgfx_font->GetHeight(pgfx_font, &fh);
+// 	ty += fh;
+// 	gfx_drawText(DRAWING_SURFACE, pgfx_font,
+// 				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
+// 				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+// 				             tx, ty + fh/2 + interfaceInfo.paddingSize, label, 0, 0);
+// 	
+// 	ty += 2*fh;
+// 	for(int i = lineOffset; i < interfaceInfo.messageList.entryCount && i < lineOffset + visibleLines; i++) {
+// 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
+// 			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
+// 			
+// 			if((i - lineOffset) == interfaceInfo.messageList.scrolling.shift) {
+// 				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
+// 				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
+// 			}
+// 			
+// 			gfx_drawText(DRAWING_SURFACE, pgfx_font,
+// 				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
+// 				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+// 				             tx, ty + rect.h/2 + interfaceInfo.paddingSize, interfaceInfo.messageList.entry[i].text, 0, 0);
+// 			ty += rect.h;
+// 		}
+// 	}
+// 	IDirectFBSurface *pIcon;
+// 	pIcon = NULL;
+// 	if (icons != NULL)
+// 	{
+// 		//n = (interfaceInfo.messageBox.type == interfaceMessageBoxCallback && interfaceInfo.messageBox.pCallback == interface_enterTextCallback) ? 3 : 2;
+// 		int ix = x + interfaceInfo.paddingSize;
+// 		int iy = y + h - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT;
+// 		for ( i = 0; i < 4; i++)
+// 		{
+// 			if ( icons[i] > 0)
+// 			{
+// 				interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icons[i]],
+// 				                    ix, iy, INTERFACE_STATUSBAR_ICON_WIDTH, INTERFACE_STATUSBAR_ICON_HEIGHT,
+// 				                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
+// 				                    interfaceAlignTopLeft, 0, 0);
+// 				ix += INTERFACE_STATUSBAR_ICON_WIDTH + interfaceInfo.paddingSize * 3;
+// 			}
+// 		}
+// 	}
+// 	interface_drawScrollingBar(DRAWING_SURFACE,
+// 				    x + w - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
+// 				    y + interfaceInfo.paddingSize,
+// 				    INTERFACE_SCROLLBAR_WIDTH,
+// 				    h - 2*interfaceInfo.paddingSize,
+// 				    interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
+// 
+// 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+// }
+
+void interface_displayListBoxColor( int x, int y, int w, int h,
+                                             const int *label, const int *icons,
+                                             int lineShift, int lineOffset, int visibleLines,
+                                             int lineCount, int icon,
+                                             int br, int bg, int bb, int ba,
+                                             int r, int g, int b, int a)
+{
+	DFBRectangle rectangle, rect;
+	int fh, i,maxWidth,tx,ty;
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+	//dprintf("%s: draw box\n", __FUNCTION__);
+	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y, w, h);
+	interface_drawOuterBorder(DRAWING_SURFACE, br, bg, bb, ba,
+	                          x, y, w, h, interfaceInfo.borderWidth, interfaceBorderSideAll);
+
+	memset(&rectangle, 0, sizeof(DFBRectangle));
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+	tx = x + interfaceInfo.paddingSize;
+	ty = y + interfaceInfo.paddingSize;
+	maxWidth = w - 2*interfaceInfo.paddingSize;
+	if ( icon > 0 )
+	{
+		//dprintf("%s: draw icon\n", __FUNCTION__);
+		interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icon],
+		                    x+interfaceInfo.paddingSize, y+interfaceInfo.paddingSize,
+		                    interfaceInfo.thumbnailSize, interfaceInfo.thumbnailSize,
+		                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
+		tx       += interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
+		maxWidth -= interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
+	}
+
+	//dprintf("%s: draw text\n", __FUNCTION__);
+	pgfx_font->GetHeight(pgfx_font, &fh);
+	ty += fh;
+	gfx_drawText(DRAWING_SURFACE, pgfx_font,
+				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
+				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+				             tx, ty + fh/2 + interfaceInfo.paddingSize, (const char*)label, 0, 0);
+	
+	ty += 2*fh;
+	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
+		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
+			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
+			
+			if((i - lineOffset) == lineShift) {
+				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
+				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
+			}
+			
+			gfx_drawText(DRAWING_SURFACE, pgfx_font,
+				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
+				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
+				             tx, ty + rect.h/2 + interfaceInfo.paddingSize, interfaceInfo.messageList.entry[i].text, 0, 0);
+			ty += rect.h;
+		}
+	}
+	if (icons != NULL)
+	{
+		//n = (interfaceInfo.messageBox.type == interfaceMessageBoxCallback && interfaceInfo.messageBox.pCallback == interface_enterTextCallback) ? 3 : 2;
+		int ix = x + interfaceInfo.paddingSize;
+		int iy = y + h - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT;
+		for ( i = 0; i < 4; i++)
+		{
+			if ( icons[i] > 0)
+			{
+				interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icons[i]],
+				                    ix, iy, INTERFACE_STATUSBAR_ICON_WIDTH, INTERFACE_STATUSBAR_ICON_HEIGHT,
+				                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
+				                    interfaceAlignTopLeft, 0, 0);
+				ix += INTERFACE_STATUSBAR_ICON_WIDTH + interfaceInfo.paddingSize * 3;
+			}
+		}
+	}
+	interface_drawScrollingBar(DRAWING_SURFACE,
+				    x + w - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
+				    y + interfaceInfo.paddingSize,
+				    INTERFACE_SCROLLBAR_WIDTH,
+				    h - 2*interfaceInfo.paddingSize,
+				    interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
+
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+}
+
+
+void interface_displayListBox()
+{
+	int *icons = NULL;
+	if ( interfaceInfo.messageList.type != interfaceMessageBoxNone )
+	{
+// 		tprintf("-----------------------------------------------------------\n");
+// 		tprintf("| %s\n", interfaceInfo.messageBox.message);
+// 		tprintf("-----------------------------------------------------------\n");
+		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+		gfx_drawRectangle(DRAWING_SURFACE, 0, 0, 0, 0x5F, 0, 0, interfaceInfo.screenWidth, interfaceInfo.screenHeight);
+		DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
+		switch ( interfaceInfo.messageList.type )
+		{
+			case interfaceMessageListCallback:
+			{
+				icons = (int*)interface_textBoxIcons;
+				interface_displayTextListBoxColor(
+					interfaceInfo.messageList.target.x, interfaceInfo.messageList.target.y,
+					interfaceInfo.messageList.title,
+					interfaceInfo.messageList.icon > 0 ? resource_thumbnails[interfaceInfo.messageList.icon] : NULL,
+					interfaceInfo.messageList.target.w, NULL, interfaceInfo.messageList.target.h, icons,
+					interfaceInfo.messageList.colors.border.R, interfaceInfo.messageList.colors.border.G,
+					interfaceInfo.messageList.colors.border.B, interfaceInfo.messageList.colors.border.A,
+					interfaceInfo.messageList.colors.background.R, interfaceInfo.messageList.colors.background.G,
+					interfaceInfo.messageList.colors.background.B, interfaceInfo.messageList.colors.background.A,
+   					pgfx_font, interfaceInfo.messageList.scrolling.offset,
+					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.entryCount);
+			}break;
+			case interfaceMessageList:
+			{
+				int ic[] = {statusbar_f1_cancel, statusbar_f2_ok, 0, 0 };
+				icons = (int*)ic;
+				interface_displayListBoxColor(
+					interfaceInfo.messageList.target.x, interfaceInfo.messageList.target.y,
+					interfaceInfo.messageList.target.w, interfaceInfo.messageList.target.h,
+					(const int *)interfaceInfo.messageList.title, icons, interfaceInfo.messageList.scrolling.shift,
+					interfaceInfo.messageList.scrolling.offset,
+					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.entryCount,
+					interfaceInfo.messageList.icon,
+					interfaceInfo.messageList.colors.border.R, interfaceInfo.messageList.colors.border.G,
+					interfaceInfo.messageList.colors.border.B, interfaceInfo.messageList.colors.border.A,
+					interfaceInfo.messageList.colors.background.R, interfaceInfo.messageList.colors.background.G,
+					interfaceInfo.messageList.colors.background.B, interfaceInfo.messageList.colors.background.A);
+			}break;
+			default:
+				eprintf("%s: Unsupported message box type %d\n", __FUNCTION__, interfaceInfo.messageBox.type);
+		}
+	}
+}
+
+static int interface_hideListBoxEvent(void *pArg)
+{
+	//dprintf("interface: hide messagebox\n");
+	if ( interfaceInfo.messageList.type != interfaceMessageBoxNone )
+	{
+		//dprintf("interface: do hide messagebox\n");
+		interface_removeEvent(interface_hideListBoxEvent, pArg);
+		interfaceInfo.messageList.type = interfaceMessageBoxNone;
+		for(int i = 0; i < interfaceInfo.messageList.entryCount; i++) {
+			if(interfaceInfo.messageList.entry[i].text != NULL) {
+				free(interfaceInfo.messageList.entry[i].text);
+			}
+		}
+		interfaceInfo.messageList.entryCount = 0;
+		interfaceInfo.messageList.entrySelected = 0;
+		interfaceInfo.messageList.scrolling.offset = 0;
+		interfaceInfo.messageList.scrolling.shift = 0;
+		interface_displayMenu(1);
+	}
+
+	return 0;
+}
+
+void interface_hideListBox()
+{
+	interface_hideListBoxEvent(NULL);
+}
+
+void interface_showTextListBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
+{
+	interface_removeEvent(interface_hideListBoxEvent, (void*)0);
+
+	STRMAXCPY(interfaceInfo.messageList.title, text, MAX_MESSAGE_BOX_LENGTH);	
+	
+	int fh;
+
+	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
+
+// 	maxWidth = interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH;
+	pgfx_font->GetHeight(pgfx_font, &fh);
+
+	interfaceInfo.messageList.scrolling.visibleLines = (interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize - 4*fh) / fh;
+	interfaceInfo.messageList.scrolling.maxOffset = 0;
+
+	interfaceInfo.messageList.pCallback = pCallback;
+	interfaceInfo.messageList.pArg = pArg;
+	messageBox_setDefaultColors();
+	interfaceInfo.messageList.target.x = interfaceInfo.screenWidth/2;
+	interfaceInfo.messageList.target.y = interfaceInfo.screenHeight/2;
+	interfaceInfo.messageList.target.w = interfaceInfo.screenWidth/4;
+	interfaceInfo.messageList.target.h = interfaceInfo.screenHeight/4;
+
+	interfaceInfo.messageList.type = interfaceMessageListCallback;
+	if(interfaceInfo.messageList.entryCount == 0) {
+		interfaceInfo.messageList.scrolling.offset = 0;
+		interfaceInfo.messageList.scrolling.shift = 0;
+		interfaceInfo.messageList.entryCount = 0;
+		interfaceInfo.messageList.entrySelected = 0;
+		interfaceInfo.messageList.entryCapacity = MENU_DEFAULT_CAPACITY;
+		
+		if (interfaceInfo.messageList.entryCapacity > 0 &&
+		  !(interfaceInfo.messageList.entry = calloc(interfaceInfo.messageList.entryCapacity, sizeof(interfaceMessageListEntry_t)))) {
+			eprintf("%s: (!) failed to allocate %d entries for %s\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity);
+			interfaceInfo.messageList.entryCapacity = 0;
+		}
+	}
+	
+	interface_displayMenu(1);
+}
+
+int interface_clearFieldText(interfaceEnterTextInfo_t *field)
+{
+	field->currentSymbol = 0;
+	if (field->subPatterns[field->currentPattern].data[field->currentSymbol] != 0)
+	{
+		field->lastChar = 0;
+		for (int i=0;field->subPatterns[field->currentPattern].data[i]!=0; i++)
+		{
+			field->subPatterns[field->currentPattern].data[i] = 0;
+		}			
+	}
+	return 0;
+}
+
+int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
+{
+	interfaceEnterTextInfo_t *field = (interfaceEnterTextInfo_t *)pArg;
+	int i;
+	int patternCount;
+	int patternLength;
+	int posdiff = 0;
+	int ret = 0;
+	int clear = 0;
+#ifdef WCHAR_SUPPORT
+	wchar_t newchar = 0;
+#else
+	char newchar = 0;
+#endif
+	dprintf("%s: %d (%c)\n", __FUNCTION__, cmd->command, cmd->command);
+
+	appControlInfo.inputMode = field->inputMode; 
+	
+	if (field->inputMode == inputModeABC &&
+		((cmd->source != DID_KEYBOARD && /* not keyboard */
+		cmd->repeat != 0 &&
+		cmd->original >= interfaceCommand0 &&
+		cmd->original <= interfaceCommand9) ||
+		((cmd->original == interfaceCommandUp ||
+		 cmd->original == interfaceCommandDown))))
+	{
+		interfaceCommandEvent_t newcmd;
+ 		//eprintf("%s: repeat symbol\n", __FUNCTION__);
+		newcmd.command = 8;
+		newcmd.repeat  = 0;
+		newcmd.source  = DID_KEYBOARD;
+		interface_listBoxEnterTextProcessCommand(pMenu, &newcmd, pArg);
+	}
+	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit)
+	{
+		if ( field->pCallback != NULL )
+			field->pCallback(pMenu, NULL, field->pArg);
+
+		appControlInfo.inputMode = inputModeDirect;
+		interface_hideListBox();
+		return 0;
+	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
+	{
+		interface_enterTextGetValue(field);
+		if (field->pCallback != NULL)
+		{
+			ret = field->pCallback(pMenu, field->value, field->pArg);
+		}
+		appControlInfo.inputMode = inputModeDirect;
+		interface_hideListBox();
+		return ret;
+	} else if (cmd->command == interfaceCommandRight)
+	{
+		posdiff = 1;
+	} else if (cmd->command == interfaceCommandLeft)
+	{
+		posdiff = -1;
+	} else if (cmd->command == interfaceCommandUp && field->inputMode == inputModeABC)
+	{	
+		if(interfaceInfo.messageList.scrolling.shift > 0) {
+			if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
+			  (interfaceInfo.messageList.scrolling.offset > 0)) {
+				interfaceInfo.messageList.scrolling.offset--;
+			}
+			else {
+				interfaceInfo.messageList.scrolling.shift--;
+			}
+			interfaceInfo.messageList.entrySelected--;
+		}
+		clear = 1;
+		newchar = 127;
+	} else if (cmd->command == interfaceCommandDown && field->inputMode == inputModeABC)
+	{
+		if(interfaceInfo.messageList.scrolling.shift + interfaceInfo.messageList.scrolling.offset < interfaceInfo.messageList.entryCount/*scrolling.lineCount*/ - 1) {
+			if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
+			  (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount/*scrolling.lineCount*/)) {
+				interfaceInfo.messageList.scrolling.offset++;
+			}
+			else {
+				interfaceInfo.messageList.scrolling.shift++;
+			}
+			interfaceInfo.messageList.entrySelected++;
+		}
+		clear = 1;
+		newchar = 127;
+	} else if (cmd->command == 127)
+	{
+		newchar = 127; // delete
+	}else if (cmd->command == 8 || cmd->command == interfaceCommandBlue
+#if (defined STB225)
+	        || cmd->command == interfaceCommandBack
+#endif
+	          )
+	{
+		newchar = 8;// backspace
+	} else if (cmd->source != DID_KEYBOARD &&
+	          (cmd->original < interfaceCommand0 ||
+	           cmd->original > interfaceCommand9) )
+	{
+		dprintf("%s: skip\n", __FUNCTION__);
+		newchar = 0; // deny non-digit input from not keyboard
+	} else if (cmd->command == interfaceCommandNone)
+	{
+#ifdef WCHAR_SUPPORT
+		field->currentSymbol = wcslen(field->subPatterns[field->currentPattern].data);
+#else
+		field->currentSymbol = strlen(field->subPatterns[field->currentPattern].data);
+#endif
+	} else
+#ifdef WCHAR_SUPPORT
+	if (cmd->command >= 32 && cmd->command < 0xF000 ) // wchar
+#else
+	if (cmd->command >= 32 && cmd->command <= 126) // 7-bit ASCII charset
+#endif
+	{
+		newchar = cmd->command;
+	} else
+	{
+		return 1;
+	}
+
+	dprintf("%s: cmd: %d, org: %d, repeat: %d, source: %d\n", __FUNCTION__, cmd->command, cmd->original, cmd->repeat, cmd->source);
+#ifdef WCHAR_SUPPORT
+#ifdef DEBUG
+	unsigned char tmp[10];
+	memset(tmp,0,sizeof(tmp));
+	i= utf8_wctomb(tmp, cmd->command, 10);
+	dprintf("%s: symbol: '%s' (%d)\n", __FUNCTION__, tmp, i);
+#endif
+#endif
+
+	/* Get pattern count */
+	interface_enterTextGetPatternCount( field, &patternCount, &patternLength );
+	/* Check if we've got a new char */
+	if (newchar != 0 && newchar != 8 && newchar != 127)
+	{
+		if (patternLength > 0 && field->currentSymbol >= patternLength)
+		{
+			field->currentSymbol = 0;
+			field->currentPattern++;
+			if (field->currentPattern >= patternCount)
+			{
+				field->currentPattern = 0;
+			}
+		}
+#ifdef WCHAR_SUPPORT
+		if (wcslen(field->subPatterns[field->currentPattern].data) < MAX_FIELD_PATTERN_LENGTH-1)
+#else
+		if (strlen(field->subPatterns[field->currentPattern].data) < MAX_FIELD_PATTERN_LENGTH-1)
+#endif
+		{
+#ifdef WCHAR_SUPPORT
+			if (patternLength == 0 || (int)wcslen(field->subPatterns[field->currentPattern].data) < patternLength)
+#else
+			if (patternLength == 0 || (int)strlen(field->subPatterns[field->currentPattern].data) < patternLength)
+#endif
+			{
+#ifdef WCHAR_SUPPORT
+				wchar_t chnext, chcur;
+#else
+				char chnext, chcur;
+#endif
+				chcur = field->subPatterns[field->currentPattern].data[field->currentSymbol];
+				for (i=field->currentSymbol+1; chcur!=0; i++)
+				{
+					chnext = field->subPatterns[field->currentPattern].data[i];
+					field->subPatterns[field->currentPattern].data[i] = chcur;
+					chcur = chnext;
+				}
+			}
+			field->subPatterns[field->currentPattern].data[field->currentSymbol] = newchar;
+			posdiff = 1;
+			field->lastChar = newchar;
+		}
+	} else if ((newchar == 127) && (clear))
+	{
+		int size;
+#ifdef WCHAR_SUPPORT
+		wchar_t *msg;
+		if ((interfaceInfo.messageList.entryCount > 0) && (interfaceInfo.messageList.entrySelected > 0)) {
+			int cSize = strlen(interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
+			msg = calloc(cSize+1, sizeof(wchar_t));
+			mbstowcs(msg, interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text, cSize);
+		}
+		else {
+			msg = wcsdup((const wchar_t *)"");
+		}
+		size = wcslen(msg);
+#else
+		char *msg;
+		if ((interfaceInfo.messageList.entryCount > 0) && (interfaceInfo.messageList.entrySelected > 0)) {
+			msg = strdup(interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
+		}
+		else {
+			msg = strdup("");
+		}
+		size = strlen(msg);
+#endif
+		interface_clearFieldText(field);
+		for(int i = 0; i < size; i++){
+			field->subPatterns[field->currentPattern].data[i] = msg[i];
+			field->currentSymbol = size;
+		}
+		free(msg);
+	} else if (newchar == 127)
+	{
+		if (field->subPatterns[field->currentPattern].data[field->currentSymbol] != 0)
+		{
+			if (field->currentSymbol-1 >= 0)
+			{
+				field->lastChar = field->subPatterns[field->currentPattern].data[field->currentSymbol-1];
+			} else
+			{
+				field->lastChar = 0;
+			}
+			for (i=field->currentSymbol;field->subPatterns[field->currentPattern].data[i]!=0; i++)
+			{
+				field->subPatterns[field->currentPattern].data[i] = field->subPatterns[field->currentPattern].data[i+1];
+			}
+
+		} else if (field->currentSymbol > 0)
+		{
+			newchar = 8;
+		}
+	}
+
+	if (newchar == 8)
+	{
+		if (field->currentSymbol == 0 && field->currentPattern > 0)
+		{
+			field->currentPattern--;
+#ifdef WCHAR_SUPPORT
+			field->currentSymbol = wcslen(field->subPatterns[field->currentPattern].data);
+#else
+			field->currentSymbol = strlen(field->subPatterns[field->currentPattern].data);
+#endif
+		}
+
+		if (field->currentSymbol > 0)
+		{
+			if (field->subPatterns[field->currentPattern].data[field->currentSymbol-1] != 0)
+			{
+				field->lastChar = field->subPatterns[field->currentPattern].data[field->currentSymbol-1];
+				for (i=field->currentSymbol-1;field->subPatterns[field->currentPattern].data[i]!=0; i++)
+				{
+					field->subPatterns[field->currentPattern].data[i] = field->subPatterns[field->currentPattern].data[i+1];
+				}
+				field->currentSymbol--;
+			}
+		} else
+		{
+			field->lastChar = 0;
+		}
+	}
+
+	/* Move input marker */
+	field->currentSymbol += posdiff;
+	if (posdiff > 0 && ((patternLength > 0 && field->currentSymbol >= patternLength) ||
+#ifdef WCHAR_SUPPORT
+		field->currentSymbol > (int)wcslen(field->subPatterns[field->currentPattern].data)
+#else
+		field->currentSymbol > (int)strlen(field->subPatterns[field->currentPattern].data)
+#endif
+	))
+	{
+		field->currentSymbol = 0;
+		field->currentPattern++;
+		if (field->currentPattern >= patternCount)
+		{
+			field->currentPattern = 0;
+		}
+	} else if (posdiff < 0 && field->currentSymbol < 0)
+	{
+		field->currentPattern--;
+		if (field->currentPattern < 0)
+		{
+			field->currentPattern = patternCount-1;
+		}
+#ifdef WCHAR_SUPPORT
+		field->currentSymbol = wcslen(field->subPatterns[field->currentPattern].data);
+#else
+		field->currentSymbol = strlen(field->subPatterns[field->currentPattern].data);
+#endif
+	}
+
+	/* Recalculate pattern count */
+	//interface_enterTextGetPatternCount( field, &patternCount, &patternLength );
+
+	/* Ensure that our text marker is inside bounds of fixed-length field */
+	/*if (patternLength > 0 && field->currentSymbol >= patternLength)
+	{
+		field->currentSymbol = patternLength-1;
+	}*/
+	return 0;
+}
+
+static int interface_listBoxEnterTextCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
+{
+	interfaceEnterTextInfo_t *field = (interfaceEnterTextInfo_t *)pArg;
+	char buf[MAX_MESSAGE_BOX_LENGTH], *str;
+	int ret;
+	ret = interface_listBoxEnterTextProcessCommand(pMenu, cmd, pArg);
+	switch ( cmd->command )
+	{
+		// see interface_enterTextProcessCommand for full list of accepted commands
+		case interfaceCommandGreen:
+		case interfaceCommandEnter:
+		case interfaceCommandOk:
+		case interfaceCommandRed:
+		case interfaceCommandExit:
+		case interfaceCommandMainMenu:
+			dfree(field);
+			return ret;
+		default:;
+	}
+
+	strcpy(buf, field->description);
+	strcat(buf, "\n\n");
+
+	str = &buf[strlen(buf)];
+	interface_enterTextShow(field, sizeof(buf) - (str-buf), str);
+
+	interface_showTextListBox(buf, thumbnail_account, interface_listBoxEnterTextCallback, pArg);
+
+	return 1;
+}
+
+int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, const char *last, const char *pattern, menuEnterTextFunction pCallback, menuEnterTextFieldsFunction pGetFields, stb810_inputMode inputMode, void *pArg)
+{
+	int i;
+	interfaceEnterTextInfo_t *info;
+	char *field;
+	interfaceCommandEvent_t cmd;
+	int patternCount;
+#ifdef WCHAR_SUPPORT
+	int dest_index;
+	int mb_count;
+#endif
+	info = (interfaceEnterTextInfo_t *)dmalloc(sizeof(interfaceEnterTextInfo_t));
+
+	memset(info, 0, sizeof(interfaceEnterTextInfo_t));
+
+	info->currentPattern = 0;
+	info->currentSymbol = 0;
+	strcpy(info->description, description);
+	info->pArg = pArg;
+	strcpy(info->pattern, pattern);
+	info->pCallback = pCallback;
+	info->inputMode = inputMode;
+	info->lastChar = 0;
+
+	interface_enterTextGetPatternCount(info, &patternCount, NULL);
+
+	for (i=0;i<patternCount; i++)
+	{
+		if (pGetFields != NULL)
+		{
+			field = pGetFields(i, pArg);
+			if (field != NULL)
+			{
+#ifdef WCHAR_SUPPORT
+				info->subPatterns[i].data[0] = 0;
+				dest_index = 0;
+				while (*field && dest_index < MAX_FIELD_PATTERN_LENGTH && (mb_count = utf8_mbtowc(&info->subPatterns[i].data[dest_index], (unsigned char *)field, strlen(field))) > 0 )
+				{
+					dest_index++;
+					field += mb_count;
+				}
+#else
+				strncpy(info->subPatterns[i].data, field, sizeof(info->subPatterns[i].data));
+				info->subPatterns[i].data[sizeof(info->subPatterns[i].data)-1] = 0;
+#endif
+			}
+		}
+	}
+	cmd.command = cmd.original = interfaceCommandNone;
+	cmd.repeat = 0;
+	cmd.source = DID_KEYBOARD;
+	
+	interface_clearFieldText(info);
+
+	return interface_listBoxEnterTextCallback(pMenu, &cmd, (void*)info);
+}
+
+void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
+                                      int x, int y, int w, int h,
+                                      int br, int bg, int bb, int ba,
+                                      int  r, int  g, int  b, int  a)
+{
+	int fh;
+
+	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
+
+	pgfx_font->GetHeight(pgfx_font, &fh);
+	strncpy(interfaceInfo.messageList.title, header, sizeof(interfaceInfo.messageList.title));
+	interfaceInfo.messageList.scrolling.visibleLines = (h - 2*interfaceInfo.paddingSize - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT - 3*fh) / fh;
+	interfaceInfo.messageList.scrolling.maxOffset = 0;
+	
+	interfaceInfo.messageList.scrolling.offset = 0;
+	interfaceInfo.messageList.scrolling.shift = 0;
+	interfaceInfo.messageList.pCallback = pCallback;
+	interfaceInfo.messageList.pArg = pArg;
+	messageBox_setDefaultColors();
+	interfaceInfo.messageList.colors.background.R = r;
+	interfaceInfo.messageList.colors.background.G = g;
+	interfaceInfo.messageList.colors.background.B = b;
+	interfaceInfo.messageList.colors.background.A = a;
+	interfaceInfo.messageList.colors.border.R = br;
+	interfaceInfo.messageList.colors.border.G = bg;
+	interfaceInfo.messageList.colors.border.B = bb;
+	interfaceInfo.messageList.colors.border.A = ba;
+	interfaceInfo.messageList.target.x = x;
+	interfaceInfo.messageList.target.y = y;
+	interfaceInfo.messageList.target.w = w;
+	interfaceInfo.messageList.target.h = h;
+	interfaceInfo.messageList.type = interfaceMessageList;
+	interfaceInfo.messageList.entryCount = 0;
+	interfaceInfo.messageList.entrySelected = 0;
+	interfaceInfo.messageList.entryCapacity = MENU_DEFAULT_CAPACITY;
+	
+	if (interfaceInfo.messageList.entryCapacity > 0 &&
+	  !(interfaceInfo.messageList.entry = calloc(interfaceInfo.messageList.entryCapacity, sizeof(interfaceMessageListEntry_t)))) {
+		eprintf("%s: (!) failed to allocate %d entries for %s\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity);
+		interfaceInfo.messageList.entryCapacity = 0;
+	}
+	interface_displayMenu(1);
 }
 

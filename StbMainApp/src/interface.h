@@ -774,7 +774,9 @@ typedef enum
 	interfaceMessageBoxSimple,
 	interfaceMessageBoxCallback,
 	interfaceMessageBoxScrolling,
-	interfaceMessageBoxPoster
+	interfaceMessageBoxPoster,
+	interfaceMessageList,
+	interfaceMessageListCallback
 } interfaceMessageBoxType_t;
 
 typedef struct
@@ -806,6 +808,48 @@ typedef struct
 	menuConfirmFunction       pCallback;
 	void *pArg;
 } interfaceMessageBox_t;
+
+typedef struct
+{
+	char  *text;
+	/** If type is interfaceMessageBoxCallback then return value 0 closes message box.
+	 * If type is interfaceMessageBoxScrolling then return value 0 mean command was processed by callback,
+	 * non-zero mean to execute default action (scroll or close)
+	 */
+	menuConfirmFunction       pCallback;
+	void *pArg;
+} interfaceMessageListEntry_t;
+
+typedef struct
+{
+	interfaceMessageBoxType_t type;
+	int   icon;
+	char  title[MENU_ENTRY_INFO_LENGTH];
+
+	int entrySelected;
+	int entryCount;
+	int entryCapacity;
+	interfaceMessageListEntry_t *entry;
+	struct
+	{
+		interfaceColor_t title;
+		interfaceColor_t text;
+		interfaceColor_t border;
+		interfaceColor_t background;
+	} colors;
+	struct
+	{
+		int shift;
+		int   offset; // index of first visible line
+		int   maxOffset;
+		int   visibleLines;
+		int   lineCount;
+	} scrolling;
+	DFBRectangle target;
+
+	menuConfirmFunction       pCallback;
+	void *pArg;
+} interfaceMessageList_t;
 
 typedef void (*sliderSetCallback)(long, void*);
 typedef long (*sliderGetCallback)(void*);
@@ -885,6 +929,7 @@ typedef struct
 
 	interfaceEvent_t event[MAX_EVENTS];
 	interfaceMessageBox_t messageBox;
+	interfaceMessageList_t messageList;
 	interfaceAnimation_t animation;
 
 	int eventCount;
@@ -1097,7 +1142,7 @@ void smartLineTrim(char *string, int length);
 int  interface_formatTextWW(const char *text, IDirectFBFont *font,
                             int maxWidth, int maxHeight, int dest_size,
                             char *dest, int *lineCount, int *visibleLines);
-
+int interface_addToListBox(const char *message, menuConfirmFunction pFunc, void *pArg);
 /* Interface primitives */
 
 /**
@@ -1657,6 +1702,11 @@ void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFun
                                       int br, int bg, int bb, int ba,
                                       int  r, int  g, int  b, int  a);
 
+void interface_showMessageListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
+                                      int x, int y, int w, int h,
+                                      int br, int bg, int bb, int ba,
+                                      int  r, int  g, int  b, int  a);
+
 /**
  *  @brief Displays message box with poster, scrollable text and custom user input handler
  *
@@ -1695,6 +1745,7 @@ void interface_showPosterBox(const char *text, const char *title,
 void interface_showConfirmationBox(const char *text, int icon,
                                    menuConfirmFunction pCallback, void *pArg);
 
+void interface_hideMessageList(void);
 /**
  *  @brief Hide displayed message box
  *
@@ -1755,6 +1806,14 @@ void interface_setMenuLogo(interfaceMenu_t *pMenu, int logo,
  */
 int  interface_getText(interfaceMenu_t *pMenu,
                        const char *description,
+                       const char *pattern,
+                       menuEnterTextFunction pCallback,
+                       menuEnterTextFieldsFunction pGetFields,
+                       stb810_inputMode inputMode, void *pArg);
+
+int  interface_listBoxGetText(interfaceMenu_t *pMenu,
+                       const char *description,
+			const char *last,
                        const char *pattern,
                        menuEnterTextFunction pCallback,
                        menuEnterTextFieldsFunction pGetFields,
