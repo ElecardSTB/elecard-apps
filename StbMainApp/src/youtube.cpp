@@ -794,7 +794,7 @@ static int youtube_fillMenu( interfaceMenu_t* pMenu, void *pArg )
 		         YOUTUBE_LINKS_PER_PAGE, (page-1)*YOUTUBE_LINKS_PER_PAGE+youtubeInfo.search_offset*YOUTUBE_MAX_LINKS+1, youtubeInfo.search);
 	}
 #endif // ENABLE_EXPAT
-	youtube_getVideoList(url, youtube_addMenuEntry, page);
+	int ret = youtube_getVideoList(url, youtube_addMenuEntry, page);
 
 	if (( youtubeInfo.count == 0 ) && ( page == 1 ))
 	{
@@ -803,7 +803,7 @@ static int youtube_fillMenu( interfaceMenu_t* pMenu, void *pArg )
 	}
 
 #ifndef ENABLE_EXPAT
-	if (( youtubeInfo.search[0] == 0 ) && ( page == 1 ))
+	if (( youtubeInfo.search[0] == 0 ) && ( page == 1 ) && (ret == 0))
 	{
 		pthread_create(&youtubeInfo.search_thread, NULL, youtube_MenuVideoSearchThread, &YoutubeMenu);
 	}
@@ -870,8 +870,17 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 	{
 		youtubeSearchHist_load();
 		youtubeInfo.search_offset = 0;
-		//TODO: Change to new interface
-		interface_getText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
+		
+		list_head *pos;
+		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "hello", "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
+		interface_addToListBox(_T("VIDEO_SEARCH"), NULL, NULL);
+		list_for_each(pos, &youtubeInfo.last_search.list) {
+			strList_t *el = list_entry(pos, strList_t, list);
+			if(el->str) {
+				interface_addToListBox(el->str, NULL, NULL);
+			}
+		}
+		interface_displayMenu(1);
 	}
 	else
 		youtube_runSearch(pMenu);
