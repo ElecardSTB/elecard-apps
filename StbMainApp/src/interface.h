@@ -1702,7 +1702,7 @@ void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFun
                                       int br, int bg, int bb, int ba,
                                       int  r, int  g, int  b, int  a);
 
-void interface_showMessageListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
+void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
                                       int x, int y, int w, int h,
                                       int br, int bg, int bb, int ba,
                                       int  r, int  g, int  b, int  a);
@@ -1813,7 +1813,6 @@ int  interface_getText(interfaceMenu_t *pMenu,
 
 int  interface_listBoxGetText(interfaceMenu_t *pMenu,
                        const char *description,
-			const char *last,
                        const char *pattern,
                        menuEnterTextFunction pCallback,
                        menuEnterTextFieldsFunction pGetFields,

@@ -8777,11 +8777,11 @@ int32_t interface_addToggleMenuEntry(interfaceMenu_t *pMenu, const toggleEntryAr
 	return 0;
 }
 void interface_displayTextListBoxColor( int targetX, int targetY, char *message, const char *icon,
-                                          int fixedWidth, DFBRectangle *resultingBox,
+                                          int fixedWidth,
                                           int fixedHeight, const int *icons,
                                           int br, int bg, int bb, int ba,
                                           int r, int g, int b, int a,
-                                          IDirectFBFont *pFont, int lineOffset, int visibleLines,
+                                          IDirectFBFont *pFont, int lineOffset, int lineShift, int visibleLines,
                                              int lineCount)
 {
 	DFBRectangle rectangle, rect;
@@ -8810,7 +8810,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	}
 
 	maxWidth -= iw;
-
+	maxWidth -= 2*interfaceInfo.paddingSize + INTERFACE_SCROLLBAR_WIDTH;
 	rectangle.x = rectangle.y = rectangle.w = rectangle.h;
 
 	rectangle.w = fixedWidth;
@@ -8967,23 +8967,27 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 		} while ( pos != NULL );
 	}
 	int fh;
-	pgfx_font->GetHeight(pgfx_font, &fh);
+	pFont->GetHeight(pFont, &fh);
 	y += fh;
 
-	for(int i = lineOffset; i < interfaceInfo.messageList.entryCount && i < lineOffset + visibleLines; i++) {
+	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
-			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
+			DFBCHECK( pFont->GetStringExtents(pFont, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
+			int l = getMaxStringLengthForFont(pFont, interfaceInfo.messageList.entry[i].text, maxWidth);
+			char *tmp = calloc(l, sizeof(char));
+			strncpy(tmp, interfaceInfo.messageList.entry[i].text, l);
 			
-			if((i - lineOffset) == interfaceInfo.messageList.scrolling.shift) {
+			if((i - lineOffset) == lineShift) {
 				interface_drawSelectionRectangle0(x, y - interfaceInfo.paddingSize, 
-				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
+				  maxWidth, fh);
 			}
 			
-			gfx_drawText(DRAWING_SURFACE, pgfx_font,
+			gfx_drawText(DRAWING_SURFACE, pFont,
 				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
 				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-				             x, y + rect.h/2 + interfaceInfo.paddingSize, interfaceInfo.messageList.entry[i].text, 0, 0);
+				             x, y + rect.h/2 + interfaceInfo.paddingSize, tmp, 0, 0);
 			y += rect.h;
+			free(tmp);
 		}
 	}
 	
@@ -8992,7 +8996,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 			                           scrollY,
 			                           INTERFACE_SCROLLBAR_WIDTH,
 			                           h - 2*interfaceInfo.paddingSize,
-			                           interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
+			                           lineCount, visibleLines, lineOffset );
 
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 }
@@ -9036,86 +9040,6 @@ int interface_addToListBox(const char *message, menuConfirmFunction pFunc, void 
 
 	return interfaceInfo.messageList.entryCount;
 }
-// void interface_displayCustomScrollingTextBox2( int x, int y, int w, int h,
-//                                               const char *label, const int *icons,
-//                                               int lineOffset, int visibleLines, int lineCount, int icon)
-// {
-// 	DFBRectangle rectangle, rect;
-// 	int fh, i,maxWidth,tx,ty;
-// 	const char *ptr;
-// 	char *pos, tmp = 0;
-// 
-// 	memset(&rectangle, 0, sizeof(DFBRectangle));
-// 
-// 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-// 
-// 	tx = x + interfaceInfo.paddingSize;
-// 	ty = y + interfaceInfo.paddingSize;
-// 	maxWidth = w - 2*interfaceInfo.paddingSize;
-// 	if ( icon > 0 )
-// 	{
-// 		//dprintf("%s: draw icon\n", __FUNCTION__);
-// 		interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icon],
-// 		                    x+interfaceInfo.paddingSize, y+interfaceInfo.paddingSize,
-// 		                    interfaceInfo.thumbnailSize, interfaceInfo.thumbnailSize,
-// 		                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
-// 		tx       += interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
-// 		maxWidth -= interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
-// 	}
-// 
-// 	//dprintf("%s: draw text\n", __FUNCTION__);
-// 	pgfx_font->GetHeight(pgfx_font, &fh);
-// 	ty += fh;
-// 	gfx_drawText(DRAWING_SURFACE, pgfx_font,
-// 				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
-// 				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-// 				             tx, ty + fh/2 + interfaceInfo.paddingSize, label, 0, 0);
-// 	
-// 	ty += 2*fh;
-// 	for(int i = lineOffset; i < interfaceInfo.messageList.entryCount && i < lineOffset + visibleLines; i++) {
-// 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
-// 			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
-// 			
-// 			if((i - lineOffset) == interfaceInfo.messageList.scrolling.shift) {
-// 				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
-// 				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
-// 			}
-// 			
-// 			gfx_drawText(DRAWING_SURFACE, pgfx_font,
-// 				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
-// 				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-// 				             tx, ty + rect.h/2 + interfaceInfo.paddingSize, interfaceInfo.messageList.entry[i].text, 0, 0);
-// 			ty += rect.h;
-// 		}
-// 	}
-// 	IDirectFBSurface *pIcon;
-// 	pIcon = NULL;
-// 	if (icons != NULL)
-// 	{
-// 		//n = (interfaceInfo.messageBox.type == interfaceMessageBoxCallback && interfaceInfo.messageBox.pCallback == interface_enterTextCallback) ? 3 : 2;
-// 		int ix = x + interfaceInfo.paddingSize;
-// 		int iy = y + h - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT;
-// 		for ( i = 0; i < 4; i++)
-// 		{
-// 			if ( icons[i] > 0)
-// 			{
-// 				interface_drawImage(DRAWING_SURFACE, resource_thumbnails[icons[i]],
-// 				                    ix, iy, INTERFACE_STATUSBAR_ICON_WIDTH, INTERFACE_STATUSBAR_ICON_HEIGHT,
-// 				                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL,
-// 				                    interfaceAlignTopLeft, 0, 0);
-// 				ix += INTERFACE_STATUSBAR_ICON_WIDTH + interfaceInfo.paddingSize * 3;
-// 			}
-// 		}
-// 	}
-// 	interface_drawScrollingBar(DRAWING_SURFACE,
-// 				    x + w - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
-// 				    y + interfaceInfo.paddingSize,
-// 				    INTERFACE_SCROLLBAR_WIDTH,
-// 				    h - 2*interfaceInfo.paddingSize,
-// 				    interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
-// 
-// 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
-// }
 
 void interface_displayListBoxColor( int x, int y, int w, int h,
                                              const int *label, const int *icons,
@@ -9164,7 +9088,10 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
 			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
-			
+			int l = getMaxStringLengthForFont(pgfx_font, interfaceInfo.messageList.entry[i].text, maxWidth);
+			char *tmp = calloc(l, sizeof(char));
+			strncpy(tmp, interfaceInfo.messageList.entry[i].text, l);
+
 			if((i - lineOffset) == lineShift) {
 				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
 				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
@@ -9173,13 +9100,13 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 			gfx_drawText(DRAWING_SURFACE, pgfx_font,
 				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
 				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-				             tx, ty + rect.h/2 + interfaceInfo.paddingSize, interfaceInfo.messageList.entry[i].text, 0, 0);
+				             tx, ty + rect.h/2 + interfaceInfo.paddingSize, tmp, 0, 0);
 			ty += rect.h;
+			free(tmp);
 		}
 	}
 	if (icons != NULL)
 	{
-		//n = (interfaceInfo.messageBox.type == interfaceMessageBoxCallback && interfaceInfo.messageBox.pCallback == interface_enterTextCallback) ? 3 : 2;
 		int ix = x + interfaceInfo.paddingSize;
 		int iy = y + h - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT;
 		for ( i = 0; i < 4; i++)
@@ -9225,12 +9152,12 @@ void interface_displayListBox()
 					interfaceInfo.messageList.target.x, interfaceInfo.messageList.target.y,
 					interfaceInfo.messageList.title,
 					interfaceInfo.messageList.icon > 0 ? resource_thumbnails[interfaceInfo.messageList.icon] : NULL,
-					interfaceInfo.messageList.target.w, NULL, interfaceInfo.messageList.target.h, icons,
+					interfaceInfo.messageList.target.w, interfaceInfo.messageList.target.h, icons,
 					interfaceInfo.messageList.colors.border.R, interfaceInfo.messageList.colors.border.G,
 					interfaceInfo.messageList.colors.border.B, interfaceInfo.messageList.colors.border.A,
 					interfaceInfo.messageList.colors.background.R, interfaceInfo.messageList.colors.background.G,
 					interfaceInfo.messageList.colors.background.B, interfaceInfo.messageList.colors.background.A,
-   					pgfx_font, interfaceInfo.messageList.scrolling.offset,
+   					pgfx_font, interfaceInfo.messageList.scrolling.offset,interfaceInfo.messageList.scrolling.shift,
 					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.entryCount);
 			}break;
 			case interfaceMessageList:
@@ -9666,7 +9593,7 @@ static int interface_listBoxEnterTextCallback(interfaceMenu_t *pMenu, pinterface
 	return 1;
 }
 
-int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, const char *last, const char *pattern, menuEnterTextFunction pCallback, menuEnterTextFieldsFunction pGetFields, stb810_inputMode inputMode, void *pArg)
+int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, const char *pattern, menuEnterTextFunction pCallback, menuEnterTextFieldsFunction pGetFields, stb810_inputMode inputMode, void *pArg)
 {
 	int i;
 	interfaceEnterTextInfo_t *info;
