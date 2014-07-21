@@ -2125,7 +2125,7 @@ void interface_updateFusionCreepSurface()
 	DFBRegion region;
 	int dstX, dstY;
 
-	if (!FusionObject.creepline) return;
+	if (!fusion_surface) return;
 	if (FusionObject.creepStartTime <= 0) return;
 
 	FusionObject.deltaTime += 1;
@@ -2138,6 +2138,17 @@ void interface_updateFusionCreepSurface()
 			FusionObject.creepShown = 1;
 			FusionObject.creepStartTime = 0;
 			FusionObject.deltaTime = 0;
+
+			if (!FusionObject.creepline){
+				//eprintf ("%s(%d): All creep is shown. Clear surface.\n", __FUNCTION__, __LINE__);
+				pthread_mutex_lock(&FusionObject.mutexDtmf);
+				if (fusion_surface){
+					int width, height;
+					fusion_surface->GetSize (fusion_surface, &width, &height);
+					gfx_drawRectangle(fusion_surface, 0x0, 0x0, 0x0, 0x0, 0, 0, width, height);
+				}
+				pthread_mutex_unlock(&FusionObject.mutexDtmf);
+			}
 			return;
 		}
 	}
@@ -2165,7 +2176,7 @@ void interface_updateFusionCreepSurface()
 	region.y1 = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
 	region.y2 = interfaceInfo.screenHeight;
 
-	mysem_get(interface_semaphore); // test
+	mysem_get(interface_semaphore);
 
 	pthread_mutex_lock(&FusionObject.mutexDtmf);
 	DFBCHECK (pgfx_frameBuffer->Blit(pgfx_frameBuffer, fusion_surface, &srcRect, dstX, dstY));  // Blit is faster than StretchBlit
@@ -2173,7 +2184,7 @@ void interface_updateFusionCreepSurface()
 
 	DFBCHECK (pgfx_frameBuffer->Flip(pgfx_frameBuffer, &region, DSFLIP_ONSYNC));
 
-	mysem_release(interface_semaphore);	// test
+	mysem_release(interface_semaphore);
 	return;
 }
 #endif

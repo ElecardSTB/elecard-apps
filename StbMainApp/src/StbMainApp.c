@@ -1871,10 +1871,8 @@ void * fusion_threadFlipCreep (void * param)
 {
 	while (1)
 	{
-		if (FusionObject.creepline && strlen(FusionObject.creepline)){
-			interface_updateFusionCreepSurface();
-		}
-		fusion_wait(20);
+		interface_updateFusionCreepSurface();
+		fusion_wait(10);
 	}
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
@@ -1908,10 +1906,11 @@ void * fusion_threadCheckReboot (void * param)
 			double diff = difftime(mktime(&rebootDate), mktime(&nowDate));
 			//eprintf ("%s(%d): diff = %f\n", __FUNCTION__, __LINE__, diff);
 			if ((diff > 0) && (diff <= 60)){
-				eprintf ("%s(%d): remoteTimestamp = %s, localTimestamp = %s, compare res = %d\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer, FusionObject.localFirmwareVer,
-					strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN));
+				//eprintf ("%s(%d): remoteTimestamp = %s, localTimestamp = %s, compare res = %d\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer, FusionObject.localFirmwareVer,
+				//	strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN));
 				eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
 				system ("reboot");
+				break;
 			}
 		}
 	}
@@ -2973,6 +2972,15 @@ int fusion_getCreepAndLogo ()
 			}
 			pthread_mutex_unlock(&FusionObject.mutexDtmf);
 		}
+	}
+	else {
+		//eprintf("%s(%d): No creepline field on playlist.\n", __FUNCTION__, __LINE__);
+		pthread_mutex_lock(&FusionObject.mutexCreep);
+		if (FusionObject.creepline) {
+			free (FusionObject.creepline);
+			FusionObject.creepline = NULL;
+		}
+		pthread_mutex_unlock(&FusionObject.mutexCreep);
 	}
 
 	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
