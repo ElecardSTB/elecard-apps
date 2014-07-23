@@ -243,6 +243,9 @@ static int interface_editDateDisplay (interfaceMenu_t* pMenu, DFBRectangle *rect
 
 static int interface_editTimeDisplay (interfaceMenu_t* pMenu, DFBRectangle *rect, int i);
 
+static void interface_displayListBox(void);
+static void interface_hideListBox(void);
+
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
@@ -9143,7 +9146,7 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 }
 
 
-void interface_displayListBox()
+void interface_displayListBox(void)
 {
 	int *icons = NULL;
 	if ( interfaceInfo.messageList.type != interfaceMessageBoxNone )
@@ -9216,7 +9219,7 @@ static int interface_hideListBoxEvent(void *pArg)
 	return 0;
 }
 
-void interface_hideListBox()
+void interface_hideListBox(void)
 {
 	interface_hideListBoxEvent(NULL);
 }

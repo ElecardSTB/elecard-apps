@@ -872,7 +872,7 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 		youtubeInfo.search_offset = 0;
 		
 		list_head *pos;
-		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "hello", "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
+		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
 		interface_addToListBox(_T("VIDEO_SEARCH"), NULL, NULL);
 		list_for_each(pos, &youtubeInfo.last_search.list) {
 			strList_t *el = list_entry(pos, strList_t, list);
