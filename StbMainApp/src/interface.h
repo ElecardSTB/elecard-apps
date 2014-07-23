@@ -1702,10 +1702,7 @@ void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFun
                                       int br, int bg, int bb, int ba,
                                       int  r, int  g, int  b, int  a);
 
-void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
-                                      int x, int y, int w, int h,
-                                      int br, int bg, int bb, int ba,
-                                      int  r, int  g, int  b, int  a);
+void interface_showListBox(const char *header, menuConfirmFunction pCallback, void *pArg);
 
 /**
  *  @brief Displays message box with poster, scrollable text and custom user input handler

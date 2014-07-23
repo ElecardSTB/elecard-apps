@@ -8803,6 +8803,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	size_t len;
 	char *ptr, *pos, tmp = 0;
 	IDirectFBSurface *pIcon;
+	int headerShift = 0;
 
 	/* fixed width does not include padding - it's size of client area */
 	maxWidth = fixedWidth == 0 ?
@@ -8827,8 +8828,14 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	maxWidth -= 2*interfaceInfo.paddingSize + INTERFACE_SCROLLBAR_WIDTH;
 	rectangle.x = rectangle.y = rectangle.w = rectangle.h;
 
+	if (message[0] != 0)
+	{
+		DFBCHECK( pFont->GetStringExtents(pFont, message, -1, &rect, NULL) );
+		headerShift += (rect.h + interfaceInfo.paddingSize) * ((rect.w / maxWidth) + 1);
+	}
+
 	rectangle.w = fixedWidth;
-	rectangle.h = fixedHeight;
+	rectangle.h = fixedHeight + headerShift;
 	if ( icons != NULL )
 	{
 		rectangle.h += interfaceInfo.paddingSize + INTERFACE_STATUSBAR_ICON_HEIGHT;
@@ -9063,14 +9070,10 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
                                              int r, int g, int b, int a)
 {
 	DFBRectangle rectangle, rect;
-	int fh, i,maxWidth,tx,ty;
-
-	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
-
-	//dprintf("%s: draw box\n", __FUNCTION__);
-	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y, w, h);
-	interface_drawOuterBorder(DRAWING_SURFACE, br, bg, bb, ba,
-	                          x, y, w, h, interfaceInfo.borderWidth, interfaceBorderSideAll);
+	int fh, i,maxWidth,tx,ty, height;
+	int headerShift = 0;
+	size_t len;
+	char *ptr, *pos, tmp = 0;
 
 	memset(&rectangle, 0, sizeof(DFBRectangle));
 
@@ -9078,7 +9081,27 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 
 	tx = x + interfaceInfo.paddingSize;
 	ty = y + interfaceInfo.paddingSize;
-	maxWidth = w - 2*interfaceInfo.paddingSize;
+	maxWidth = w - 3*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH;
+	if ( icon > 0 )
+	{
+		tx       += interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
+		maxWidth -= interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
+	}
+
+	if (label[0] != 0)
+	{
+		DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, (char *)label, -1, &rect, NULL) );
+		headerShift += (rect.h + interfaceInfo.paddingSize) * ((rect.w / maxWidth) + 1);
+	}
+	height = h + headerShift;
+	ty -= headerShift;
+	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_BLEND) );
+
+	//dprintf("%s: draw box\n", __FUNCTION__);
+	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y - headerShift, w, height);
+	interface_drawOuterBorder(DRAWING_SURFACE, br, bg, bb, ba,
+	                          x, y- headerShift, w, height, interfaceInfo.borderWidth, interfaceBorderSideAll);
+
 	if ( icon > 0 )
 	{
 		//dprintf("%s: draw icon\n", __FUNCTION__);
@@ -9086,19 +9109,82 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 		                    x+interfaceInfo.paddingSize, y+interfaceInfo.paddingSize,
 		                    interfaceInfo.thumbnailSize, interfaceInfo.thumbnailSize,
 		                    0, NULL, DSBLIT_BLEND_ALPHACHANNEL, interfaceAlignTopLeft, 0, 0);
-		tx       += interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
-		maxWidth -= interfaceInfo.thumbnailSize + interfaceInfo.paddingSize;
 	}
-
 	//dprintf("%s: draw text\n", __FUNCTION__);
 	pgfx_font->GetHeight(pgfx_font, &fh);
+
+	if (label[0] != 0)
+	{
+		ptr = (char *)label;
+		do
+		{
+			pos = strchr(ptr, '\n');
+			if (pos != NULL)
+			{
+				tmp = *pos;
+				*pos = 0;
+			}
+			len = getMaxStringLengthForFont(pgfx_font, ptr, maxWidth);
+			if (pos != NULL)
+			{
+				*pos = tmp;
+			}
+			if ( pos != NULL )
+			{
+				if ((size_t)(pos-ptr) > len)
+				{
+					pos = &ptr[len];
+					while (pos > ptr && *pos != ' ')
+					{
+						pos--;
+					}
+					if (pos > ptr)
+					{
+						len = pos-ptr;
+						//pos++;
+					} else
+					{
+						pos = &ptr[len];
+					}
+				}
+				tmp = *pos;
+				*pos = 0;
+			} else if (strlen(ptr) > len)
+			{
+				pos = &ptr[len];
+				while (pos > ptr && *pos != ' ')
+				{
+					pos--;
+				}
+				if (pos > ptr)
+				{
+					len = pos-ptr;
+					//pos++;
+				} else
+				{
+					pos = &ptr[len];
+				}
+				tmp = *pos;
+				*pos = 0;
+			}
+			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, ptr, -1, &rect, NULL) );
+
+			gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, 
+				      tx-rect.x, ty-rect.y, ptr, 0, 0);
+			ty += rect.h;
+
+			if ( pos != NULL )
+			{
+				*pos = tmp;
+				ptr = pos+(tmp=='\n' || tmp==' ' ? 1 : 0);
+			} else
+			{
+				ptr += len;
+			}
+			//pos = strchr(ptr, '\n');
+		} while ( pos != NULL );
+	}
 	ty += fh;
-	gfx_drawText(DRAWING_SURFACE, pgfx_font,
-				             INTERFACE_BOOKMARK_RED,  INTERFACE_BOOKMARK_GREEN,
-				             INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA,
-				             tx, ty + fh/2 + interfaceInfo.paddingSize, (const char*)label, 0, 0);
-	
-	ty += 2*fh;
 	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
 			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
@@ -9108,7 +9194,7 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 
 			if((i - lineOffset) == lineShift) {
 				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
-				  maxWidth - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH, fh);
+				  maxWidth, fh);
 			}
 			
 			gfx_drawText(DRAWING_SURFACE, pgfx_font,
@@ -9137,9 +9223,9 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 	}
 	interface_drawScrollingBar(DRAWING_SURFACE,
 				    x + w - interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
-				    y + interfaceInfo.paddingSize,
+				    y + interfaceInfo.paddingSize - headerShift,
 				    INTERFACE_SCROLLBAR_WIDTH,
-				    h - 2*interfaceInfo.paddingSize,
+				    height - 2*interfaceInfo.paddingSize,
 				    interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
 
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
@@ -9234,10 +9320,9 @@ void interface_showTextListBox(const char *text, int icon, menuConfirmFunction p
 
 	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
 
-// 	maxWidth = interfaceInfo.clientWidth - 2*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH;
 	pgfx_font->GetHeight(pgfx_font, &fh);
 
-	interfaceInfo.messageList.scrolling.visibleLines = (interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize - 4*fh) / fh;
+	interfaceInfo.messageList.scrolling.visibleLines = (interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize - 2*fh) / fh;
 	interfaceInfo.messageList.scrolling.maxOffset = 0;
 
 	interfaceInfo.messageList.pCallback = pCallback;
@@ -9664,10 +9749,8 @@ int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, co
 	return interface_listBoxEnterTextCallback(pMenu, &cmd, (void*)info);
 }
 
-void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
-                                      int x, int y, int w, int h,
-                                      int br, int bg, int bb, int ba,
-                                      int  r, int  g, int  b, int  a)
+static void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallback, void *pArg,
+                                      int x, int y, int w, int h)
 {
 	int fh;
 
@@ -9675,7 +9758,7 @@ void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallba
 
 	pgfx_font->GetHeight(pgfx_font, &fh);
 	strncpy(interfaceInfo.messageList.title, header, sizeof(interfaceInfo.messageList.title));
-	interfaceInfo.messageList.scrolling.visibleLines = (h - 2*interfaceInfo.paddingSize - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT - 3*fh) / fh;
+	interfaceInfo.messageList.scrolling.visibleLines = (h - 2*interfaceInfo.paddingSize - interfaceInfo.paddingSize - INTERFACE_STATUSBAR_ICON_HEIGHT) / fh;
 	interfaceInfo.messageList.scrolling.maxOffset = 0;
 	
 	interfaceInfo.messageList.scrolling.offset = 0;
@@ -9683,14 +9766,6 @@ void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallba
 	interfaceInfo.messageList.pCallback = pCallback;
 	interfaceInfo.messageList.pArg = pArg;
 	messageBox_setDefaultColors();
-	interfaceInfo.messageList.colors.background.R = r;
-	interfaceInfo.messageList.colors.background.G = g;
-	interfaceInfo.messageList.colors.background.B = b;
-	interfaceInfo.messageList.colors.background.A = a;
-	interfaceInfo.messageList.colors.border.R = br;
-	interfaceInfo.messageList.colors.border.G = bg;
-	interfaceInfo.messageList.colors.border.B = bb;
-	interfaceInfo.messageList.colors.border.A = ba;
 	interfaceInfo.messageList.target.x = x;
 	interfaceInfo.messageList.target.y = y;
 	interfaceInfo.messageList.target.w = w;
@@ -9708,3 +9783,8 @@ void interface_showListBoxCustom(const char *header, menuConfirmFunction pCallba
 	interface_displayMenu(1);
 }
 
+void interface_showListBox(const char *header, menuConfirmFunction pCallback, void *pArg)
+{
+	 interface_showListBoxCustom(header, pCallback, pArg,
+                                      interfaceInfo.screenWidth/3, interfaceInfo.screenHeight/3, interfaceInfo.screenWidth/3, interfaceInfo.screenHeight/3);
+}
