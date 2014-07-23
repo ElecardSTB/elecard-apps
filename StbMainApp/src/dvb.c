@@ -1085,7 +1085,6 @@ static int32_t dvb_sectionRead(__u32 frequency, struct section_buf *s)
 
 static void dvb_filtersRead(__u32 frequency)
 {
-	dprintf("%s: frequency = %d\n", __func__, frequency);
 	struct list_head *pos;
 	struct list_head *n;
 	struct pollfd *fds;

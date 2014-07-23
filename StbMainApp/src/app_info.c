@@ -141,13 +141,10 @@ int loadAppSettings()
 	int res = 0;
 	char cmd[1024];
 	int i;
-	extern int32_t gdbDebug;
-	extern int32_t gdbBouquet;
 
 	fd = fopen(SETTINGS_FILE, "rb");
 
-	if (fd == NULL)
-	{
+	if(fd == NULL) {
 		eprintf("AppSettings: Failed to open %s for reading\n", SETTINGS_FILE);
 		res = -1;
 		goto set_overrides;
@@ -552,14 +549,12 @@ int loadAppSettings()
 			//dprintf("%s: Analog TV file with channel names %s\n", __FUNCTION__, appControlInfo.tvInfo.channelNamesFile );
 		}
 #endif
-		else if (sscanf(buf, "YOUTUBE_SEARCH_NUM=%d", &appControlInfo.youtubeSearchNumber ) == 1)
-		{
-		}
-		else if (sscanf(buf, "DEBUG=%d", &gdbDebug ) == 1)
-		{
-		}
-		else if (sscanf(buf, "DEBUG_BOUQUET=%d", &gdbBouquet ) == 1)
-		{
+		else if(sscanf(buf, "YOUTUBE_SEARCH_NUM=%d", &appControlInfo.youtubeSearchNumber ) == 1) {
+
+		} else if(sscanf(buf, "DEBUG=%d", &i) == 1) {
+			dbg_setDebug(eDebug_gloabal, i);
+		} else if(sscanf(buf, "DEBUG_BOUQUET=%d", &i) == 1) {
+			dbg_setDebug(eDebug_bouquet, i);
 		}
 	}
 
@@ -891,10 +886,8 @@ int saveAppSettings()
 	fprintf(fd, "ATVCHANNELNAMESFILE=%s\n",         	appControlInfo.tvInfo.channelNamesFile);
 #endif
 	fprintf(fd, "YOUTUBE_SEARCH_NUM=%d\n",           appControlInfo.youtubeSearchNumber);
-	extern int32_t gdbDebug;
-	extern int32_t gdbBouquet;
-	fprintf(fd, "DEBUG=%d\n",         	gdbDebug);
-	fprintf(fd, "DEBUG_BOUQUET=%d\n",   gdbBouquet);
+	fprintf(fd, "DEBUG=%d\n",         dbg_getDebug(eDebug_gloabal));
+	fprintf(fd, "DEBUG_BOUQUET=%d\n", dbg_getDebug(eDebug_bouquet));
 	fclose(fd);
 	rename( SETTINGS_FILE ".tmp", SETTINGS_FILE );
 

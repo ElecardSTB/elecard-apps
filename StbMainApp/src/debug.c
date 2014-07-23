@@ -33,51 +33,58 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
-
-#include "debug.h"
-
-#include "app_info.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <time.h>
 #include <pthread.h>
 #include <poll.h>
 
+#include "debug.h"
+#include "app_info.h"
+#include "helper.h"
+
 /***********************************************
 * LOCAL MACROS                                 *
 ************************************************/
-
 #define MAX_ALLOCS (256)
 #define GDB_PIPE "/tmp/pipe_gdg"
 #define SIZE_BUFFER  256
 
-static pthread_t dbgThread;
-
-#ifdef ALLOC_DEBUG
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
-
-typedef struct _alloc_info_t {
+typedef struct {
 	void *addr;
 	unsigned int present;
 	char source[32];
 } alloc_info_t;
 
 /******************************************************************
-* STATIC DATA                                                     *
+* GLOBAL DATA                                                     *
 *******************************************************************/
 
-static pthread_t dbgThread;
+/******************************************************************
+* STATIC DATA                                                     *
+*******************************************************************/
+#ifdef ALLOC_DEBUG
 static int initialized = 0;
 static alloc_info_t allocs[MAX_ALLOCS];
+#endif //#ifdef ALLOC_DEBUG
+
+static pthread_t dbgThread;
+static int32_t debugGroupValues[eDebug_count] = { [0 ... (eDebug_count - 1)] = 0 };
+
+/******************************************************************
+* STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
+*******************************************************************/
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
-
+#ifdef ALLOC_DEBUG
 static void dbg_cat_alloc(void)
 {
 	int i = 0;
@@ -237,6 +244,13 @@ static void *dbg_thread(void *pArg)
 	while(1) {
 		if(poll(pfd, 1, 1000) > 0) {
 			if(pfd[0].revents & POLLIN) {
+				static const table_IntStr_t debugGroupNames[] = {
+					{eDebug_gloabal, "DEBUG"},
+					{eDebug_bouquet, "BOUQUET"},
+					TABLE_INT_STR_END_VALUE
+				};
+				int32_t i;
+				
 				memset(buff, 0, sizeof(buff));
 				len = read(fd, buff, SIZE_BUFFER);
 				if(len < 0) {
@@ -244,23 +258,30 @@ static void *dbg_thread(void *pArg)
 					continue;
 				}
 				buff[len] = '\0';
-				if (strncasecmp(buff, "?", 1) == 0 ) {
-					printf("Debag help:\n");
-					printf("%s=%d\n",DEBUG_MESSAGE, gdbDebug);
-					printf("%s=%d\n",DEBUG_BOUQUET, gdbBouquet);
-				}
-				else if (strncasecmp(buff, DEBUG_MESSAGE, 5) == 0 ) {
-					sscanf(buff + 6, "%d\n", &gdbDebug);
-					if (gdbDebug) {
-						setoutputlevel(errorLevelDebug);
-					} else {
-						setoutputlevel(errorLevelNormal);
+				if(strncasecmp(buff, "?", 1) == 0 ) {
+					printf("Debug help:\n");
+					for(i = 0; i < eDebug_count; i++) {
+						const char *cmdName = table_IntStrLookup(debugGroupNames, i, NULL);
+						if(cmdName == NULL) {
+							continue;
+						}
+						printf("  %s=%d\n", cmdName, dbg_getDebug(i));
 					}
-					saveAppSettings();
-				}
-				else if (strncasecmp(buff, DEBUG_BOUQUET, 7) == 0 ) {
-					sscanf(buff + 8, "%d\n", &gdbBouquet);
-					saveAppSettings();
+				} else {
+					for(i = 0; i < eDebug_count; i++) {
+						const char *cmdName = table_IntStrLookup(debugGroupNames, i, NULL);
+						size_t len;
+						if(cmdName == NULL) {
+							continue;
+						}
+						len = strlen(cmdName);
+						if(strncasecmp(buff, cmdName, len) == 0) {
+							int32_t tmp;
+							sscanf(buff + len + 1, "%d\n", &tmp);
+							dbg_setDebug(i, tmp);
+							saveAppSettings();
+						}
+					}
 				}
 			}
 		}
@@ -270,12 +291,16 @@ static void *dbg_thread(void *pArg)
 	return NULL;
 }
 
-int  dbg_ThreadInit(void)
+int32_t dbg_init(void)
 {
-	int32_t thread;
-	int32_t dbg_pipe = -1;
-	gdbDebug = 0;
-	gdbBouquet = 0;
+	int32_t dbg_pipe;
+	int32_t i;
+
+	/* By default send all output to stdout, except for error and warning output */
+	for(i = 0; i < errorLevelCount; i++) {
+		setoutput((errorLevel_t)i, (i == errorLevelError || i == errorLevelWarning) ? stderr : stdout);
+	}
+	setoutputlevel(errorLevelNormal);
 
 	unlink(GDB_PIPE);
 	if(mkfifo(GDB_PIPE, 0666) < 0) {
@@ -288,33 +313,52 @@ int  dbg_ThreadInit(void)
 		eprintf("Error in opening file %s\n", GDB_PIPE);
 		return -2;
 	}
-	thread = pthread_create(&dbgThread, NULL, dbg_thread, (void *)dbg_pipe);
-	if(thread != 0) {
+	if(pthread_create(&dbgThread, NULL, dbg_thread, (void *)dbg_pipe) != 0) {
 		eprintf("%s: ERROR not create thread\n", __func__);
 		return -4;
 	}
+
 	return 0;
 }
 
-void dbg_ThreadStop(void)
+int32_t dbg_term(void)
 {
 	if(dbgThread) {
 		pthread_cancel(dbgThread);
 		pthread_join(dbgThread, NULL);
 		dbgThread = 0;
 	}
-}
-
-int dbg_getDebag(char *cmd)
-{
-	if (strcasecmp(cmd, DEBUG_MESSAGE) == 0)
-		return gdbDebug;
-	if (strcasecmp(cmd, DEBUG_BOUQUET) == 0)
-		return gdbBouquet;
 	return 0;
 }
 
-int  dbg_cmdSystem2(const char *cmd, const char *func, int32_t line)
+int32_t dbg_getDebug(debugGroup_t group)
+{
+	if(group >= eDebug_count) {
+		return 0;
+	}
+
+	return debugGroupValues[group];
+}
+
+int32_t dbg_setDebug(debugGroup_t group, int32_t value)
+{
+	if(group >= eDebug_count) {
+		return -1;
+	}
+
+	debugGroupValues[group] = value;
+	if(group == eDebug_gloabal) {
+		if(value) {
+			setoutputlevel(errorLevelDebug);
+		} else {
+			setoutputlevel(errorLevelNormal);
+		}
+	}
+
+	return 0;
+}
+
+int dbg_cmdSystem2(const char *cmd, const char *func, int32_t line)
 {
 	dprintf("%s()[%d]: cmd: '%s'\n", func, line, cmd);
 	return system(cmd);

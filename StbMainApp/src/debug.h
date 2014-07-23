@@ -31,17 +31,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
+#include <stdint.h>
 
 #include "defines.h"
-
 #include <common.h>
 
 /***********************************************
 * EXPORTED MACROS                              *
 ************************************************/
-#define DEBUG_MESSAGE         "DEBUG"
-#define DEBUG_BOUQUET "BOUQUET"
-
 #define dprintf(...)        DPRINT(errorLevelDebug, __VA_ARGS__)
 #define dbg_cmdSystem(cmd)  dbg_cmdSystem2(cmd, __func__, __LINE__)
 
@@ -68,24 +65,34 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 /******************************************************************
+* EXPORTED TYPEDEFS                            [for headers only] *
+*******************************************************************/
+typedef enum {
+	eDebug_gloabal = 0,
+	eDebug_bouquet,
+
+	eDebug_count, //Fake enum for counting debug groups. This shouldnt use outside debug.c!
+} debugGroup_t;
+
+/******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
-
-int32_t gdbDebug;
-int32_t gdbBouquet;
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void *dbg_calloc(size_t nmemb, size_t size, const char *location);
-void *dbg_malloc(size_t size, const char *location);
-void  dbg_free   (void *ptr,  const char *location);
-void *dbg_realloc(void *ptr, size_t size, const char *location);
-int  dbg_ThreadInit(void);
-void  dbg_ThreadStop(void);
-int  dbg_getDebag(char *);
-int  dbg_cmdSystem2(const char *cmd, const char *func, int32_t line);
+void   *dbg_calloc(size_t nmemb, size_t size, const char *location);
+void   *dbg_malloc(size_t size, const char *location);
+void    dbg_free   (void *ptr,  const char *location);
+void   *dbg_realloc(void *ptr, size_t size, const char *location);
+
+int32_t dbg_cmdSystem2(const char *cmd, const char *func, int32_t line);
+
+int32_t dbg_getDebug(debugGroup_t group);
+int32_t dbg_setDebug(debugGroup_t group, int32_t value);
+
+int32_t dbg_init(void);
+int32_t dbg_term(void);
 
 #ifdef __cplusplus
 };

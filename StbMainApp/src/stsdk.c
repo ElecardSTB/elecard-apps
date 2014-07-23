@@ -373,7 +373,7 @@ static void st_poolThreadCleanup(void* pArg)
 		}
 }
 
-static void* st_poolThread(void* pArg)
+static void *st_poolThread(void* pArg)
 {
 	char buf[BUFFER_SIZE];
 	cJSON *msg = NULL;

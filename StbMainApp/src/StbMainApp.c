@@ -3265,7 +3265,7 @@ void cleanup()
 	}
 #endif
 
-	dbg_ThreadStop();
+	dbg_term();
 
 	unlink(APP_LOCK_FILE);
 }
@@ -3474,7 +3474,7 @@ void tprintf(const char *str, ...)
 
 int main(int argc, char *argv[])
 {
-	int restart, i;
+	int restart;
 	FILE *pidfile;
 
 	pidfile = fopen("/var/run/mainapp.pid", "w");
@@ -3483,7 +3483,7 @@ int main(int argc, char *argv[])
 		fclose(pidfile);
 	}
 
-	dbg_ThreadInit();
+	dbg_init();
 	appInfo_init();
 
 #ifdef ENABLE_BROWSER
@@ -3497,16 +3497,6 @@ int main(int argc, char *argv[])
 		smrtsp_play_range_scale(connection, &range, 2.0f);
 	}
 */
-	/* By default send all output to stdout, except for error and warning output */
-	for(i = 0; i < errorLevelCount; i++) {
-		setoutput((errorLevel_t)i, (i == errorLevelError || i == errorLevelWarning) ? stderr : stdout);
-	}
-
-	if(dbg_getDebag("DEBUG")) {
-		setoutputlevel(errorLevelDebug);
-	} else {
-		setoutputlevel(errorLevelNormal);
-	}
 
 	do {
 		restart = 0;
