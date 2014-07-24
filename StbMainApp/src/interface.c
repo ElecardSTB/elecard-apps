@@ -8796,7 +8796,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
                                           int br, int bg, int bb, int ba,
                                           int r, int g, int b, int a,
                                           IDirectFBFont *pFont, int lineOffset, int lineShift, int visibleLines,
-                                             int lineCount)
+                                          int lineCount)
 {
 	DFBRectangle rectangle, rect;
 	int x,y,w,h,iw,ih,maxWidth,n,i,icons_w = 0;
@@ -8995,9 +8995,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
 			DFBCHECK( pFont->GetStringExtents(pFont, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
 			int l = getMaxStringLengthForFont(pFont, interfaceInfo.messageList.entry[i].text, maxWidth);
-			char *tmp = calloc(l, sizeof(char));
-			strncpy(tmp, interfaceInfo.messageList.entry[i].text, l);
-			
+			char *tmp = strndup(interfaceInfo.messageList.entry[i].text, l);
 			if((i - lineOffset) == lineShift) {
 				interface_drawSelectionRectangle0(x, y - interfaceInfo.paddingSize, 
 				  maxWidth, fh);
@@ -9189,9 +9187,7 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
 			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
 			int l = getMaxStringLengthForFont(pgfx_font, interfaceInfo.messageList.entry[i].text, maxWidth);
-			char *tmp = calloc(l, sizeof(char));
-			strncpy(tmp, interfaceInfo.messageList.entry[i].text, l);
-
+			char *tmp = strndup(interfaceInfo.messageList.entry[i].text, l);
 			if((i - lineOffset) == lineShift) {
 				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
 				  maxWidth, fh);
@@ -9310,11 +9306,11 @@ void interface_hideListBox(void)
 	interface_hideListBoxEvent(NULL);
 }
 
-void interface_showTextListBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
+void interface_showTextListBox(const char *header, int icon, menuConfirmFunction pCallback, void *pArg)
 {
 	interface_removeEvent(interface_hideListBoxEvent, (void*)0);
 
-	STRMAXCPY(interfaceInfo.messageList.title, text, MAX_MESSAGE_BOX_LENGTH);	
+	STRMAXCPY(interfaceInfo.messageList.title, header, MAX_MESSAGE_BOX_LENGTH);	
 	
 	int fh;
 
