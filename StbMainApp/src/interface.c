@@ -9324,7 +9324,7 @@ void interface_showTextListBox(const char *header, int icon, menuConfirmFunction
 
 	pgfx_font->GetHeight(pgfx_font, &fh);
 
-	interfaceInfo.messageList.scrolling.visibleLines = (interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize - 2*fh) / fh;
+	interfaceInfo.messageList.scrolling.visibleLines = (interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize - 3*fh) / fh;
 	interfaceInfo.messageList.scrolling.maxOffset = 0;
 
 	interfaceInfo.messageList.pCallback = pCallback;
