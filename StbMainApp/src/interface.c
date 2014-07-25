@@ -5667,6 +5667,7 @@ int interface_showSplash(int x, int y, int w, int h, int animate, int showMenu)
 		imageDesc.flags |= DSDESC_PIXELFORMAT;
 		imageDesc.pixelformat = DSPF_RGB24;
 #endif
+
 		/* Resize image to specified width and height */
 		if ( w != 0 )
 			imageDesc.width = w;
@@ -5680,7 +5681,7 @@ int interface_showSplash(int x, int y, int w, int h, int animate, int showMenu)
 		DFBCHECKLABEL(pImageProvider->RenderTo(pImageProvider,interface_splash, &actualRect), render_error);
 		pImageProvider->Release(pImageProvider);
 	}
-
+#ifndef ENABLE_FUSION
 	frame = 0;
 	do
 	{
@@ -5718,6 +5719,11 @@ int interface_showSplash(int x, int y, int w, int h, int animate, int showMenu)
 	{
 		interface_displayMenu(1);
 	}
+#else
+	DFBCHECK(DRAWING_SURFACE->SetBlittingFlags(DRAWING_SURFACE, DSBLIT_NOFX));
+	DFBCHECK(DRAWING_SURFACE->Blit(DRAWING_SURFACE, interface_splash, NULL, 0, 0));
+	interface_flipSurface();
+#endif
 	return 0;
 
 render_error:

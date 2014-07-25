@@ -2671,7 +2671,7 @@ int fusion_getCreepAndLogo ()
 				eprintf ("%s(%d): Mode ondemand.\n", __FUNCTION__, __LINE__);
 				FusionObject.mode = FUSION_MODE_FILES;
 				snprintf(FusionObject.streamUrl, PATH_MAX, FUSION_STUB);
-				eprintf ("%s(%d): On-demand stub = %s.\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
+				//eprintf ("%s(%d): On-demand stub = %s.\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
 			}
 			else if (strncmp("stream", jsonMode->valuestring, 6) == 0){
 				eprintf ("%s(%d): Mode stream (hls).\n", __FUNCTION__, __LINE__);
