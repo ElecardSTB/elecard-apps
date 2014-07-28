@@ -276,22 +276,28 @@ static fe_delivery_system_t dvbfe_getDelSysFromMedia(EIT_media_config_t *media)
 }
 
 
-int32_t dvbfe_isCurrentDelSys_dvbt2(uint32_t adapter)
+static int32_t dvbfe_updateCurrentDelSys(uint32_t adapter)
 {
-	if(!dvbfe_checkDelSysSupport(adapter, SYS_DVBT2)) {
-		return 0;
+	if(adapter >= MAX_ADAPTER_SUPPORTED) {
+		return -1;
 	}
 
-	if(g_adapterInfo[adapter].fd >= 0) {
-		struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
-		struct dtv_properties cmdseq = { .num = 1, .props = &p, };
-		if(ioctl(g_adapterInfo[adapter].fd, FE_GET_PROPERTY, &cmdseq) == 0) {
-			g_adapterInfo[adapter].state.curDelSys = p.u.data;
-			if(p.u.data == SYS_DVBT2) {
-				return 1;
+	switch(g_adapterInfo[adapter].driverType) {
+		case eTunerDriver_linuxDVBapi:
+			if(g_adapterInfo[adapter].fd >= 0) {
+				struct dtv_property p = { .cmd = DTV_DELIVERY_SYSTEM, };
+				struct dtv_properties cmdseq = { .num = 1, .props = &p, };
+				if(ioctl(g_adapterInfo[adapter].fd, FE_GET_PROPERTY, &cmdseq) == 0) {
+					g_adapterInfo[adapter].state.curDelSys = p.u.data;
+				}
 			}
-		}
+			break;
+		case eTunerDriver_STAPISDK:
+		case eTunerDriver_streamerInput:
+		default:
+			break;
 	}
+
 	return 0;
 }
 
@@ -310,7 +316,7 @@ int32_t dvbfe_fillMediaConfig(uint32_t adapter, uint32_t frequency, EIT_media_co
 			media->dvb_t.centre_frequency = frequency;
 			media->dvb_t.inversion = appControlInfo.dvbtInfo.fe.inversion;
 			media->dvb_t.bandwidth = appControlInfo.dvbtInfo.bandwidth;
-			media->dvb_t.plp_id = appControlInfo.dvbtInfo.plp_id;
+			media->dvb_t.plp_id = 0;
 			media->dvb_t.generation = (curDelSys == SYS_DVBT2) ? 2 : 1;
 			break;
 		case SYS_DVBC_ANNEX_AC:
@@ -1254,6 +1260,39 @@ int32_t dvbfe_setFrontendType(uint32_t adapter, fe_delivery_system_t type)
 			break;
 	}
 	g_adapterInfo[adapter].state.curDelSys = type;
+
+	return 0;
+}
+
+int32_t dvbfe_updateMediaToCurentState(uint32_t adapter, EIT_media_config_t *media)
+{
+	dvbfe_updateCurrentDelSys(adapter);
+	if(g_adapterInfo[adapter].state.curDelSys == SYS_DVBT2) {
+		printf("%s:%s()[%d]: is dvb-t2, plp_id=%d\n", __FILE__, __func__, __LINE__, media->dvb_t.plp_id);
+//		if(media->dvb_t.plp_id == 0) {
+			media->dvb_t.generation = 2;
+//		}
+	}
+	return 0;
+}
+
+int32_t dvbfe_isMultistreamMux(uint32_t adapter, EIT_media_config_t *media)
+{
+	if(g_adapterInfo[adapter].state.curDelSys == SYS_DVBT2) {
+		return 1;
+	}
+	return 0;
+}
+
+int32_t dvbfe_updateMediaToNextStream(uint32_t adapter, EIT_media_config_t *media)
+{
+	if(g_adapterInfo[adapter].state.curDelSys == SYS_DVBT2) {
+		media->dvb_t.plp_id++;
+		if(media->dvb_t.plp_id > 3) {
+			return -1;
+		}
+		return 0;
+	}
 
 	return 0;
 }

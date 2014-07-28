@@ -3704,19 +3704,19 @@ static int  offair_updatePSI(void* pArg)
 	int which = GET_NUMBER(pArg);
 	list_element_t *running_program_map = NULL;
 	int my_channel = appControlInfo.dvbInfo.channel;
+	EIT_service_t *service = current_service();
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if( current_service() == NULL )
-	{
+	if(service == NULL) {
 		eprintf("offair: Can't update PSI: service %d is null\n",appControlInfo.dvbInfo.channel);
 		return -1;
 	}
 
 	//if (appControlInfo.dvbInfo.scanPSI)
 	{
-		dprintf("%s: *** updating PSI [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
-		dvb_scanForPSI( appControlInfo.dvbInfo.adapter, current_service()->media.frequency, &running_program_map );
+		dprintf("%s: *** updating PSI [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
+		dvb_scanForPSI(appControlInfo.dvbInfo.adapter, &(service->media), &running_program_map);
 		dprintf("%s: *** PSI updated ***\n", __FUNCTION__ );
 
 		dprintf("%s: active %d, channel %d/%d\n", __FUNCTION__, appControlInfo.dvbInfo.active, my_channel, appControlInfo.dvbInfo.channel);
@@ -3748,10 +3748,11 @@ static int offair_updateEPG(void* pArg)
 {
 	char desc[BUFFER_SIZE];
 	int my_channel = appControlInfo.dvbInfo.channel;
+	EIT_service_t *service = current_service();
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if(current_service() == NULL) {
+	if(service == NULL) {
 		dprintf("offair: Can't update EPG: service %d is null\n",appControlInfo.dvbInfo.channel);
 		return -1;
 	}
@@ -3765,8 +3766,8 @@ static int offair_updateEPG(void* pArg)
 	if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel) {// can be 0 if we switched from DVB when already updating
 		dprintf("%s: scan for epg\n", __FUNCTION__);
 
-		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(current_service()));
-		dvb_scanForEPG( appControlInfo.dvbInfo.adapter, current_service()->media.frequency );
+		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
+		dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
 		dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
 
 		dprintf("%s: if active\n", __FUNCTION__);
@@ -3775,7 +3776,7 @@ static int offair_updateEPG(void* pArg)
 			dprintf("%s: refresh event\n", __FUNCTION__);
 
 			if(appControlInfo.dvbInfo.active) {
-				offair_getServiceDescription(current_service(),desc,_T("DVB_CHANNELS"));
+				offair_getServiceDescription(service, desc, _T("DVB_CHANNELS"));
 				interface_playControlUpdateDescription(desc);
 				interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
 			}

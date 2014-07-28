@@ -224,7 +224,7 @@ int dvb_frequencyScan(	uint32_t adapter, __u32 frequency,
  *   @param[in]  tuner             Tuner to use
  *   @param[in]  frequency         Frequency to scan
  */
-void dvb_scanForEPG(uint32_t adapter, uint32_t frequency );
+void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media);
 
 /**  @ingroup dvb_instance
  *   @ingroup dvb_service
@@ -233,7 +233,7 @@ void dvb_scanForEPG(uint32_t adapter, uint32_t frequency );
  *   @param[in]  frequency         Frequency to scan
  *   @param[out] out_list          Service list to store PAT+PMT data
  */
-void dvb_scanForPSI(uint32_t adapter, uint32_t frequency, list_element_t **out_list );
+void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t **out_list);
 
 int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service);
 int32_t dvb_getCountOfServices(void);

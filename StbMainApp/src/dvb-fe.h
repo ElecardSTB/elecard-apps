@@ -130,7 +130,10 @@ int32_t dvbfe_getFrontendInfo(uint32_t adapter, struct dvb_frontend_info *fe_inf
 int32_t dvbfe_getDelSysCount(uint32_t adapter);
 int32_t dvbfe_toggleType(uint32_t adapter);
 int32_t dvbfe_checkDelSysSupport(uint32_t adapter, fe_delivery_system_t delSys);
-int32_t dvbfe_isCurrentDelSys_dvbt2(uint32_t adapter);
+
+int32_t dvbfe_updateMediaToCurentState(uint32_t adapter, EIT_media_config_t *media);
+int32_t dvbfe_updateMediaToNextStream(uint32_t adapter, EIT_media_config_t *media);
+int32_t dvbfe_isMultistreamMux(uint32_t adapter, EIT_media_config_t *media);
 
 const char *dvbfe_getTunerTypeName(uint32_t adapter);
 

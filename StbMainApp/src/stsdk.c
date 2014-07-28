@@ -476,18 +476,20 @@ static const char *getModulationName(fe_modulation_t modulation)
 
 void st_setTuneParams(uint32_t adapter, cJSON *params, EIT_media_config_t *media)
 {
+	if(media == NULL) {
+		eprintf("%s(): Wrong argument: media not setted!\n", __func__);
+		return;
+	}
 	cJSON_AddItemToObject(params, "tuner", cJSON_CreateNumber(adapter));
 	switch(dvbfe_getType(adapter)) {
 		case SYS_DVBT:
 		case SYS_DVBT2:
-			cJSON_AddItemToObject(params, "stream",
-				cJSON_CreateNumber( media ? media->dvb_t.plp_id : appControlInfo.dvbtInfo.plp_id ));
-//			cJSON_AddItemToObject(params, "generation",
-//				cJSON_CreateNumber( media ? media->dvb_t.generation : appControlInfo.dvbtInfo.generation ));
+			cJSON_AddItemToObject(params, "stream", cJSON_CreateNumber(media->dvb_t.plp_id));
+//			cJSON_AddItemToObject(params, "generation", cJSON_CreateNumber(media->dvb_t.generation));
 			break;
 		case SYS_DVBC_ANNEX_AC: {
-			fe_modulation_t modulation = media ? media->dvb_c.modulation : appControlInfo.dvbcInfo.modulation;
-			uint32_t symbolRate = media ? media->dvb_c.symbol_rate / 1000 : appControlInfo.dvbcInfo.symbolRate;
+			fe_modulation_t modulation = media->dvb_c.modulation;
+			uint32_t symbolRate = media->dvb_c.symbol_rate / 1000;
 			const char *modName;
 			modName = getModulationName(modulation);
 			if(modName) {
@@ -497,8 +499,8 @@ void st_setTuneParams(uint32_t adapter, cJSON *params, EIT_media_config_t *media
 			break;
 		}
 		case SYS_DVBS: {
-			int32_t vertical = media ? media->dvb_s.polarization == 1 : appControlInfo.dvbsInfo.polarization != 0;
-			uint32_t symbolRate = media ? media->dvb_s.symbol_rate / 1000 : appControlInfo.dvbsInfo.symbolRate;
+			int32_t vertical = media->dvb_s.polarization == 1;
+			uint32_t symbolRate = media->dvb_s.symbol_rate / 1000;
 
 			cJSON_AddItemToObject(params, "symbolrate", cJSON_CreateNumber(symbolRate));
 			if(vertical) {
@@ -508,7 +510,7 @@ void st_setTuneParams(uint32_t adapter, cJSON *params, EIT_media_config_t *media
 		}
 		case SYS_ATSC:
 		case SYS_DVBC_ANNEX_B:{
-			fe_modulation_t modulation = media ? media->atsc.modulation : appControlInfo.atscInfo.modulation;
+			fe_modulation_t modulation = media->atsc.modulation;
 			const char *modName;
 			modName = getModulationName(modulation);
 			if(modName) {
