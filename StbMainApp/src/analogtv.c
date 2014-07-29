@@ -127,7 +127,7 @@ bouquetAnalog_t analogBouquet = {
 
 void analogtv_init(void)
 {
-	if (!helperCheckDirectoryExsists(ANALOGTV_CONFIG_DIR)) {
+	if(!helperCheckDirectoryExsists(ANALOGTV_CONFIG_DIR)) {
 		mkdir(ANALOGTV_CONFIG_DIR, 0777);
 	}
 	// Data cleansing
@@ -363,8 +363,10 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 
 void analogtv_stop(void)
 {
-	offair_stopVideo(screenMain, 1);
-	appControlInfo.tvInfo.active = 0;
+	if(appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV) {
+		offair_stopVideo(screenMain, 1);
+		appControlInfo.tvInfo.active = 0;
+	}
 }
 
 int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
@@ -450,19 +452,15 @@ int32_t analogtv_swapService(int first, int second)
 
 int32_t analogtv_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg)
 {
-	uint32_t i = 0;
-
-	while(changeCallbacks[i].pCallback) {
-		i++;
-		if((i >= ARRAY_SIZE(changeCallbacks))) {
-			return -1;
+	uint32_t i;
+	for(i = 0; i < ARRAY_SIZE(changeCallbacks); i++) {
+		if(changeCallbacks[i].pCallback == NULL) {
+			changeCallbacks[i].pCallback = pCallback;
+			changeCallbacks[i].pArg = pArg;
+			return 0;
 		}
 	}
-	printf("%s[%d] i = %d\n",__func__, __LINE__, i);
-	changeCallbacks[i].pCallback = pCallback;
-	changeCallbacks[i].pArg = pArg;
-
-	return 0;
+	return -1;
 }
 
 int32_t analogtv_changed(void)

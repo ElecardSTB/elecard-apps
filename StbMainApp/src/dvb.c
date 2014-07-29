@@ -3034,13 +3034,13 @@ void dvb_init(void)
 {
 	dprintf("%s: in\n", __FUNCTION__);
 
-	dvbfe_init();
-	dvbChannel_init();
-	bouquet_init();
-
 	mysem_create(&dvb_semaphore);
 	mysem_create(&scan_semaphore);
 	mysem_create(&dvb_filter_semaphore);
+
+	dvbfe_init();
+	dvbChannel_init();
+	bouquet_init();
 
 	dprintf("%s: out\n", __FUNCTION__);
 }
@@ -3053,15 +3053,16 @@ void dvb_terminate(void)
 		dvb_stopDVB(i, 1);
 	}
 
+	bouquet_terminate();
+	dvbChannel_terminate();
+	dvbfe_terminate();
+
 	free_services(&dvb_services);
 
 	mysem_destroy(dvb_semaphore);
 	mysem_destroy(scan_semaphore);
 	mysem_destroy(dvb_filter_semaphore);
 
-	bouquet_terminate();
-	dvbChannel_terminate();
-	dvbfe_terminate();
 }
 
 #ifdef ENABLE_DVB_PVR

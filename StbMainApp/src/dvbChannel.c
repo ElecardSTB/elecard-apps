@@ -635,24 +635,21 @@ static int32_t dvbChannel_initServices(void)
 
 int32_t dvbChannel_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg)
 {
-	uint32_t i = 0;
-	
-	while(changeCallbacks[i].pCallback) {
-		i++;
-		if((i >= ARRAY_SIZE(changeCallbacks))) {
-			return -1;
+	uint32_t i;
+	for(i = 0; i < ARRAY_SIZE(changeCallbacks); i++) {
+		if(changeCallbacks[i].pCallback == NULL) {
+			changeCallbacks[i].pCallback = pCallback;
+			changeCallbacks[i].pArg = pArg;
+			return 0;
 		}
 	}
-	changeCallbacks[i].pCallback = pCallback;
-	changeCallbacks[i].pArg = pArg;
-
-	return 0;
+	return -1;
 }
 
 int32_t dvbChannel_changed(void)
 {
 	uint32_t i = 0;
-	
+
 	while(changeCallbacks[i].pCallback) {
 		changeCallbacks[i].pCallback(changeCallbacks[i].pArg);
 		i++;
@@ -689,7 +686,7 @@ int32_t dvbChannel_clear(void)
 {
 	struct list_head *pos;
 	list_for_each(pos, &g_dvb_channels.orderNoneHead) {
-		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);dbg_printf("\n");
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		dvbChannel_remove(srvIdx);
 	}
 	dvbChannel_changed();
