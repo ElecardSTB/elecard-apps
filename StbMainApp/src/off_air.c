@@ -417,43 +417,42 @@ static void offair_setInfoUpdateTimer(int which, int bEnable)
 
 static int32_t offair_sliderCallback(int32_t id, interfaceCustomSlider_t *info, void *pArg)
 {
-	uint16_t snr, signal;
-	uint32_t ber, uncorrected_blocks;
-	fe_status_t status;
+	tunerState_t state;
 
 	if(id < 0 || info == NULL) {
 		return 3;
 	}
 
-	//dprintf("%s: get info 0x%08X\n", __FUNCTION__, info);
-	status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
+	memset(&state, 0, sizeof(state));
+	dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state);
+	
 	switch(id) {
 	case 0:
 		info->min = 0;
 		info->max = MAX_SIGNAL;
-		info->value = info->max > (signal&SIGNAL_MASK) ? (signal&SIGNAL_MASK) : info->max;
+		info->value = info->max > (state.signal_strength & SIGNAL_MASK) ? (state.signal_strength & SIGNAL_MASK) : info->max;
 		info->steps = 3;
-		sprintf(info->caption, _T("DVB_SIGNAL_INFO"), info->value*100/(info->max-info->min), _T(status == 1 ? "LOCKED" : "NO_LOCK"));
+		sprintf(info->caption, _T("DVB_SIGNAL_INFO"), info->value*100/(info->max-info->min), _T((state.fe_status == FE_HAS_LOCK) ? "LOCKED" : "NO_LOCK"));
 		break;
 	case 1:
 		info->min = 0;
 		info->max = MAX_BER;
-		info->value = status == 1 && info->max > (int)ber ? info->max-(int)ber : info->min;
+		info->value = ((state.fe_status == FE_HAS_LOCK) && (info->max > (int)state.ber)) ? (info->max - (int)state.ber) : info->min;
 		info->steps = 3;
-		sprintf(info->caption, _T("DVB_BER"), info->value*100/(info->max-info->min));
+		sprintf(info->caption, _T("DVB_BER"), info->value * 100 / (info->max - info->min));
 		break;
 	case 2:
 		info->min = 0;
 		info->max = MAX_UNC;
-		info->value = status == 1 && info->max > (int)uncorrected_blocks ? info->max-(int)uncorrected_blocks : info->min;
+		info->value = ((state.fe_status == FE_HAS_LOCK) && (info->max > (int)state.uncorrected_blocks)) ? (info->max - (int)state.uncorrected_blocks) : info->min;
 		info->steps = 1;
-		sprintf(info->caption, _T("DVB_UNCORRECTED"), info->value*100/(info->max-info->min));
+		sprintf(info->caption, _T("DVB_UNCORRECTED"), info->value * 100 / (info->max - info->min));
 		break;
 		/*		case 3:
 		info->min = 0;
 		info->max = 255;
-		info->value = (snr&0xFF) == 0 ? 0xFF : snr&0xFF;
-		sprintf(info->caption, _T("DVB_SNR"), info->value*100/(info->max-info->min));
+		info->value = (state.snr & 0xFF) == 0 ? 0xFF : state.snr & 0xFF;
+		sprintf(info->caption, _T("DVB_SNR"), info->value * 100 / (info->max-info->min));
 		break;*/
 	default:
 		return -1;
@@ -468,31 +467,29 @@ static int offair_infoTimerEvent(void *pArg)
 {
 
 	int tuner = GET_NUMBER(pArg);
-	/*char buf[BUFFER_SIZE];
+// 	char buf[BUFFER_SIZE];
 
-	uint16_t snr, signal;
-	uint32_t ber, uncorrected_blocks;
-	fe_status_t status;*/
 
 	mysem_get(offair_semaphore);
 
-	if (appControlInfo.dvbInfo.active)
-	{
-		if (appControlInfo.dvbInfo.showInfo)
-		{
-			/*status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
+	if(appControlInfo.dvbInfo.active) {
+		if(appControlInfo.dvbInfo.showInfo) {
+/*			tunerState_t state;
+
+			memset(&state, 0, sizeof(state));
+			dvbfe_getSignalInfo(adapter, &state);
 
 			sprintf(buf, _T("DVB_SIGNAL_INFO"),
-				signal&0xFF, ber, uncorrected_blocks, _T(status == 1 ? "LOCKED" : "NO_LOCK") );*/
-	/*
+				signal & 0xFF, state.ber, state.uncorrected_blocks, _T((state.fe_status  & FE_HAS_LOCK) ? "LOCKED" : "NO_LOCK") );
+
 			sprintf(buf, LANG_TEXT_DVB_SIGNAL_INFO "%s",
-				appControlInfo.tunerInfo[tuner].signal_strength,
-				appControlInfo.tunerInfo[tuner].snr,
-				appControlInfo.tunerInfo[tuner].ber,
-				appControlInfo.tunerInfo[tuner].uncorrected_blocks,
-				appControlInfo.tunerInfo[tuner].fe_status & FE_HAS_LOCK ? LANG_TEXT_LOCKED : LANG_TEXT_NO_LOCK);
-	*/
-			//interface_notifyText(buf, 1);
+				state.signal_strength,
+				state.snr,
+				state.ber,
+				state.uncorrected_blocks,
+				(state.fe_status & FE_HAS_LOCK) ? LANG_TEXT_LOCKED : LANG_TEXT_NO_LOCK);
+
+			interface_notifyText(buf, 1);*/
 			interface_customSlider(offair_sliderCallback, pArg, 0, 1);
 		}
 
@@ -1294,8 +1291,6 @@ void offair_displayPlayControl(void)
 		{
 		int adv, color;
 		float value;
-		uint16_t snr, signal;
-		uint32_t ber, uncorrected_blocks;
 		int stepsize;
 		int step;
 		int cindex;
@@ -1306,16 +1301,17 @@ void offair_displayPlayControl(void)
 			{0x00, 0xFF, 0x00, 0xFF},
 			{0x00, 0xFF, 0x00, 0xFF},
 		};
+		tunerState_t state;
 
-		dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
+		memset(&state, 0, sizeof(state));
+		dvbfe_getSignalInfo(adapter, &state);
 
-		signal &= SIGNAL_MASK;
+		state.signal_strength &= SIGNAL_MASK;
 
 		rect.w = w/4;
 
-		value = (float)(signal)/(float)(MAX_SIGNAL);
-		if (value < 1.0f)
-		{
+		value = (float)(state.signal_strength) / (float)(MAX_SIGNAL);
+		if(value < 1.0f) {
 			color = 0xb9;
 			gfx_drawRectangle(DRAWING_SURFACE, color, color, color, 0xFF, rect.x, rect.y, rect.w, rect.h);
 		}
@@ -1326,13 +1322,12 @@ void offair_displayPlayControl(void)
 		clip.h = rect.h;
 
 		/* Leave at least a small part of slider */
-		if (clip.w == 0)
-		{
-			clip.w = rect.w*4/100;
+		if(clip.w == 0) {
+			clip.w = rect.w * 4 / 100;
 		}
 
-		stepsize = (MAX_SIGNAL)/3;
-		step = signal/stepsize;
+		stepsize = (MAX_SIGNAL) / 3;
+		step = state.signal_strength / stepsize;
 
 		cindex = step;
 
@@ -1343,11 +1338,11 @@ void offair_displayPlayControl(void)
 
 		gfx_drawRectangle(DRAWING_SURFACE, colors[cindex][0], colors[cindex][1], colors[cindex][2], colors[cindex][3], rect.x, rect.y, clip.w, clip.h);
 
-		sprintf(buffer, "% 4d%%", signal*100/MAX_SIGNAL);
+		sprintf(buffer, "% 4d%%", state.signal_strength * 100 / MAX_SIGNAL);
 
 		DFBCHECK( pgfx_font->GetStringWidth (pgfx_font, buffer, -1, &adv) );
 
-		color = 0x00; //signal*2/MAX_SIGNAL > 0 ? 0x00 : 0xFF;
+		color = 0x00; //state.signal_strength * 2 / MAX_SIGNAL > 0 ? 0x00 : 0xFF;
 
 		gfx_drawText(DRAWING_SURFACE, pgfx_font, color, color, color, 0xFF, rect.x+rect.w/2-adv/2, rect.y+fa, buffer, 0, 0);
 		}
@@ -3538,13 +3533,11 @@ static int offair_diagnisticsCallback(interfaceMenu_t *pMenu, pinterfaceCommandE
 
 static int offair_checkSignal(int which, list_element_t **pPSI)
 {
-	uint16_t snr, signal;
-	uint32_t ber, uncorrected_blocks;
-	fe_status_t status;
 	list_element_t *running_program_map = NULL;
 	int res = 1;
 	int ccerrors;
 	stb810_signalStatus lastSignalStatus = signalStatusNoStatus;
+	tunerState_t state;
 
 	if(pPSI != NULL) {
 		running_program_map = *pPSI;
@@ -3552,15 +3545,16 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 
 	dprintf("%s: Check signal %d!\n", __FUNCTION__, appControlInfo.dvbInfo.reportedSignalStatus);
 
-	status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
+	memset(&state, 0, sizeof(state));
+	dvbfe_getSignalInfo(adapter, &state);
 
 	ccerrors = phStbSystemManager_GetErrorsStatistics(phStbRpc_MainTMErrorId_DemuxerContinuityCounterMismatch, 1);
 
-	dprintf("%s: Status: %d, ccerrors: %d\n", __FUNCTION__, status, ccerrors);
+	dprintf("%s: Status: %d, ccerrors: %d\n", __FUNCTION__, state.fe_status, ccerrors);
 
-	if(status == 0) {
+	if((state.fe_status & FE_HAS_LOCK) == 0) {
 		lastSignalStatus = signalStatusNoSignal;
-	} else if(signal < BAD_SIGNAL && (uncorrected_blocks > BAD_UNC || ber > BAD_BER)) {
+	} else if((state.signal < BAD_SIGNAL) && (uncorrected_blocks > BAD_UNC || state.ber > BAD_BER)) {
 		lastSignalStatus = signalStatusBadSignal;
 	} else if(running_program_map != NULL) {
 		int has_new_channels = 0;
@@ -3598,29 +3592,22 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 			element = element->next;
 		}
 
-		if (has_new_channels || missing_old_channels)
-		{
+		if(has_new_channels || missing_old_channels) {
 			lastSignalStatus = signalStatusNewServices;
 		}
-	} else if (running_program_map == NULL && pPSI != NULL && uncorrected_blocks == 0)
-	{
+	} else if((running_program_map == NULL) && (pPSI != NULL) && (state.uncorrected_blocks == 0)) {
 		lastSignalStatus = signalStatusNoPSI;
 	}
 
 	// When we're called by 'info' button or we're already showing info
-	if (lastSignalStatus == signalStatusNoStatus && (pPSI == NULL || appControlInfo.dvbInfo.reportedSignalStatus))
-	{
-		if (signal > AVG_SIGNAL && (uncorrected_blocks > BAD_UNC || ber > BAD_BER))
-		{
+	if(lastSignalStatus == signalStatusNoStatus && (pPSI == NULL || appControlInfo.dvbInfo.reportedSignalStatus)) {
+		if((state.signal > AVG_SIGNAL) && (state.uncorrected_blocks > BAD_UNC || state.ber > BAD_BER)) {
 			lastSignalStatus = signalStatusBadQuality;
-		} else if (signal > AVG_SIGNAL && uncorrected_blocks == 0 && ber < BAD_BER && ccerrors > BAD_CC)
-		{
+		} else if((state.signal > AVG_SIGNAL) && (state.uncorrected_blocks == 0 && state.ber < BAD_BER && ccerrors > BAD_CC)) {
 			lastSignalStatus = signalStatusBadCC;
-		} else if (signal < BAD_SIGNAL && uncorrected_blocks == 0 && ber < BAD_BER)
-		{
+		} else if((state.signal < BAD_SIGNAL) && (state.uncorrected_blocks == 0 && state.ber < BAD_BER)) {
 			lastSignalStatus = signalStatusLowSignal;
-		} else
-		{
+		} else {
 			lastSignalStatus = signalStatusNoProblems;
 		}
 	}
@@ -4727,39 +4714,31 @@ static void wizard_displayCallback(interfaceMenu_t *pMenu)
 				static int rating = 5;
 				char tindex[] = "SETTINGS_WIZARD_DIAG_SIGNAL_0";
 
-				if (time(NULL)-lastUpdate > 1)
-				{
-					uint16_t snr, signal;
-					uint32_t ber, uncorrected_blocks;
-					fe_status_t status;
+				if((time(NULL) - lastUpdate) > 1) {
+					tunerState_t state;
 
 					rating = 5;
 					lastUpdate = time(NULL);
 
-					status = dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &snr, &signal, &ber, &uncorrected_blocks);
+					memset(&state, 0, sizeof(state));
+					dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state);
 
-					if (status == 0)
-					{
+					if((state.fe_status & FE_HAS_LOCK) == 0) {
 						rating = min(rating, 1);
 					}
 
-					if (uncorrected_blocks > BAD_UNC)
-					{
+					if(state.uncorrected_blocks > BAD_UNC) {
 						rating = min(rating, 2);
 					}
 
-					if (ber > BAD_BER)
-					{
+					if(state.ber > BAD_BER) {
 						rating = min(rating, 3);
 					}
 
-					if (signal < AVG_SIGNAL)
-					{
+					if(state.signal_strength < AVG_SIGNAL) {
 						rating = min(rating, 4);
 					}
-
-					if (signal < BAD_SIGNAL)
-					{
+					if(state.signal_strength < BAD_SIGNAL) {
 						rating = min(rating, 3);
 					}
 				}

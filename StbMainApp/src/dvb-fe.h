@@ -108,6 +108,14 @@ typedef struct  {
 	stb810_diseqcInfo_t	diseqc;
 } stb810_dvbsInfo;
 
+typedef struct  {
+	fe_status_t  fe_status;
+	uint32_t     ber;
+	uint32_t     uncorrected_blocks;
+	uint16_t     signal_strength;
+	uint16_t     snr;
+} tunerState_t;
+	
 typedef int32_t dvbfe_cancelFunctionDef(void);
 
 /******************************************************************
@@ -171,14 +179,11 @@ int32_t dvbfe_getTuner_freqs(uint32_t adapter, __u32 * low_freq, __u32 * high_fr
  *   @brief Get signal info from specified adapter
  *
  *   @param[in]  adapter    Adapter tuner to be used
- *   @param[out] snr
- *   @param[out] signal
- *   @param[out] ber
- *   @param[out] uncorrected_blocks
+ *   @param[out] state
  *
  *   @return 0 on success
  */
-int32_t dvbfe_getSignalInfo(uint32_t adapter, uint16_t *snr, uint16_t *signal, uint32_t *ber, uint32_t *uncorrected_blocks);
+int32_t dvbfe_getSignalInfo(uint32_t adapter, tunerState_t *state);
 
 int32_t dvbfe_setFrontendType(uint32_t adapter, fe_delivery_system_t type);
 
