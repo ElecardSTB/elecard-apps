@@ -50,17 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED TYPEDEFS                            [for headers only] *
 *******************************************************************/
 typedef struct {
-	struct list_head	orderNoneHead;
-
-    uint32_t		viewedCount;
-    uint32_t		totalCount;
-    serviceSort_t	sortOrderType;
-
-//	uint32_t		initialized;
-} dvb_channels_t;
-
-typedef struct {
-    uint8_t serviceType;
+    uint8_t  serviceType;
 	uint16_t network_id;
 } bouquet_data_t;
 
@@ -68,22 +58,22 @@ typedef struct {
 	uint16_t audio_track;
 	uint16_t visible;
 	uint16_t parent_control;
-	char	 channelsName[MENU_ENTRY_INFO_LENGTH];
+	char     channelsName[MENU_ENTRY_INFO_LENGTH];
 } service_index_data_t;
 
 typedef struct {
-	EIT_common_t	     common;
+	EIT_common_t         common;
 	bouquet_data_t       bouquet_data;
 	uint8_t              flag;
 	service_index_data_t data;
-	EIT_service_t	    *service;
+	EIT_service_t       *service;
 
 	/* First EPG event which fit to current timeline.
 	Updated on each call to offair_initEPGRecordMenu. */
-	list_element_t	    *first_event;
+	list_element_t      *first_event;
 
 	//lists
-	struct list_head	 orderNone;
+	struct list_head     orderNone;
 } service_index_t;
 
 /******************************************************************
@@ -103,7 +93,7 @@ int32_t dvbChannel_hasSchedule(uint32_t serviceNumber);
 int32_t dvbChannel_sort(serviceSort_t sortType);
 int32_t dvbChannel_swapServices(uint32_t first, uint32_t second);
 
-int32_t dvbChannel_hasSchedule( uint32_t channelNumber );
+int32_t dvbChannel_hasSchedule(uint32_t channelNumber);
 
 EIT_service_t *dvbChannel_getService(uint32_t id);
 int32_t dvbChannel_getServiceId(EIT_common_t *header);

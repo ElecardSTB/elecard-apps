@@ -47,6 +47,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * LOCAL TYPEDEFS                               *
 ************************************************/
+typedef struct {
+	struct list_head orderNoneHead;
+
+    uint32_t         viewedCount;
+    uint32_t         totalCount;
+    serviceSort_t    sortOrderType;
+
+//	uint32_t         initialized;
+} dvb_channels_t;
 
 /******************************************************************
 * STATIC DATA                                                     *

@@ -564,20 +564,21 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, ui
 	dprintf("%s(): Adapter=%u scan freq=%u\n", __FUNCTION__, adapter, frequency);
 
 	interfaceCommand_t cmd = helperGetEvent(1);
-	if (cmd == interfaceCommandRed) {
+	if(cmd == interfaceCommandRed) {
 		return -1;
 	}
 	
-	if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) == 0) {
-		interface_refreshMenu(pMenu);
-		output_showDVBMenu(pMenu, NULL);
-		bouquet_addScanChannels();
-
-#ifdef ENABLE_PVR
-		pvr_updateSettings();
-#endif
+	if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) != 0) {
+		return -2;
 	}
 
+	interface_refreshMenu(pMenu);
+	output_showDVBMenu(pMenu, NULL);
+	bouquet_addScanChannels();
+
+#ifdef ENABLE_PVR
+	pvr_updateSettings();
+#endif
 	return 0;
 }
 
@@ -610,8 +611,8 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		if(offair_scanFrequency(pMenu, adapter, frequency) < 0) {
 			interface_hideMessageBox();
 			interface_sliderShow(0, 0);
-			sprintf(buf, _T("Scan was stopped. Found %d channels"), dvb_getNumberOfServices());
-			interface_showMessageBox(buf, thumbnail_info, 5000);
+			sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
+			interface_showMessageBox(buf, thumbnail_warning, 5000);
 			return -1;
 		}
 		interface_sliderShow(0, 0);
@@ -757,7 +758,7 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 		interface_hideMessageBox();
 		interface_sliderShow(0, 0);
 		sprintf(buf, _T("Scan was stopped. Found %d channels"), dvb_getNumberOfServices());
-		interface_showMessageBox(buf, thumbnail_info, 5000);
+		interface_showMessageBox(buf, thumbnail_warning, 5000);
 		return -1;
 	}
 

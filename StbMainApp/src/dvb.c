@@ -967,11 +967,9 @@ static int dvb_sectionParse(struct section_buf *s)
 
 			case 0x40:
 				verbose("%s: NIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
-				if(appControlInfo.dvbCommonInfo.networkScan) {
-					mysem_get(dvb_semaphore);
-					updated = parse_nit(services, (unsigned char *)s->buf, network_id, s->media, &dvb_scan_network);
-					mysem_release(dvb_semaphore);
-				}
+				mysem_get(dvb_semaphore);
+				updated = parse_nit(services, (unsigned char *)s->buf, network_id, s->media, &dvb_scan_network);
+				mysem_release(dvb_semaphore);
 				break;
 
 			case 0x42:
@@ -1446,7 +1444,7 @@ static int32_t dvb_isFrequencyesEqual(uint32_t adapter, uint32_t freq1, uint32_t
 			break;
 		case SYS_DVBS:
 			//for dvb-s frequencies are in KHz
-			range = 1000;//1MHz
+			range = 2000;//1MHz
 			break;
 		default :
 			break;
@@ -1466,7 +1464,9 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 						dvb_displayFunctionDef* pFunction,
 						int save_service_list, dvbfe_cancelFunctionDef* pCancelFunction)
 {
-	int current_frequency_number = 1, max_frequency_number = 0;
+	int current_frequency_number = 1;
+	int max_frequency_number = 0;
+	int ret = 0;
 
 	if(!appControlInfo.dvbCommonInfo.streamerInput) {
 		struct dvb_frontend_info fe_info;
@@ -1494,9 +1494,7 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 		//fill media with current user settings
 		dvbfe_fillMediaConfig(adapter, frequency, &local_media);
 
-		dvb_frequencyScanOne(adapter, &local_media, pFunction, pCancelFunction, 1);
-
-		{
+		if(dvb_frequencyScanOne(adapter, &local_media, pFunction, pCancelFunction, 1) == 0) {
 			list_element_t *tstream_element;
 			NIT_transport_stream_t *tsrtream;
 
@@ -1515,20 +1513,21 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 					} else {
 						if(appControlInfo.dvbCommonInfo.networkScan) {
 							dvb_frequencyScanOne(adapter, &tsrtream->media, pFunction, pCancelFunction, 0);
-	//						max_frequency_number++;
+//							max_frequency_number++;
 						}
 					}
 				}
 				tstream_element = tstream_element->next;
 			}
-		}
-
-		if(save_service_list) {
-			dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+			if(save_service_list) {
+				dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+			}
+		} else {
+			ret = -1;
 		}
 
 		dvbfe_close(adapter);
-		return 0;
+		return ret;
 #endif
 
 		ZERO_SCAN_MESAGE();
@@ -2194,10 +2193,8 @@ int dvb_getNumberOfServices(void)
 	list_element_t *service_element;
 	int serviceCount = 0;
 	mysem_get(dvb_semaphore);
-	for( service_element = dvb_services; service_element != NULL; service_element = service_element->next )
-	{
-		if (dvb_hasMediaNB(service_element->data))
-		{
+	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+		if(dvb_hasMediaNB(service_element->data)) {
 			serviceCount++;
 		}
 	}
@@ -2210,8 +2207,7 @@ int32_t dvb_getCountOfServices(void)
     list_element_t *service_element;
     int serviceCount = 0;
     mysem_get(dvb_semaphore);
-    for( service_element = dvb_services; service_element != NULL; service_element = service_element->next )
-    {
+    for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
         serviceCount++;
     }
     mysem_release(dvb_semaphore);
