@@ -9017,7 +9017,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	}
 	
 	interface_drawScrollingBar(DRAWING_SURFACE,
-			                           x + w - 2*interfaceInfo.paddingSize - INTERFACE_SCROLLBAR_WIDTH,
+			                           x + maxWidth + 2*interfaceInfo.paddingSize,
 			                           scrollY,
 			                           INTERFACE_SCROLLBAR_WIDTH,
 			                           h - 2*interfaceInfo.paddingSize,
