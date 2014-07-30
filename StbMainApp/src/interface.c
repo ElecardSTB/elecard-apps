@@ -9440,9 +9440,9 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 		newchar = 127;
 	} else if (cmd->command == interfaceCommandDown && field->inputMode == inputModeABC)
 	{
-		if(interfaceInfo.messageList.scrolling.shift + interfaceInfo.messageList.scrolling.offset < interfaceInfo.messageList.entryCount/*scrolling.lineCount*/ - 1) {
+		if(interfaceInfo.messageList.scrolling.shift + interfaceInfo.messageList.scrolling.offset < interfaceInfo.messageList.entryCount - 1) {
 			if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
-			  (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount/*scrolling.lineCount*/)) {
+			  (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount)) {
 				interfaceInfo.messageList.scrolling.offset++;
 			}
 			else {
@@ -9547,9 +9547,17 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 #ifdef WCHAR_SUPPORT
 		wchar_t *msg;
 		if ((interfaceInfo.messageList.entryCount > 0) && (interfaceInfo.messageList.entrySelected > 0)) {
-			int cSize = strlen(interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
-			msg = calloc(cSize+1, sizeof(wchar_t));
-			mbstowcs(msg, interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text, cSize);
+			char *str = interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text;
+			int dest_index = 0;
+			int mb_count;
+
+			msg = calloc(strlen(str) + 1, sizeof(wchar_t));
+			while (*str && dest_index < MAX_FIELD_PATTERN_LENGTH &&
+			      (mb_count = utf8_mbtowc((wchar_t *)&msg[dest_index], (unsigned char *)str, strlen(str))) > 0 )
+			{
+				dest_index++;
+				str += mb_count;
+			}
 		}
 		else {
 			msg = wcsdup((const wchar_t *)"");

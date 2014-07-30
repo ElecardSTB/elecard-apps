@@ -1043,7 +1043,7 @@ static int youtube_startVideoSearch(interfaceMenu_t *pMenu, char *value, void* p
 		buf[search_length] = 0;
 		strncpy(youtubeInfo.search, buf, search_length+1);
 
-		youtubeSearchHist_check(youtubeInfo.search);
+		youtubeSearchHist_check(value);
 		youtubeSearchHist_save();
 		youtube_runSearch(pMenu);
 	} else {
