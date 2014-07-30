@@ -7910,6 +7910,15 @@ int interface_getText(interfaceMenu_t *pMenu, const char *description, const cha
 	return interface_enterTextCallback(pMenu, &cmd, (void*)info);
 }
 
+int32_t interface_isGetTextBoxNow(void)
+{
+	if((interfaceInfo.messageBox.type == interfaceMessageBoxCallback)
+	&& (interfaceInfo.messageBox.pCallback == interface_enterTextCallback)) {
+		return 1;
+	}
+	return 0;
+}
+
 int  interface_getMenuEntryCount(interfaceMenu_t *pMenu)
 {
 	return pMenu->menuEntryCount;

@@ -1893,6 +1893,8 @@ int  interface_slideshowControlProcessCommand(pinterfaceCommandEvent_t cmd);
 
 int  interface_getTextBoxMaxLineCount(void);
 
+int32_t interface_isGetTextBoxNow(void);
+
 void interface_flipSurface(void);
 
 void interface_customSlider(customSliderFunction pFunction, void *pArg,
