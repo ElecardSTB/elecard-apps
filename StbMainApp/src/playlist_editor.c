@@ -434,7 +434,8 @@ static int32_t bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 
 static int32_t bouquet_updateBouquetList(interfaceMenu_t *pMenu, void *pArg)
 {
-	typeBouquet_t btype = (typeBouquet_t)pArg;
+	playlistEditorMenuParam_t *pParam = (playlistEditorMenuParam_t *)pArg;
+	typeBouquet_t btype = pParam->type;
 
 	interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 	bouquet_updateNameList(btype, 1);
