@@ -1188,6 +1188,7 @@ int32_t dvbfe_getSignalInfo(uint32_t adapter, tunerState_t *state)
 				ret = -1;
 #endif
 			}
+			break;
 		}
 		case eTunerDriver_STAPISDK: {
 #if (defined STSDK)
@@ -1219,6 +1220,7 @@ int32_t dvbfe_getSignalInfo(uint32_t adapter, tunerState_t *state)
 			}
 			cJSON_Delete(res);
 #endif //#if (defined STSDK)
+			break;
 		}
 		case eTunerDriver_streamerInput:
 		default:
