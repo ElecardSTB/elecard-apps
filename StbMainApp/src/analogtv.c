@@ -101,6 +101,7 @@ static analog_service_t *analogChannelList_getElementVisible(int index);
 static int32_t analogtv_parseConfigFile(void);
 static analog_service_t *analogList_add(struct list_head *listHead);
 static int32_t analogtv_saveConfigFile(void);
+static int32_t analogtv_changed(void);
 
 /******************************************************************
 * STATIC DATA                                                     *
@@ -124,39 +125,35 @@ bouquetAnalog_t analogBouquet = {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
+static void analogtv_cleanList(void)
+{
+	analogBouquet.channelCount = 0;
+	analogBouquet.channelCountVisible = 0;
+	analogChannelList_release();
+	analogtv_changed();
+}
 
 void analogtv_init(void)
 {
 	if(!helperCheckDirectoryExsists(ANALOGTV_CONFIG_DIR)) {
 		mkdir(ANALOGTV_CONFIG_DIR, 0777);
 	}
-	// Data cleansing
-	analogBouquet.channelCount = 0;
-	analogBouquet.channelCountVisible = 0;
-	analogChannelList_release();
+
+	analogtv_cleanList();
 	analogtv_parseConfigFile();
 }
 
 void analogtv_terminate(void)
 {
 	analogtv_stop();
-	analogBouquet.channelCount = 0;
-	analogBouquet.channelCountVisible = 0;
-	analogChannelList_release();
-}
-
-static void analogtv_cleanList(void)
-{
-	analogtv_stop();
-	analogBouquet.channelCount = 0;
-	analogBouquet.channelCountVisible = 0;
-	analogChannelList_release();
+	analogtv_cleanList();
 }
 
 void analogtv_load(void)
 {
+	analogtv_stop();
 	analogtv_cleanList();
-	analogtv_init();
+	analogtv_parseConfigFile();
 }
 
 struct list_head *analogtv_getChannelList(void)
@@ -372,6 +369,8 @@ void analogtv_stop(void)
 int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 {
 	(void)pArg;
+
+	analogtv_stop();
 	analogtv_cleanList();
 	analogtv_saveConfigFile();
 	pMenu->pActivatedAction(pMenu, pMenu->pArg);
@@ -463,9 +462,8 @@ int32_t analogtv_registerCallbackOnChange(changeCallback_t *pCallback, void *pAr
 	return -1;
 }
 
-int32_t analogtv_changed(void)
+static int32_t analogtv_changed(void)
 {
-		printf("%s[%d]\n",__func__, __LINE__);
 	uint32_t i = 0;
 
 	while(changeCallbacks[i].pCallback) {

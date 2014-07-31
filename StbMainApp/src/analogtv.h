@@ -139,7 +139,6 @@ int analogtv_getServiceDescription(uint32_t index, char *buf);
 int  menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index);
 void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 
-int32_t analogtv_changed(void);
 int32_t analogtv_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg);
 
 #else /* ENABLE_ANALOGTV */

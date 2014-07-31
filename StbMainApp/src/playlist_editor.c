@@ -486,29 +486,15 @@ static int32_t playlistEditor_createNewBouquet(interfaceMenu_t *pMenu, char *val
 	}
 	gfx_stopVideoProvider(screenMain, 1, 1);
 
-	if(btype == eBouquet_digital) {
-		if(strList_isExist(bouquet_getNameList(eBouquet_digital), value)) {
-			interface_showMessageBox(_T("PLAYLIST_NAME_EXIST"), thumbnail_loading, 0);
-			if(!bouquet_isDownloaded(btype, value)) {
-				interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-				bouquet_update(btype, value);
-			}
-		} else {
-			bouquet_create(eBouquet_digital, value);
+
+	if(strList_isExist(bouquet_getNameList(btype), value)) {
+		interface_showMessageBox(_T("PLAYLIST_NAME_EXIST"), thumbnail_loading, 0);
+		if(!bouquet_isDownloaded(btype, value)) {
+			interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
+			bouquet_update(btype, value);
 		}
-	} else if(btype == eBouquet_analog) {
-		printf("%s[%d]\n",__func__, __LINE__);
-		if(strList_isExist(bouquet_getNameList(eBouquet_analog), value)) {
-			interface_showMessageBox(_T("PLAYLIST_NAME_EXIST"), thumbnail_loading, 0);
-			if(!bouquet_isDownloaded(btype, value)) {
-				interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
-				bouquet_update(btype, value);
-			}
-		} else {
-			printf("%s[%d]\n",__func__, __LINE__);
-			bouquet_create(eBouquet_analog, value);
-		}
-		analogtv_changed();
+	} else {
+		bouquet_create(btype, value);
 	}
 
 	interface_hideMessageBox();
@@ -589,7 +575,6 @@ static int32_t playlistEditor_setBouquet(interfaceMenu_t *pMenu, playlistEditorM
 			interface_menuActionShowMenu(pMenu, &InterfacePlaylistDigital);
 		} else if(btype == eBouquet_analog) {
 			interface_menuActionShowMenu(pMenu, &InterfacePlaylistAnalog);
-			analogtv_changed();
 		}
 	} else {
 		output_redrawMenu(pMenu);
