@@ -1154,10 +1154,12 @@ static void dvb_filterServices(list_element_t **head)
 
 static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *service)
 {
-	struct section_buf pat_filter;
 	if(service == NULL) {
 		return -1;
 	}
+
+	mysem_get(scan_semaphore);
+	dvb_filtersUnlock();
 
 	if(service->flags & serviceFlagHasPAT) {
 		struct section_buf pmt_filter;
@@ -1171,16 +1173,23 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 		pmt_filter.transport_stream_id = service->common.transport_stream_id;
 		dvb_filterAdd(&pmt_filter);
 	} else {
+		struct section_buf pat_filter;
 		dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services, &service->media); /* PAT */
 		dvb_filterAdd(&pat_filter);
 	}
+/*	if((service->flags & serviceFlagHasSDT) == 0) {
+		struct section_buf sdt_filter;
+		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, &dvb_services, &service->media);
+		dvb_filterAdd(&sdt_filter);
+	}*/
 
 	do {
 		dvb_filtersRead();
 	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
-	mysem_release(scan_semaphore);
+
 	dvb_filtersLock();
 	dvb_filtersFlush();
+	mysem_release(scan_semaphore);
 
 	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 
@@ -1196,8 +1205,8 @@ static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_
 	struct section_buf eit_filter;
 	struct section_buf nit_filter;
 
-	dvb_filtersUnlock();
 	mysem_get(scan_semaphore);
+	dvb_filtersUnlock();
 
 	/**
 	*  filter timeouts > min repetition rates specified in ETR211
@@ -1234,9 +1243,10 @@ static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_
 	do {
 		dvb_filtersRead();
 	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
-	mysem_release(scan_semaphore);
-	dvb_filtersLock();
+
 	dvb_filtersFlush();
+	dvb_filtersLock();
+	mysem_release(scan_semaphore);
 
 	//dvb_filterServices(&dvb_services);
 }
@@ -1269,9 +1279,7 @@ void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media)
 	struct section_buf eit_filter;
 	int counter = 0;
 
-	if(!dvbfe_isLinuxAdapter(adapter)) {
-		dvb_filtersUnlock();
-	}
+	dvb_filtersUnlock();
 
 	dvb_filterSetup(&eit_filter, adapter, 0x12, -1, 2, &dvb_services, media); /* EIT */
 	eit_filter.running_counter = &counter;
@@ -1284,6 +1292,8 @@ void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media)
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((eit_filter.start_time == 0) || (counter > 0));
 	//dvb_filterServices(&dvb_services);
+
+	dvb_filtersLock();
 
 	if(eit_filter.was_updated) {
 		/* Write the channel list to the root file system */
@@ -1299,6 +1309,7 @@ void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t 
 	if(out_list == NULL) {
 		out_list = &dvb_services;
 	}
+	dvb_filtersUnlock();
 
 	dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 2, out_list, media); /* PAT */
 	pat_filter.running_counter = &counter;
@@ -1310,6 +1321,8 @@ void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t 
 		//dprintf("DVB: pat %d, counter %d\n", pat_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((pat_filter.start_time == 0) || (counter > 0));
+
+	dvb_filtersLock();
 
 	//dvb_filterServices(out_list);
 }
