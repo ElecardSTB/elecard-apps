@@ -1467,7 +1467,7 @@ int32_t bouquet_update(typeBouquet_t btype, const char *name)
 		if(!bouquet_isDownloaded(eBouquet_digital, name)) {
 			rename(bouqueteDir_temp, bouqueteDir);
 		} else {
-			snprintf(cmd, sizeof(cmd), "rm -r %s_temp/", bouqueteDir);
+			snprintf(cmd, sizeof(cmd), "rm -rf %s_temp/", bouqueteDir);
 		}
 		dbg_cmdSystem(cmd);
 	} else if(btype == eBouquet_analog) {

@@ -564,6 +564,7 @@ static int32_t playlistEditor_setBouquet(interfaceMenu_t *pMenu, playlistEditorM
 {
 	const char *newBouquetName;
 	int32_t number;
+	int32_t forceReload = 0;
 	typeBouquet_t btype = pParam->type;
 
 	number = interface_getSelectedItem(pMenu) - 4; //TODO: remove number
@@ -580,9 +581,10 @@ static int32_t playlistEditor_setBouquet(interfaceMenu_t *pMenu, playlistEditorM
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		bouquet_update(btype, newBouquetName);
 		interface_hideMessageBox();
+		forceReload = 1;
 	}
 
-	if(bouquet_open(btype, newBouquetName, 0) == 0) {
+	if(bouquet_open(btype, newBouquetName, forceReload) == 0) {
 		if(btype == eBouquet_digital) {
 			interface_menuActionShowMenu(pMenu, &InterfacePlaylistDigital);
 		} else if(btype == eBouquet_analog) {
