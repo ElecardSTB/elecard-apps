@@ -74,15 +74,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
 *******************************************************************/
-
-typedef struct
-{
+typedef struct {
 	char video_id[YOUTUBE_ID_LENGTH];
 	char thumbnail[YOUTUBE_THUMBNAIL_SIZE];
 } youtubeVideo_t;
 
-typedef struct
-{
+typedef struct {
 	char search[MAX_FIELD_PATTERN_LENGTH]; /**< Search request in readable form. If empty, standard feed is used. */
 	youtubeVideo_t videos[YOUTUBE_MAX_LINKS];
 	char current_id[YOUTUBE_ID_LENGTH];
@@ -91,22 +88,20 @@ typedef struct
 	size_t search_offset;/** Current page of search results */
 	bool youtube_canceled;
 	int last_selected;
-	strList_t last_search;
+	struct list_head last_search;
 
 	pthread_t search_thread;
 } youtubeInfo_t;
 
 #ifdef ENABLE_EXPAT
-typedef enum
-{
+typedef enum {
 	parseStart = 0,
 	parseFeed,
 	parseEntry,
 	parseMediaGroup,
 } parser_state_t;
 
-typedef struct
-{
+typedef struct {
 	parser_state_t state;
 	char   title[MENU_ENTRY_INFO_LENGTH];
 	size_t title_offset;
@@ -738,7 +733,7 @@ void youtube_buildMenu(interfaceMenu_t* pParent)
 #endif
 		0 };
 
-	youtubeInfo.last_search.list = LIST_HEAD_INIT(youtubeInfo.last_search.list);
+	INIT_LIST_HEAD(&youtubeInfo.last_search);
 
 	createListMenu(&YoutubeMenu, "YouTube", thumbnail_youtube, youtube_icons, pParent,
 		interfaceListMenuIconThumbnail, youtube_fillFirstMenu, youtube_exitMenu, SET_NUMBER(1));
@@ -866,19 +861,20 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 	youtubeInfo.search_offset = GET_NUMBER(pArg);
 	youtubeInfo.last_selected = 0;
 
-	if (youtubeInfo.search_offset == YOUTUBE_NEW_SEARCH)
-	{
+	if(youtubeInfo.search_offset == YOUTUBE_NEW_SEARCH) {
+		int32_t i;
+		const char *str;
+
 		youtubeSearchHist_load();
 		youtubeInfo.search_offset = 0;
-		
-		list_head *pos;
+
 		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
 		interface_addToListBox(_T("VIDEO_SEARCH"), NULL, NULL);
-		list_for_each(pos, &youtubeInfo.last_search.list) {
-			strList_t *el = list_entry(pos, strList_t, list);
-			if(el->str) {
-				interface_addToListBox(el->str, NULL, NULL);
-			}
+
+		i = 0;
+		while((str = strList_get(&youtubeInfo.last_search, i)) != NULL) {
+			interface_addToListBox(str, NULL, NULL);
+			i++;
 		}
 		interface_displayMenu(1);
 	}
@@ -890,23 +886,20 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 
 static char *youtube_getLastSearch(int index, void* pArg)
 {
-	if (index == 0)
-	{
+	if(index == 0) {
 		static char last_search[sizeof(youtubeInfo.search)];
 		int search_length;
 
 		search_length = utf8_uritomb(youtubeInfo.search, strlen(youtubeInfo.search), last_search, sizeof(last_search)-1 );
-		if (search_length < 0)
-		{
+		if(search_length < 0) {
 			return youtubeInfo.search;
-		}
-		else
-		{
+		} else {
 			last_search[search_length] = 0;
 			return last_search;
 		}
-	} else
+	} else {
 		return NULL;
+	}
 }
 
 static void youtube_MenuVideoSearchThreadTerm(void* pArg)
@@ -966,18 +959,19 @@ static void youtube_runSearch(void *pArg)
 static int youtubeSearchHist_load()
 {
 	FILE *fd = fopen(YOUTUBE_SEARCH_FILE, "r");
-	strList_release(&youtubeInfo.last_search.list);
+	strList_release(&youtubeInfo.last_search);
 	if(fd != NULL) {
 		int i = 0;
 		while(!feof(fd)) {
 			char buf[MAX_FIELD_PATTERN_LENGTH];
 			if(fgets(buf, sizeof(buf), fd) != NULL) {
 				char *str = cutEnterInStr(buf);
-				strList_add(&youtubeInfo.last_search.list, str);
+				strList_add(&youtubeInfo.last_search, str);
 				free(str);
 				i++;
-				if(i == appControlInfo.youtubeSearchNumber)
+				if(i == appControlInfo.youtubeSearchNumber) {
 					break;
+				}
 			}
 		}
 		fclose(fd);
@@ -986,36 +980,39 @@ static int youtubeSearchHist_load()
 
 static int youtubeSearchHist_save()
 {
-	int fd = open(YOUTUBE_SEARCH_FILE, O_WRONLY | O_CREAT | O_TRUNC);
+	const char *str;
+	int32_t i;
+	int32_t fd;
+	
+	fd = open(YOUTUBE_SEARCH_FILE, O_WRONLY | O_CREAT | O_TRUNC);
 	if(fd == NULL) {
 		eprintf("File with searches can't open!\n");
 		return -1;
 	}
-	list_head *pos;
-	list_for_each(pos, &youtubeInfo.last_search.list) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		if(el->str) {
-			write(fd, el->str, strlen(el->str));
-			write(fd, "\n", 1);
-		}
+
+	i = 0;
+	while((str = strList_get(&youtubeInfo.last_search, i)) != NULL) {
+		write(fd, str, strlen(str));
+		write(fd, "\n", 1);
+		i++;
 	}
 
 	close(fd);
-	strList_release(&youtubeInfo.last_search.list);
+	strList_release(&youtubeInfo.last_search);
 	return 0;
 }
 
 static int youtubeSearchHist_check(char* search)
 {
-	int newSearchIndex = strList_find(&youtubeInfo.last_search.list, search);
+	int newSearchIndex = strList_find(&youtubeInfo.last_search, search);
 	if(newSearchIndex == -1) {
-		if(strList_count(&youtubeInfo.last_search.list) == appControlInfo.youtubeSearchNumber) {
-			strList_remove_last(&youtubeInfo.last_search.list);
+		if(strList_count(&youtubeInfo.last_search) == appControlInfo.youtubeSearchNumber) {
+			strList_remove_last(&youtubeInfo.last_search);
 		}
-		strList_add_head(&youtubeInfo.last_search.list, search);
+		strList_add_head(&youtubeInfo.last_search, search);
 	} else if(newSearchIndex >= 0) {
-		strList_remove(&youtubeInfo.last_search.list, search);
-		strList_add_head(&youtubeInfo.last_search.list, search);
+		strList_remove(&youtubeInfo.last_search, search);
+		strList_add_head(&youtubeInfo.last_search, search);
 	}
 	return 0;
 }
