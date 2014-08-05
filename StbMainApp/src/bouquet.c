@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "analogtv.h"
 #include "list.h"
 #include "md5.h"
+#include "server.h"
 
 #include "stsdk.h"
 #include <cJSON.h>
@@ -365,66 +366,6 @@ static void bouquet_loadFromFile(typeBouquet_t type, const char *bouquetName)
 
 }
 
-static int32_t bouquet_getServerWorkDir(char *buf, size_t bufsize)
-{
-	getParam(GARB_CONFIG, "SERVER_DIR", "-spool/input", buf);
-	return 0;
-}
-
-static int32_t bouquet_runSftpBatchFile(const char *fileName)
-{
-	char serverName[16];
-	char loginName[32];
-	char cmd[1024];
-	int32_t ret;
-
-	if(!(helperFileExists(GARB_DIR "/.ssh/id_rsa") && helperFileExists(GARB_DIR "/.ssh/id_rsa.pub"))) {
-		eprintf("%s(): No garb private or public key!!!\n", __func__);
-		return -1;
-	}
-	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
-	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
-
-	snprintf(cmd, sizeof(cmd), "sftp -b %s -i " GARB_DIR "/.ssh/id_rsa %s@%s", fileName, loginName, serverName);
-	ret = dbg_cmdSystem(cmd);
-
-	return WEXITSTATUS(ret);
-}
-
-static int32_t bouquet_copyServer(int32_t isFrom, const char *from, const char *to)
-{
-	char serverName[16];
-	char serverDir[256];
-	char loginName[32];
-	char cmd[1024];
-	char *fmt;
-	int32_t ret;
-
-	bouquet_getServerWorkDir(serverDir, sizeof(serverDir));
-	getParam(GARB_CONFIG, "SERVER_USER", "", loginName);
-	getParam(GARB_CONFIG, "SERVER_IP", "", serverName);
-
-	if(isFrom) {
-		fmt = "scp -i " GARB_DIR "/.ssh/id_rsa -r %s@%s:%s/%s %s";
-	} else {
-		fmt = "scp -i " GARB_DIR "/.ssh/id_rsa -r %s %s@%s:%s/%s";
-	}
-	snprintf(cmd, sizeof(cmd), fmt, loginName, serverName, serverDir, from, to);
-	ret = dbg_cmdSystem(cmd);
-
-	return WEXITSTATUS(ret);
-}
-
-int32_t bouquet_copyFromServer(const char *remoteFile, const char *localFile)
-{
-	return bouquet_copyServer(1, remoteFile, localFile);
-}
-
-int32_t bouquet_copyToServer(const char *localFile, const char *dest)
-{
-	return bouquet_copyServer(0, localFile, dest);
-}
-
 static int32_t bouquet_uploadDigitalBouquet(const char *curBouquetName)
 {
 	char *tmpFile;
@@ -440,7 +381,7 @@ static int32_t bouquet_uploadDigitalBouquet(const char *curBouquetName)
 		FILE *fd;
 
 		remove(tmpFile);
-		bouquet_copyFromServer("../bouquet/" BOUQUET_CONFIG_FILE, tmpFile);
+		server_get("../bouquet/" BOUQUET_CONFIG_FILE, tmpFile);
 
 		fd = fopen(tmpFile, "a");
 		if(fd == NULL) {
@@ -453,7 +394,7 @@ static int32_t bouquet_uploadDigitalBouquet(const char *curBouquetName)
 
 	{//Make batch file for scp
 		FILE *fd;
-		char serverDir[256];
+		const char *serverDir;
 
 		fd = fopen(TMP_BATCH_FILE, "w");
 		if(fd == NULL) {
@@ -461,7 +402,7 @@ static int32_t bouquet_uploadDigitalBouquet(const char *curBouquetName)
 			return 1;
 		}
 
-		bouquet_getServerWorkDir(serverDir, sizeof(serverDir));
+		serverDir = server_getWorkDir();
 
 		fprintf(fd, "-mkdir %s/../bouquet/%s.STB/\n", serverDir, curBouquetName);
 		fprintf(fd, "put %s/%s/* %s/../bouquet/%s.STB/\n", BOUQUET_CONFIG_DIR, curBouquetName, serverDir, curBouquetName);
@@ -469,7 +410,7 @@ static int32_t bouquet_uploadDigitalBouquet(const char *curBouquetName)
 		fclose(fd);
 	}
 
-	ret = bouquet_runSftpBatchFile(TMP_BATCH_FILE);
+	ret = server_runSFTPBatchFile(TMP_BATCH_FILE);
 
 	remove(tmpFile);
 	remove(TMP_BATCH_FILE);
@@ -489,7 +430,7 @@ static int32_t bouquet_uploadAnalogBouquet(const char *bouquetName)
 
 	{//Make batch file for scp
 		FILE *fd;
-		char serverDir[256];
+		const char *serverDir;
 
 		fd = fopen(TMP_BATCH_FILE, "w");
 		if(fd == NULL) {
@@ -497,13 +438,13 @@ static int32_t bouquet_uploadAnalogBouquet(const char *bouquetName)
 			return 1;
 		}
 
-		bouquet_getServerWorkDir(serverDir, sizeof(serverDir));
+		serverDir = server_getWorkDir();
 
 		fprintf(fd, "-mkdir %s/../analog\n", serverDir);
 		fprintf(fd, "put %s/analog.%s.json %s/../analog/analog.%s.json", BOUQUET_CONFIG_DIR_ANALOG, bouquetName, serverDir, bouquetName);
 		fclose(fd);
 	}
-	ret = bouquet_runSftpBatchFile(TMP_BATCH_FILE);
+	ret = server_runSFTPBatchFile(TMP_BATCH_FILE);
 	remove(TMP_BATCH_FILE);
 
 	return ret;
@@ -1043,7 +984,7 @@ int32_t bouquet_updateNameList(typeBouquet_t btype, int32_t download)
 		char *tmpFile = "/tmp/" BOUQUET_CONFIG_FILE;
 		
 		remove(tmpFile);
-		bouquet_copyFromServer(serverPath, tmpFile);
+		server_get(serverPath, tmpFile);
 		bouquet_parseNameListFile(btype, tmpFile);
 	}
 	bouquet_parseNameListFile(btype, defaultListFile);
@@ -1457,11 +1398,11 @@ int32_t bouquet_update(typeBouquet_t btype, const char *name)
 		rename(bouqueteDir, bouqueteDir_temp);
 
 		snprintf(from, sizeof(from), "../bouquet/%s.STB", name);
-		bouquet_copyFromServer(from, bouqueteDir);
+		server_get(from, bouqueteDir);
 
 		if(!bouquet_isDownloaded(eBouquet_digital, name)) {
 			snprintf(from, sizeof(from), "../bouquet/%s", name);
-			bouquet_copyFromServer(from, bouqueteDir);
+			server_get(from, bouqueteDir);
 		}
 
 		if(!bouquet_isDownloaded(eBouquet_digital, name)) {
@@ -1476,7 +1417,7 @@ int32_t bouquet_update(typeBouquet_t btype, const char *name)
 
 		snprintf(from, sizeof(from), "../analog/analog.%s.json", name);
 		snprintf(to, sizeof(to), BOUQUET_CONFIG_DIR_ANALOG "/analog.%s.json", name);
-		bouquet_copyFromServer(from, to);
+		server_get(from, to);
 	} else {
 		return -2;
 	}
