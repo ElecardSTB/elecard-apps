@@ -54,6 +54,7 @@ CASH_IN=Пополнить баланс
 CHANGE_HIGHLIGHT_COLOR=Сменить цвет подсветки активного элемента
 CHANGE_LANGUAGE_CONFIRM=Для смены языка требуется перезагрузка\nприложения. Продолжить?
 CHANNEL=Телеканал
+CHANNEL_NEW_NAME=Новое имя
 CHANNEL_NUMBER=Номер канала
 CHILDRENS=Детские
 CHOOSE_GENRE=Выберите жанр

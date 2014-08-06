@@ -24,7 +24,7 @@
 typedef struct {
 	uint32_t frequency;
 	//analog_service_t *service_index;
-	service_index_data_t data;
+	service_index_data_t  data;
 	struct list_head      list;
 } playListEditorAnalog_t;
 
@@ -672,9 +672,9 @@ int32_t playlistEditor_enterIntoAnalog(interfaceMenu_t *interfaceMenu, void *pAr
 	playlistEditor_fillAnalog(interfaceMenu, pArg);
 	needRefillAnalog = 0;
 
-	if((appControlInfo.dvbInfo.channel >= 0) && (appControlInfo.dvbInfo.channel < interface_getMenuEntryCount(interfaceMenu))) {
+/*	if((appControlInfo.dvbInfo.channel >= 0) && (appControlInfo.dvbInfo.channel < interface_getMenuEntryCount(interfaceMenu))) {
 		interface_setSelectedItem(interfaceMenu, appControlInfo.dvbInfo.channel);
-	}
+	}*/
 	return 0;
 }
 
@@ -900,7 +900,7 @@ static char* interface_getChannelCaption(int32_t dummy, void* pArg)
 {
 	(void)dummy;
 	char * ptr = strstr(output_getSelectedNamePlaylistEditor(), ". ");
-	if (ptr) {
+	if(ptr) {
 		ptr += 2;
 		return ptr;
 	}
@@ -984,7 +984,7 @@ static void playlistEditor_moveElement(typeBouquet_t index, int32_t elementId, i
 	}
 }
 
-static int32_t interface_switchMenuEntryCustom(interfaceMenu_t *pMenu, int32_t srcId, int32_t move)
+static int32_t interface_moveMenuEntry(interfaceMenu_t *pMenu, int32_t srcId, int32_t move)
 {
 	if(move == 0) {
 		return 0;
@@ -1047,7 +1047,7 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 					TABLE_INT_INT_END_VALUE
 				};
 
-				if(interface_switchMenuEntryCustom(pMenu, pMenu->selectedItem, table_IntIntLookup(moves, cmd->command, 0)) != 0) {
+				if(interface_moveMenuEntry(pMenu, pMenu->selectedItem, table_IntIntLookup(moves, cmd->command, 0)) != 0) {
 					return 1;
 				}
 				pParam->isChanged = 1;
@@ -1059,15 +1059,36 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 			default:
 				return 0;
 		}
-	} else {
-		if(cmd->command == interfaceCommandYellow) {
-			interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
-			return 0;
-		}
 	}
 
 	if(cmd->command == interfaceCommandGreen) {
 		playlistEditor_save(pMenu->pArg);
+		return 0;
+	} else if(cmd->command == interfaceCommandYellow) {//edit name
+		if(pParam->type == eBouquet_digital) {
+			interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
+		} else if(pParam->type == eBouquet_analog) {
+			if(!analogNames_isExist()) {
+				interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
+				analogNames_download();
+				interface_hideMessageBox();
+			}
+			if(analogNames_isExist()) {
+				int32_t i = 0;
+				const char *str;
+
+				analogNames_load();
+				interface_addToListBox(_T("CHANNEL_NEW_NAME"));
+
+				while((str = strList_get(analogNames_getList(), i)) != NULL) {
+					interface_addToListBox(str);
+					i++;
+				}
+				interface_listBoxGetText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
+			} else {
+				interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
+			}
+		}
 		return 0;
 	} else if(cmd->command == interfaceCommandRight) {
 		int32_t n = pMenu->selectedItem;
@@ -1124,6 +1145,7 @@ int32_t playlistEditor_init(void)
 	createListMenu(&InterfacePlaylistEditorAnalog, _T("PLAYLIST_EDITOR"), settings_interface, playlistEditor_icons, _M &InterfacePlaylistAnalog,
 		interfaceListMenuIconThumbnail, playlistEditor_enterIntoAnalog, playlistEditor_onExit, (void *)&playlistEditorMenu_analogParam);
 
+	//trick for early handle command
 	InterfacePlaylistEditorDigital.baseMenu.processCommand = playlistEditor_processCommand;
 	InterfacePlaylistEditorAnalog.baseMenu.processCommand = playlistEditor_processCommand;
 

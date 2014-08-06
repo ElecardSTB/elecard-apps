@@ -6,7 +6,6 @@
 *******************************************************************/
 #include <stdint.h>
 #include "interface.h"
-#include "bouquet.h"
 
 /******************************************************************
 * EXPORTED DATA                                [for headers only] *

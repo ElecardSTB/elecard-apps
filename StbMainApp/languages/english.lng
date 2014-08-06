@@ -54,6 +54,7 @@ CASH_IN_DESC_FORMAT=Transfer Money to Account %s\n Through 'Mobile Wallet' Syste
 CHANGE_HIGHLIGHT_COLOR=Change Highlight Color
 CHANGE_LANGUAGE_CONFIRM=Application Restart is Required for Language\nChange. Do You Want to Continue?
 CHANNEL=Channel
+CHANNEL_NEW_NAME=New name
 CHANNEL_NUMBER=Channel Number
 CHILDRENS=Children's Programmes
 CHOOSE_GENRE=Choose Genre
