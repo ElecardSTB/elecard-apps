@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gfx.h"
 #include "off_air.h"
 #include "helper.h"
+#include "server.h"
 
 #include <cJSON.h>
 #include <sys/stat.h>
@@ -58,12 +59,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define verbose(...)
 #define debug(...)
 
-#define PERROR(fmt, ...)		eprintf(fmt " (%s)\n", ##__VA_ARGS__, strerror(errno))
+#define PERROR(fmt, ...)        eprintf(fmt " (%s)\n", ##__VA_ARGS__, strerror(errno))
 
-#define FILE_PERMS				(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define FILE_PERMS              (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 
-#define ANALOGTV_CONFIG_DIR        CONFIG_DIR "/analog"
-#define ANALOGTV_UNDEF			"UNDEF"
+#define ANALOGTV_CONFIG_DIR     CONFIG_DIR "/analog"
+#define ANALOGTV_UNDEF          "UNDEF"
 
 #define MAX_SERVICE_COUNT 2048
 
@@ -103,6 +104,8 @@ static analog_service_t *analogList_add(struct list_head *listHead);
 static int32_t analogtv_saveConfigFile(void);
 static int32_t analogtv_changed(void);
 
+static int32_t analogNames_release(void);
+
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
@@ -117,6 +120,7 @@ bouquetAnalog_t analogBouquet = {
 	.channelCountVisible  = 0,
 	.channelList          = LIST_HEAD_INIT(analogBouquet.channelList),
 };
+static struct list_head analogChannelsNamesHead = LIST_HEAD_INIT(analogChannelsNamesHead);
 
 /******************************************************************
 * FUNCTION DECLARATION                     <Module>[_<Word>+]  *
@@ -147,6 +151,8 @@ void analogtv_terminate(void)
 {
 	analogtv_stop();
 	analogtv_cleanList();
+
+	analogNames_release();
 }
 
 void analogtv_load(void)
@@ -287,7 +293,7 @@ int32_t analogtv_findOnFrequency(uint32_t frequency)
 		if(element == NULL ) {
 			continue;
 		}
-		if (element->frequency == frequency) {
+		if(element->frequency == frequency) {
 			return i;
 		}
 		i++;
@@ -522,7 +528,7 @@ int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 				offair_setChannel(appControlInfo.offairInfo.previousChannel, SET_NUMBER(screenMain));
 			}
 			return 0;
-	/*	case interfaceCommandGreen:
+/*		case interfaceCommandGreen:
 			if(services_edit_able) {
 				analogtv_fillFullServList();
 				if(full_service_count > 0) {
@@ -765,5 +771,69 @@ analog_service_t *analogList_add(struct list_head *listHead)
 	list_add_tail(&(new_element->channelList), listHead);
 	return new_element;
 }
+
+int32_t analogNames_isExist(void)
+{
+	if(!list_empty(&analogChannelsNamesHead)) {
+		return 1;
+	}
+	return helperFileExists(ANALOGTV_CONFIG_DIR "/tvchannels.txt");
+}
+
+int32_t analogNames_download(void)
+{
+	if(server_get("../channels/tvchannels.txt", ANALOGTV_CONFIG_DIR "/tvchannels.txt") != 0) {
+		if(server_get("../analog/tvchannels.txt", ANALOGTV_CONFIG_DIR "/tvchannels.txt") != 0) {
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int32_t analogNames_load(void)
+{
+	if(!list_empty(&analogChannelsNamesHead)) {
+		return 0;
+	}
+	FILE *fd = fopen(ANALOGTV_CONFIG_DIR "/tvchannels.txt", "r");
+	if(fd != NULL) {
+		int i = 0;
+		while(!feof(fd)) {
+			char buf[256];
+			int32_t id;
+ 			if(fgets(buf, sizeof(buf), fd) != NULL) {
+				 char *name;
+				 id = atoi(buf);
+				 name = strchr(buf, '\t');
+				 if(name) {
+					name++;
+					stripEnterInStr(name);
+				 } else {
+					name = "-";
+				 }
+// dbg_printf("id=%d, name=%s\n", id, name);
+				strList_add(&analogChannelsNamesHead, name);
+				i++;
+			}
+		}
+		dbg_printf("i=%d\n", i);
+		fclose(fd);
+	} else {
+		eprintf("%s(): Cant open file " ANALOGTV_CONFIG_DIR "/tvchannels.txt: %m\n", __func__);
+	}
+	return 0;
+}
+
+int32_t analogNames_release(void)
+{
+	strList_release(&analogChannelsNamesHead);
+	return 0;
+}
+
+struct list_head *analogNames_getList(void)
+{
+	return &analogChannelsNamesHead;
+}
+
 
 #endif /* ENABLE_ANALOGTV */
