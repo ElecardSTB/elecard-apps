@@ -148,7 +148,7 @@ static void *youtube_MenuVideoSearchThread(void* pArg);
 static void youtube_runSearch(void* pArg);
 static int youtubeSearchHist_save();
 static int youtubeSearchHist_load();
-static int youtubeSearchHist_check(char* search);
+static int youtubeSearchHist_add(char* search);
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -868,18 +868,18 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 		youtubeSearchHist_load();
 		youtubeInfo.search_offset = 0;
 
-		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
-		interface_addToListBox(_T("VIDEO_SEARCH"), NULL, NULL);
+		interface_addToListBox(_T("VIDEO_SEARCH"));
 
 		i = 0;
 		while((str = strList_get(&youtubeInfo.last_search, i)) != NULL) {
-			interface_addToListBox(str, NULL, NULL);
+			interface_addToListBox(str);
 			i++;
 		}
-		interface_displayMenu(1);
-	}
-	else
+		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
+//		interface_displayMenu(1);
+	} else {
 		youtube_runSearch(pMenu);
+	}
 
 	return 0;
 }
@@ -1002,7 +1002,7 @@ static int youtubeSearchHist_save()
 	return 0;
 }
 
-static int youtubeSearchHist_check(char* search)
+static int youtubeSearchHist_add(char* search)
 {
 	int newSearchIndex = strList_find(&youtubeInfo.last_search, search);
 	if(newSearchIndex == -1) {
@@ -1040,7 +1040,7 @@ static int youtube_startVideoSearch(interfaceMenu_t *pMenu, char *value, void* p
 		buf[search_length] = 0;
 		strncpy(youtubeInfo.search, buf, search_length+1);
 
-		youtubeSearchHist_check(value);
+		youtubeSearchHist_add(value);
 		youtubeSearchHist_save();
 		youtube_runSearch(pMenu);
 	} else {

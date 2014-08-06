@@ -3598,18 +3598,6 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		{
 			interface_hideMessageBox();
 		}
-	} else if ( interfaceInfo.messageList.type == interfaceMessageListCallback )
-	{
-		if (cmd->command == interfaceCommandYellow && cmd != &mycmd && appControlInfo.inputMode == inputModeABC)
-		{
-			interfaceInfo.keypad.enable = !interfaceInfo.keypad.enable;
-			interfaceInfo.keypad.shift = 0;
-			interface_displayMenu(1);
-		} else if (interfaceInfo.messageList.pCallback == NULL ||
-			interfaceInfo.messageList.pCallback(interfaceInfo.currentMenu, cmd, interfaceInfo.messageList.pArg) == 0)
-		{
-			interface_hideListBox();
-		}
 	} else
 	if ( interfaceInfo.messageBox.type == interfaceMessageBoxScrolling || 
 	     interfaceInfo.messageBox.type == interfaceMessageBoxPoster)
@@ -3658,6 +3646,18 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 				default:
 					interface_hideMessageBox();
 			}
+		}
+	} else if ( interfaceInfo.messageList.type == interfaceMessageListCallback )
+	{
+		if (cmd->command == interfaceCommandYellow && cmd != &mycmd && appControlInfo.inputMode == inputModeABC)
+		{
+			interfaceInfo.keypad.enable = !interfaceInfo.keypad.enable;
+			interfaceInfo.keypad.shift = 0;
+			interface_displayMenu(1);
+		} else if (interfaceInfo.messageList.pCallback == NULL ||
+			interfaceInfo.messageList.pCallback(interfaceInfo.currentMenu, cmd, interfaceInfo.messageList.pArg) == 0)
+		{
+			interface_hideListBox();
 		}
 	} else if ( interfaceInfo.messageList.type == interfaceMessageList)
 	{
@@ -3730,11 +3730,6 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 				case interfaceCommandEnter:
 				case interfaceCommandGreen:
 					{
-						if((interfaceInfo.messageList.entrySelected >= 0) &&
-						  (interfaceInfo.messageList.entrySelected < interfaceInfo.messageList.entryCount) && 
-						  (interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].pCallback != NULL)) {
-							interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].pCallback(interfaceInfo.currentMenu, cmd, interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
-						}
 						interface_hideListBox();
 					}
 					break;
@@ -7515,27 +7510,23 @@ static int interface_enterTextGetPatternCount(interfaceEnterTextInfo_t* field, i
 {
 	int patternCount = 0;
 	int patternLength = 0;
-	int i, j;
+	size_t i;
+	int j;
 	char tmpbuf[16];
 
-	for (i=0; i<(int)strlen(field->pattern); i++)
-	{
-		if (field->pattern[i] == '\\')
-		{
-			if (patternCount == field->currentPattern)
-			{
-				i+=2;
-				if (field->pattern[i] == '{')
-				{
+	for(i = 0; i < strlen(field->pattern); i++) {
+		if(field->pattern[i] == '\\') {
+			if(patternCount == field->currentPattern) {
+				i += 2;
+				if(field->pattern[i] == '{') {
 					/* Got fixed length pattern */
 					j = i+1;
 					/* Find out length */
-					for (;field->pattern[i] != '}';i++);
+					for(; field->pattern[i] != '}'; i++);
 					memset(tmpbuf, 0, sizeof(tmpbuf));
 					strncpy(tmpbuf, &field->pattern[j], i-j);
 					patternLength = atoi(tmpbuf);
-				} else
-				{
+				} else {
 					/* Variable length pattern */
 					patternLength = 0;
 				}
@@ -7543,10 +7534,12 @@ static int interface_enterTextGetPatternCount(interfaceEnterTextInfo_t* field, i
 			patternCount++;
 		}
 	}
-	if ( ppatternCount  != NULL )
+	if(ppatternCount  != NULL) {
 		*ppatternCount  = patternCount;
-	if ( ppatternLength != NULL )
+	}
+	if(ppatternLength != NULL) {
 		*ppatternLength = patternLength;
+	}
 	return patternCount;
 }
 
@@ -9045,7 +9038,7 @@ int interface_setListCapacity(int newCapacity)
 		return -2;
 	}
 	interfaceMessageListEntry_t *newEntries = realloc(interfaceInfo.messageList.entry, newCapacity*sizeof(interfaceMessageListEntry_t));
-	if (!newEntries) {
+	if(!newEntries) {
 		eprintf("%s: can't change capacity from %d to %d\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity, newCapacity);
 		return -1;
 	}
@@ -9054,21 +9047,20 @@ int interface_setListCapacity(int newCapacity)
 	return newCapacity;
 }
 
-int interface_addToListBox(const char *message, menuConfirmFunction pFunc, void *pArg)
+int interface_addToListBox(const char *message)
 {
-	if (interfaceInfo.messageList.entryCount == interfaceInfo.messageList.entryCapacity &&
-	    interface_setListCapacity(interfaceInfo.messageList.entryCapacity + MENU_CAPACITY_INCREMENT) < 0)
-	  return -1;
+	if((interfaceInfo.messageList.entryCount == interfaceInfo.messageList.entryCapacity)
+	&& (interface_setListCapacity(interfaceInfo.messageList.entryCapacity + MENU_CAPACITY_INCREMENT) < 0)) {
+		return -1;
+	}
 
 	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].text = strdup(message);
-	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pArg = pArg;
-
-	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pCallback = pFunc;
+// 	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pArg = pArg;
+// 	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pCallback = pFunc;
 
 	interfaceInfo.messageList.entryCount++;
 	interfaceInfo.messageList.scrolling.maxOffset = interfaceInfo.messageList.entryCount - interfaceInfo.messageList.scrolling.visibleLines;
-	if ( interfaceInfo.messageList.scrolling.maxOffset < 0 )
-	{
+	if(interfaceInfo.messageList.scrolling.maxOffset < 0) {
 		interfaceInfo.messageList.scrolling.maxOffset = 0;
 	}
 
@@ -9296,12 +9288,12 @@ void interface_displayListBox(void)
 static int interface_hideListBoxEvent(void *pArg)
 {
 	//dprintf("interface: hide messagebox\n");
-	if ( interfaceInfo.messageList.type != interfaceMessageBoxNone )
-	{
+	if(interfaceInfo.messageList.type != interfaceMessageBoxNone) {
+		int32_t i;
 		//dprintf("interface: do hide messagebox\n");
 		interface_removeEvent(interface_hideListBoxEvent, pArg);
 		interfaceInfo.messageList.type = interfaceMessageBoxNone;
-		for(int i = 0; i < interfaceInfo.messageList.entryCount; i++) {
+		for(i = 0; i < interfaceInfo.messageList.entryCount; i++) {
 			if(interfaceInfo.messageList.entry[i].text != NULL) {
 				free(interfaceInfo.messageList.entry[i].text);
 			}
@@ -9567,8 +9559,7 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 				dest_index++;
 				str += mb_count;
 			}
-		}
-		else {
+		} else {
 			msg = wcsdup((const wchar_t *)"");
 		}
 		size = wcslen(msg);
@@ -9576,14 +9567,13 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 		char *msg;
 		if ((interfaceInfo.messageList.entryCount > 0) && (interfaceInfo.messageList.entrySelected > 0)) {
 			msg = strdup(interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
-		}
-		else {
+		} else {
 			msg = strdup("");
 		}
 		size = strlen(msg);
 #endif
 		interface_clearFieldText(field);
-		for(int i = 0; i < size; i++){
+		for(int i = 0; i < size; i++) {
 			field->subPatterns[field->currentPattern].data[i] = msg[i];
 			field->currentSymbol = size;
 		}
@@ -9763,7 +9753,7 @@ int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, co
 	cmd.repeat = 0;
 	cmd.source = DID_KEYBOARD;
 	
-	interface_clearFieldText(info);
+//	interface_clearFieldText(info);
 
 	return interface_listBoxEnterTextCallback(pMenu, &cmd, (void*)info);
 }

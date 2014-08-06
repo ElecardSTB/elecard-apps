@@ -809,19 +809,17 @@ typedef struct
 	void *pArg;
 } interfaceMessageBox_t;
 
-typedef struct
-{
+typedef struct {
 	char  *text;
 	/** If type is interfaceMessageBoxCallback then return value 0 closes message box.
 	 * If type is interfaceMessageBoxScrolling then return value 0 mean command was processed by callback,
 	 * non-zero mean to execute default action (scroll or close)
 	 */
-	menuConfirmFunction       pCallback;
-	void *pArg;
+// 	menuConfirmFunction       pCallback;
+// 	void *pArg;
 } interfaceMessageListEntry_t;
 
-typedef struct
-{
+typedef struct {
 	interfaceMessageBoxType_t type;
 	int   icon;
 	char  title[MENU_ENTRY_INFO_LENGTH];
@@ -830,15 +828,13 @@ typedef struct
 	int entryCount;
 	int entryCapacity;
 	interfaceMessageListEntry_t *entry;
-	struct
-	{
+	struct {
 		interfaceColor_t title;
 		interfaceColor_t text;
 		interfaceColor_t border;
 		interfaceColor_t background;
 	} colors;
-	struct
-	{
+	struct {
 		int shift;
 		int   offset; // index of first visible line
 		int   maxOffset;
@@ -1142,7 +1138,7 @@ void smartLineTrim(char *string, int length);
 int  interface_formatTextWW(const char *text, IDirectFBFont *font,
                             int maxWidth, int maxHeight, int dest_size,
                             char *dest, int *lineCount, int *visibleLines);
-int interface_addToListBox(const char *message, menuConfirmFunction pFunc, void *pArg);
+int interface_addToListBox(const char *message);
 /* Interface primitives */
 
 /**
