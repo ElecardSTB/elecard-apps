@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "teletext.h"
 #include "pvr.h"
 #include "stsdk.h"
+#include "helper.h"
 #ifdef STB225
 #include "Stb225.h"
 #endif
@@ -9425,52 +9426,103 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 	} else if (cmd->command == interfaceCommandLeft)
 	{
 		posdiff = -1;
-	} else if (cmd->command == interfaceCommandUp && field->inputMode == inputModeABC)
-	{	
-		if(interfaceInfo.messageList.scrolling.shift > 0) {
-			if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
-			  (interfaceInfo.messageList.scrolling.offset > 0)) {
-				interfaceInfo.messageList.scrolling.offset--;
-			}
-			else {
-				interfaceInfo.messageList.scrolling.shift--;
-			}
-			interfaceInfo.messageList.entrySelected--;
+	} else if((field->inputMode == inputModeABC)
+			&& (   (cmd->command == interfaceCommandUp)
+				|| (cmd->command == interfaceCommandPageUp)
+				|| (cmd->command == interfaceCommandDown)
+				|| (cmd->command == interfaceCommandPageDown)
+				))
+	{//List navigation
+		int32_t positionChanged = 0;
+		int32_t newPosition = 0;
+		int32_t visibleLines = interfaceInfo.messageList.scrolling.visibleLines; //reduce code
+
+		table_IntInt_t listMoves[] = {
+			{interfaceCommandUp,      -1},
+			{interfaceCommandPageUp,  -visibleLines},
+			{interfaceCommandDown,     1},
+			{interfaceCommandPageDown, visibleLines},
+			TABLE_INT_INT_END_VALUE
+		};
+
+		switch(cmd->command) {
+			case interfaceCommandUp:
+			case interfaceCommandPageUp:
+				if(interfaceInfo.messageList.entrySelected > 0) {
+					newPosition = interfaceInfo.messageList.entrySelected + table_IntIntLookup(listMoves, cmd->command, 0);
+					if(newPosition < 0) {
+						newPosition = 0;
+					}
+					positionChanged = 1;
+				}
+				break;
+			case interfaceCommandDown:
+			case interfaceCommandPageDown:
+				if(interfaceInfo.messageList.entrySelected < (interfaceInfo.messageList.entryCount - 1)) {
+					newPosition = interfaceInfo.messageList.entrySelected + table_IntIntLookup(listMoves, cmd->command, 0);
+					if(newPosition >= interfaceInfo.messageList.entryCount) {
+						newPosition = interfaceInfo.messageList.entryCount - 1;
+					}
+					positionChanged = 1;
+				}
+				break;
+			default:
+				break;
 		}
-		clear = 1;
-		newchar = 127;
-	} else if (cmd->command == interfaceCommandDown && field->inputMode == inputModeABC)
-	{
-		if(interfaceInfo.messageList.scrolling.shift + interfaceInfo.messageList.scrolling.offset < interfaceInfo.messageList.entryCount - 1) {
-			if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
-			  (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount)) {
-				interfaceInfo.messageList.scrolling.offset++;
+		if(positionChanged) {
+//			int32_t visibleBorderItems = (int32_t)(((float)visibleLines + 0.5) / 2.0);
+			int32_t visibleBorderItems = (visibleLines - 1) / 2;
+//			int32_t visibleBorderItems = 2;
+			int32_t windowOffset       = interfaceInfo.messageList.scrolling.offset;
+			int32_t unshiftItemTop     = windowOffset + visibleBorderItems;
+			int32_t unshiftItemBottom  = windowOffset + visibleLines - visibleBorderItems - 1;
+
+			/* List Box example, visibleLines = 7, visibleBorderItems = 2
+			  * 
+			  * -----------
+			  * | n       |   <- windowOffset
+			  * | n+1     |
+			  * -----------
+			  * | n+2     |   <- unshiftItemTop
+			  * | n+3     |
+			  * | n+4     |   <- unshiftItemBottom
+			  * -----------
+			  * | n+5     |
+			  * | n+6     |
+			  * -----------
+			  * */
+
+			if(newPosition < visibleBorderItems) {//at begin of list
+				windowOffset = 0;
+			} else if(newPosition >= (interfaceInfo.messageList.entryCount - visibleBorderItems - 1)) {//at end of list
+				windowOffset = interfaceInfo.messageList.entryCount - visibleLines;
+			} else if(newPosition < unshiftItemTop) {
+				windowOffset = newPosition - visibleBorderItems;
+			} else if(newPosition > unshiftItemBottom) {
+				windowOffset = newPosition - (visibleLines - visibleBorderItems - 1);
 			}
-			else {
-				interfaceInfo.messageList.scrolling.shift++;
-			}
-			interfaceInfo.messageList.entrySelected++;
+
+			interfaceInfo.messageList.scrolling.offset = windowOffset;
+			interfaceInfo.messageList.scrolling.shift = newPosition - windowOffset;
+			interfaceInfo.messageList.entrySelected = newPosition;
+			clear = 1;
+			newchar = 127;
 		}
-		clear = 1;
-		newchar = 127;
-	} else if (cmd->command == 127)
-	{
+	} else if(cmd->command == 127) {
 		newchar = 127; // delete
-	}else if (cmd->command == 8 || cmd->command == interfaceCommandBlue
+	} else if(cmd->command == 8 || cmd->command == interfaceCommandBlue
 #if (defined STB225)
 	        || cmd->command == interfaceCommandBack
 #endif
 	          )
 	{
 		newchar = 8;// backspace
-	} else if (cmd->source != DID_KEYBOARD &&
-	          (cmd->original < interfaceCommand0 ||
-	           cmd->original > interfaceCommand9) )
+	} else if((cmd->source != DID_KEYBOARD)
+			&& ((cmd->original < interfaceCommand0) || (cmd->original > interfaceCommand9)))
 	{
 		dprintf("%s: skip\n", __FUNCTION__);
 		newchar = 0; // deny non-digit input from not keyboard
-	} else if (cmd->command == interfaceCommandNone)
-	{
+	} else if(cmd->command == interfaceCommandNone) {
 #ifdef WCHAR_SUPPORT
 		field->currentSymbol = wcslen(field->subPatterns[field->currentPattern].data);
 #else
@@ -9484,8 +9536,7 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 #endif
 	{
 		newchar = cmd->command;
-	} else
-	{
+	} else {
 		return 1;
 	}
 

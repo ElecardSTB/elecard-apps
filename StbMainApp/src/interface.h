@@ -835,7 +835,7 @@ typedef struct {
 		interfaceColor_t background;
 	} colors;
 	struct {
-		int shift;
+		int   shift;
 		int   offset; // index of first visible line
 		int   maxOffset;
 		int   visibleLines;
