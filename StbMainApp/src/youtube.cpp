@@ -965,9 +965,8 @@ static int youtubeSearchHist_load()
 		while(!feof(fd)) {
 			char buf[MAX_FIELD_PATTERN_LENGTH];
 			if(fgets(buf, sizeof(buf), fd) != NULL) {
-				char *str = cutEnterInStr(buf);
-				strList_add(&youtubeInfo.last_search, str);
-				free(str);
+				stripEnterInStr(buf);
+				strList_add(&youtubeInfo.last_search, buf);
 				i++;
 				if(i == appControlInfo.youtubeSearchNumber) {
 					break;

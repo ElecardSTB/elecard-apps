@@ -186,21 +186,22 @@ int32_t setParam(const char *path, const char *param, const char *value)
 	return 0;
 }
 
-char *cutEnterInStr(const char *str) {
+int32_t stripEnterInStr(const char *str)
+{
+	char *ch;
 	if(!str) {
 		eprintf("%s(): Wrong argument!\n", __func__);
-		return NULL;
+		return -1;
 	}
-	char *strRes = strdup(str);
-	char *ch;
-	if((ch = strchr(strRes, '\r')) != NULL) {
+
+	if((ch = strchr(str, '\r')) != NULL) {
 		ch[0] = '\0';
 	}
-	if((ch = strchr(strRes, '\n')) != NULL) {
+	if((ch = strchr(str, '\n')) != NULL) {
 		ch[0] = '\0';
 	}
 
-	return strRes;
+	return 0;
 }
 
 const char *table_IntStrLookup(const table_IntStr_t table[], int32_t key, char *defaultValue)

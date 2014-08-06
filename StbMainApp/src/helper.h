@@ -68,7 +68,7 @@ int32_t	table_IntIntLookup(const table_IntInt_t table[], int32_t key, int32_t de
 int32_t	table_IntIntLookupR(const table_IntInt_t table[], int32_t value, int32_t defaultValue);
 
 //Cut "Enters" from string
-char * cutEnterInStr(const char *str);
+int32_t	stripEnterInStr(const char *str);
 
 //String list API
 int32_t strList_add        (struct list_head *listHead, const char *str);
