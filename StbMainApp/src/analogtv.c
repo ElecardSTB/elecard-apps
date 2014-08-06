@@ -802,21 +802,21 @@ int32_t analogNames_load(void)
 			char buf[256];
 			int32_t id;
  			if(fgets(buf, sizeof(buf), fd) != NULL) {
-				 char *name;
-				 id = atoi(buf);
-				 name = strchr(buf, '\t');
-				 if(name) {
+				char *name;
+				id = atoi(buf);
+				(void)id;
+				name = strchr(buf, '\t');
+				if(name == NULL) {
+					name = strchr(buf, ' ');
+				}
+				if(name) {
 					name++;
 					stripEnterInStr(name);
-				 } else {
-					name = "-";
-				 }
-// dbg_printf("id=%d, name=%s\n", id, name);
-				strList_add(&analogChannelsNamesHead, name);
-				i++;
+					strList_add(&analogChannelsNamesHead, name);
+					i++;
+				}
 			}
 		}
-		dbg_printf("i=%d\n", i);
 		fclose(fd);
 	} else {
 		eprintf("%s(): Cant open file " ANALOGTV_CONFIG_DIR "/tvchannels.txt: %m\n", __func__);
