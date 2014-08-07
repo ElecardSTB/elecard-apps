@@ -481,6 +481,8 @@ const void *commonList_get(listHead_t *commonList, uint32_t number)
 	}
 	if((commonList->last.id + 1) == number) {
 		pos = commonList->last.pos->next;
+	} else if(commonList->last.id == number) {
+		pos = commonList->last.pos;
 	} else if((commonList->last.id - 1) == number) {
 		pos = commonList->last.pos->prev;
 	}
