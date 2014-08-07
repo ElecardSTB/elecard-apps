@@ -3667,6 +3667,7 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 		{
 			switch ( cmd->command )
 			{
+/* TODO: uncomment this
 				case interfaceCommandUp:
 					if(interfaceInfo.messageList.scrolling.shift > 0) {
 						if((interfaceInfo.messageList.scrolling.shift == interfaceInfo.messageList.scrolling.visibleLines/2) &&
@@ -3711,22 +3712,22 @@ void interface_processCommand(pinterfaceCommandEvent_t cmd)
 					}
 					break;
 				case interfaceCommandPageDown:
-					if ( interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ )
+					if ( interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines < interfaceInfo.messageList.entryCount)
 					{
 						interfaceInfo.messageList.scrolling.offset += interfaceInfo.messageList.scrolling.visibleLines - 1;
 						interfaceInfo.messageList.entrySelected += interfaceInfo.messageList.scrolling.visibleLines - 1;
-						if (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines >= interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ )
+						if (interfaceInfo.messageList.scrolling.offset + interfaceInfo.messageList.scrolling.visibleLines >= interfaceInfo.messageList.entryCount)
 						{
-							interfaceInfo.messageList.scrolling.offset = interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ - interfaceInfo.messageList.scrolling.visibleLines;
+							interfaceInfo.messageList.scrolling.offset = interfaceInfo.messageList.entryCount - interfaceInfo.messageList.scrolling.visibleLines;
 						}
-						if (interfaceInfo.messageList.entrySelected >= interfaceInfo.messageList.entryCount/*.scrolling.lineCount*/ )
+						if (interfaceInfo.messageList.entrySelected >= interfaceInfo.messageList.entryCount)
 						{
 							interfaceInfo.messageList.entrySelected = interfaceInfo.messageList.entryCount - 1;
 							interfaceInfo.messageList.scrolling.shift = interfaceInfo.messageList.scrolling.visibleLines - 1;
 						}
 						interface_displayMenu(1);
 					}
-					break;
+					break;*/
 				case interfaceCommandOk:
 				case interfaceCommandEnter:
 				case interfaceCommandGreen:
@@ -8835,12 +8836,24 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 
 	maxWidth -= iw;
 	maxWidth -= 2*interfaceInfo.paddingSize + INTERFACE_SCROLLBAR_WIDTH;
-	rectangle.x = rectangle.y = rectangle.w = rectangle.h;
+	if(message[0] != 0) {
+		int32_t tmpWidth;
+		int32_t headerLines = 0;
+		int32_t fontHeight = 0;
+		ptr = message;
+		while((pos = strchr(ptr, '\n')) != NULL) {
+			DFBCHECK(pFont->GetStringWidth(pFont, ptr, (pos - ptr), &tmpWidth));
+			headerLines += ((tmpWidth / maxWidth) + 1);
+			ptr = pos + 1;
+		}
+		DFBCHECK(pFont->GetStringWidth(pFont, ptr, -1, &tmpWidth));
+		headerLines += ((tmpWidth / maxWidth) + 1);
 
-	if (message[0] != 0)
-	{
-		DFBCHECK( pFont->GetStringExtents(pFont, message, -1, &rect, NULL) );
-		headerShift += (rect.h + interfaceInfo.paddingSize) * ((rect.w / maxWidth) + 1);
+		if(headerLines > 2) {
+			headerLines -= 2;
+		}
+		DFBCHECK(pFont->GetHeight(pFont, &fontHeight));
+		headerShift += (fontHeight + interfaceInfo.paddingSize) * headerLines;
 	}
 
 	rectangle.w = fixedWidth;
@@ -9001,13 +9014,14 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	y += fh;
 
 	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
-		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
-			DFBCHECK( pFont->GetStringExtents(pFont, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
-			int l = getMaxStringLengthForFont(pFont, interfaceInfo.messageList.entry[i].text, maxWidth);
-			char *tmp = strndup(interfaceInfo.messageList.entry[i].text, l);
-			if((i - lineOffset) == lineShift) {
+		const char *str = strList_get(interfaceInfo.messageList.strListHead, i);
+		if(str) {
+			DFBCHECK(pFont->GetStringExtents(pFont, str, -1, &rect, NULL));
+			int l = getMaxStringLengthForFont(pFont, str, maxWidth);
+			char *tmp = strndup(str, l);
+			if(i == (lineOffset + lineShift)) {
 				interface_drawSelectionRectangle0(x, y - interfaceInfo.paddingSize, 
-				  maxWidth, fh);
+					maxWidth, fh);
 			}
 			
 			gfx_drawText(DRAWING_SURFACE, pFont,
@@ -9018,7 +9032,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 			free(tmp);
 		}
 	}
-	
+
 	interface_drawScrollingBar(DRAWING_SURFACE,
 			                           x + maxWidth + 2*interfaceInfo.paddingSize,
 			                           scrollY,
@@ -9029,44 +9043,6 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 }
 
-
-int interface_setListCapacity(int newCapacity)
-{
-	if (newCapacity == interfaceInfo.messageList.entryCapacity)
-		return newCapacity;
-	if (newCapacity < interfaceInfo.messageList.entryCount) {
-		eprintf("%s: can't set capacity to %d while there are %d entries used\n", __FUNCTION__, newCapacity, interfaceInfo.messageList.entryCount);
-		return -2;
-	}
-	interfaceMessageListEntry_t *newEntries = realloc(interfaceInfo.messageList.entry, newCapacity*sizeof(interfaceMessageListEntry_t));
-	if(!newEntries) {
-		eprintf("%s: can't change capacity from %d to %d\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity, newCapacity);
-		return -1;
-	}
-	interfaceInfo.messageList.entry         = newEntries;
-	interfaceInfo.messageList.entryCapacity = newCapacity;
-	return newCapacity;
-}
-
-int interface_addToListBox(const char *message)
-{
-	if((interfaceInfo.messageList.entryCount == interfaceInfo.messageList.entryCapacity)
-	&& (interface_setListCapacity(interfaceInfo.messageList.entryCapacity + MENU_CAPACITY_INCREMENT) < 0)) {
-		return -1;
-	}
-
-	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].text = strdup(message);
-// 	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pArg = pArg;
-// 	interfaceInfo.messageList.entry[interfaceInfo.messageList.entryCount].pCallback = pFunc;
-
-	interfaceInfo.messageList.entryCount++;
-	interfaceInfo.messageList.scrolling.maxOffset = interfaceInfo.messageList.entryCount - interfaceInfo.messageList.scrolling.visibleLines;
-	if(interfaceInfo.messageList.scrolling.maxOffset < 0) {
-		interfaceInfo.messageList.scrolling.maxOffset = 0;
-	}
-
-	return interfaceInfo.messageList.entryCount;
-}
 
 void interface_displayListBoxColor( int x, int y, int w, int h,
                                              const int *label, const int *icons,
@@ -9192,10 +9168,11 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 	}
 	ty += fh;
 	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
-		if (interfaceInfo.messageList.entry[i].text[0] != 0) {
-			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, interfaceInfo.messageList.entry[i].text, -1, &rect, NULL) );
-			int l = getMaxStringLengthForFont(pgfx_font, interfaceInfo.messageList.entry[i].text, maxWidth);
-			char *tmp = strndup(interfaceInfo.messageList.entry[i].text, l);
+		const char *str = strList_get(interfaceInfo.messageList.strListHead, i);
+		if (str != 0) {
+			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, str, -1, &rect, NULL) );
+			int l = getMaxStringLengthForFont(pgfx_font, str, maxWidth);
+			char *tmp = strndup(str, l);
 			if((i - lineOffset) == lineShift) {
 				interface_drawSelectionRectangle0(tx, ty - interfaceInfo.paddingSize, 
 				  maxWidth, fh);
@@ -9230,7 +9207,7 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 				    y + interfaceInfo.paddingSize - headerShift,
 				    INTERFACE_SCROLLBAR_WIDTH,
 				    height - 2*interfaceInfo.paddingSize,
-				    interfaceInfo.messageList.entryCount, visibleLines, lineOffset );
+				    strList_count(interfaceInfo.messageList.strListHead), visibleLines, lineOffset );
 
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 }
@@ -9262,7 +9239,7 @@ void interface_displayListBox(void)
 					interfaceInfo.messageList.colors.background.R, interfaceInfo.messageList.colors.background.G,
 					interfaceInfo.messageList.colors.background.B, interfaceInfo.messageList.colors.background.A,
    					pgfx_font, interfaceInfo.messageList.scrolling.offset,interfaceInfo.messageList.scrolling.shift,
-					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.entryCount);
+					interfaceInfo.messageList.scrolling.visibleLines, strList_count(interfaceInfo.messageList.strListHead));
 			}break;
 			case interfaceMessageList:
 			{
@@ -9273,7 +9250,7 @@ void interface_displayListBox(void)
 					interfaceInfo.messageList.target.w, interfaceInfo.messageList.target.h,
 					(const int *)interfaceInfo.messageList.title, icons, interfaceInfo.messageList.scrolling.shift,
 					interfaceInfo.messageList.scrolling.offset,
-					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.entryCount,
+					interfaceInfo.messageList.scrolling.visibleLines, strList_count(interfaceInfo.messageList.strListHead),
 					interfaceInfo.messageList.icon,
 					interfaceInfo.messageList.colors.border.R, interfaceInfo.messageList.colors.border.G,
 					interfaceInfo.messageList.colors.border.B, interfaceInfo.messageList.colors.border.A,
@@ -9288,18 +9265,9 @@ void interface_displayListBox(void)
 
 static int interface_hideListBoxEvent(void *pArg)
 {
-	//dprintf("interface: hide messagebox\n");
 	if(interfaceInfo.messageList.type != interfaceMessageBoxNone) {
-		int32_t i;
-		//dprintf("interface: do hide messagebox\n");
 		interface_removeEvent(interface_hideListBoxEvent, pArg);
 		interfaceInfo.messageList.type = interfaceMessageBoxNone;
-		for(i = 0; i < interfaceInfo.messageList.entryCount; i++) {
-			if(interfaceInfo.messageList.entry[i].text != NULL) {
-				free(interfaceInfo.messageList.entry[i].text);
-			}
-		}
-		interfaceInfo.messageList.entryCount = 0;
 		interfaceInfo.messageList.entrySelected = 0;
 		interfaceInfo.messageList.scrolling.offset = 0;
 		interfaceInfo.messageList.scrolling.shift = 0;
@@ -9314,7 +9282,7 @@ void interface_hideListBox(void)
 	interface_hideListBoxEvent(NULL);
 }
 
-void interface_showTextListBox(const char *header, int icon, menuConfirmFunction pCallback, void *pArg)
+static void interface_showTextListBox(const char *header, int icon, menuConfirmFunction pCallback, void *pArg)
 {
 	interface_removeEvent(interface_hideListBoxEvent, (void*)0);
 
@@ -9326,7 +9294,7 @@ void interface_showTextListBox(const char *header, int icon, menuConfirmFunction
 
 	pgfx_font->GetHeight(pgfx_font, &fh);
 
-	interfaceInfo.messageList.scrolling.visibleLines = (interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize - 3*fh) / fh;
+	interfaceInfo.messageList.scrolling.visibleLines = ((interfaceInfo.screenHeight/4 - interfaceInfo.paddingSize) / fh) - 3;
 	interfaceInfo.messageList.scrolling.maxOffset = 0;
 
 	interfaceInfo.messageList.pCallback = pCallback;
@@ -9338,19 +9306,6 @@ void interface_showTextListBox(const char *header, int icon, menuConfirmFunction
 	interfaceInfo.messageList.target.h = interfaceInfo.screenHeight/4;
 
 	interfaceInfo.messageList.type = interfaceMessageListCallback;
-	if(interfaceInfo.messageList.entryCount == 0) {
-		interfaceInfo.messageList.scrolling.offset = 0;
-		interfaceInfo.messageList.scrolling.shift = 0;
-		interfaceInfo.messageList.entryCount = 0;
-		interfaceInfo.messageList.entrySelected = 0;
-		interfaceInfo.messageList.entryCapacity = MENU_DEFAULT_CAPACITY;
-		
-		if (interfaceInfo.messageList.entryCapacity > 0 &&
-		  !(interfaceInfo.messageList.entry = calloc(interfaceInfo.messageList.entryCapacity, sizeof(interfaceMessageListEntry_t)))) {
-			eprintf("%s: (!) failed to allocate %d entries for %s\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity);
-			interfaceInfo.messageList.entryCapacity = 0;
-		}
-	}
 	
 	interface_displayMenu(1);
 }
@@ -9433,9 +9388,9 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 				|| (cmd->command == interfaceCommandPageDown)
 				))
 	{//List navigation
-		int32_t positionChanged = 0;
-		int32_t newPosition = 0;
 		int32_t visibleLines = interfaceInfo.messageList.scrolling.visibleLines; //reduce code
+		int32_t entryCount = strList_count(interfaceInfo.messageList.strListHead);
+		int32_t move = 0;
 
 		table_IntInt_t listMoves[] = {
 			{interfaceCommandUp,      -1},
@@ -9445,31 +9400,11 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 			TABLE_INT_INT_END_VALUE
 		};
 
-		switch(cmd->command) {
-			case interfaceCommandUp:
-			case interfaceCommandPageUp:
-				if(interfaceInfo.messageList.entrySelected > 0) {
-					newPosition = interfaceInfo.messageList.entrySelected + table_IntIntLookup(listMoves, cmd->command, 0);
-					if(newPosition < 0) {
-						newPosition = 0;
-					}
-					positionChanged = 1;
-				}
-				break;
-			case interfaceCommandDown:
-			case interfaceCommandPageDown:
-				if(interfaceInfo.messageList.entrySelected < (interfaceInfo.messageList.entryCount - 1)) {
-					newPosition = interfaceInfo.messageList.entrySelected + table_IntIntLookup(listMoves, cmd->command, 0);
-					if(newPosition >= interfaceInfo.messageList.entryCount) {
-						newPosition = interfaceInfo.messageList.entryCount - 1;
-					}
-					positionChanged = 1;
-				}
-				break;
-			default:
-				break;
-		}
-		if(positionChanged) {
+		move = table_IntIntLookup(listMoves, cmd->command, 0);
+		if(((move < 0) && (interfaceInfo.messageList.entrySelected > 0))
+		|| ((move > 0) && (interfaceInfo.messageList.entrySelected < (entryCount - 1))))
+		{
+			int32_t newPosition = 0;
 //			int32_t visibleBorderItems = (int32_t)(((float)visibleLines + 0.5) / 2.0);
 			int32_t visibleBorderItems = (visibleLines - 1) / 2;
 //			int32_t visibleBorderItems = 2;
@@ -9492,10 +9427,16 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 			  * -----------
 			  * */
 
+			newPosition = interfaceInfo.messageList.entrySelected + move;
+			if(newPosition < 0) {
+				newPosition = 0;
+			} else if(newPosition >= entryCount) {
+				newPosition = entryCount - 1;
+			}
 			if(newPosition < visibleBorderItems) {//at begin of list
 				windowOffset = 0;
-			} else if(newPosition >= (interfaceInfo.messageList.entryCount - visibleBorderItems - 1)) {//at end of list
-				windowOffset = interfaceInfo.messageList.entryCount - visibleLines;
+			} else if(newPosition >= (entryCount - visibleBorderItems - 1)) {//at end of list
+				windowOffset = entryCount - visibleLines;
 			} else if(newPosition < unshiftItemTop) {
 				windowOffset = newPosition - visibleBorderItems;
 			} else if(newPosition > unshiftItemBottom) {
@@ -9598,8 +9539,8 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 		int size;
 #ifdef WCHAR_SUPPORT
 		wchar_t *msg;
-		if ((interfaceInfo.messageList.entryCount > 0) && (interfaceInfo.messageList.entrySelected > 0)) {
-			char *str = interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text;
+		if ((strList_count(interfaceInfo.messageList.strListHead) > 0) && (interfaceInfo.messageList.entrySelected >= 0)) {
+			const char *str = strList_get(interfaceInfo.messageList.strListHead, interfaceInfo.messageList.entrySelected);
 			int dest_index = 0;
 			int mb_count;
 
@@ -9616,8 +9557,8 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 		size = wcslen(msg);
 #else
 		char *msg;
-		if ((interfaceInfo.messageList.entryCount > 0) && (interfaceInfo.messageList.entrySelected > 0)) {
-			msg = strdup(interfaceInfo.messageList.entry[interfaceInfo.messageList.entrySelected].text);
+		if ((strList_count(interfaceInfo.messageList.strListHead) > 0) && (interfaceInfo.messageList.entrySelected >= 0)) {
+			msg = strdup(strList_get(interfaceInfo.messageList.strListHead, interfaceInfo.messageList.entrySelected));
 		} else {
 			msg = strdup("");
 		}
@@ -9752,7 +9693,13 @@ static int interface_listBoxEnterTextCallback(interfaceMenu_t *pMenu, pinterface
 	return 1;
 }
 
-int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, const char *pattern, menuEnterTextFunction pCallback, menuEnterTextFieldsFunction pGetFields, stb810_inputMode inputMode, void *pArg)
+int interface_listBoxGetText(interfaceMenu_t *pMenu,
+                       const char *description,
+                       const char *pattern,
+                       menuEnterTextFunction pCallback,
+                       menuEnterTextFieldsFunction pGetFields,
+                       stb810_inputMode inputMode, void *pArg,
+					   listHead_t *listHead)
 {
 	int i;
 	interfaceEnterTextInfo_t *info;
@@ -9775,6 +9722,11 @@ int interface_listBoxGetText(interfaceMenu_t *pMenu, const char *description, co
 	info->pCallback = pCallback;
 	info->inputMode = inputMode;
 	info->lastChar = 0;
+
+	interfaceInfo.messageList.strListHead = listHead;
+	interfaceInfo.messageList.scrolling.offset = 0;
+	interfaceInfo.messageList.scrolling.shift = -1;//for no selection at begin
+	interfaceInfo.messageList.entrySelected = -1;
 
 	interface_enterTextGetPatternCount(info, &patternCount, NULL);
 
@@ -9831,15 +9783,8 @@ static void interface_showListBoxCustom(const char *header, menuConfirmFunction 
 	interfaceInfo.messageList.target.w = w;
 	interfaceInfo.messageList.target.h = h;
 	interfaceInfo.messageList.type = interfaceMessageList;
-	interfaceInfo.messageList.entryCount = 0;
 	interfaceInfo.messageList.entrySelected = 0;
-	interfaceInfo.messageList.entryCapacity = MENU_DEFAULT_CAPACITY;
 	
-	if (interfaceInfo.messageList.entryCapacity > 0 &&
-	  !(interfaceInfo.messageList.entry = calloc(interfaceInfo.messageList.entryCapacity, sizeof(interfaceMessageListEntry_t)))) {
-		eprintf("%s: (!) failed to allocate %d entries for %s\n", __FUNCTION__, interfaceInfo.messageList.entryCapacity);
-		interfaceInfo.messageList.entryCapacity = 0;
-	}
 	interface_displayMenu(1);
 }
 

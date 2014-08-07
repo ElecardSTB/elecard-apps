@@ -862,20 +862,12 @@ static int youtube_videoSearch(interfaceMenu_t *pMenu, void* pArg)
 	youtubeInfo.last_selected = 0;
 
 	if(youtubeInfo.search_offset == YOUTUBE_NEW_SEARCH) {
-		int32_t i;
-		const char *str;
 
 		youtubeSearchHist_load();
 		youtubeInfo.search_offset = 0;
 
-		interface_addToListBox(_T("VIDEO_SEARCH"));
-
-		i = 0;
-		while((str = strList_get(&youtubeInfo.last_search, i)) != NULL) {
-			interface_addToListBox(str);
-			i++;
-		}
-		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, youtube_getLastSearch, inputModeABC, NULL);
+		interface_listBoxGetText(pMenu, _T("ENTER_TITLE"), "\\w+", youtube_startVideoSearch, 
+								 youtube_getLastSearch, inputModeABC, NULL, &youtubeInfo.last_search);
 //		interface_displayMenu(1);
 	} else {
 		youtube_runSearch(pMenu);

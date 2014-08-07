@@ -825,9 +825,7 @@ typedef struct {
 	char  title[MENU_ENTRY_INFO_LENGTH];
 
 	int entrySelected;
-	int entryCount;
-	int entryCapacity;
-	interfaceMessageListEntry_t *entry;
+	listHead_t *strListHead;
 	struct {
 		interfaceColor_t title;
 		interfaceColor_t text;
@@ -1138,7 +1136,6 @@ void smartLineTrim(char *string, int length);
 int  interface_formatTextWW(const char *text, IDirectFBFont *font,
                             int maxWidth, int maxHeight, int dest_size,
                             char *dest, int *lineCount, int *visibleLines);
-int interface_addToListBox(const char *message);
 /* Interface primitives */
 
 /**
@@ -1698,8 +1695,6 @@ void interface_showScrollingBoxCustom(const char *text, int icon, menuConfirmFun
                                       int br, int bg, int bb, int ba,
                                       int  r, int  g, int  b, int  a);
 
-void interface_showListBox(const char *header, menuConfirmFunction pCallback, void *pArg);
-
 /**
  *  @brief Displays message box with poster, scrollable text and custom user input handler
  *
@@ -1809,7 +1804,10 @@ int  interface_listBoxGetText(interfaceMenu_t *pMenu,
                        const char *pattern,
                        menuEnterTextFunction pCallback,
                        menuEnterTextFieldsFunction pGetFields,
-                       stb810_inputMode inputMode, void *pArg);
+                       stb810_inputMode inputMode, void *pArg,
+					   listHead_t *listHead);
+
+void interface_showListBox(const char *header, menuConfirmFunction pCallback, void *pArg);
 
 /** Text input process command function.
  *  Used by interface_getText internally

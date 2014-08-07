@@ -1074,17 +1074,9 @@ static int32_t playlistEditor_processCommand(interfaceMenu_t *pMenu, pinterfaceC
 				interface_hideMessageBox();
 			}
 			if(analogNames_isExist()) {
-				int32_t i = 0;
-				const char *str;
-
 				analogNames_load();
-				interface_addToListBox(_T("CHANNEL_NEW_NAME"));
-
-				while((str = strList_get(analogNames_getList(), i)) != NULL) {
-					interface_addToListBox(str);
-					i++;
-				}
-				interface_listBoxGetText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
+				interface_listBoxGetText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption,
+										 interface_getChannelCaption, inputModeABC, pMenu->pArg, analogNames_getList());
 			} else {
 				interface_getText(pMenu, _T("DVB_ENTER_CAPTION"), "\\w+", interface_saveChannelCaption, interface_getChannelCaption, inputModeABC, pMenu->pArg);
 			}
