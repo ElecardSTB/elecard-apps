@@ -104,6 +104,7 @@ static analog_service_t *analogList_add(struct list_head *listHead);
 static int32_t analogtv_saveConfigFile(void);
 static int32_t analogtv_changed(void);
 
+static int32_t analogNames_init(void);
 static int32_t analogNames_release(void);
 
 /******************************************************************
@@ -120,7 +121,7 @@ bouquetAnalog_t analogBouquet = {
 	.channelCountVisible  = 0,
 	.channelList          = LIST_HEAD_INIT(analogBouquet.channelList),
 };
-static struct list_head analogChannelsNamesHead = LIST_HEAD_INIT(analogChannelsNamesHead);
+static listHead_t analogChannelsNamesHead;
 
 /******************************************************************
 * FUNCTION DECLARATION                     <Module>[_<Word>+]  *
@@ -143,6 +144,7 @@ void analogtv_init(void)
 		mkdir(ANALOGTV_CONFIG_DIR, 0777);
 	}
 
+	analogNames_init();
 	analogtv_cleanList();
 	analogtv_parseConfigFile();
 }
@@ -473,7 +475,6 @@ static int32_t analogtv_changed(void)
 	uint32_t i = 0;
 
 	while(changeCallbacks[i].pCallback) {
-		printf("%s[%d]\n",__func__, __LINE__);
 		changeCallbacks[i].pCallback(changeCallbacks[i].pArg);
 		i++;
 		if((i >= ARRAY_SIZE(changeCallbacks))) {
@@ -774,7 +775,7 @@ analog_service_t *analogList_add(struct list_head *listHead)
 
 int32_t analogNames_isExist(void)
 {
-	if(!list_empty(&analogChannelsNamesHead)) {
+	if(!list_empty(&analogChannelsNamesHead.head)) {
 		return 1;
 	}
 	return helperFileExists(ANALOGTV_CONFIG_DIR "/tvchannels.txt");
@@ -792,7 +793,7 @@ int32_t analogNames_download(void)
 
 int32_t analogNames_load(void)
 {
-	if(!list_empty(&analogChannelsNamesHead)) {
+	if(!list_empty(&analogChannelsNamesHead.head)) {
 		return 0;
 	}
 	FILE *fd = fopen(ANALOGTV_CONFIG_DIR "/tvchannels.txt", "r");
@@ -824,15 +825,21 @@ int32_t analogNames_load(void)
 	return 0;
 }
 
-int32_t analogNames_release(void)
+listHead_t *analogNames_getList(void)
 {
-	strList_release(&analogChannelsNamesHead);
+	return &analogChannelsNamesHead;
+}
+
+static int32_t analogNames_init(void)
+{
+	strList_init(&analogChannelsNamesHead, 0);
 	return 0;
 }
 
-struct list_head *analogNames_getList(void)
+static int32_t analogNames_release(void)
 {
-	return &analogChannelsNamesHead;
+	strList_release(&analogChannelsNamesHead);
+	return 0;
 }
 
 

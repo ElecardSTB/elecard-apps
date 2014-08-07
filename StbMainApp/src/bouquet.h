@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdint.h>
 
 #include "defines.h"
-#include "list.h"
+#include "helper.h"
 #include <service.h>
 
 /***********************************************
@@ -74,7 +74,7 @@ int32_t bouquet_isEnable(void);
 void bouquet_setEnable(int32_t enable);
 
 //Name list
-struct list_head *bouquet_getNameList(typeBouquet_t btype);
+listHead_t *bouquet_getNameList(typeBouquet_t btype);
 
 const char *bouquet_getCurrentName(typeBouquet_t btype);
 void        bouquet_setCurrentName(typeBouquet_t btype, const char *name);

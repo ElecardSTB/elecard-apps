@@ -88,7 +88,7 @@ typedef struct {
 	size_t search_offset;/** Current page of search results */
 	bool youtube_canceled;
 	int last_selected;
-	struct list_head last_search;
+	listHead_t last_search;
 
 	pthread_t search_thread;
 } youtubeInfo_t;
@@ -733,7 +733,7 @@ void youtube_buildMenu(interfaceMenu_t* pParent)
 #endif
 		0 };
 
-	INIT_LIST_HEAD(&youtubeInfo.last_search);
+	strList_init(&youtubeInfo.last_search, 0);
 
 	createListMenu(&YoutubeMenu, "YouTube", thumbnail_youtube, youtube_icons, pParent,
 		interfaceListMenuIconThumbnail, youtube_fillFirstMenu, youtube_exitMenu, SET_NUMBER(1));
@@ -1003,14 +1003,13 @@ static int youtubeSearchHist_save()
 
 static int youtubeSearchHist_add(char* search)
 {
-	int newSearchIndex = strList_find(&youtubeInfo.last_search, search);
-	if(newSearchIndex == -1) {
+	if(strList_isExist(&youtubeInfo.last_search, search)) {
+		strList_remove(&youtubeInfo.last_search, search);
+		strList_add_head(&youtubeInfo.last_search, search);
+	} else {
 		if(strList_count(&youtubeInfo.last_search) == appControlInfo.youtubeSearchNumber) {
 			strList_remove_last(&youtubeInfo.last_search);
 		}
-		strList_add_head(&youtubeInfo.last_search, search);
-	} else if(newSearchIndex >= 0) {
-		strList_remove(&youtubeInfo.last_search, search);
 		strList_add_head(&youtubeInfo.last_search, search);
 	}
 	return 0;

@@ -24,8 +24,9 @@
 /******************************************************************
 * LOCAL MACROS                                                    *
 *******************************************************************/
-#define TEMP_CONFIG_FILE            "/var/tmp/cfg.tmp"
-
+#define TEMP_CONFIG_FILE             "/var/tmp/cfg.tmp"
+#define commonList_getPtrToObj(pos)  (((void *)pos) + sizeof(struct list_head))
+#define commonList_isValid(listHead) ((listHead == NULL) ? 0 : 1)
 
 /******************************************************************
 * LOCAL TYPEDEFS                                                  *
@@ -256,190 +257,246 @@ int32_t table_IntIntLookupR(const table_IntInt_t table[], int32_t value, int32_t
 	return defaultValue;
 }
 
-int32_t strList_add_head(struct list_head *listHead, const char *str)
+static int32_t strList_compareFunc(const void *str1, const void *str2, void *pArg)
 {
-	strList_t *newName;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
+	if((int32_t)pArg == 0) {//ignore case
+		return strcasecmp((const char *)str1, (const char *)str2);
+	}
+	return strcmp((const char *)str1, (const char *)str2);
+}
+
+static size_t strList_getLengthFunc(const void *str, void *pArg)
+{
+	(void)pArg;
+	return strlen((const char *)str) + 1;//calculate with '\0' symbol
+}
+
+int32_t strList_init(listHead_t *commonList, int32_t isCaseSensivity)
+{
+	return commonList_init(commonList, strList_compareFunc, (void *)isCaseSensivity, 0, strList_getLengthFunc);
+}
+
+
+/* Asume the next struct for constant objects size:
+ * struct {
+ *     struct list_head  list;
+ *     char              object[objSize];
+ * };
+ * and for strings (objSize=0):
+ * struct {
+ *     struct list_head  list;
+ *     char              str[strlen];
+ * };
+ */
+int32_t commonList_init(listHead_t *commonList, compareFunc_t *compar, void *pArg, size_t objSize, getLengthFunc_t *len)
+{
+	memset(commonList, 0, sizeof(listHead_t));
+	INIT_LIST_HEAD(&commonList->head);
+	commonList->compar = compar;
+	commonList->len = len;
+	commonList->pArg = pArg;
+	commonList->objSize = objSize;
+	if((commonList->objSize == 0) && (commonList->len == NULL)) {
+		eprintf("%s(): Error, objSize=0 and len() function not defined!", __func__);
 		return -1;
 	}
-
-	newName = malloc(sizeof(strList_t));
-	if(!newName) {
-		eprintf("%s(): Allocation error!\n", __func__);
-		return -2;
-	}
-	newName->str = strdup(str);
-	if(!newName->str) {
-		eprintf("%s(): Cat duplicate str=%s!\n", __func__, str);
-		free(newName);
-		return -3;
-	}
-	dprintf("%s: %s\n", __func__, str);
-	list_add(&newName->list, listHead);
-
 	return 0;
 }
 
-int32_t strList_add(struct list_head *listHead, const char *str)
-{
-	strList_t *newName;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return -1;
-	}
-
-	newName = malloc(sizeof(strList_t));
-	if(!newName) {
-		eprintf("%s(): Allocation error!\n", __func__);
-		return -2;
-	}
-	newName->str = strdup(str);
-	if(!newName->str) {
-		eprintf("%s(): Cat duplicate str=%s!\n", __func__, str);
-		free(newName);
-		return -3;
-	}
-	dprintf("%s: %s\n", __func__, str);
-	list_add_tail(&newName->list, listHead);
-
-	return 0;
-}
-
-int32_t strList_remove(struct list_head *listHead, const char *str)
-{
-	struct list_head *pos;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return -1;
-	}
-	list_for_each(pos, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		if(strcasecmp(el->str, str) == 0) {
-			dprintf("%s: %s\n", __func__, str);
-			list_del(pos);
-			if(el->str) {
-				free(el->str);
-			} else {
-				eprintf("%s(): Something wrong, element has no str!\n", __func__);
-			}
-			free(el);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int32_t strList_remove_last(struct list_head *listHead)
-{
-	struct list_head *pos;
-	if(!listHead) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return -1;
-	}
-	list_for_each(pos, listHead) {
-		if(listHead == pos->next) {
-			strList_t *el = list_entry(pos, strList_t, list);
-			list_del(pos);
-			if(el->str) {
-				free(el->str);
-			} else {
-				eprintf("%s(): Something wrong, element has no str!\n", __func__);
-			}
-			free(el);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int32_t strList_isExist(struct list_head *listHead, const char *str)
-{
-	struct list_head *pos;
-	if(!listHead || !str) {
-		eprintf("%s(): Wrong arguments!\n", __func__);
-		return 0;
-	}
-	list_for_each(pos, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		//CHECK: is there need to ignore case???
-		if(strcasecmp(el->str, str) == 0) {
-			dprintf("%s: %s\n", __func__, str);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int32_t strList_release(struct list_head *listHead)
+int32_t commonList_release(listHead_t *commonList)
 {
 	struct list_head *pos;
 	struct list_head *n;
-	if(!listHead) {
+	if(!commonList_isValid(commonList)) {
 		eprintf("%s(): Wrong argument!\n", __func__);
 		return -1;
 	}
-	list_for_each_safe(pos, n, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-
+	list_for_each_safe(pos, n, &commonList->head) {
 		list_del(pos);
-		if(el->str) {
-			free(el->str);
-		} else {
-			eprintf("%s(): Something wrong, element has no str!\n", __func__);
-		}
-		free(el);
+		free((void *)pos);
 	}
 	return 0;
 }
 
-int32_t strList_count(struct list_head *listHead)
+static struct list_head *commonList_createListItem(listHead_t *commonList, const void *pArg)
+{
+	void *newItem;
+	size_t len;
+
+	if(!commonList_isValid(commonList) || !pArg) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return NULL;
+	}
+
+	if(commonList->objSize) {
+		len = commonList->objSize;
+	} else {
+		if(commonList->len) {
+			len = commonList->len(pArg, commonList->pArg);
+			if(len == 0) {
+				eprintf("%s(): Error, len() return 0!", __func__);
+				return NULL;
+			}
+		} else {
+			eprintf("%s(): Error, objSize=0 and len() function not defined!", __func__);
+			return NULL;
+		}
+	}
+
+	newItem = malloc(len + sizeof(struct list_head));
+	if(!newItem) {
+		eprintf("%s(): Allocation error!\n", __func__);
+		return NULL;
+	}
+	memcpy(newItem + sizeof(struct list_head), pArg, len);
+
+	return (struct list_head *)newItem;
+}
+
+int32_t commonList_add_head(listHead_t *commonList, const void *pArg)
+{
+	struct list_head *listItem;
+	listItem = commonList_createListItem(commonList, pArg);
+	if(listItem == NULL) {
+		return -1;
+	}
+
+	list_add(listItem, &commonList->head);
+	return 0;
+}
+
+int32_t commonList_add(listHead_t *commonList, const void *pArg)
+{
+	struct list_head *listItem;
+	listItem = commonList_createListItem(commonList, pArg);
+	if(listItem == NULL) {
+		return -1;
+	}
+
+	list_add_tail(listItem, &commonList->head);
+	return 0;
+}
+
+int32_t commonList_remove(listHead_t *commonList, const void *pArg)
 {
 	struct list_head *pos;
-	uint32_t id = 0;
-	if(!listHead) {
+	if(!commonList_isValid(commonList) || !pArg) {
 		eprintf("%s(): Wrong arguments!\n", __func__);
 		return -1;
 	}
-	list_for_each(pos, listHead) {
+	if(commonList->compar == NULL) {
+		eprintf("%s(): Comparison function not setted!\n", __func__);
+		return -2;
+	}
+	list_for_each(pos, &commonList->head) {
+		if(commonList->compar(commonList_getPtrToObj(pos), pArg, commonList->pArg) == 0) {
+			list_del(pos);
+			free((void *)pos);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int32_t commonList_remove_last(listHead_t *commonList)
+{
+	if(!commonList_isValid(commonList)) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return -1;
+	}
+	if(!list_empty(&commonList->head)) {
+		struct list_head *pos = commonList->head.prev;
+		list_del(pos);
+		free((void *)pos);
+		return 1;
+	}
+
+	return 0;
+}
+
+int32_t commonList_isExist(listHead_t *commonList, const void *pArg)
+{
+	struct list_head *pos;
+	if(!commonList_isValid(commonList) || !pArg) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return 0;
+	}
+	if(commonList->compar == NULL) {
+		eprintf("%s(): Comparison function not setted!\n", __func__);
+		return 0;
+	}
+	list_for_each(pos, &commonList->head) {
+		if(commonList->compar(commonList_getPtrToObj(pos), pArg, commonList->pArg) == 0) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int32_t commonList_count(listHead_t *commonList)
+{
+	struct list_head *pos;
+	uint32_t id = 0;
+	if(!commonList_isValid(commonList)) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return -1;
+	}
+	list_for_each(pos, &commonList->head) {
 		id++;
 	}
 	return id;
 }
 
-int32_t strList_find(struct list_head *listHead, const char *str)
+int32_t commonList_find(listHead_t *commonList, const void *pArg)
 {
 	struct list_head *pos;
 	uint32_t id = 0;
-	if(!listHead || !str) {
+	if(!commonList_isValid(commonList) || !pArg) {
 		eprintf("%s(): Wrong arguments!\n", __func__);
 		return -2;
 	}
-	list_for_each(pos, listHead) {
-		strList_t *el = list_entry(pos, strList_t, list);
-		if(strcasecmp(el->str, str) == 0) {
+	if(commonList->compar == NULL) {
+		eprintf("%s(): Comparison function not setted!\n", __func__);
+		return -3;
+	}
+	list_for_each(pos, &commonList->head) {
+		if(commonList->compar(commonList_getPtrToObj(pos), pArg, commonList->pArg) == 0) {
 			return id;
 		}
 		id++;
 	}
+
 	return -1;
 }
 
-const char *strList_get(struct list_head *listHead, uint32_t number)
+const void *commonList_get(listHead_t *commonList, uint32_t number)
 {
-	struct list_head *pos;
+	struct list_head *pos = NULL;
 	uint32_t id = 0;
-	if(!listHead) {
+	if(!commonList_isValid(commonList)) {
 		eprintf("%s(): Wrong argument!\n", __func__);
 		return NULL;
 	}
-	list_for_each(pos, listHead) {
+	if((commonList->last.id + 1) == number) {
+		pos = commonList->last.pos->next;
+	} else if((commonList->last.id - 1) == number) {
+		pos = commonList->last.pos->prev;
+	}
+	if(pos) {
+		if(pos == &commonList->head) {
+			return NULL;
+		}
+		commonList->last.id = number;
+		commonList->last.pos = pos;
+		return commonList_getPtrToObj(pos);
+	}
+	list_for_each(pos, &commonList->head) {
 		if(id == number) {
-			strList_t *el = list_entry(pos, strList_t, list);
-			return el->str;
+			commonList->last.id = id;
+			commonList->last.pos = pos;
+			return commonList_getPtrToObj(pos);
 		}
 		id++;
 	}

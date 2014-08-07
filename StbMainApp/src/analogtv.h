@@ -141,10 +141,10 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 
 int32_t analogtv_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg);
 
-int32_t           analogNames_isExist(void);
-int32_t           analogNames_download(void);
-int32_t           analogNames_load(void);
-struct list_head *analogNames_getList(void);
+int32_t     analogNames_isExist(void);
+int32_t     analogNames_download(void);
+int32_t     analogNames_load(void);
+listHead_t *analogNames_getList(void);
 
 #else /* ENABLE_ANALOGTV */
 

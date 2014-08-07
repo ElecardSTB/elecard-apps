@@ -12,6 +12,7 @@
 *******************************************************************/
 #include "list.h"
 #include <stdint.h>
+#include <stddef.h>
 
 /******************************************************************
 * EXPORTED MACROS                              [for headers only] *
@@ -34,6 +35,18 @@
 		fprintf(stderr, "%s:%s()[%d]: " fmt, __FILE__, __func__, __LINE__, ##args); \
 	}
 
+#define strList_release(commonHead)                  commonList_release(commonHead)
+#define strList_add(commonHead, str)                 commonList_add(commonHead, str)
+#define strList_add_head(commonHead, str)            commonList_add_head(commonHead, str)
+#define strList_remove(commonHead, str)              commonList_remove(commonHead, str)
+#define strList_isExist(commonHead, str)             commonList_isExist(commonHead, str)
+#define strList_find(commonHead, str)                commonList_find(commonHead, str)
+#define strList_get(commonHead, number)              (const char *)commonList_get(commonHead, number)
+#define strList_remove_last(commonHead)              commonList_remove_last(commonHead)
+#define strList_count(commonHead)                    commonList_count(commonHead)
+
+#define commonList_getObj(commonHead, number, type)  (type *)commonList_get(commonHead, number)
+
 
 /******************************************************************
 * EXPORTED TYPEDEFS                            [for headers only] *
@@ -47,6 +60,22 @@ typedef struct {
 	int32_t key;
 	int32_t value;
 } table_IntInt_t;
+
+typedef int32_t compareFunc_t(const void *, const void *, void *);
+typedef size_t  getLengthFunc_t(const void *, void *);
+
+typedef struct {
+	compareFunc_t    *compar;
+	getLengthFunc_t  *len; //this matter if objSize=0
+	void             *pArg;
+	size_t            objSize;
+	struct list_head  head;
+	uint32_t          count;
+	struct {
+		struct list_head *pos;
+		uint32_t          id;
+	} last;
+} listHead_t;
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
@@ -70,16 +99,22 @@ int32_t	table_IntIntLookupR(const table_IntInt_t table[], int32_t value, int32_t
 //Cut "Enters" from string
 int32_t	stripEnterInStr(const char *str);
 
+
+//Common list API
+int32_t commonList_init       (listHead_t *commonHead, compareFunc_t *compar, void *pArg, size_t objSize, getLengthFunc_t *len);
+int32_t commonList_release    (listHead_t *commonHead);
+
+int32_t commonList_add        (listHead_t *commonHead, const void *pArg);
+int32_t commonList_add_head   (listHead_t *commonHead, const void *pArg);
+int32_t commonList_remove     (listHead_t *commonHead, const void *pArg);
+int32_t commonList_remove_last(listHead_t *commonHead);
+int32_t commonList_isExist    (listHead_t *commonHead, const void *pArg);
+int32_t commonList_count      (listHead_t *commonHead);
+int32_t commonList_find       (listHead_t *commonHead, const void *pArg);
+const void *commonList_get    (listHead_t *commonHead, uint32_t number);
+
 //String list API
-int32_t strList_add        (struct list_head *listHead, const char *str);
-int32_t strList_add_head   (struct list_head *listHead, const char *str);
-int32_t strList_remove     (struct list_head *listHead, const char *str);
-int32_t strList_remove_last(struct list_head *listHead);
-int32_t strList_isExist    (struct list_head *listHead, const char *str);
-int32_t strList_release    (struct list_head *listHead);
-int32_t strList_count      (struct list_head *listHead);
-int32_t strList_find       (struct list_head *listHead, const char *str);
-const char *strList_get    (struct list_head *listHead, uint32_t number);
+int32_t strList_init(listHead_t *commonList, int32_t isCaseSensivity);
 
 #ifdef __cplusplus
 }

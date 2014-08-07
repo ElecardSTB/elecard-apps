@@ -126,8 +126,8 @@ typedef struct {
 } services_t;
 
 typedef struct {
-	struct list_head  name_tv;
-	struct list_head  name_radio;
+	listHead_t name_tv;
+	listHead_t name_radio;
 	struct list_head  channelsList;
 	struct list_head  transponderList;
 } bouquetDigital_t;
@@ -145,17 +145,12 @@ static int bouquets_enable = 0;
 static char pName[CHANNEL_BUFFER_NAME];
 
 static bouquetDigital_t digitalBouquet = {
-	.name_tv         = LIST_HEAD_INIT(digitalBouquet.name_tv),
-	.name_radio      = LIST_HEAD_INIT(digitalBouquet.name_radio),
 	.channelsList    = LIST_HEAD_INIT(digitalBouquet.channelsList),
 	.transponderList = LIST_HEAD_INIT(digitalBouquet.transponderList),
 };
 
 static char *bouqueteCurrentName[eBouquet_all] = { NULL, NULL };
-static struct list_head nameListHead[eBouquet_all] = {
-	[0] = LIST_HEAD_INIT(nameListHead[0]),
-	[1] = LIST_HEAD_INIT(nameListHead[1]),
-};
+static listHead_t nameListHead[eBouquet_all];
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -166,7 +161,7 @@ static void bouquet_loadLamedb( const char *bouquet_file, struct list_head *list
 static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element);
 static bouquet_element_list_t *digitalList_add(struct list_head *listHead);
 
-static void bouquet_loadNamesFromFile(struct list_head *listHead, char *bouquet_file);
+static void bouquet_loadNamesFromFile(listHead_t *listHead, char *bouquet_file);
 static void bouquet_loadServicesFromFile(struct list_head *listHead, char *bouquet_file);
 static void get_bouquets_blacklist(struct list_head *listHead, char *bouquet_file);
 
@@ -336,7 +331,7 @@ static void bouquet_loadFromFile(typeBouquet_t type, const char *bouquetName)
 
 			snprintf(fileName, sizeof(fileName), "%s/%s/bouquets.tv", BOUQUET_CONFIG_DIR, bouquetName);
 			bouquet_loadNamesFromFile(&digitalBouquet.name_tv, fileName);
-			if(!list_empty(&digitalBouquet.name_tv)) {
+			if(!list_empty(&digitalBouquet.name_tv.head)) {
 				//Use first name only here
 				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&digitalBouquet.name_tv, 0));
 				bouquet_loadServicesFromFile(&digitalBouquet.channelsList, fileName/*tv*/);
@@ -344,7 +339,7 @@ static void bouquet_loadFromFile(typeBouquet_t type, const char *bouquetName)
 
 			snprintf(fileName, sizeof(fileName), "%s/%s/bouquets.radio", BOUQUET_CONFIG_DIR, bouquetName);
 			bouquet_loadNamesFromFile(&digitalBouquet.name_radio, fileName);
-			if(!list_empty(&digitalBouquet.name_radio)) {
+			if(!list_empty(&digitalBouquet.name_radio.head)) {
 				//Use first name only here
 				snprintf(fileName, sizeof(fileName), "%s/%s/%s", BOUQUET_CONFIG_DIR, bouquetName, strList_get(&digitalBouquet.name_radio, 0));
 				bouquet_loadServicesFromFile(&digitalBouquet.channelsList, fileName/*radio*/);
@@ -491,7 +486,7 @@ void bouquet_addScanChannels(void)
 
 }
 
-static void bouquet_loadNamesFromFile(struct list_head *listHead, char *bouquet_file)
+static void bouquet_loadNamesFromFile(listHead_t *listHead, char *bouquet_file)
 {
 	char buf[BUFFER_SIZE];
 	FILE *fd;
@@ -1271,7 +1266,7 @@ const char *bouquet_getCurrentName(typeBouquet_t btype)
 	return NULL;
 }
 
-struct list_head *bouquet_getNameList(typeBouquet_t btype)
+listHead_t *bouquet_getNameList(typeBouquet_t btype)
 {
 	switch(btype) {
 		case eBouquet_digital:
@@ -1544,6 +1539,11 @@ void bouquet_init(void)
 		mkdir(BOUQUET_CONFIG_DIR_ANALOG, 0777);
 	}
 
+	strList_init(bouquet_getNameList(eBouquet_digital), 0);
+	strList_init(bouquet_getNameList(eBouquet_analog), 0);
+	strList_init(&digitalBouquet.name_tv, 0);
+	strList_init(&digitalBouquet.name_radio, 0);
+
 	bouquet_updateNameList(eBouquet_digital, 0);
 	bouquet_updateNameList(eBouquet_analog, 0);
 
@@ -1560,7 +1560,7 @@ void bouquet_terminate(void)
 	//TODO: free more obviosly
 	bouquet_setCurrentName(eBouquet_digital, NULL);
 	bouquet_setCurrentName(eBouquet_analog, NULL);
-	
+
 	strList_release(bouquet_getNameList(eBouquet_digital));
 	strList_release(bouquet_getNameList(eBouquet_analog));
 }
