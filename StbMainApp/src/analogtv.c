@@ -818,6 +818,7 @@ int32_t analogNames_load(void)
 				}
 			}
 		}
+		commonList_sort(&analogChannelsNamesHead);
 		fclose(fd);
 	} else {
 		eprintf("%s(): Cant open file " ANALOGTV_CONFIG_DIR "/tvchannels.txt: %m\n", __func__);
@@ -832,7 +833,7 @@ listHead_t *analogNames_getList(void)
 
 static int32_t analogNames_init(void)
 {
-	strList_init(&analogChannelsNamesHead, 0);
+	strList_init(&analogChannelsNamesHead, 1);
 	return 0;
 }
 
