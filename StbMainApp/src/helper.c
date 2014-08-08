@@ -26,6 +26,7 @@
 *******************************************************************/
 #define TEMP_CONFIG_FILE             "/var/tmp/cfg.tmp"
 #define commonList_getPtrToObj(pos)  (((void *)pos) + sizeof(struct list_head))
+#define commonList_getPtrToList(obj) (((void *)obj) - sizeof(struct list_head))
 #define commonList_isValid(listHead) ((listHead == NULL) ? 0 : 1)
 
 /******************************************************************
@@ -503,4 +504,49 @@ const void *commonList_get(listHead_t *commonList, uint32_t number)
 		id++;
 	}
 	return NULL;
+}
+
+static int commonList_cmp_qsort_r(const void *p1, const void *p2, void *pArg)
+{
+	listHead_t *commonList = (listHead_t *)pArg;
+
+	if(commonList->compar == NULL) {
+		return 0;//is this right?
+	}
+	return commonList->compar(*((const void **)p1), *((const void **)p2), commonList->pArg);
+}
+
+
+int32_t commonList_sort(listHead_t *commonList)
+{
+	const void **array;
+	uint32_t count = commonList_count(commonList);
+	uint32_t i;
+	struct list_head *pos;
+
+	if(commonList->compar == NULL) {
+		eprintf("%s(): Comparison function not setted!\n", __func__);
+		return -3;
+	}
+
+	array = malloc(count * sizeof(void *));
+	if(array == NULL) {
+		eprintf("%s(): Error allocating memory %dB!", __func__, sizeof(void *) * count);
+		return -1;
+	}
+
+	i = 0;
+	list_for_each(pos, &commonList->head) {
+		array[i] = commonList_getPtrToObj(pos);
+		i++;
+	}
+	qsort_r(array, count, sizeof(void *), commonList_cmp_qsort_r, (void *)commonList);
+
+	for(i = 0; i < count; i++) {
+		pos = commonList_getPtrToList(array[i]);
+		list_del(pos);
+		list_add_tail(pos, &commonList->head);
+	}
+	free(array);
+	return 0;
 }
