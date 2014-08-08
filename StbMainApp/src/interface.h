@@ -810,22 +810,15 @@ typedef struct
 } interfaceMessageBox_t;
 
 typedef struct {
-	char  *text;
-	/** If type is interfaceMessageBoxCallback then return value 0 closes message box.
-	 * If type is interfaceMessageBoxScrolling then return value 0 mean command was processed by callback,
-	 * non-zero mean to execute default action (scroll or close)
-	 */
-// 	menuConfirmFunction       pCallback;
-// 	void *pArg;
-} interfaceMessageListEntry_t;
-
-typedef struct {
 	interfaceMessageBoxType_t type;
 	int   icon;
 	char  title[MENU_ENTRY_INFO_LENGTH];
 
 	int entrySelected;
-	listHead_t *strListHead;
+	listHead_t  *strListHead;
+	const char **selectionList;
+	uint32_t     selectionCount;
+	uint32_t     selectionNeedRebuild;
 	struct {
 		interfaceColor_t title;
 		interfaceColor_t text;

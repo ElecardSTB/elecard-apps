@@ -199,8 +199,6 @@ static int interface_displayPosterBox(void);
 
 static int interface_hideMessageBoxEvent(void *pArg);
 
-static int interface_hideListBoxEvent(void *pArg);
-
 static void interface_enterChannelList(void);
 
 static void interface_reinitializeListMenu(interfaceMenu_t *pMenu);
@@ -9014,7 +9012,7 @@ void interface_displayTextListBoxColor( int targetX, int targetY, char *message,
 	y += fh;
 
 	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
-		const char *str = strList_get(interfaceInfo.messageList.strListHead, i);
+		const char *str = interfaceInfo.messageList.selectionList[i];
 		if(str) {
 			DFBCHECK(pFont->GetStringExtents(pFont, str, -1, &rect, NULL));
 			int l = getMaxStringLengthForFont(pFont, str, maxWidth);
@@ -9168,7 +9166,7 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 	}
 	ty += fh;
 	for(int i = lineOffset; i < lineCount && i < lineOffset + visibleLines; i++) {
-		const char *str = strList_get(interfaceInfo.messageList.strListHead, i);
+		const char *str = interfaceInfo.messageList.selectionList[i];
 		if (str != 0) {
 			DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, str, -1, &rect, NULL) );
 			int l = getMaxStringLengthForFont(pgfx_font, str, maxWidth);
@@ -9207,7 +9205,7 @@ void interface_displayListBoxColor( int x, int y, int w, int h,
 				    y + interfaceInfo.paddingSize - headerShift,
 				    INTERFACE_SCROLLBAR_WIDTH,
 				    height - 2*interfaceInfo.paddingSize,
-				    strList_count(interfaceInfo.messageList.strListHead), visibleLines, lineOffset );
+				    interfaceInfo.messageList.selectionCount, visibleLines, lineOffset );
 
 	DFBCHECK( DRAWING_SURFACE->SetDrawingFlags(DRAWING_SURFACE, DSDRAW_NOFX) );
 }
@@ -9239,7 +9237,7 @@ void interface_displayListBox(void)
 					interfaceInfo.messageList.colors.background.R, interfaceInfo.messageList.colors.background.G,
 					interfaceInfo.messageList.colors.background.B, interfaceInfo.messageList.colors.background.A,
    					pgfx_font, interfaceInfo.messageList.scrolling.offset,interfaceInfo.messageList.scrolling.shift,
-					interfaceInfo.messageList.scrolling.visibleLines, strList_count(interfaceInfo.messageList.strListHead));
+					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.selectionCount);
 			}break;
 			case interfaceMessageList:
 			{
@@ -9250,7 +9248,7 @@ void interface_displayListBox(void)
 					interfaceInfo.messageList.target.w, interfaceInfo.messageList.target.h,
 					(const int *)interfaceInfo.messageList.title, icons, interfaceInfo.messageList.scrolling.shift,
 					interfaceInfo.messageList.scrolling.offset,
-					interfaceInfo.messageList.scrolling.visibleLines, strList_count(interfaceInfo.messageList.strListHead),
+					interfaceInfo.messageList.scrolling.visibleLines, interfaceInfo.messageList.selectionCount,
 					interfaceInfo.messageList.icon,
 					interfaceInfo.messageList.colors.border.R, interfaceInfo.messageList.colors.border.G,
 					interfaceInfo.messageList.colors.border.B, interfaceInfo.messageList.colors.border.A,
@@ -9263,34 +9261,28 @@ void interface_displayListBox(void)
 	}
 }
 
-static int interface_hideListBoxEvent(void *pArg)
-{
-	if(interfaceInfo.messageList.type != interfaceMessageBoxNone) {
-		interface_removeEvent(interface_hideListBoxEvent, pArg);
-		interfaceInfo.messageList.type = interfaceMessageBoxNone;
-		interfaceInfo.messageList.entrySelected = 0;
-		interfaceInfo.messageList.scrolling.offset = 0;
-		interfaceInfo.messageList.scrolling.shift = 0;
-		interface_displayMenu(1);
-	}
-
-	return 0;
-}
-
 void interface_hideListBox(void)
 {
-	interface_hideListBoxEvent(NULL);
+	//dprintf("interface: hide messagebox\n");
+	if(interfaceInfo.messageList.type != interfaceMessageBoxNone) {
+		interfaceInfo.messageList.type = interfaceMessageBoxNone;
+		interfaceInfo.messageList.entrySelected = -1;
+		interfaceInfo.messageList.scrolling.offset = 0;
+		interfaceInfo.messageList.scrolling.shift = -1;
+		if(interfaceInfo.messageList.selectionList) {
+			free(interfaceInfo.messageList.selectionList);
+			interfaceInfo.messageList.selectionList = NULL;
+		}
+		interfaceInfo.messageList.selectionCount = 0;
+		interface_displayMenu(1);
+	}
 }
 
 static void interface_showTextListBox(const char *header, int icon, menuConfirmFunction pCallback, void *pArg)
 {
-	interface_removeEvent(interface_hideListBoxEvent, (void*)0);
-
-	STRMAXCPY(interfaceInfo.messageList.title, header, MAX_MESSAGE_BOX_LENGTH);	
-	
 	int fh;
 
-	//dprintf("%s: scrolling in: '%s'\n", __FUNCTION__, text);
+	STRMAXCPY(interfaceInfo.messageList.title, header, MAX_MESSAGE_BOX_LENGTH);	
 
 	pgfx_font->GetHeight(pgfx_font, &fh);
 
@@ -9306,7 +9298,50 @@ static void interface_showTextListBox(const char *header, int icon, menuConfirmF
 	interfaceInfo.messageList.target.h = interfaceInfo.screenHeight/4;
 
 	interfaceInfo.messageList.type = interfaceMessageListCallback;
-	
+
+	if(interfaceInfo.messageList.selectionNeedRebuild) {
+		const char *str;
+		char buf[256];
+		uint32_t i;
+		uint32_t j;
+		uint32_t bufLength = 0;
+		interfaceEnterTextInfo_t *field = (interfaceEnterTextInfo_t *)pArg;
+
+		//Get only field->currentPattern!
+		i = 0;
+		while(field->subPatterns[field->currentPattern].data[i] != L'\0') {
+			int ret = utf8_wctomb((uint8_t *)(buf + bufLength), field->subPatterns[field->currentPattern].data[i], sizeof(buf) - bufLength);
+			if(ret > 0) {
+				bufLength += ret;
+			}
+			i++;
+			if(i >= sizeof(field->subPatterns[field->currentPattern].data)) {
+				break;
+			}
+		}
+		if(bufLength < sizeof(buf)) {
+			buf[bufLength] = 0;
+		} else {
+			buf[sizeof(buf) - 1] = 0;
+			bufLength = sizeof(buf) - 1;
+		}
+
+		i = 0;
+		j = 0;
+		while((str = strList_get(interfaceInfo.messageList.strListHead, i)) != NULL) {
+			if(strncasecmp(str, buf, bufLength) == 0) {
+				interfaceInfo.messageList.selectionList[j] = str;
+				j++;
+			}
+			i++;
+		}
+		interfaceInfo.messageList.selectionCount = j;
+		interfaceInfo.messageList.scrolling.offset = 0;
+		interfaceInfo.messageList.scrolling.shift = -1;
+		interfaceInfo.messageList.entrySelected = -1;
+		interfaceInfo.messageList.selectionNeedRebuild = 0;
+	}
+
 	interface_displayMenu(1);
 }
 
@@ -9341,45 +9376,26 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 	dprintf("%s: %d (%c)\n", __FUNCTION__, cmd->command, cmd->command);
 
 	appControlInfo.inputMode = field->inputMode; 
-	
-	if (field->inputMode == inputModeABC &&
-		((cmd->source != DID_KEYBOARD && /* not keyboard */
-		cmd->repeat != 0 &&
-		cmd->original >= interfaceCommand0 &&
-		cmd->original <= interfaceCommand9) ||
-		((cmd->original == interfaceCommandUp ||
-		 cmd->original == interfaceCommandDown))))
-	{
-		interfaceCommandEvent_t newcmd;
- 		//eprintf("%s: repeat symbol\n", __FUNCTION__);
-		newcmd.command = 8;
-		newcmd.repeat  = 0;
-		newcmd.source  = DID_KEYBOARD;
-		interface_listBoxEnterTextProcessCommand(pMenu, &newcmd, pArg);
-	}
-	if (cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit)
-	{
-		if ( field->pCallback != NULL )
+
+	if(cmd->command == interfaceCommandRed || cmd->command == interfaceCommandExit) {
+		if(field->pCallback != NULL) {
 			field->pCallback(pMenu, NULL, field->pArg);
+		}
 
 		appControlInfo.inputMode = inputModeDirect;
 		interface_hideListBox();
 		return 0;
-	} else if (cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk)
-	{
+	} else if(cmd->command == interfaceCommandGreen || cmd->command == interfaceCommandEnter || cmd->command == interfaceCommandOk) {
 		interface_enterTextGetValue(field);
-		if (field->pCallback != NULL)
-		{
+		if(field->pCallback != NULL) {
 			ret = field->pCallback(pMenu, field->value, field->pArg);
 		}
 		appControlInfo.inputMode = inputModeDirect;
 		interface_hideListBox();
 		return ret;
-	} else if (cmd->command == interfaceCommandRight)
-	{
+	} else if (cmd->command == interfaceCommandRight) {
 		posdiff = 1;
-	} else if (cmd->command == interfaceCommandLeft)
-	{
+	} else if (cmd->command == interfaceCommandLeft) {
 		posdiff = -1;
 	} else if((field->inputMode == inputModeABC)
 			&& (   (cmd->command == interfaceCommandUp)
@@ -9389,7 +9405,7 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 				))
 	{//List navigation
 		int32_t visibleLines = interfaceInfo.messageList.scrolling.visibleLines; //reduce code
-		int32_t entryCount = strList_count(interfaceInfo.messageList.strListHead);
+		int32_t entryCount = interfaceInfo.messageList.selectionCount;
 		int32_t move = 0;
 
 		table_IntInt_t listMoves[] = {
@@ -9447,7 +9463,6 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 			interfaceInfo.messageList.scrolling.shift = newPosition - windowOffset;
 			interfaceInfo.messageList.entrySelected = newPosition;
 			clear = 1;
-			newchar = 127;
 		}
 	} else if(cmd->command == 127) {
 		newchar = 127; // delete
@@ -9494,14 +9509,11 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 	/* Get pattern count */
 	interface_enterTextGetPatternCount( field, &patternCount, &patternLength );
 	/* Check if we've got a new char */
-	if (newchar != 0 && newchar != 8 && newchar != 127)
-	{
-		if (patternLength > 0 && field->currentSymbol >= patternLength)
-		{
+	if((newchar != 0) && (newchar != 8) && (newchar != 127)) {
+		if(patternLength > 0 && field->currentSymbol >= patternLength) {
 			field->currentSymbol = 0;
 			field->currentPattern++;
-			if (field->currentPattern >= patternCount)
-			{
+			if(field->currentPattern >= patternCount) {
 				field->currentPattern = 0;
 			}
 		}
@@ -9523,8 +9535,7 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 				char chnext, chcur;
 #endif
 				chcur = field->subPatterns[field->currentPattern].data[field->currentSymbol];
-				for (i=field->currentSymbol+1; chcur!=0; i++)
-				{
+				for(i = field->currentSymbol + 1; chcur != 0; i++) {
 					chnext = field->subPatterns[field->currentPattern].data[i];
 					field->subPatterns[field->currentPattern].data[i] = chcur;
 					chcur = chnext;
@@ -9533,20 +9544,20 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 			field->subPatterns[field->currentPattern].data[field->currentSymbol] = newchar;
 			posdiff = 1;
 			field->lastChar = newchar;
+			interfaceInfo.messageList.selectionNeedRebuild = 1;
 		}
-	} else if ((newchar == 127) && (clear))
-	{
+	} else if(clear) {
 		int size;
 #ifdef WCHAR_SUPPORT
 		wchar_t *msg;
-		if ((strList_count(interfaceInfo.messageList.strListHead) > 0) && (interfaceInfo.messageList.entrySelected >= 0)) {
-			const char *str = strList_get(interfaceInfo.messageList.strListHead, interfaceInfo.messageList.entrySelected);
+		if((interfaceInfo.messageList.selectionCount > 0) && (interfaceInfo.messageList.entrySelected >= 0)) {
+			const char *str = interfaceInfo.messageList.selectionList[interfaceInfo.messageList.entrySelected];
 			int dest_index = 0;
 			int mb_count;
 
 			msg = calloc(strlen(str) + 1, sizeof(wchar_t));
-			while (*str && dest_index < MAX_FIELD_PATTERN_LENGTH &&
-			      (mb_count = utf8_mbtowc((wchar_t *)&msg[dest_index], (unsigned char *)str, strlen(str))) > 0 )
+			while(*str && dest_index < MAX_FIELD_PATTERN_LENGTH &&
+				(mb_count = utf8_mbtowc((wchar_t *)&msg[dest_index], (unsigned char *)str, strlen(str))) > 0 )
 			{
 				dest_index++;
 				str += mb_count;
@@ -9557,8 +9568,8 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 		size = wcslen(msg);
 #else
 		char *msg;
-		if ((strList_count(interfaceInfo.messageList.strListHead) > 0) && (interfaceInfo.messageList.entrySelected >= 0)) {
-			msg = strdup(strList_get(interfaceInfo.messageList.strListHead, interfaceInfo.messageList.entrySelected));
+		if((interfaceInfo.messageList.selectionCount > 0) && (interfaceInfo.messageList.entrySelected >= 0)) {
+			msg = strdup(interfaceInfo.messageList.selectionList[interfaceInfo.messageList.entrySelected]);
 		} else {
 			msg = strdup("");
 		}
@@ -9570,32 +9581,24 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 			field->currentSymbol = size;
 		}
 		free(msg);
-	} else if (newchar == 127)
-	{
-		if (field->subPatterns[field->currentPattern].data[field->currentSymbol] != 0)
-		{
-			if (field->currentSymbol-1 >= 0)
-			{
+	} else if(newchar == 127) {//delete
+		if(field->subPatterns[field->currentPattern].data[field->currentSymbol] != 0) {
+			if(field->currentSymbol - 1 >= 0) {
 				field->lastChar = field->subPatterns[field->currentPattern].data[field->currentSymbol-1];
-			} else
-			{
+			} else {
 				field->lastChar = 0;
 			}
-			for (i=field->currentSymbol;field->subPatterns[field->currentPattern].data[i]!=0; i++)
-			{
+			for(i = field->currentSymbol; field->subPatterns[field->currentPattern].data[i] != 0; i++) {
 				field->subPatterns[field->currentPattern].data[i] = field->subPatterns[field->currentPattern].data[i+1];
 			}
-
-		} else if (field->currentSymbol > 0)
-		{
+			interfaceInfo.messageList.selectionNeedRebuild = 1;
+		} else if(field->currentSymbol > 0) {
 			newchar = 8;
 		}
 	}
 
-	if (newchar == 8)
-	{
-		if (field->currentSymbol == 0 && field->currentPattern > 0)
-		{
+	if(newchar == 8) {//backspace
+		if(field->currentSymbol == 0 && field->currentPattern > 0) {
 			field->currentPattern--;
 #ifdef WCHAR_SUPPORT
 			field->currentSymbol = wcslen(field->subPatterns[field->currentPattern].data);
@@ -9604,26 +9607,23 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 #endif
 		}
 
-		if (field->currentSymbol > 0)
-		{
-			if (field->subPatterns[field->currentPattern].data[field->currentSymbol-1] != 0)
-			{
-				field->lastChar = field->subPatterns[field->currentPattern].data[field->currentSymbol-1];
-				for (i=field->currentSymbol-1;field->subPatterns[field->currentPattern].data[i]!=0; i++)
-				{
-					field->subPatterns[field->currentPattern].data[i] = field->subPatterns[field->currentPattern].data[i+1];
+		if(field->currentSymbol > 0) {
+			if(field->subPatterns[field->currentPattern].data[field->currentSymbol-1] != 0) {
+				field->lastChar = field->subPatterns[field->currentPattern].data[field->currentSymbol - 1];
+				for(i = field->currentSymbol - 1; field->subPatterns[field->currentPattern].data[i] != 0; i++) {
+					field->subPatterns[field->currentPattern].data[i] = field->subPatterns[field->currentPattern].data[i + 1];
 				}
 				field->currentSymbol--;
 			}
-		} else
-		{
+		} else {
 			field->lastChar = 0;
 		}
+		interfaceInfo.messageList.selectionNeedRebuild = 1;
 	}
 
 	/* Move input marker */
 	field->currentSymbol += posdiff;
-	if (posdiff > 0 && ((patternLength > 0 && field->currentSymbol >= patternLength) ||
+	if(posdiff > 0 && ((patternLength > 0 && field->currentSymbol >= patternLength) ||
 #ifdef WCHAR_SUPPORT
 		field->currentSymbol > (int)wcslen(field->subPatterns[field->currentPattern].data)
 #else
@@ -9633,16 +9633,13 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 	{
 		field->currentSymbol = 0;
 		field->currentPattern++;
-		if (field->currentPattern >= patternCount)
-		{
+		if(field->currentPattern >= patternCount) {
 			field->currentPattern = 0;
 		}
-	} else if (posdiff < 0 && field->currentSymbol < 0)
-	{
+	} else if(posdiff < 0 && field->currentSymbol < 0) {
 		field->currentPattern--;
-		if (field->currentPattern < 0)
-		{
-			field->currentPattern = patternCount-1;
+		if(field->currentPattern < 0) {
+			field->currentPattern = patternCount - 1;
 		}
 #ifdef WCHAR_SUPPORT
 		field->currentSymbol = wcslen(field->subPatterns[field->currentPattern].data);
@@ -9703,13 +9700,10 @@ int interface_listBoxGetText(interfaceMenu_t *pMenu,
 {
 	int i;
 	interfaceEnterTextInfo_t *info;
-	char *field;
 	interfaceCommandEvent_t cmd;
 	int patternCount;
-#ifdef WCHAR_SUPPORT
-	int dest_index;
-	int mb_count;
-#endif
+	const char *str;
+
 	info = (interfaceEnterTextInfo_t *)dmalloc(sizeof(interfaceEnterTextInfo_t));
 
 	memset(info, 0, sizeof(interfaceEnterTextInfo_t));
@@ -9728,19 +9722,32 @@ int interface_listBoxGetText(interfaceMenu_t *pMenu,
 	interfaceInfo.messageList.scrolling.shift = -1;//for no selection at begin
 	interfaceInfo.messageList.entrySelected = -1;
 
+	interfaceInfo.messageList.selectionCount = strList_count(listHead);
+	interfaceInfo.messageList.selectionList = malloc(interfaceInfo.messageList.selectionCount * sizeof(char *));
+	if(interfaceInfo.messageList.selectionList == NULL) {
+		eprintf("%s(): Error allocating memory %dB!", __func__, interfaceInfo.messageList.selectionCount * sizeof(char *));
+		return -1;
+	}
+
+	i = 0;
+	while((str = strList_get(listHead, i)) != NULL) {
+		interfaceInfo.messageList.selectionList[i] = str;
+		i++;
+	}
+
 	interface_enterTextGetPatternCount(info, &patternCount, NULL);
 
-	for (i=0;i<patternCount; i++)
-	{
-		if (pGetFields != NULL)
-		{
-			field = pGetFields(i, pArg);
-			if (field != NULL)
-			{
+	for(i = 0; i < patternCount; i++) {
+		if(pGetFields != NULL) {
+			char *field = pGetFields(i, pArg);
+			if(field != NULL) {
 #ifdef WCHAR_SUPPORT
+				int dest_index;
+				int mb_count;
+
 				info->subPatterns[i].data[0] = 0;
 				dest_index = 0;
-				while (*field && dest_index < MAX_FIELD_PATTERN_LENGTH && (mb_count = utf8_mbtowc(&info->subPatterns[i].data[dest_index], (unsigned char *)field, strlen(field))) > 0 )
+				while(*field && dest_index < MAX_FIELD_PATTERN_LENGTH && (mb_count = utf8_mbtowc(&info->subPatterns[i].data[dest_index], (unsigned char *)field, strlen(field))) > 0 )
 				{
 					dest_index++;
 					field += mb_count;
