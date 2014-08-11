@@ -1491,7 +1491,7 @@ void *keyThread(void *pArg)
 		if(result == DFB_OK)
 		{
 			eventBuffer->GetEvent(eventBuffer, &event);
-			eventBuffer->Reset(eventBuffer);
+// 			eventBuffer->Reset(eventBuffer);
 
 			if(!helperIsEventValid(&event))
 				continue;
