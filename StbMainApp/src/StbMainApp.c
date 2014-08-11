@@ -1519,14 +1519,9 @@ void *keyThread(void *pArg)
 					output_toggleOutputModes();
 					continue;
 				}
-				if(event.input.key_symbol == DIKS_CUSTOM2) { // Source
+				if(event.input.key_symbol == DIKS_CUSTOM3) { //Source
 					output_toggleInputs();
 					continue;
-				}
-
-				/// TODO : redo: F1 will always disable inputs first
-				if(event.input.key_symbol == DIKS_F1) { // interfaceCommandRed, Cancel all inputs
-					output_setInput(NULL, INPUT_NONE);
 				}
 #endif
 

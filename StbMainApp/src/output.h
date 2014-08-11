@@ -159,9 +159,7 @@ int output_setZoom(zoomPreset_t preset);
 int output_readInterfacesFile(void);
 int output_toggleOutputModes(void);
 
-#define INPUT_NONE "None"
 int output_toggleInputs(void);
-int output_setInput(interfaceMenu_t *pMenu, void* pArg);
 
 void output_onUpdate(int found);
 #endif

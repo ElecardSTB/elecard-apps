@@ -121,7 +121,10 @@ bouquetAnalog_t analogBouquet = {
 	.channelCountVisible  = 0,
 	.channelList          = LIST_HEAD_INIT(analogBouquet.channelList),
 };
+
+static listHead_t inputNamesHead;
 static listHead_t analogChannelsNamesHead;
+static const char *inputSelected = 0;
 
 /******************************************************************
 * FUNCTION DECLARATION                     <Module>[_<Word>+]  *
@@ -140,6 +143,8 @@ static void analogtv_cleanList(void)
 
 void analogtv_init(void)
 {
+	extInput_init();
+
 	if(!helperCheckDirectoryExsists(ANALOGTV_CONFIG_DIR)) {
 		mkdir(ANALOGTV_CONFIG_DIR, 0777);
 	}
@@ -154,6 +159,7 @@ void analogtv_terminate(void)
 	analogtv_stop();
 	analogtv_cleanList();
 
+	extInput_release();
 	analogNames_release();
 }
 
@@ -771,6 +777,117 @@ analog_service_t *analogList_add(struct list_head *listHead)
 	memset(new_element, 0, sizeof(analog_service_t));
 	list_add_tail(&(new_element->channelList), listHead);
 	return new_element;
+}
+
+int32_t extInput_set(const char *name, char *descr)
+{
+#ifdef STSDK
+  	elcdRpcType_t type;
+	cJSON        *res   = NULL;
+	cJSON        *param = cJSON_CreateObject();
+	if(param == NULL) {
+		eprintf("%s(): Error on creating cJSON object!\n", __func__);
+		return -1;
+	}
+#endif
+
+	//stop any playback
+	gfx_stopVideoProvider(screenMain, 1, 1);
+#ifdef STSDK
+	cJSON_AddItemToObject(param, "input", cJSON_CreateString(name));
+	st_rpcSync(elcmd_setvinput, param, &type, &res);
+	cJSON_Delete(param);
+	st_isOk(type, res, __func__);
+	cJSON_Delete(res);
+#endif
+	inputSelected = strList_find(&inputNamesHead, name);
+
+	return 0;
+}
+
+int32_t extInput_disble(void)
+{
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON        *res   = NULL;
+	st_rpcSync(elcmd_disablevinput, NULL, &type, &res);
+//	st_isOk(type, res, __FUNCTION__);
+	cJSON_Delete(res);
+	inputSelected = NULL;
+#endif
+	gfx_resumeVideoProvider(screenMain);
+
+	return 0;
+}
+
+
+listHead_t *extInput_getList(void)
+{
+	return &inputNamesHead;
+}
+
+int32_t extInput_getSelectedId(void)
+{
+	int32_t id;
+	if(inputSelected == NULL) {
+		return -1;
+	}
+	id = commonList_findId(&inputNamesHead, inputSelected);
+	if(id < 0) {
+		return -1;
+	}
+	return id;
+}
+
+int32_t extInput_init(void)
+{
+#ifdef STSDK
+	elcdRpcType_t  type;
+	cJSON         *list;
+	int32_t        ret;
+
+	strList_init(&inputNamesHead, 1);
+
+	ret = st_rpcSync(elcmd_listvinput, NULL, &type, &list);
+	if((ret == 0) && (type == elcdRpcResult) && list && (list->type == cJSON_Array)) {
+		cJSON *inputItem;
+		uint32_t i;
+
+		for(i = 0; (inputItem = cJSON_GetArrayItem(list, i)) != NULL; i++) {
+			char *name;
+			const char *newStr;
+			int32_t isSelected;
+
+			name = objGetString(inputItem, "name", NULL);
+			if(name == NULL) {
+				continue;
+			}
+			if(strcasecmp(name, "none") == 0) {
+				continue;
+			}
+			newStr = strList_add(&inputNamesHead, name);
+
+			isSelected = objGetInt(inputItem, "selected", 0);
+			if(isSelected == 1) {
+				inputSelected = newStr;
+			}
+		}
+	} else {
+		if((type == elcdRpcError) && list && (list->type == cJSON_String)) {
+			eprintf("%s: failed to get video inputs: %s\n", __FUNCTION__, list->valuestring);
+		}
+	}
+	if(list) {
+		cJSON_Delete(list);
+	}
+#endif
+	return 0;
+}
+
+int32_t extInput_release(void)
+{
+	strList_release(&inputNamesHead);
+	return 0;
 }
 
 int32_t analogNames_isExist(void)

@@ -141,6 +141,15 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex);
 
 int32_t analogtv_registerCallbackOnChange(changeCallback_t *pCallback, void *pArg);
 
+//Inputs API (in common this not relate to analogtv, but now it here)
+int32_t     extInput_set(const char *name, char *descr);
+int32_t     extInput_getSelectedId(void);
+int32_t     extInput_disble(void);
+listHead_t *extInput_getList(void);
+
+int32_t     extInput_init(void);
+int32_t     extInput_release(void);
+
 int32_t     analogNames_isExist(void);
 int32_t     analogNames_download(void);
 int32_t     analogNames_load(void);
