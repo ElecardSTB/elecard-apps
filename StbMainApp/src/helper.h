@@ -37,10 +37,10 @@
 
 #define strList_release(commonList)                  commonList_release(commonList)
 #define strList_add(commonList, str)                 commonList_add(commonList, str)
-#define strList_add_head(commonList, str)            commonList_add_head(commonList, str)
+#define strList_add_head(commonList, str)            (const char *)commonList_add_head(commonList, str)
 #define strList_remove(commonList, str)              commonList_remove(commonList, str)
 #define strList_isExist(commonList, str)             commonList_isExist(commonList, str)
-#define strList_find(commonList, str)                commonList_find(commonList, str)
+#define strList_find(commonList, str)                (const char *)commonList_find(commonList, str)
 #define strList_get(commonList, number)              (const char *)commonList_get(commonList, number)
 #define strList_remove_last(commonList)              commonList_remove_last(commonList)
 #define strList_count(commonList)                    commonList_count(commonList)
@@ -104,15 +104,16 @@ int32_t	stripEnterInStr(const char *str);
 int32_t commonList_init       (listHead_t *commonList, compareFunc_t *compar, void *pArg, size_t objSize, getLengthFunc_t *len);
 int32_t commonList_release    (listHead_t *commonList);
 
-int32_t commonList_add        (listHead_t *commonList, const void *pArg);
-int32_t commonList_add_head   (listHead_t *commonList, const void *pArg);
-int32_t commonList_remove     (listHead_t *commonList, const void *pArg);
-int32_t commonList_remove_last(listHead_t *commonList);
-int32_t commonList_isExist    (listHead_t *commonList, const void *pArg);
-int32_t commonList_count      (listHead_t *commonList);
-int32_t commonList_find       (listHead_t *commonList, const void *pArg);
-const void *commonList_get    (listHead_t *commonList, uint32_t number);
-int32_t commonList_sort       (listHead_t *commonList);
+const void *commonList_add        (listHead_t *commonList, const void *pArg);
+const void *commonList_add_head   (listHead_t *commonList, const void *pArg);
+int32_t     commonList_remove     (listHead_t *commonList, const void *pArg);
+int32_t     commonList_remove_last(listHead_t *commonList);
+int32_t     commonList_isExist    (listHead_t *commonList, const void *pArg);
+int32_t     commonList_count      (listHead_t *commonList);
+const void *commonList_find       (listHead_t *commonList, const void *pArg);
+int32_t     commonList_findId     (listHead_t *commonList, const void *pArg);
+const void *commonList_get        (listHead_t *commonList, uint32_t number);
+int32_t     commonList_sort       (listHead_t *commonList);
 
 //String list API
 int32_t strList_init(listHead_t *commonList, int32_t isCaseSensivity);

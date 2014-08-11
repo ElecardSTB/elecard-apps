@@ -354,28 +354,28 @@ static struct list_head *commonList_createListItem(listHead_t *commonList, const
 	return (struct list_head *)newItem;
 }
 
-int32_t commonList_add_head(listHead_t *commonList, const void *pArg)
+const void *commonList_add_head(listHead_t *commonList, const void *pArg)
 {
 	struct list_head *listItem;
 	listItem = commonList_createListItem(commonList, pArg);
 	if(listItem == NULL) {
-		return -1;
+		return NULL;
 	}
 
 	list_add(listItem, &commonList->head);
-	return 0;
+	return commonList_getPtrToObj(listItem);
 }
 
-int32_t commonList_add(listHead_t *commonList, const void *pArg)
+const void *commonList_add(listHead_t *commonList, const void *pArg)
 {
 	struct list_head *listItem;
 	listItem = commonList_createListItem(commonList, pArg);
 	if(listItem == NULL) {
-		return -1;
+		return NULL;
 	}
 
 	list_add_tail(listItem, &commonList->head);
-	return 0;
+	return commonList_getPtrToObj(listItem);
 }
 
 int32_t commonList_remove(listHead_t *commonList, const void *pArg)
@@ -450,10 +450,30 @@ int32_t commonList_count(listHead_t *commonList)
 	return id;
 }
 
-int32_t commonList_find(listHead_t *commonList, const void *pArg)
+const void *commonList_find(listHead_t *commonList, const void *pArg)
 {
 	struct list_head *pos;
-	uint32_t id = 0;
+	if(!commonList_isValid(commonList) || !pArg) {
+		eprintf("%s(): Wrong arguments!\n", __func__);
+		return NULL;
+	}
+	if(commonList->compar == NULL) {
+		eprintf("%s(): Comparison function not setted!\n", __func__);
+		return NULL;
+	}
+	list_for_each(pos, &commonList->head) {
+		if(commonList->compar(commonList_getPtrToObj(pos), pArg, commonList->pArg) == 0) {
+			return commonList_getPtrToObj(pos);
+		}
+	}
+
+	return NULL;
+}
+
+int32_t commonList_findId(listHead_t *commonList, const void *pArg)
+{
+	struct list_head *pos;
+	int32_t id = 0;
 	if(!commonList_isValid(commonList) || !pArg) {
 		eprintf("%s(): Wrong arguments!\n", __func__);
 		return -2;
