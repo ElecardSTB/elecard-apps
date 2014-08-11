@@ -4521,23 +4521,7 @@ static int analogtv_changeAnalogAudio(interfaceMenu_t *pMenu, void* pArg)
 
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
-/*
-static int analogtv_sendToServer(interfaceMenu_t *pMenu, void* pArg)
-{
-	interface_showMessageBox(_T("ANALOGTV_SENDING_CHFILE"), thumbnail_info, 0);
-	interface_hideMessageBox();
-	return 0;
-}
-*/
-/*
-static int analogtv_downloadFromServer(interfaceMenu_t *pMenu, void* pArg)
-{
-	interface_showMessageBox(_T("ANALOGTV_DOWNLOADING_CHFILE"), thumbnail_info, 0);
-	interface_hideMessageBox();
 
-	return 0;
-}
-*/
 static int output_enterAnalogTvMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	interfaceMenu_t * tvMenu = &AnalogTvSubMenu.baseMenu;
