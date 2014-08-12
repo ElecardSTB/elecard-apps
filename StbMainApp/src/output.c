@@ -6273,25 +6273,24 @@ void output_buildMenu(interfaceMenu_t *pParent)
 
 	createListMenu(&VideoSubMenu, _T("VIDEO_CONFIG"), settings_video, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterVideoMenu, NULL, NULL);
-#ifdef STSDK
+
 	if(strList_count(extInput_getList()) > 0) {
 		createListMenu(&InputsSubMenu, _T("INPUTS_CONFIG"), settings_video, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, NULL, NULL, NULL);
 		output_fillInputsMenu(&InputsSubMenu, NULL);
 	}
-#endif
+
 #ifdef ENABLE_ANALOGTV
 	if(analogtv_hasTuner()) {
 		createListMenu(&AnalogTvSubMenu, _T("ANALOGTV_CONFIG"), settings_dvb, NULL, _M &OutputMenu,
 		interfaceListMenuIconThumbnail, output_enterAnalogTvMenu, NULL, NULL);
 	}
 #endif
-#ifdef STSDK
-	if(currentmeter_isExist()){
+
+	if(currentmeter_isExist()) {
 		createListMenu(&CurrentmeterSubMenu, _T("CURRENTMETER_CALIBRATE"), settings_dvb, NULL, _M &OutputMenu,
 			interfaceListMenuIconThumbnail, output_enterCalibrateMenu, NULL, NULL);
 	}
-#endif
 
 #ifdef ENABLE_3D
 	createListMenu(&Video3DSubMenu, _T("3D_SETTINGS"), settings_video, NULL, _M &OutputMenu,

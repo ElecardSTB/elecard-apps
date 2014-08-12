@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "app_info.h"
 #include "interface.h"
+#include "helper.h"
 
 #include <platform.h>
 //#include <sdp.h>
@@ -165,6 +166,11 @@ static inline int32_t analogtv_getServiceDescription(uint32_t index, char *buf, 
 static inline int32_t menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index) { return 0; }
 
 static inline int32_t analogtv_hasTuner(void) { return 0; }
+
+static inline int32_t extInput_set(const char *name, char *descr) { return 0; }
+static inline int32_t extInput_getSelectedId(void) { return -1; }
+static inline int32_t extInput_disble(void) { return 0; }
+static inline listHead_t *extInput_getList(void) { return NULL; }
 #endif /* ENABLE_ANALOGTV */
 
 #endif /* __ANALOGTV_H__      Do not add any thing below this line */
