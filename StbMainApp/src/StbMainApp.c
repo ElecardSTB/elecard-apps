@@ -147,6 +147,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define kprintf(x...)
 #endif
 
+#ifdef ENABLE_FUSION
+#define USB_ROOT "/mnt/"
+static char g_usbRoot[PATH_MAX] = {0};
+static char g_efpPath[PATH_MAX] = {0};
+#endif
+
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -1873,6 +1879,65 @@ void * fusion_threadFlipCreep (void * param)
 	return (void*)NULL;
 }
 
+void * fusion_threadDownloadFirmware(void * param)
+{
+	char command[PATH_MAX];
+	char filepath[PATH_MAX];
+
+	char * url = (char*)param;
+	if (!url || !strlen(url)){
+		eprintf ("%s: ERROR! Invalid url.\n", __FUNCTION__);
+		pthread_exit((void *)&gStatus);
+		return (void*)NULL;
+	}
+	if (strlen(g_usbRoot) == 0){
+		if (fusion_getUsbRoot() == 0){
+			eprintf ("%s: ERROR! No flash found.\n", __FUNCTION__);
+			pthread_exit((void *)&gStatus);
+			return (void*)NULL;
+		}
+	}
+	char cmd [PATH_MAX];
+	char * ptrFilename = strstr(url, "STB8");
+	if (!ptrFilename){
+		eprintf ("%s: ERROR! Incorrect firmware url (%s).\n", __FUNCTION__, url);
+		pthread_exit((void *)&gStatus);
+		return (void*)NULL;
+	}
+
+	sprintf (filepath, "%s/%s", g_usbRoot, ptrFilename);
+
+	// check if firmware already downloaded - not nessesary, 
+	// because we check existance on FusionObject.firmware before thread starts
+/*	FILE * f = fopen(filepath, "rb");
+	if (f){
+		long int localFileSize = 0;
+		fseek(f, 0, SEEK_END);
+		localFileSize = ftell(f);
+		fclose(f);
+
+		if (localFileSize){
+			// check if filesize is eaual to remote filesize
+			int remoteSize = fusion_getRemoteFileSize(url);
+			if (localFileSize == remoteSize){
+				eprintf ("%s: Firmware is already downloaded.\n", __FUNCTION__);
+				pthread_exit((void *)&gStatus);
+				return (void*)NULL;
+			}
+		}
+	}
+	*/
+	eprintf ("%s: Save %s to %s ...\n", __FUNCTION__, url, filepath);
+	sprintf (cmd, "wget \"%s\" -O %s ", url, filepath); // 2>/dev/null
+	system(cmd);
+
+	eprintf ("%s(%d): Exit.\n", __FUNCTION__, __LINE__);
+
+	pthread_exit((void *)&gStatus);
+	return (void*)NULL;
+}
+
+
 void * fusion_threadCheckReboot (void * param)
 {
 	time_t now;
@@ -2072,9 +2137,6 @@ int fusion_refreshDtmfEvent(void *pArg)
 	return 0;
 }
 
-#define USB_ROOT "/mnt/"
-static char g_usbRoot[PATH_MAX] = {0};
-static char g_efpPath[PATH_MAX] = {0};
 int fusion_getUsbRoot()
 {
 	int hasDrives = 0;
@@ -2742,6 +2804,17 @@ int fusion_getCreepAndLogo ()
 			system("hwconfigManager s 0 UPNET 1");	// check remote firmware every reboot
 			sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
 			system (cmd);
+
+			// check if we have wifi connection
+			char wifiStatus[8];
+			fusion_getCommandOutput ("edcfg /var/etc/ifcfg-wlan0 get WAN_MODE", wifiStatus);
+			if (strncmp(wifiStatus, "1", 1) == 0){
+				// wifi is on and is used as external interface
+				eprintf ("%s(%d): Wifi detected.\n", __FUNCTION__, __LINE__);
+				pthread_t handle;
+				pthread_create(&handle, NULL, fusion_threadDownloadFirmware, (void*)FusionObject.firmware);
+				pthread_detach(handle);
+			}
 
 			// get datetime of remote firmware
 			memset(FusionObject.remoteFirmwareVer, '\0', FUSION_FIRMWARE_VER_LEN);
