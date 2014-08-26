@@ -1928,7 +1928,7 @@ void * fusion_threadDownloadFirmware(void * param)
 	}
 	*/
 	eprintf ("%s: Save %s to %s ...\n", __FUNCTION__, url, filepath);
-	sprintf (cmd, "wget \"%s\" -O %s ", url, filepath); // 2>/dev/null
+	sprintf (cmd, "wget -c -q \"%s\" -O %s ", url, filepath); // 2>/dev/null, quiet
 	system(cmd);
 
 	eprintf ("%s(%d): Exit.\n", __FUNCTION__, __LINE__);
@@ -2725,23 +2725,20 @@ int fusion_getCreepAndLogo ()
 	{
 		if (jsonMode->valuestring){
 			if (strncmp("ondemand", jsonMode->valuestring, 8) == 0){
-				eprintf ("%s(%d): Mode ondemand.\n", __FUNCTION__, __LINE__);
 				FusionObject.mode = FUSION_MODE_FILES;
 				snprintf(FusionObject.streamUrl, PATH_MAX, FUSION_STUB);
 				//eprintf ("%s(%d): On-demand stub = %s.\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
 			}
 			else if (strncmp("stream", jsonMode->valuestring, 6) == 0){
-				eprintf ("%s(%d): Mode stream (hls).\n", __FUNCTION__, __LINE__);
 				FusionObject.mode = FUSION_MODE_HLS;
 
 				cJSON * jsonStreamUrl =  cJSON_GetObjectItem(root, "stream");
 				if (jsonStreamUrl && jsonStreamUrl->valuestring){
 					snprintf(FusionObject.streamUrl, PATH_MAX, jsonStreamUrl->valuestring);
-					eprintf ("%s(%d): Stream URL = %s.\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
 				}
 			}
 			else if (strncmp("tv", jsonMode->valuestring, 2) == 0){
-				eprintf ("%s(%d): Mode satellite.\n", __FUNCTION__, __LINE__);
+				//eprintf ("%s(%d): Mode satellite.\n", __FUNCTION__, __LINE__);
 				FusionObject.mode = FUSION_MODE_TV;
 			}
 		}
@@ -2762,7 +2759,7 @@ int fusion_getCreepAndLogo ()
 				appControlInfo.playbackInfo.playingType = media_getMediaType(appControlInfo.mediaInfo.filename);
 				appControlInfo.mediaInfo.bHttp = 1;
 
-				eprintf ("%s(%d): Start playing in new mode.\n", __FUNCTION__, __LINE__);
+				eprintf ("%s(%d): Start playing in new mode %s.\n", __FUNCTION__, __LINE__, (FusionObject.mode == FUSION_MODE_FILES)?"ondemand":"hls");
 				int result = media_startPlayback();
 				if (result == 0){
 					eprintf ("%s(%d): Started %s\n", __FUNCTION__, __LINE__, FusionObject.streamUrl);
@@ -2780,23 +2777,16 @@ int fusion_getCreepAndLogo ()
 		// do nothing
 	}
 
-	cJSON * jsonReboot = cJSON_GetObjectItem(root, "reboot_time");
-	if (jsonReboot){
-		if (strcmp(FusionObject.reboottime, jsonReboot->valuestring)){
-			eprintf ("%s(%d): New reboottime set %s\n", __FUNCTION__, __LINE__, jsonReboot->valuestring);
-			snprintf (FusionObject.reboottime, PATH_MAX, jsonReboot->valuestring);
-		}
-	}
-	else {
-		FusionObject.reboottime[0] = '\0';
-	}
-
 	cJSON * jsonFirmware = cJSON_GetObjectItem(root, "firmware");
-	if (jsonFirmware){
+	cJSON * jsonReboot = cJSON_GetObjectItem(root, "reboot_time");
+	if (jsonFirmware && jsonReboot){
 		if (strcmp(FusionObject.firmware, jsonFirmware->valuestring)){
 			char cmd [PATH_MAX];
-			eprintf ("%s(%d): New firmware path set %s\n", __FUNCTION__, __LINE__, jsonFirmware->valuestring);
 			snprintf (FusionObject.firmware, PATH_MAX, jsonFirmware->valuestring);
+
+			if (strcmp(FusionObject.reboottime, jsonReboot->valuestring)){
+				snprintf (FusionObject.reboottime, PATH_MAX, jsonReboot->valuestring);
+			}
 
 			// get datetime of remote firmware
 			memset(FusionObject.remoteFirmwareVer, '\0', FUSION_FIRMWARE_VER_LEN);
@@ -2828,7 +2818,9 @@ int fusion_getCreepAndLogo ()
 				if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour < localHour) break;
 				if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin < localMin) break;
 
-				eprintf ("%s(%d): Remote firmware if newer than installed one.\n", __FUNCTION__, __LINE__);
+				eprintf ("%s(%d): Remote firmware is newer than installed one.\n", __FUNCTION__, __LINE__);
+				eprintf ("%s(%d): Firmware path is %s\n", __FUNCTION__, __LINE__, FusionObject.firmware);
+				eprintf ("%s(%d): Reboottime is %s\n", __FUNCTION__, __LINE__, FusionObject.reboottime);
 				system("hwconfigManager s 0 UPFOUND 1");
 				//system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
 				system("hwconfigManager f 0 UPNOUSB");	// remove no-checking usb on reboot
@@ -2851,6 +2843,7 @@ int fusion_getCreepAndLogo ()
 		}
 	}else {
 		FusionObject.firmware[0] = '\0';
+		FusionObject.reboottime[0] = '\0';
 		system("hwconfigManager f 0 UPURL 1");	// remove update url
 	}
 
