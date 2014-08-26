@@ -150,7 +150,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_FUSION
 #define USB_ROOT "/mnt/"
 static char g_usbRoot[PATH_MAX] = {0};
-static char g_efpPath[PATH_MAX] = {0};
 #endif
 
 
@@ -168,6 +167,8 @@ long fusion_getRemoteFileSize(char * url);
 int fusion_getSecret ();
 int fusion_setMoscowDateTime();
 int fusion_getUtc (char * utcBuffer, int size);
+int fusion_getUsbRoot();
+int32_t fusion_checkDirectory(const char *path);
 #endif
 
 /******************************************************************
@@ -1881,7 +1882,6 @@ void * fusion_threadFlipCreep (void * param)
 
 void * fusion_threadDownloadFirmware(void * param)
 {
-	char command[PATH_MAX];
 	char filepath[PATH_MAX];
 
 	char * url = (char*)param;
@@ -1947,6 +1947,7 @@ void * fusion_threadCheckReboot (void * param)
 	{
 		if (strlen(FusionObject.reboottime) && (strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN) != 0))
 		{
+			// todo : check if remote firmware is older 
 			time (&now);
 			nowDate = *localtime (&now);
 
@@ -2637,7 +2638,6 @@ int fusion_downloadMarkFile(int index, char * folderPath)
 int fusion_removeOldMarkVideo(char * folderPath)
 {
 	DIR *d;
-	int i;
 	struct dirent *dir;
 	if (!folderPath) return -1;
 
@@ -2681,7 +2681,7 @@ int fusion_getCreepAndLogo ()
 {
 	cJSON * root;
 	char request[FUSION_URL_LEN];
-	unsigned int i;
+	int i;
 	time_t now;
 	struct tm nowDate;
 	int result = 0;
@@ -2798,24 +2798,6 @@ int fusion_getCreepAndLogo ()
 			eprintf ("%s(%d): New firmware path set %s\n", __FUNCTION__, __LINE__, jsonFirmware->valuestring);
 			snprintf (FusionObject.firmware, PATH_MAX, jsonFirmware->valuestring);
 
-			system("hwconfigManager s 0 UPFOUND 1");
-			//system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
-			system("hwconfigManager f 0 UPNOUSB");	// remove no-checking usb on reboot
-			system("hwconfigManager s 0 UPNET 1");	// check remote firmware every reboot
-			sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
-			system (cmd);
-
-			// check if we have wifi connection
-			char wifiStatus[8];
-			fusion_getCommandOutput ("edcfg /var/etc/ifcfg-wlan0 get WAN_MODE", wifiStatus);
-			if (strncmp(wifiStatus, "1", 1) == 0){
-				// wifi is on and is used as external interface
-				eprintf ("%s(%d): Wifi detected.\n", __FUNCTION__, __LINE__);
-				pthread_t handle;
-				pthread_create(&handle, NULL, fusion_threadDownloadFirmware, (void*)FusionObject.firmware);
-				pthread_detach(handle);
-			}
-
 			// get datetime of remote firmware
 			memset(FusionObject.remoteFirmwareVer, '\0', FUSION_FIRMWARE_VER_LEN);
 			char * ptrDev = strstr(FusionObject.firmware, "dev");
@@ -2830,6 +2812,42 @@ int fusion_getCreepAndLogo ()
 					}
 				}
 			}
+			// check if remoteFirmwareVer is older then installed one
+			// then dont save params in hwconfig to prevent overwriting
+			int remoteMon, remoteDay, remoteYear, remoteHour, remoteMin;
+			int localMon, localDay, localYear, localHour, localMin;
+			int scannedItemsRemote, scannedItemsLocal;
+			// eg. 201407251445
+			scannedItemsRemote = sscanf(FusionObject.remoteFirmwareVer, "%04d%02d%02d%02d%02d", &remoteYear, &remoteMon, &remoteDay, &remoteHour, &remoteMin);
+			scannedItemsLocal = sscanf(FusionObject.localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
+			do {
+				if (scannedItemsRemote != 5 || scannedItemsLocal != 5) break;
+				if (remoteYear < localYear) break;
+				if (remoteYear == localYear && remoteMon < localMon) break;
+				if (remoteYear == localYear && remoteMon == localMon && remoteDay < localDay) break;
+				if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour < localHour) break;
+				if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin < localMin) break;
+
+				eprintf ("%s(%d): Remote firmware if newer than installed one.\n", __FUNCTION__, __LINE__);
+				system("hwconfigManager s 0 UPFOUND 1");
+				//system("hwconfigManager s 0 UPNOUSB 1");	// switch off usb check
+				system("hwconfigManager f 0 UPNOUSB");	// remove no-checking usb on reboot
+				system("hwconfigManager s 0 UPNET 1");	// check remote firmware every reboot
+				sprintf (cmd, "hwconfigManager l 0 UPURL '%s'", FusionObject.firmware);
+				system (cmd);
+
+				// check if we have wifi connection
+				char wifiStatus[8];
+				fusion_getCommandOutput ("edcfg /var/etc/ifcfg-wlan0 get WAN_MODE", wifiStatus);
+				if (strncmp(wifiStatus, "1", 1) == 0){
+					// wifi is on and is used as external interface
+					eprintf ("%s(%d): Wifi detected.\n", __FUNCTION__, __LINE__);
+					pthread_t handle;
+					pthread_create(&handle, NULL, fusion_threadDownloadFirmware, (void*)FusionObject.firmware);
+					pthread_detach(handle);
+				}
+
+			} while (0);
 		}
 	}else {
 		FusionObject.firmware[0] = '\0';
