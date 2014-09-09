@@ -1041,6 +1041,8 @@ typedef struct _interfaceFusionObject_t {
 	char localFirmwareVer[FUSION_FIRMWARE_VER_LEN];
 	char remoteFirmwareVer[FUSION_FIRMWARE_VER_LEN];
 
+	char savedPlaylist[FUSION_STREAM_SIZE];
+
 	char demoUrl[PATH_MAX];
 	fusion_mark_t marks[FUSION_MAX_MARKS];
 
@@ -1049,6 +1051,8 @@ typedef struct _interfaceFusionObject_t {
 	char * preallocSurface;
 
 } interfaceFusionObject_t;
+
+void interface_updateFusionCreepSurface();
 #endif
 
 struct __toggleEntryArg_t;
