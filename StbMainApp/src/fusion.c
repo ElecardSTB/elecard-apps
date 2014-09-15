@@ -210,8 +210,8 @@ void * fusion_threadCheckReboot (void * param)
 				break;
 			}
 		}
+		fusion_wait(20 * 1000);
 	}
-	fusion_wait(20 * 1000);
 
 	pthread_exit((void *)&gStatus);
 	return (void*)NULL;
