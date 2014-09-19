@@ -100,6 +100,7 @@ typedef struct
 
 static void  st_syncCallback(elcdRpcType_t type, cJSON *result, void* pArg);
 static void* st_poolThread(void* pArg);
+static int st_setVideoFormat(const char *output, const char *mode);
 
 /******************************************************************
 * STATIC DATA                  g[k|p|kp|pk|kpk]<Module>_<Word>+   *
@@ -149,7 +150,6 @@ static int32_t g_board_ver = 0;
 int st_init(void)
 {
 	int res;
-
 	memset(&pool, 0, sizeof(pool));
 
 #ifdef RPC_DUMP
@@ -169,6 +169,12 @@ int st_init(void)
 		eprintf("%s: (!) failed to create pool thread: %s\n", __FUNCTION__, strerror(res));
 	}
 
+#ifdef ENABLE_FUSION
+
+#define FUSION_PREFERRED_FMT "1080i60"
+	eprintf("%s: st_setVideoFormat %s\n", __FUNCTION__, FUSION_PREFERRED_FMT);
+	st_setVideoFormat("main", FUSION_PREFERRED_FMT);
+#endif
 	return res;
 }
 

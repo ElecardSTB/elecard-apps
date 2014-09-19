@@ -416,6 +416,8 @@ void fusion_getLocalFirmwareVer()
 
 void fusion_startup()
 {
+	system ("echo 3 >/proc/sys/vm/drop_caches");
+
 	if (fusion_setMoscowDateTime() != 0){
 		return;
 	}
