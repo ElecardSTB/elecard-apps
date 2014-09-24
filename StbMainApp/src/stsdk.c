@@ -171,7 +171,7 @@ int st_init(void)
 
 #ifdef ENABLE_FUSION
 
-#define FUSION_PREFERRED_FMT "1080i60"
+#define FUSION_PREFERRED_FMT "1080i50"
 	eprintf("%s: st_setVideoFormat %s\n", __FUNCTION__, FUSION_PREFERRED_FMT);
 	st_setVideoFormat("main", FUSION_PREFERRED_FMT);
 #endif
