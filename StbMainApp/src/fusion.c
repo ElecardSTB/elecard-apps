@@ -1147,10 +1147,13 @@ int fusion_getCreepAndLogo ()
 
 			long logoFileSize = fusion_getRemoteFileSize(FusionObject.logos[i].url);
 
-			if (logoFileSize == -1){	// failed to get remote size
+			if (logoFileSize <= 0){
+				eprintf ("%s(%d): WARNING! Failed to get remote logo size.\n", __FUNCTION__, __LINE__);
 				FusionObject.logos[i].filepath[0] = '\0';
 				continue;
 			}
+			// remove and wget only if we got remote size
+
 			char tmpStr[PATH_MAX];
 			char * ptr, *ptrSlash;
 			sprintf (tmpStr, "%s", FusionObject.logos[i].url);
