@@ -942,7 +942,7 @@ static int32_t bouquet_parseNameListFile(typeBouquet_t btype, const char *path)
 	
 	fd = fopen(path, "r");
 	if(fd == NULL) {
-		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, path);
+		eprintf("%s: Failed to open '%s': %m\n", __func__, path);
 		return -2;
 	}
 	// check head file name

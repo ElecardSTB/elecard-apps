@@ -188,7 +188,7 @@ int32_t setParam(const char *path, const char *param, const char *value)
 	return 0;
 }
 
-int32_t stripEnterInStr(const char *str)
+int32_t stripEnterInStr(char *str)
 {
 	char *ch;
 	if(!str) {
@@ -204,6 +204,19 @@ int32_t stripEnterInStr(const char *str)
 	}
 
 	return 0;
+}
+
+char *skipSpacesInStr(char *str)
+{
+	if(str == NULL) {
+		eprintf("%s(): Wrong argument!\n", __func__);
+		return NULL;
+	}
+	while((*str != 0)
+			&& ((*str == ' ') || (*str == '\t'))) {
+		str++;
+	}
+	return str;
 }
 
 const char *table_IntStrLookup(const table_IntStr_t table[], int32_t key, char *defaultValue)

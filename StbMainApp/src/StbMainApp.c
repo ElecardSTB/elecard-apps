@@ -1011,11 +1011,7 @@ void *testServerThread(void *pArg)
 					int todo = -1;
 
 					ptr = ibuf+strlen("seterrorled ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					todo = atoi(ptr);
 
@@ -1033,11 +1029,7 @@ void *testServerThread(void *pArg)
 					int todo = -1;
 
 					ptr = ibuf+strlen("setstandbyled ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					todo = atoi(ptr);
 
@@ -1055,11 +1047,7 @@ void *testServerThread(void *pArg)
 					int format = -1;
 
 					ptr = ibuf+strlen("outputmode ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					if (strcmp(ptr, "cvbs") == 0 || strcmp(ptr, "composite") == 0)
 					{
@@ -1094,11 +1082,7 @@ void *testServerThread(void *pArg)
 					int channel = -1;
 
 					ptr = ibuf+strlen("dvbchannel ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					channel = atoi(ptr);
 
@@ -1157,11 +1141,7 @@ void *testServerThread(void *pArg)
 					unsigned long from, to, step, speed;
 
 					ptr = ibuf+strlen("dvbscan ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					if (sscanf(ptr, "%lu %lu %lu %lu", &from, &to, &step, &speed) == 4 &&
 						from > 1000 && to > 1000 && step >= 1000 && speed <= 10)
@@ -1244,11 +1224,7 @@ void *testServerThread(void *pArg)
 				else if (strstr(ibuf, "playvod ") == ibuf)
 				{
 					ptr = ibuf+strlen("playvod ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					if (strstr(ptr, "rtsp://") != NULL && rtsp_playURL(screenMain, ptr, NULL, NULL) == 0)
 					{
@@ -1260,11 +1236,7 @@ void *testServerThread(void *pArg)
 				} else if (strstr(ibuf, "playrtp ") == ibuf)
 				{
 					ptr = ibuf+strlen("playrtp ");
-
-					while (*ptr != 0 && *ptr == ' ')
-					{
-						ptr++;
-					}
+					ptr = skipSpacesInStr(ptr);
 
 					if (strstr(ptr, "://") != NULL && rtp_playURL(screenMain, ptr, NULL, NULL) == 0)
 					{
@@ -1297,12 +1269,13 @@ void *testServerThread(void *pArg)
 				else if (strncmp(ibuf, "newmsg", 6) == 0)
 				{
 					appControlInfo.messagesInfo.newMessage = messages_checkNew();
-					if (appControlInfo.messagesInfo.newMessage)
+					if(appControlInfo.messagesInfo.newMessage) {
 #ifdef MESSAGES_NAGGING
-					messages_showFile(appControlInfo.messagesInfo.newMessage);
+						messages_showFile(appControlInfo.messagesInfo.newMessage);
 #else
-					interface_displayMenu(1);
+						interface_displayMenu(1);
 #endif
+					}
 				}
 #endif // ENABLE_MESSAGES
 #ifdef STSDK
@@ -1321,8 +1294,7 @@ void *testServerThread(void *pArg)
 				}
 
 				write(s, obuf, strlen(obuf)+1);
-			} else if (pos >= (int)sizeof(ibuf)-1)
-			{
+			} else if(pos >= ((int)sizeof(ibuf) - 1)) {
 				pos = 0;
 			}
 		}
