@@ -678,23 +678,18 @@ static int32_t dvbfe_scanSTAPISDKTuners()
 
 static uint32_t dvbfe_getBandwidthHz(fe_bandwidth_t bw)
 {
-	switch(bw) {
-	  case BANDWIDTH_8_MHZ:
-		return 8000000;
-	  case BANDWIDTH_7_MHZ:
-		return 7000000;
-	  case BANDWIDTH_6_MHZ:
-		return 6000000;
-	  case BANDWIDTH_5_MHZ:
-		return 5000000;
-	  case BANDWIDTH_10_MHZ:
-		return 10000000;
-	  case BANDWIDTH_1_712_MHZ:
-		return 1712000;
-	  default:
-		break;
-	}
-	return 0;//AUTO
+	table_IntInt_t bands[] = {
+		{BANDWIDTH_8_MHZ, 8000000},
+		{BANDWIDTH_7_MHZ, 7000000},
+		{BANDWIDTH_6_MHZ, 6000000},
+		{BANDWIDTH_5_MHZ, 5000000},
+		{BANDWIDTH_10_MHZ, 10000000},
+		{BANDWIDTH_1_712_MHZ, 1712000},
+		{BANDWIDTH_AUTO, 0},
+		TABLE_INT_INT_END_VALUE
+	};
+
+	return table_IntIntLookup(bands, bw, 0);
 }
 
 
@@ -762,7 +757,7 @@ static int32_t dvbfe_setParamLinuxDVBapi(uint32_t adapter, fe_delivery_system_t 
 		fe_modulation_t modulation = QPSK;
 		uint32_t polarization = media->dvb_s.polarization;
 		uint32_t symbol_rate = media->dvb_s.symbol_rate;
-		uint32_t freqLO;
+		uint32_t freqLO = 0;
 		uint32_t tone = SEC_TONE_OFF;
 
 		if((TUNER_C_BAND_START <= frequency) && (frequency <= TUNER_C_BAND_END)) {
