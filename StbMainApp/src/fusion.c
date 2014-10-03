@@ -1,4 +1,4 @@
-
+#ifdef ENABLE_FUSION
 #include "fusion.h"
 //#include "helper.h"
 
@@ -1417,3 +1417,4 @@ void fusion_cleanup()
 	pthread_mutex_destroy(&FusionObject.mutexLogo);
 	pthread_mutex_destroy(&FusionObject.mutexDtmf);
 }
+#endif // ENABLE_FUSION
