@@ -1279,18 +1279,18 @@ void *testServerThread(void *pArg)
 				}
 #endif // ENABLE_MESSAGES
 				else if(strncmp(ibuf, "fastmsg ", sizeof("fastmsg ") - 1) == 0) {
-					int32_t showtime = 0;
+					int32_t delaytime = 0;
 					ptr = ibuf + sizeof("fastmsg ") - 1;
-					if(strncmp(ptr, "-t", sizeof("-t") - 1) == 0) {
-						ptr = ptr + sizeof("-t") - 1;
-						showtime = strtol(ptr, &ptr, 10);
-						if(showtime < 0) {
-							showtime = 0;
+					if(strncmp(ptr, "-d", sizeof("-d") - 1) == 0) {
+						ptr = ptr + sizeof("-d") - 1;
+						delaytime = strtol(ptr, &ptr, 10);
+						if(delaytime < 0) {
+							delaytime = 0;
 						}
 					}
 					ptr = skipSpacesInStr(ptr);
 
-					interface_showMessageBox(ptr, 0, showtime ? (showtime * 1000) : 10000);
+					interface_showMessageBox(ptr, 0, delaytime ? (delaytime * 1000) : 10000);
 				}
 #ifdef STSDK
 				else if (strncmp(ibuf, "has_update", 10) == 0) {
