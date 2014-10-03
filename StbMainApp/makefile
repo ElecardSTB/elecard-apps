@@ -1,7 +1,7 @@
 
 #
-# Elecard STB820 Demo Application
-# Copyright (C) 2007  Elecard Devices
+# Elecard STB UI Main Application
+# Copyright (C) 2007-2014  Elecard Devices
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -391,6 +391,14 @@ endif
 ifeq ($(ENABLE_USE_DVB_APPS),1)
 	LOCAL_CFLAGS += -DENABLE_USE_DVB_APPS
 	LOCAL_LDFLAGS += -ldvbapi -lucsi
+endif
+
+ifneq ($(SHOW_LOGO_IMAGE),)
+	SEP_FLAGS_interface.c += -DSHOW_LOGO_IMAGE=\"$(SHOW_LOGO_IMAGE)\"
+endif
+
+ifneq ($(SHOW_LOGO_TEXT),)
+	SEP_FLAGS_interface.c += -DSHOW_LOGO_TEXT=\"$(SHOW_LOGO_TEXT)\"
 endif
 
 # -----------------------------------------------------------------------------
