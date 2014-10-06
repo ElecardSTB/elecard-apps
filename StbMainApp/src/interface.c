@@ -1418,7 +1418,7 @@ void interface_displayScrollingTextBoxColor( int x, int y, int w, int h,
 
 void interface_displayMessageBox()
 {
-	int *icons = NULL;
+	const int32_t *icons = NULL;
 	if ( interfaceInfo.messageBox.type != interfaceMessageBoxNone )
 	{
 		tprintf("-----------------------------------------------------------\n");
@@ -1430,17 +1430,23 @@ void interface_displayMessageBox()
 		switch ( interfaceInfo.messageBox.type )
 		{
 			case interfaceMessageBoxCallback:
-				if ( !interfaceInfo.keypad.enable )
-					icons = (interfaceInfo.messageBox.pCallback == interface_enterTextCallback && 
-					         appControlInfo.inputMode == inputModeABC) ?
-					  (int*)interface_textBoxIcons :
-					  (int*)interface_confirmBoxIcons;
+				if(!interfaceInfo.keypad.enable) {
+					if(interfaceInfo.messageBox.customIconsEnable) {
+						icons = interfaceInfo.messageBox.customIcons;
+					} else if((interfaceInfo.messageBox.pCallback == interface_enterTextCallback)
+							|| (appControlInfo.inputMode == inputModeABC))
+					{
+						icons = interface_textBoxIcons;
+					} else {
+						icons = interface_confirmBoxIcons;
+					}
+				}
 #ifdef ENABLE_REGPLAT
 				if (interfaceInfo.currentMenu == (interfaceMenu_t*)&regplatPaymentMenu && 
 				    summary_amount != NULL && atoi(summary_amount) > atoi(card_balance))
 				{
-					int interface_confBoxIcns[] = {statusbar_f1_cancel,0,0,0};
-					icons = (int*)interface_confBoxIcns;
+					static const int interface_confBoxIcns[] = {statusbar_f1_cancel,0,0,0};
+					icons = interface_confBoxIcns;
 				}
 #endif
 				tprintf("| Confirmation: YES/NO |");
@@ -6739,7 +6745,7 @@ void messageBox_setDefaultColors(void)
 	interfaceInfo.messageList.colors.title.A = INTERFACE_BORDER_ALPHA;
 }
 
-void interface_showConfirmationBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
+static void interface_showConfirmationBoxInternal(const char *text, int icon, menuConfirmFunction pCallback, void *pArg, const int32_t *icons)
 {
 	interface_removeEvent(interface_hideMessageBoxEvent, (void*)0);
 
@@ -6755,10 +6761,26 @@ void interface_showConfirmationBox(const char *text, int icon, menuConfirmFuncti
 	interfaceInfo.messageBox.target.w = 0;
 	interfaceInfo.messageBox.target.h = 0;
 	messageBox_setDefaultColors();
+	if(icons) {
+		memcpy(interfaceInfo.messageBox.customIcons, icons, sizeof(interfaceInfo.messageBox.customIcons));
+		interfaceInfo.messageBox.customIconsEnable = 1;
+	} else {
+		interfaceInfo.messageBox.customIconsEnable = 0;
+	}
 
 	interfaceInfo.messageBox.type = interfaceMessageBoxCallback;
 
 	interface_displayMenu(1);
+}
+
+void interface_showConfirmationBox(const char *text, int icon, menuConfirmFunction pCallback, void *pArg)
+{
+	interface_showConfirmationBoxInternal(text, icon, pCallback, pArg, NULL);
+}
+
+void interface_showConfirmationBoxCustomIcons(const char *text, int icon, menuConfirmFunction pCallback, void *pArg, const int32_t *icons)
+{
+	interface_showConfirmationBoxInternal(text, icon, pCallback, pArg, icons);
 }
 
 void interface_showMessageBox(const char *text, int icon, int hideDelay)
@@ -6779,6 +6801,7 @@ void interface_showMessageBox(const char *text, int icon, int hideDelay)
 	interfaceInfo.messageBox.target.y = interfaceInfo.screenHeight/2;
 	interfaceInfo.messageBox.target.w = 0;
 	interfaceInfo.messageBox.target.h = 0;
+	interfaceInfo.messageBox.customIconsEnable = 0;
 
 	interfaceInfo.messageBox.type = interfaceMessageBoxSimple;
 

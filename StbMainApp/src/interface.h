@@ -807,6 +807,10 @@ typedef struct
 	 */
 	menuConfirmFunction       pCallback;
 	void *pArg;
+
+	//custom icons
+	int32_t   customIconsEnable;
+	int32_t   customIcons[4];
 } interfaceMessageBox_t;
 
 typedef struct {
@@ -1728,7 +1732,10 @@ void interface_showPosterBox(const char *text, const char *title,
  *  @sa interface_hideMessageBox()
  */
 void interface_showConfirmationBox(const char *text, int icon,
-                                   menuConfirmFunction pCallback, void *pArg);
+									menuConfirmFunction pCallback, void *pArg);
+
+void interface_showConfirmationBoxCustomIcons(const char *text, int icon,
+									menuConfirmFunction pCallback, void *pArg, const int32_t *icons);
 
 void interface_hideMessageList(void);
 /**
