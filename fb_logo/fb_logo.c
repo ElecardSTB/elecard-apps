@@ -241,6 +241,7 @@ int32_t drawImage_fromFile(fb_logo_t *config, char *filename)
 	config->logo_x = x;
 	config->logo_y = y;
 
+	lseek(bmp_fd, bmp_header.bmp_offset, SEEK_SET);
 	row_size = 3 * bmp_w;
 	for(row = bmp_h - 1; row >= 0; row--) {
 		fb_offset = (x + p_vinfo->xoffset) * (p_vinfo->bits_per_pixel / 8) + (y + row + p_vinfo->yoffset) * p_finfo->line_length;
