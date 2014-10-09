@@ -419,7 +419,7 @@ void fusion_startup()
 	system ("echo 3 >/proc/sys/vm/drop_caches");
 
 	if (fusion_setMoscowDateTime() != 0){
-		return;
+		eprintf ("%s(%d): WARNING! use preset datetime.\n", __FUNCTION__, __LINE__);
 	}
 
 	memset(&FusionObject, 0, sizeof(interfaceFusionObject_t));
@@ -610,6 +610,7 @@ int fusion_setMoscowDateTime()
 	// set timezone
 	system("rm /var/etc/localtime");
 	system("ln -s /usr/share/zoneinfo/Russia/Moscow /var/etc/localtime");
+	system("hwclock -w -u");
 
 	return 0;
 }
