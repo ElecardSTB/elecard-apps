@@ -40,6 +40,7 @@ void fusion_ms2timespec(int ms, struct timespec * ts);
 int fusion_readConfig();
 int fusion_refreshDtmfEvent(void *pArg);
 int fusion_removeFirmwareFormFlash();
+void fusion_removeHwconfigUrl();
 int fusion_removeOldMarkVideo(char * folderPath);
 int fusion_setMoscowDateTime();
 void * fusion_threadCheckReboot (void * param);
@@ -173,6 +174,28 @@ void * fusion_threadDownloadFirmware(void * param)
 	return (void*)NULL;
 }
 
+int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmwareVer)
+{
+	int remoteMon, remoteDay, remoteYear, remoteHour, remoteMin;
+	int localMon, localDay, localYear, localHour, localMin;
+	int scannedItemsRemote, scannedItemsLocal;
+	//if (!localFirmwareVer || !remoteFirmwareVer) return NO;
+	if (!remoteFirmwareVer) return NO;
+	// eg. 201407251445
+	scannedItemsRemote = sscanf(remoteFirmwareVer, "%04d%02d%02d%02d%02d", &remoteYear, &remoteMon, &remoteDay, &remoteHour, &remoteMin);
+	scannedItemsLocal = sscanf(localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
+	do {
+		//if (scannedItemsRemote != 5 || scannedItemsLocal != 5) break;
+		if (scannedItemsRemote != 5) break;
+		if (remoteYear < localYear) break;
+		if (remoteYear == localYear && remoteMon < localMon) break;
+		if (remoteYear == localYear && remoteMon == localMon && remoteDay < localDay) break;
+		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour < localHour) break;
+		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin < localMin) break;
+		return YES;
+	} while (0);
+	return NO;
+}
 
 void * fusion_threadCheckReboot (void * param)
 {
@@ -181,9 +204,10 @@ void * fusion_threadCheckReboot (void * param)
 
 	while (1)
 	{
-		if (strlen(FusionObject.reboottime) && (strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN) != 0))
+		if (strlen(FusionObject.reboottime) && 
+			(strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN) != 0) && 
+			fusion_isRemoteFirmwareBetter(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer) == YES)
 		{
-			// todo : check if remote firmware is older 
 			time (&now);
 			nowDate = *localtime (&now);
 
@@ -405,6 +429,12 @@ int fusion_removeFirmwareFormFlash()
 	return result;
 }
 
+void fusion_removeHwconfigUrl()
+{
+	system ("hwconfigManager f 0 UPURL");
+	return;
+}
+
 void fusion_getLocalFirmwareVer()
 {
 	//FusionObject.localFirmwareVer[0] = '\0';
@@ -426,6 +456,7 @@ void fusion_startup()
 
 	fusion_getSecret();
 	fusion_removeFirmwareFormFlash();
+	fusion_removeHwconfigUrl();
 	fusion_getLocalFirmwareVer();
 
 	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
@@ -1072,22 +1103,8 @@ int fusion_getCreepAndLogo ()
 					}
 				}
 			}
-			// check if remoteFirmwareVer is older then installed one
-			// then dont save params in hwconfig to prevent overwriting
-			int remoteMon, remoteDay, remoteYear, remoteHour, remoteMin;
-			int localMon, localDay, localYear, localHour, localMin;
-			int scannedItemsRemote, scannedItemsLocal;
-			// eg. 201407251445
-			scannedItemsRemote = sscanf(FusionObject.remoteFirmwareVer, "%04d%02d%02d%02d%02d", &remoteYear, &remoteMon, &remoteDay, &remoteHour, &remoteMin);
-			scannedItemsLocal = sscanf(FusionObject.localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
-			do {
-				if (scannedItemsRemote != 5 || scannedItemsLocal != 5) break;
-				if (remoteYear < localYear) break;
-				if (remoteYear == localYear && remoteMon < localMon) break;
-				if (remoteYear == localYear && remoteMon == localMon && remoteDay < localDay) break;
-				if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour < localHour) break;
-				if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin < localMin) break;
-
+			if (fusion_isRemoteFirmwareBetter(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer) == YES)
+			{
 				eprintf ("%s(%d): Remote firmware is newer than installed one.\n", __FUNCTION__, __LINE__);
 				eprintf ("%s(%d): Firmware path is %s\n", __FUNCTION__, __LINE__, FusionObject.firmware);
 				eprintf ("%s(%d): Reboottime is %s\n", __FUNCTION__, __LINE__, FusionObject.reboottime);
@@ -1108,8 +1125,7 @@ int fusion_getCreepAndLogo ()
 					pthread_create(&handle, NULL, fusion_threadDownloadFirmware, (void*)FusionObject.firmware);
 					pthread_detach(handle);
 				}
-
-			} while (0);
+			}
 		}
 	}else {
 		FusionObject.firmware[0] = '\0';

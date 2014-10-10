@@ -19,6 +19,9 @@
 #include "interface.h"
 #include "stsdk.h"
 
+#define NO  0
+#define YES 1
+
 #define USB_ROOT "/mnt/"
 #define FUSION_PLAYLIST_NAME  "fusion.playlist"
 
