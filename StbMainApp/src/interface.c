@@ -2071,7 +2071,7 @@ static void interface_displayLogo(void)
 				break;
 			case FUSION_TOP_RIGHT:
 				left = interfaceInfo.screenWidth - w - 100;
-				top = 70;
+				top = 100;
 				break;
 			case FUSION_BOTTOM_LEFT:
 				left = 100;
