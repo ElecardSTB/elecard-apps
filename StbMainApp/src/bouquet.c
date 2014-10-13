@@ -474,6 +474,7 @@ void bouquet_addScanChannels(void)
 			}
 		} else {
 			service_index_data_t data;
+			memset(&data, 0, sizeof(data));
 			curService->common.media_id = curService->original_network_id;
 			data.visible = 1;
 			data.parent_control = 0;
