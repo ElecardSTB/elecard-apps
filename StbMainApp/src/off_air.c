@@ -903,6 +903,22 @@ static int32_t offair_audioChange(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 }
 #endif // !STSDK
 
+int32_t offair_dvbInfo(int32_t which)
+{
+#ifdef ENABLE_DVB_DIAG
+	/* Make diagnostics... */
+// 	if(appControlInfo.offairInfo.diagnosticsMode == DIAG_ON) {
+		offair_checkSignal(which, NULL);
+// 	}
+	//offair_setInfoUpdateTimer(which, 1);
+#else
+	appControlInfo.dvbInfo.showInfo = !appControlInfo.dvbInfo.showInfo;
+	offair_setInfoUpdateTimer(which, appControlInfo.dvbInfo.showInfo);
+#endif
+	interface_displayMenu(1);
+	return 0;
+}
+
 int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 {
 	int which = GET_NUMBER(pArg);
@@ -939,19 +955,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 #endif
 		offair_stopVideo(which, 1);
 	} else if(button == interfacePlayControlInfo) {
-#ifdef ENABLE_DVB_DIAG
-		/* Make diagnostics... */
-		//if (appControlInfo.offairInfo.diagnosticsMode == DIAG_ON)
-		{
-			offair_checkSignal(which, NULL);
-		}
-		//offair_setInfoUpdateTimer(which, 1);
-		interface_displayMenu(1);
-#else
-		appControlInfo.dvbInfo.showInfo = !appControlInfo.dvbInfo.showInfo;
-		offair_setInfoUpdateTimer(which, appControlInfo.dvbInfo.showInfo);
-		interface_displayMenu(1);
-#endif
+		offair_dvbInfo(which);
 		return 0;
 	} else
 #if 0 // !STSDK
@@ -2945,8 +2949,7 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			return 0;
 		}
 		break;
-#ifdef ENABLE_PVR
-#ifdef STBPNX
+#if (defined ENABLE_PVR) && (defined STBPNX)
 	case interfaceCommandRed:
 		switch( pMenu->selectedItem )
 		{
@@ -2991,8 +2994,7 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 		default: ;
 		}
 		break;
-#endif // STBPNX
-#endif // ENABLE_PVR
+#endif //#if (defined ENABLE_PVR) && (defined STBPNX)
 	case interfaceCommandGreen:
 		if( pMenu->selectedItem == MENU_ITEM_EVENT )
 		{

@@ -127,6 +127,7 @@ DVB_SCAN_FREQUENCY=Scan Custom Frequency
 DVB_SCANNING_SERVICE=Retrieving service info...
 DVB_SHOW_SCRAMBLED=Show Scrambled Channels in List
 DVB_SIGNAL_INFO=Signal strength: %d%%, %s
+DVB_SIGNAL_MONITOR=Signal monitoring
 DVB_SNR=Signal to noise ratio
 DVB_BER=Data quality
 DVB_UNCORRECTED=Data consistency

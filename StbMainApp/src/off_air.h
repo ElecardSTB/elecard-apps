@@ -311,4 +311,6 @@ int  offair_getCurrentChannel(void);
 
 int  offair_setPreviousChannel(int previousChannel);
 
+int32_t offair_dvbInfo(int32_t which);
+
 #endif /* __OFF_AIR_H      Do not add any thing below this line */

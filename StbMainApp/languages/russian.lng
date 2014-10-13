@@ -127,6 +127,7 @@ DVB_SCAN_FREQUENCY=Сканировать частоту
 DVB_SCANNING_SERVICE=Получение информации о канале...
 DVB_SHOW_SCRAMBLED=Зашифрованные каналы в списке
 DVB_SIGNAL_INFO=Сила сигнала: %d%%, %s
+DVB_SIGNAL_MONITOR=Слежение за сигналом
 DVB_SNR=Отношение Сигнал/Шум: %d%%
 DVB_BER=Качество принимаемых данных: %d%%
 DVB_UNCORRECTED=Корректность данных: %d%%

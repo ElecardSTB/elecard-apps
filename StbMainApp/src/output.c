@@ -3016,6 +3016,13 @@ static int output_changeDvbRange(interfaceMenu_t *pMenu, void* pArg)
 	return interface_getText(pMenu, buf, "\\d+", output_setDvbRange, output_getDvbRange, inputModeDirect, pArg);
 }
 
+static int output_dvbSignalMonitor(interfaceMenu_t *pMenu, void* pArg)
+{
+	interface_showMenu(0, 0);
+	offair_dvbInfo(appControlInfo.dvbInfo.adapter);
+	return 0;
+}
+
 int output_showDVBMenu(interfaceMenu_t *pMenu, void* notused)
 {
 	return interface_menuActionShowMenu(pMenu, &DVBSubMenu);
@@ -3149,6 +3156,8 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	if(delSys == SYS_DVBS) {
 		interface_addMenuEntry(dvbMenu, "DiSEqC", interface_menuActionShowMenu, &DiSEqCMenu, thumbnail_scan);
 	}
+
+	interface_addMenuEntry(dvbMenu, _T("DVB_SIGNAL_MONITOR"), output_dvbSignalMonitor, NULL, thumbnail_info);
 
 	return 0;
 }
