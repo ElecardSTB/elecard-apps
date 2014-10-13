@@ -4096,14 +4096,14 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 
 	dprintf("%s: in\n", __FUNCTION__);
 
-	if(cmd->command == interfaceCommandRed) {
+/*	if(cmd->command == interfaceCommandRed) {
 		appControlInfo.offairInfo.sorting = (appControlInfo.offairInfo.sorting + 1) % serviceSortCount;
 		saveAppSettings();
 		dvbChannel_sort(appControlInfo.offairInfo.sorting);
 
 		interface_displayMenu(1);
 		return 0;
-	}
+	}*/
 
 	if((pMenu->selectedItem < 0) || (GET_NUMBER(pArg) < 0)) {
 		return 1;
