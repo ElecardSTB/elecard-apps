@@ -126,6 +126,13 @@ static listHead_t inputNamesHead;
 static listHead_t analogChannelsNamesHead;
 static const char *inputSelected = 0;
 
+static const char *analogtv_audioName[] = {
+	[TV_AUDIO_SIF]	= "sif",
+	[TV_AUDIO_AM]	= "am",
+	[TV_AUDIO_FM1]	= "fm1",
+	[TV_AUDIO_FM2]	= "fm2",
+};
+
 /******************************************************************
 * FUNCTION DECLARATION                     <Module>[_<Word>+]  *
 *******************************************************************/
@@ -344,13 +351,6 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 		[TV_SYSTEM_NTSC]	= "ntsc",
 	};
 	cJSON_AddItemToObject(params, "delsys", cJSON_CreateString(analogtv_delSysName[appControlInfo.tvInfo.delSys]));
-
-	char *analogtv_audioName[] = {
-		[TV_AUDIO_SIF]	= "sif",
-		[TV_AUDIO_AM]	= "am",
-		[TV_AUDIO_FM1]	= "fm1",
-		[TV_AUDIO_FM2]	= "fm2",
-	};
 	cJSON_AddItemToObject(params, "audio", cJSON_CreateString(analogtv_audioName[appControlInfo.tvInfo.audioMode]));
 
 	int res = st_rpcSyncTimeout(elcmd_tvscan, params, RPC_ANALOG_SCAN_TIMEOUT, &type, &result );
@@ -494,27 +494,27 @@ static int32_t analogtv_changed(void)
 //----------------------SET NEXT AUDIO MODE ----  button F3--------------
 int32_t analogtv_setNextAudioMode()
 {
-	char *analogtv_audioName[] = {
-		[TV_AUDIO_SIF]	= "sif",
-		[TV_AUDIO_AM]	= "am",
-		[TV_AUDIO_FM1]	= "fm1",
-		[TV_AUDIO_FM2]	= "fm2",
-	};
 	uint32_t id = appControlInfo.tvInfo.id;
 	uint32_t i = 0;
+	char text[MAX_MESSAGE_BOX_LENGTH];
+
 	analog_service_t *element = analogChannelList_getElementVisible(id);
 
-	for (i = 0; i <= TV_AUDIO_FM2; i++) {
-		if ( !strcmp(element->audio, analogtv_audioName[i]) )
+	for(i = 0; i < ARRAY_SIZE(analogtv_audioName); i++) {
+		if(!strcmp(element->audio, analogtv_audioName[i])) {
+			i++;
+			if(i >= ARRAY_SIZE(analogtv_audioName)) {
+				i = 0;
+			}
 			break;
+		}
 	}
-	i++;
-	if(i > TV_AUDIO_FM2)
-		i = 0;
-	
-	strncpy(element->audio, analogtv_audioName[i], sizeof(analogtv_audioName[i]));
+
+	strncpy(element->audio, analogtv_audioName[i], sizeof(element->audio));
 
 	analogtv_activateChannel(interfaceInfo.currentMenu, (void *)id);
+	snprintf(text, sizeof(text), "%s: %s", _T("ANALOGTV_AUDIO_MODE"), element->audio);
+	interface_showMessageBox(text, thumbnail_info, 3000);
 	return analogtv_saveConfigFile();
 }
 
