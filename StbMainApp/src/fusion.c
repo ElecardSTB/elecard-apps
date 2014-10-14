@@ -294,6 +294,7 @@ int fusion_readConfig()
 	FusionObject.logoBotLeftY  = interfaceInfo.screenHeight - 200;
 	FusionObject.logoBotRightX = -1;
 	FusionObject.logoBotRightY = interfaceInfo.screenHeight - 200;
+	FusionObject.creepY = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
 
 	FusionObject.demoUrl[0] = '\0'; // test
 
@@ -362,6 +363,12 @@ int fusion_readConfig()
 			eprintf (" %s: bottomright logo y = %d\n",   __FUNCTION__, FusionObject.logoBotRightY);
 		}
 		// --------- end logo coord section ------------------------- //
+		else if ((ptr = strcasestr((const char*) line, (const char*)"CREEPY ")) != NULL){
+			ptr += 7;
+			FusionObject.creepY = atoi(ptr);
+			eprintf (" %s: creep y = %d\n",   __FUNCTION__, FusionObject.creepY);
+		}
+		// --------- end creep coord section ------------------------- //
 	}
 	fclose (f);
 	return 0;

@@ -2178,7 +2178,7 @@ void interface_updateFusionCreepSurface()
 	}
 
 	dstX = positionDst;
-	dstY = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
+	dstY = FusionObject.creepY;
 
 	region.x1 = dstX;
 	region.x2 = dstX + FusionObject.creepWidth;

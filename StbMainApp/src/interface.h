@@ -1036,6 +1036,7 @@ typedef struct _interfaceFusionObject_t {
 	char * creepline;
 	char * preallocSurface;
 	int creepWidth;
+	int creepY;
 	fusion_creep_t creep;
 
 	fusion_logo_t logos[FUSION_MAX_LOGOS];
