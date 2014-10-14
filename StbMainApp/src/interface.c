@@ -2059,27 +2059,28 @@ static void interface_displayLogo(void)
 	for (int i=0; i<FusionObject.logoCount; i++){
 		int left=0, top=0;
 		int w=0, h=0;
-		if (!strlen(FusionObject.logos[i].filepath) || getPngSize(FusionObject.logos[i].filepath, &w, &h) != 0) {
+		if (!strlen(FusionObject.logos[i].filepath)) continue;
+		if (getPngSize(FusionObject.logos[i].filepath, &w, &h) != 0) {
 			eprintf ("%s(%d): Warning! Couldn't get logo size (%s)\n", __FILE__, __LINE__, FusionObject.logos[i].filepath);
 			continue;
 		}
 		switch (FusionObject.logos[i].position)
 		{
 			case FUSION_TOP_LEFT:
-				left = 100;
-				top = 100;
+				left = FusionObject.logoTopLeftX;
+				top = FusionObject.logoTopLeftY;
 				break;
 			case FUSION_TOP_RIGHT:
-				left = interfaceInfo.screenWidth - w - 100;
-				top = 100;
+				left = (FusionObject.logoTopRightX == -1) ? (interfaceInfo.screenWidth - w - 100) : FusionObject.logoTopRightX;
+				top = FusionObject.logoTopRightY;
 				break;
 			case FUSION_BOTTOM_LEFT:
-				left = 100;
-				top = interfaceInfo.screenHeight - 200;
+				left = FusionObject.logoBotLeftX;
+				top = FusionObject.logoBotLeftY;
 				break;
 			case FUSION_BOTTOM_RIGHT:
-				left = interfaceInfo.screenWidth - w - 100;
-				top = interfaceInfo.screenHeight - 200;
+				left = (FusionObject.logoBotRightX == -1) ? (interfaceInfo.screenWidth - w - 100): FusionObject.logoBotRightX;
+				top = FusionObject.logoBotRightY;
 				break;
 		}
 
@@ -2134,18 +2135,18 @@ void interface_updateFusionCreepSurface()
 	int dstX, dstY;
 
 	if (!fusion_surface) return;
-	if (FusionObject.creepStartTime <= 0) return;
+	if (FusionObject.creep.startTime <= 0) return;
 
-	FusionObject.deltaTime += 1;
-	positionDst = interfaceInfo.screenWidth - FusionObject.deltaTime;
+	FusionObject.creep.deltaTime += 1;
+	positionDst = interfaceInfo.screenWidth - FusionObject.creep.deltaTime;
 	positionSrc = 0;
 	if (positionDst < 0){
 		positionSrc = - positionDst;
 		positionDst = 0;
 		if (positionSrc > FusionObject.creepWidth){ // all creep is shown
-			FusionObject.creepShown = 1;
-			FusionObject.creepStartTime = 0;
-			FusionObject.deltaTime = 0;
+			FusionObject.creep.isShown = 1;
+			FusionObject.creep.startTime = 0;
+			FusionObject.creep.deltaTime = 0;
 
 			if (!FusionObject.creepline){
 				//eprintf ("%s(%d): All creep is shown. Clear surface.\n", __FUNCTION__, __LINE__);
@@ -2277,7 +2278,7 @@ static void interface_animateMenu(int flipFB, int animate)
 
 		interface_flipSurface();
 #ifdef ENABLE_FUSION
-		if (FusionObject.creepStartTime <= 0){
+		if (FusionObject.creep.startTime <= 0){
 			interface_flipStatusbarSurface();
 		}
 #endif
@@ -2296,7 +2297,7 @@ static void interface_animateMenu(int flipFB, int animate)
 	}
 
 #ifdef ENABLE_FUSION
-	if (FusionObject.creepStartTime <= 0){
+	if (FusionObject.creep.startTime <= 0){
 		interface_displayStatusbar();
 		interface_flipStatusbarSurface();
 	}

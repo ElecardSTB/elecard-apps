@@ -18,6 +18,7 @@ interfaceFusionObject_t FusionObject;
 typedef size_t (*curlWriteCB)(void *buffer, size_t size, size_t nmemb, void *userp);
 
 int32_t fusion_checkDirectory(const char *path);
+int fusion_getMostAppropFile (char * directory, char * pathEnd, int i);
 int fusion_checkFileIsDownloaded(char * remotePath, char * localPath);
 int fusion_checkLastModified (char * url);
 int fusion_checkResponse (char * curlStream, cJSON ** ppRoot);
@@ -243,32 +244,31 @@ void * fusion_threadCheckReboot (void * param)
 
 void * fusion_threadCreepline(void * param)
 {
-	int result;
 	struct timeval tv;
 
 	fusion_readConfig();
 
 	while (1){
-		//fusion_readConfig(); // test
-		result = fusion_getCreepAndLogo();
-		if (result == FUSION_FAIL){
+		FusionObject.creep.status = fusion_getCreepAndLogo();
+
+		if (FusionObject.creep.status == FUSION_FAIL){
 			fusion_wait(FusionObject.checktime * 1000);
 			continue;
 		}
-		else if (result == FUSION_NEW_CREEP){
+		else if (FusionObject.creep.status == FUSION_NEW_CREEP){
 			gettimeofday(&tv, NULL);
-			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 			eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
-			FusionObject.deltaTime = 0;
+			FusionObject.creep.deltaTime = 0;
 		}
-		else if (result == FUSION_SAME_CREEP && FusionObject.creepShown)
+		else if (FusionObject.creep.status == FUSION_SAME_CREEP && FusionObject.creep.isShown)
 		{
 			//eprintf ("%s(%d): creepShown got. Wait pause and start again.\n", __FUNCTION__, __LINE__);
-			fusion_wait(FusionObject.pause * 1000);
+			fusion_wait(FusionObject.creep.pause * 1000);
 			gettimeofday(&tv, NULL);
-			FusionObject.creepStartTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
-			FusionObject.creepShown = 0;
-			FusionObject.deltaTime = 0;
+			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+			FusionObject.creep.isShown = 0;
+			FusionObject.creep.deltaTime = 0;
 		}
 		fusion_wait(FusionObject.checktime * 1000);
 	}
@@ -285,6 +285,15 @@ int fusion_readConfig()
 
 	FusionObject.checktime = FUSION_DEFAULT_CHECKTIME;
 	sprintf (FusionObject.server, "%s", FUSION_DEFAULT_SERVER_PATH);
+
+	FusionObject.logoTopLeftX  = 100;
+	FusionObject.logoTopLeftY  = 100;
+	FusionObject.logoTopRightX = -1;
+	FusionObject.logoTopRightY = 100;
+	FusionObject.logoBotLeftX  = 100;
+	FusionObject.logoBotLeftY  = interfaceInfo.screenHeight - 200;
+	FusionObject.logoBotRightX = -1;
+	FusionObject.logoBotRightY = interfaceInfo.screenHeight - 200;
 
 	FusionObject.demoUrl[0] = '\0'; // test
 
@@ -311,6 +320,48 @@ int fusion_readConfig()
 			sprintf (FusionObject.demoUrl, "%s", ptr);
 			eprintf (" %s: demo url = %s\n",   __FUNCTION__, FusionObject.demoUrl);
 		}
+		// --------- logo coord section ----------------------------- //
+		else if ((ptr = strcasestr((const char*) line, (const char*)"TOPLEFTX ")) != NULL){
+			ptr += 9;
+			FusionObject.logoTopLeftX = atoi(ptr);
+			eprintf (" %s: topleft logo x = %d\n",   __FUNCTION__, FusionObject.logoTopLeftX);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"TOPLEFTY ")) != NULL){
+			ptr += 9;
+			FusionObject.logoTopLeftY = atoi(ptr);
+			eprintf (" %s: topleft logo y = %d\n",   __FUNCTION__, FusionObject.logoTopLeftY);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"TOPRIGHTX ")) != NULL){
+			ptr += 10;
+			FusionObject.logoTopRightX = atoi(ptr);
+			eprintf (" %s: topright logo x = %d\n",   __FUNCTION__, FusionObject.logoTopRightX);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"TOPRIGHTY ")) != NULL){
+			ptr += 10;
+			FusionObject.logoTopRightY = atoi(ptr);
+			eprintf (" %s: topright logo y = %d\n",   __FUNCTION__, FusionObject.logoTopRightY);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"BOTLEFTX ")) != NULL){
+			ptr += 9;
+			FusionObject.logoBotLeftX = atoi(ptr);
+			eprintf (" %s: bottomleft logo x = %d\n",   __FUNCTION__, FusionObject.logoBotLeftX);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"BOTLEFTY ")) != NULL){
+			ptr += 9;
+			FusionObject.logoBotLeftY = atoi(ptr);
+			eprintf (" %s: bottomleft logo y = %d\n",   __FUNCTION__, FusionObject.logoBotLeftY);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"BOTRIGHTX ")) != NULL){
+			ptr += 10;
+			FusionObject.logoBotRightX = atoi(ptr);
+			eprintf (" %s: bottomright logo x = %d\n",   __FUNCTION__, FusionObject.logoBotRightX);
+		}
+		else if ((ptr = strcasestr((const char*) line, (const char*)"BOTRIGHTY ")) != NULL){
+			ptr += 10;
+			FusionObject.logoBotRightY = atoi(ptr);
+			eprintf (" %s: bottomright logo y = %d\n",   __FUNCTION__, FusionObject.logoBotRightY);
+		}
+		// --------- end logo coord section ------------------------- //
 	}
 	fclose (f);
 	return 0;
@@ -459,12 +510,13 @@ void fusion_startup()
 	fusion_removeHwconfigUrl();
 	fusion_getLocalFirmwareVer();
 
-	pthread_mutex_init(&FusionObject.mutexCreep, NULL);
+	pthread_mutex_init(&FusionObject.creep.mutex, NULL);
 	pthread_mutex_init(&FusionObject.mutexLogo, NULL);
 	pthread_mutex_init(&FusionObject.mutexDtmf, NULL);
 
 	//interface_addEvent(fusion_refreshDtmfEvent, (void*)NULL, FUSION_REFRESH_DTMF_MS, 1);
 	FusionObject.currentDtmfDigit = '_';
+	FusionObject.creep.isShown = 1;
 
 	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
 	pthread_create(&FusionObject.threadCheckReboot, NULL, fusion_threadCheckReboot, (void*)NULL);
@@ -629,7 +681,8 @@ int fusion_setMoscowDateTime()
 	char utcBuffer [1024];
 	memset(utcBuffer, 0, 1024);
 
-	if (fusion_getUtc(utcBuffer, 1024) != 0) {
+	//if (fusion_getUtc(utcBuffer, 1024) != 0) {
+	if (fusion_getUtcByCurl(utcBuffer, 1024) != 0) {
 		eprintf ("%s(%d): WARNING! Couldn't get UTC datetime.\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
@@ -646,11 +699,48 @@ int fusion_setMoscowDateTime()
 	return 0;
 }
 
+int fusion_getUtcByCurl (char * utcBuffer, int size)
+{
+	char request[256];
+	char ans[1024];
+	int buflen;
+	char * ptrStartUtc, * ptrEndUtc;
+	memset(utcBuffer, 0, size);
+	memset(ans, 0, 1024);
+
+	if (!utcBuffer) {
+		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	// use earthtools instead timeapi.org which is currently dead
+	sprintf (request, "http://www.earthtools.org/timezone/0/0" );
+	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
+	fusion_getDataByCurl(request, ans, &buflen, (curlWriteCB)fusion_curlCallback);
+
+	eprintf ("%s(%d): ans: %s\n", __FUNCTION__, __LINE__, ans);
+	if (!strlen(ans) || !strchr(ans, ' ')) {
+		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
+		return -1;
+	}
+
+	ptrStartUtc = strstr(ans, "<utctime>");
+	if (ptrStartUtc) {
+		ptrStartUtc += 9;
+		ptrEndUtc = strstr(ptrStartUtc, "</utctime>");
+		if (ptrEndUtc){
+			snprintf (utcBuffer, (int)(ptrEndUtc - ptrStartUtc) + 1, "%s", ptrStartUtc);
+		}
+	}
+
+	return 0;
+}
 
 int fusion_getUtc (char * utcBuffer, int size)
 {
 	FILE * f;
 	char request[256];
+	char ans[1024];
 	char * ptrStartUtc, * ptrEndUtc;
 	char utcData[64];
 	memset(utcData, 0, 64);
@@ -662,9 +752,23 @@ int fusion_getUtc (char * utcBuffer, int size)
 
 	// use earthtools instead timeapi.org which is currently dead
 	//sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt");  // 2>/dev/null
-	sprintf (request, "wget \"http://www.earthtools.org/timezone/0/0\" -O /tmp/utc.txt");
+	sprintf (request, "wget \"http://www.earthtools.org/timezone/0/0\" -O /tmp/utc.txt 2>/tmp/wget.log" );
 	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
 	system (request);
+
+	f = fopen("/tmp/wget.log", "rt");
+	if (f) {
+		fread(ans, size, 1, f);
+		fclose(f);
+		if (strstr(ans, "failed:") || strstr(ans, "ERROR")){
+			eprintf ("%s(%d): Some error occured:\n%s\n",   __FUNCTION__, __LINE__, ans);
+			return -1;
+		}
+	}
+	else {
+		eprintf ("%s(%d): Some error occured. No wget answer.\n",   __FUNCTION__, __LINE__);
+		return -1;
+	}
 
 	f = fopen("/tmp/utc.txt", "rt");
 	if (!f) {
@@ -703,6 +807,33 @@ int32_t fusion_checkDirectory(const char *path)
 		return 0;
 	closedir(d);
 	return 1;
+}
+
+int fusion_getMostAppropFile (char * directory, char * pathEnd, int i)
+{
+	if (!directory || !pathEnd || (i < 0) || (i >= FusionObject.logoCount)) return NO;
+	DIR * dir = opendir(directory);
+	if (dir == NULL) {
+		eprintf("%s: WARNING! %s opening failed\n", __FUNCTION__, directory);
+		return NO;
+	}
+	struct dirent *item = readdir(dir);
+	while (item) {
+		// we take first file found.
+		// it can lead to problems, eg.
+		// logo_123size_public_tv_image.png
+		// logo_321size_public_tv_image.png
+		// so we can't determine which one is correct as we don't have 
+		// net connection to get filesize
+		char * ptr = strstr(item->d_name, pathEnd);
+		if (ptr){
+			sprintf (FusionObject.logos[i].filepath, "%s/%s", directory, item->d_name);
+			break;
+		}
+		item = readdir(dir);
+	}
+	closedir (dir);
+	return YES;
 }
 
 int fusion_checkLastModified (char * url)
@@ -965,10 +1096,6 @@ int fusion_getCreepAndLogo ()
 	int result = 0;
 	int oldMode;
 
-	if (!fusion_checkDirectory("/tmp/fusion")) {
-		system("mkdir /tmp/fusion");
-	}
-
 	time (&now);
 	nowDate = *localtime (&now);
 
@@ -1016,6 +1143,12 @@ int fusion_getCreepAndLogo ()
 				system(cmd);
 				return FUSION_FAIL;
 			}
+			eprintf ("%s(%d): Got valid saved playlist.\n",   __FUNCTION__, __LINE__);
+		}
+		else {
+			eprintf ("%s(%d): WARNING! No saved playlist.\n",   __FUNCTION__, __LINE__);
+			// todo : no connection, no saved one, what to do ?
+			return FUSION_FAIL;
 		}
 		// end test saved
 	}
@@ -1135,6 +1268,19 @@ int fusion_getCreepAndLogo ()
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
 	if (jsonLogo){
+		char logoDir[PATH_MAX];
+		char fileNameEnding[PATH_MAX];
+		if (fusion_checkDirectory(g_usbRoot) == NO){
+			sprintf (logoDir, "/tmp/logos");
+		}
+		else {
+			sprintf (logoDir, "%s/logos", g_usbRoot);
+		}
+		if (fusion_checkDirectory(logoDir) == NO){
+			char command[PATH_MAX];
+			sprintf (command, "mkdir %s", logoDir);
+			system (command);
+		}
 		pthread_mutex_lock(&FusionObject.mutexLogo);
 
 		FusionObject.logoCount = cJSON_GetArraySize(jsonLogo);
@@ -1160,59 +1306,107 @@ int fusion_getCreepAndLogo ()
 			else continue;
 
 			sprintf (FusionObject.logos[i].url, "%s", jsonItem->valuestring);
-			//eprintf ("%s(%d): logo[%d] = %s\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].url);
+			FusionObject.logos[i].filepath[0] = '\0';
+
+			// make filepath regardless if we have filesize
+			// problem is the same logo name too often on server, with different sizes
+			char tmpLogoUrl[PATH_MAX];
+			char * ptr, *ptrSlash;
+			sprintf (tmpLogoUrl, "%s", FusionObject.logos[i].url);
+			ptr = strstr(tmpLogoUrl, "http:");
+			if (ptr != NULL) {
+				ptr += 7;
+				while ((ptrSlash = strchr(ptr, '/')) != NULL) ptrSlash[0] = '_';
+				sprintf (fileNameEnding, "size_%s", ptr);
+			}
 
 			long logoFileSize = fusion_getRemoteFileSize(FusionObject.logos[i].url);
 
 			if (logoFileSize <= 0){
-				eprintf ("%s(%d): WARNING! Failed to get remote logo size.\n", __FUNCTION__, __LINE__);
-				FusionObject.logos[i].filepath[0] = '\0';
-				continue;
-			}
-			// remove and wget only if we got remote size
+				eprintf ("%s(%d): WARNING! Failed to get remote logo size. Search saved one.\n", __FUNCTION__, __LINE__);
 
-			char tmpStr[PATH_MAX];
-			char * ptr, *ptrSlash;
-			sprintf (tmpStr, "%s", FusionObject.logos[i].url);
-			ptr = strstr(tmpStr, "http:");
-			if ((ptr != NULL) && (logoFileSize > 0)) {
-				ptr += 7;
-				while ((ptrSlash = strchr(ptr, '/')) != NULL) ptrSlash[0] = '_';
-				sprintf (FusionObject.logos[i].filepath, "/tmp/fusion/logo_%ld_%s", logoFileSize, ptr);
+				if (fusion_getMostAppropFile (logoDir, fileNameEnding, i) == YES){
+					eprintf ("%s(%d): %d-th logo: found approp = %s\n", __FUNCTION__, __LINE__, i, FusionObject.logos[i].filepath);
+				}
 			}
-			else {
-				eprintf ("%s(%d): WARNING! Incorrect logo url\n", __FUNCTION__, __LINE__); 
-				FusionObject.logos[i].filepath[0] = '\0';
-			}
-			//eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
-			//	i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
-			
-			// get local file size and compare
-			// dont donwload if we have logo on flash
-			long int localFileSize = 0;
-			FILE * f = fopen(FusionObject.logos[i].filepath, "rb");
-			if (f) {
-				fseek(f, 0, SEEK_END);
-				localFileSize = ftell(f);
-				fclose(f);
-			}
-			if (localFileSize != logoFileSize){
-				char cmd[128];
-				//sprintf (cmd, "wget \"%s\" -O %s 2>/dev/null", url, logoPath);
-				sprintf (cmd, "rm -f \"%s\"", FusionObject.logos[i].filepath);
-				system(cmd);
-				sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, FusionObject.logos[i].filepath);
-				system(cmd);
+			else { // remove and wget only if we got remote size
+				sprintf (FusionObject.logos[i].filepath, "%s/logo_%ld%s", logoDir, logoFileSize, fileNameEnding);
+				//eprintf ("%s(%d): logo[%d] = %s, position = %d, path = %s\n", __FUNCTION__, __LINE__, 
+				//	i, FusionObject.logos[i].url, FusionObject.logos[i].position, FusionObject.logos[i].filepath);
+
+				// get local file size and compare
+				// dont donwload if we have logo on flash
+				long int localFileSize = 0;
+				FILE * f = fopen(FusionObject.logos[i].filepath, "rb");
+				if (f) {
+					fseek(f, 0, SEEK_END);
+					localFileSize = ftell(f);
+					fclose(f);
+				}
+				if (localFileSize != logoFileSize){
+					char cmd[128];
+					//sprintf (cmd, "wget \"%s\" -O %s 2>/dev/null", url, logoPath);
+					sprintf (cmd, "rm -f \"%s\"", FusionObject.logos[i].filepath);
+					system(cmd);
+					sprintf (cmd, "wget \"%s\" -O %s", FusionObject.logos[i].url, FusionObject.logos[i].filepath);
+					system(cmd);
+				}
 			}
 		}
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 		interface_displayMenu(1);
 	}
+	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
+	if (jsonMarks){
+		char folderToSaveMarks[PATH_MAX];
+		fusion_createMarksDirectory(folderToSaveMarks);
+
+		int markCount = cJSON_GetArraySize(jsonMarks);
+		for (i=0; i<markCount; i++)
+		{
+			cJSON * jsonItem = cJSON_GetArrayItem(jsonMarks, i);
+			if (jsonItem){
+				long fileIndex = -1;
+				cJSON * jsonMarkLink = cJSON_GetObjectItem(jsonItem, "link");
+				cJSON * jsonMarkDuration = cJSON_GetObjectItem(jsonItem, "duration");
+
+				if (jsonItem->string){
+					char * err;
+					fileIndex = strtol(jsonItem->string, &err, 10);
+					if ((*err) || (fileIndex < 0) || (fileIndex > FUSION_MAX_MARKS)){
+						eprintf ("%s(%d): WARNING! file index in marks is incorrect: %s.\n", __FUNCTION__, __LINE__, jsonItem->string);
+						continue;
+					}
+					fileIndex = fileIndex - 1; // because it starts from 1
+				}
+
+				if (jsonMarkDuration && jsonMarkDuration->valuestring){
+					int markIndex = atoi(jsonMarkDuration->valuestring);
+					if (markIndex > 0){
+						FusionObject.marks[fileIndex].duration = markIndex;
+					}
+					else FusionObject.marks[fileIndex].duration = 0;
+				}
+
+				if (jsonMarkLink && jsonMarkLink->valuestring){
+					if (strcmp(FusionObject.marks[fileIndex].link, jsonMarkLink->valuestring))
+					{
+						sprintf (FusionObject.marks[fileIndex].link, "%s", jsonMarkLink->valuestring);
+						fusion_downloadMarkFile(fileIndex, folderToSaveMarks);
+					}
+				}
+			}
+		}
+		//fusion_removeOldMarkVideo(folderToSaveMarks);		// todo : remove symlinks and old video more correct
+	} // if (jsonMarks)
+
 
 	result = FUSION_SAME_CREEP;
 	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
 	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep-line");
 	if (jsonCreep){
+
+		// todo : manage more than 6 large creeps
 		int creepCount = cJSON_GetArraySize(jsonCreep);
 		int allCreepsLen = 0;
 		int allCreepsWithSpaceLen = 0;
@@ -1240,19 +1434,14 @@ int fusion_getCreepAndLogo ()
 
 			// todo : now count and pause are rewritten
 			// do something with it
-			cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "pause");
-			if (!jsonPause) FusionObject.pause = FUSION_DEFAULT_CREEP_PAUSE;
+			cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "count");
+			if (!jsonPause) FusionObject.creep.pause = FUSION_DEFAULT_CREEP_PAUSE;
 			else {
-				FusionObject.pause = atoi(jsonPause->valuestring);
-			}
-			cJSON * jsonRepeats = cJSON_GetObjectItem(jsonItem, "count");
-			if (!jsonRepeats) FusionObject.repeats = FUSION_DEFAULT_CREEP_REPEATS;
-			else {
-				FusionObject.repeats = atoi(jsonRepeats->valuestring);
+				FusionObject.creep.pause = atoi(jsonPause->valuestring);
 			}
 
 			if (i) strncat(allCreeps, FUSION_CREEP_SPACES, strlen(FUSION_CREEP_SPACES));
-			strncat(allCreeps, jsonText->valuestring, FUSION_MAX_CREEPLEN /*strlen(jsonText->valuestring)*/);
+			strncat(allCreeps, jsonText->valuestring, FUSION_MAX_CREEPLEN);  // strlen(jsonText->valuestring)
 		}
 		for (int k=0; k<allCreepsWithSpaceLen; k++){
 			if (allCreeps[k] == '\n' || allCreeps[k] == '\r') allCreeps[k] = ' ';
@@ -1261,22 +1450,23 @@ int fusion_getCreepAndLogo ()
 		if (!FusionObject.creepline){
 			result = FUSION_NEW_CREEP;
 
-			pthread_mutex_lock(&FusionObject.mutexCreep);
+			pthread_mutex_lock(&FusionObject.creep.mutex);
 			FusionObject.creepline = (char*)malloc(allCreepsWithSpaceLen);
 			if (!FusionObject.creepline) {
 				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
 				cJSON_Delete(root);
-				pthread_mutex_unlock(&FusionObject.mutexCreep);
+				pthread_mutex_unlock(&FusionObject.creep.mutex);
 				return FUSION_SAME_CREEP;
 			}
 			FusionObject.creepline[0] = '\0';
 			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
-			pthread_mutex_unlock(&FusionObject.mutexCreep);
-			//eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+			pthread_mutex_unlock(&FusionObject.creep.mutex);
+			eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
 		}
 		else if (strcmp(FusionObject.creepline, allCreeps)) {
+			// todo : wait event current creepline is chown
 			result = FUSION_NEW_CREEP;
-			pthread_mutex_lock(&FusionObject.mutexCreep);
+			pthread_mutex_lock(&FusionObject.creep.mutex);
 			if (FusionObject.creepline) {
 				free (FusionObject.creepline);
 				FusionObject.creepline = NULL;
@@ -1285,12 +1475,12 @@ int fusion_getCreepAndLogo ()
 			if (!FusionObject.creepline) {
 				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
 				cJSON_Delete(root);
-				pthread_mutex_unlock(&FusionObject.mutexCreep);
+				pthread_mutex_unlock(&FusionObject.creep.mutex);
 				return FUSION_SAME_CREEP;
 			}
 			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
-			pthread_mutex_unlock(&FusionObject.mutexCreep);
-			//eprintf ("%s(%d): creepline = %s, pause = %d, repeats = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.pause, FusionObject.repeats);
+			pthread_mutex_unlock(&FusionObject.creep.mutex);
+			eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
 		}
 		fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
 
@@ -1343,57 +1533,13 @@ int fusion_getCreepAndLogo ()
 	}
 	else {
 		//eprintf("%s(%d): No creepline field on playlist.\n", __FUNCTION__, __LINE__);
-		pthread_mutex_lock(&FusionObject.mutexCreep);
+		pthread_mutex_lock(&FusionObject.creep.mutex);
 		if (FusionObject.creepline) {
 			free (FusionObject.creepline);
 			FusionObject.creepline = NULL;
 		}
-		pthread_mutex_unlock(&FusionObject.mutexCreep);
+		pthread_mutex_unlock(&FusionObject.creep.mutex);
 	}
-
-	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
-	if (jsonMarks){
-		char folderToSaveMarks[PATH_MAX];
-		fusion_createMarksDirectory(folderToSaveMarks);
-
-		int markCount = cJSON_GetArraySize(jsonMarks);
-		for (i=0; i<markCount; i++)
-		{
-			cJSON * jsonItem = cJSON_GetArrayItem(jsonMarks, i);
-			if (jsonItem){
-				long fileIndex = -1;
-				cJSON * jsonMarkLink = cJSON_GetObjectItem(jsonItem, "link");
-				cJSON * jsonMarkDuration = cJSON_GetObjectItem(jsonItem, "duration");
-
-				if (jsonItem->string){
-					char * err;
-					fileIndex = strtol(jsonItem->string, &err, 10);
-					if ((*err) || (fileIndex < 0) || (fileIndex > FUSION_MAX_MARKS)){
-						eprintf ("%s(%d): WARNING! file index in marks is incorrect: %s.\n", __FUNCTION__, __LINE__, jsonItem->string);
-						continue;
-					}
-					fileIndex = fileIndex - 1; // because it starts from 1
-				}
-
-				if (jsonMarkDuration && jsonMarkDuration->valuestring){
-					int markIndex = atoi(jsonMarkDuration->valuestring);
-					if (markIndex > 0){
-						FusionObject.marks[fileIndex].duration = markIndex;
-					}
-					else FusionObject.marks[fileIndex].duration = 0;
-				}
-
-				if (jsonMarkLink && jsonMarkLink->valuestring){
-					if (strcmp(FusionObject.marks[fileIndex].link, jsonMarkLink->valuestring))
-					{
-						sprintf (FusionObject.marks[fileIndex].link, "%s", jsonMarkLink->valuestring);
-						fusion_downloadMarkFile(fileIndex, folderToSaveMarks);
-					}
-				}
-			}
-		}
-		//fusion_removeOldMarkVideo(folderToSaveMarks);		// todo : remove symlinks and old video more correct
-	} // if (jsonMarks)
 
 	cJSON_Delete(root);
 	return result;
@@ -1430,7 +1576,7 @@ void fusion_cleanup()
 	}
 	pthread_mutex_unlock(&FusionObject.mutexDtmf);
 
-	pthread_mutex_destroy(&FusionObject.mutexCreep);
+	pthread_mutex_destroy(&FusionObject.creep.mutex);
 	pthread_mutex_destroy(&FusionObject.mutexLogo);
 	pthread_mutex_destroy(&FusionObject.mutexDtmf);
 }

@@ -949,7 +949,7 @@ typedef struct
 #define FUSION_URL_LEN        (512)
 
 #define FUSION_MAX_LOGOS             (4)
-#define FUSION_MAX_CREEPLEN          (1024)
+#define FUSION_MAX_CREEPLEN          (512)
 
 #define FUSION_SPACES        250
 #define FUSION_SYMBOLS_FITS  250
@@ -1006,27 +1006,54 @@ typedef struct {
 	int duration;
 } fusion_mark_t;
 
+typedef struct {
+	char line[FUSION_MAX_CREEPLEN];
+	IDirectFBSurface * surface;
+	int width;
+	int pause;
+	//int isShown;
+} fusion_creep_element_t;
+
+typedef struct {
+	unsigned long long startTime;
+	double deltaTime;
+
+	fusion_creep_element_t * elems;
+	int count;
+	int current;
+	int maxWidth;
+	pthread_mutex_t mutex;
+	int status;
+
+	int isShown;
+	int pause;
+} fusion_creep_t;
+
 typedef struct _interfaceFusionObject_t {
 	unsigned char secret[64];
 	char server[512];
 
 	char * creepline;
-	int pause;
-	int repeats;
-	pthread_mutex_t mutexCreep;
+	char * preallocSurface;
+	int creepWidth;
+	fusion_creep_t creep;
 
 	fusion_logo_t logos[FUSION_MAX_LOGOS];
 	int logoCount;
 	pthread_mutex_t mutexLogo;
+	int logoTopLeftX;
+	int logoTopLeftY;
+	int logoTopRightX;
+	int logoTopRightY;
+	int logoBotLeftX;
+	int logoBotLeftY;
+	int logoBotRightX;
+	int logoBotRightY;
 
 	pthread_t threadCreepHandle;
 	pthread_t threadCheckReboot;
 	pthread_t threadFlipCreep;
 	int checktime;
-
-	unsigned long long creepStartTime;
-	int creepWidth;
-	int creepShown;
 
 	unsigned int audHandle;
 	char currentDtmfDigit;
@@ -1049,10 +1076,6 @@ typedef struct _interfaceFusionObject_t {
 
 	char demoUrl[PATH_MAX];
 	fusion_mark_t marks[FUSION_MAX_MARKS];
-
-	double deltaTime;
-
-	char * preallocSurface;
 
 } interfaceFusionObject_t;
 
