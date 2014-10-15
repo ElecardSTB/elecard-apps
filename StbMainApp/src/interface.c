@@ -2182,8 +2182,8 @@ void interface_updateFusionCreepSurface()
 
 	region.x1 = dstX;
 	region.x2 = dstX + FusionObject.creepWidth;
-	region.y1 = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
-	region.y2 = interfaceInfo.screenHeight;
+	region.y1 = FusionObject.creepY;
+	region.y2 = FusionObject.creepY + FUSION_FONT_HEIGHT * 2;
 
 	mysem_get(interface_semaphore);
 
