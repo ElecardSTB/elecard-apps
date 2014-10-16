@@ -603,11 +603,13 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, fusion_curlError);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, curlStream);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 60);  // 15
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60);  // 15
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15);
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
+	curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 0); // to make curl resolve after net connection re-established
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	res_init();
 
 	//eprintf ("%s: rq: %s\n", __FUNCTION__, url);
 
@@ -857,7 +859,9 @@ int fusion_checkLastModified (char * url)
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
 	curl_easy_setopt(curl, CURLOPT_FILETIME, 1);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 0); // to make curl resolve after net connection re-established
+	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	res_init();
 
 	curl_easy_perform(curl);
 	res = curl_easy_getinfo(curl, CURLOPT_FILETIME, &lastModified);
@@ -887,7 +891,9 @@ long fusion_getRemoteFileSize(char * url)
 
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+	curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 0); // to make curl resolve after net connection re-established
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	res_init();
 
 	curl_easy_perform(curl);
 	res = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &remoteFileSize);
@@ -955,7 +961,9 @@ CURLcode fusion_getVideoByCurl (char * url, void * fsink/*char * curlStream*/, i
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60);  // 15
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
+	curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 0); // to make curl resolve after net connection re-established
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	res_init();
 
 	//eprintf ("%s: rq: %s\n", __FUNCTION__, url);
 
@@ -1105,6 +1113,12 @@ int fusion_getCreepAndLogo ()
 
 	time (&now);
 	nowDate = *localtime (&now);
+	if (nowDate.tm_year + 1900 == 2000){ // date was not set earlier
+		if (fusion_setMoscowDateTime() == 0){
+			time (&now);
+			nowDate = *localtime (&now);
+		}
+	}
 
 	if (strlen(FusionObject.demoUrl)){
 		sprintf (request, "%s", FusionObject.demoUrl);

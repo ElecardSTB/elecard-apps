@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <wait.h>
 #include <sys/ioctl.h>
+#include <resolv.h>
 
 #include "md5.h"
 #include "gfx.h"
