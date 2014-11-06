@@ -2066,14 +2066,16 @@ int offair_setChannel(int channel, void* pArg)
 	if(channel <= 0) {
 		return 1;
 	}
-// 	channel--;
 
+	channel--;
+	printf("%s: offair_channelChange... ", __func__);
 	if((channel < dvbChannel_getCount()) && (dvbChannel_getService(channel) != NULL)) {
-		printf("%s: offair_channelChange...\n", __FUNCTION__);
+		printf(" dvb\n");
 		offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, channel));
 		return 0;
 	} else if(channel >= dvbChannel_getCount()) {
-		channel = channel - dvbChannel_getCount() - 1;
+		printf(" analog\n");
+		channel = channel - dvbChannel_getCount();
 		analogtv_activateChannel(interfaceInfo.currentMenu, CHANNEL_INFO_SET(which, channel));
 		return 0;
 	}
