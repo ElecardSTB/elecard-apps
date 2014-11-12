@@ -49,6 +49,7 @@ void * fusion_threadCreepline(void * param);
 void * fusion_threadDownloadFirmware(void * param);
 void * fusion_threadFlipCreep (void * param);
 void fusion_wait (unsigned int timeout_ms);
+int fusion_getUtcByCurl (char * utcBuffer, int size);
 
 void fusion_ms2timespec(int ms, struct timespec * ts)
 {
@@ -179,12 +180,12 @@ int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmware
 {
 	int remoteMon, remoteDay, remoteYear, remoteHour, remoteMin;
 	int localMon, localDay, localYear, localHour, localMin;
-	int scannedItemsRemote, scannedItemsLocal;
+	int scannedItemsRemote/*, scannedItemsLocal*/;
 	//if (!localFirmwareVer || !remoteFirmwareVer) return NO;
 	if (!remoteFirmwareVer) return NO;
 	// eg. 201407251445
 	scannedItemsRemote = sscanf(remoteFirmwareVer, "%04d%02d%02d%02d%02d", &remoteYear, &remoteMon, &remoteDay, &remoteHour, &remoteMin);
-	scannedItemsLocal = sscanf(localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
+	//scannedItemsLocal = sscanf(localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
 	do {
 		//if (scannedItemsRemote != 5 || scannedItemsLocal != 5) break;
 		if (scannedItemsRemote != 5) break;
@@ -242,6 +243,11 @@ void * fusion_threadCheckReboot (void * param)
 	return (void*)NULL;
 }
 
+void fusion_clearMemCache()
+{
+	system ("echo 3 >/proc/sys/vm/drop_caches");
+}
+
 void * fusion_threadCreepline(void * param)
 {
 	struct timeval tv;
@@ -249,7 +255,9 @@ void * fusion_threadCreepline(void * param)
 	fusion_readConfig();
 
 	while (1){
+
 		FusionObject.creep.status = fusion_getCreepAndLogo();
+		fusion_clearMemCache();
 
 		if (FusionObject.creep.status == FUSION_FAIL){
 			fusion_wait(FusionObject.checktime * 1000);
@@ -617,10 +625,7 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 	curl_easy_cleanup(curl);
 	curl = NULL;
 /*#ifdef FUSION_TEST
-	char cuttedStream[256];
-	snprintf (cuttedStream, 256, "%s", curlStream);
-	eprintf ("ans: %s ...\n", cuttedStream);
-	//eprintf ("ans: %s\n", playlistBuffer);
+	eprintf ("ans: %.*s ...\n", 256, curlStream);
 #endif
 */
 
@@ -641,34 +646,31 @@ int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 {
 	char * playlistBuffer = NULL;
 	int res;
-
 	int buflen;
 
 	if (!url || !strlen(url)) return -1;
-	playlistBuffer = (char *)malloc(FUSION_STREAM_SIZE);
-	if (!playlistBuffer){
-		eprintf ("%s(%d): ERROR! Malloc failed.\n",   __FUNCTION__, __LINE__);
-		return -1;
+
+	if (!FusionObject.playlistBuffer){
+		FusionObject.playlistBuffer = (char *)malloc(FUSION_STREAM_SIZE);
+		if (!FusionObject.playlistBuffer){
+			eprintf ("%s(%d): ERROR! Malloc failed.\n",   __FUNCTION__, __LINE__);
+			return -1;
+		}
 	}
-	memset(playlistBuffer, 0, FUSION_STREAM_SIZE);
+	memset(FusionObject.playlistBuffer, 0, FUSION_STREAM_SIZE);
 
 	eprintf ("%s(%d): rq: %s ...\n",   __FUNCTION__, __LINE__, url);
-	fusion_getDataByCurl(url, playlistBuffer, &buflen, (curlWriteCB)fusion_curlCallback);
+	fusion_getDataByCurl(url, FusionObject.playlistBuffer, &buflen, (curlWriteCB)fusion_curlCallback);
 
 #ifdef FUSION_TEST
-	char cuttedStream[256];
-	snprintf (cuttedStream, 256, "%s", playlistBuffer);
-	eprintf ("ans: %s ...\n", cuttedStream);
-	//eprintf ("ans: %s\n", playlistBuffer);
+	eprintf ("ans: %.*s ...\n", 256, FusionObject.playlistBuffer);
 #endif
 	
-	if (strlen(playlistBuffer) == 0) {
+	if (strlen(FusionObject.playlistBuffer) == 0) {
 		eprintf (" %s: ERROR! empty response.\n",   __FUNCTION__);
-		free(playlistBuffer);
 		return -1;
 	}
-	res = fusion_checkResponse(playlistBuffer, ppRoot);
-	free(playlistBuffer);
+	res = fusion_checkResponse(FusionObject.playlistBuffer, ppRoot);
 	return res;
 }
 
@@ -676,9 +678,7 @@ int fusion_checkResponse (char * curlStream, cJSON ** ppRoot)
 {
 	*ppRoot = cJSON_Parse(curlStream);
 	if (!(*ppRoot)) {
-		char cuttedStream[256];
-		snprintf (cuttedStream, 256, curlStream);
-		eprintf ("%s: ERROR! Not a JSON response. %s\n",   __FUNCTION__, cuttedStream);
+		eprintf ("%s: ERROR! Not a JSON response. %.*s\n", __FUNCTION__, 256, curlStream);
 		return -1;
 	}
 	return 0;
@@ -1142,7 +1142,6 @@ int fusion_getCreepAndLogo ()
 
 	if (fusion_downloadPlaylist(request, &root) != 0) {
 		eprintf ("%s(%d): WARNING! download playlist failed. Search for saved one.\n",   __FILE__, __LINE__);
-		
 		// test - use saved playlist
 		// test - we may have usb here already
 		if (strlen(g_usbRoot) == 0){
@@ -1583,6 +1582,11 @@ void fusion_cleanup()
 	if (FusionObject.creepline) {
 		free (FusionObject.creepline);
 		FusionObject.creepline = NULL;
+	}
+
+	if (FusionObject.playlistBuffer){
+		free (FusionObject.playlistBuffer);
+		FusionObject.playlistBuffer = NULL;
 	}
 
 	if (fusion_surface){

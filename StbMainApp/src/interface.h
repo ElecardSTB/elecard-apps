@@ -1073,6 +1073,7 @@ typedef struct _interfaceFusionObject_t {
 	char localFirmwareVer[FUSION_FIRMWARE_VER_LEN];
 	char remoteFirmwareVer[FUSION_FIRMWARE_VER_LEN];
 
+	char * playlistBuffer;
 	char savedPlaylist[FUSION_STREAM_SIZE];
 
 	char demoUrl[PATH_MAX];
