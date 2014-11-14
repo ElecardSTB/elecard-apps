@@ -701,8 +701,17 @@ int fusion_setMoscowDateTime()
 	system(setDateString);
 
 	// set timezone
-	system("rm /var/etc/localtime");
-	system("ln -s /usr/share/zoneinfo/Russia/Moscow /var/etc/localtime");
+	char buf[1024];
+	if (helperFileExists("/var/etc/localtime") && 
+	    helperParseLine("/tmp/info.txt", "readlink " "/var/etc/localtime", "zoneinfo/", buf, 0))
+	{
+		eprintf ("%s: Current timezone - %s.\n", __FUNCTION__, buf);
+	}
+	else {
+		eprintf ("%s: Set Russia/Moscow timezone.\n", __FUNCTION__);
+		system("rm /var/etc/localtime");
+		system("ln -s /usr/share/zoneinfo/Russia/Moscow /var/etc/localtime");
+	}
 	system("hwclock -w -u");
 
 	return 0;
