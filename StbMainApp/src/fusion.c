@@ -180,12 +180,12 @@ int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmware
 {
 	int remoteMon, remoteDay, remoteYear, remoteHour, remoteMin;
 	int localMon, localDay, localYear, localHour, localMin;
-	int scannedItemsRemote/*, scannedItemsLocal*/;
+	int scannedItemsRemote, scannedItemsLocal;
 	//if (!localFirmwareVer || !remoteFirmwareVer) return NO;
 	if (!remoteFirmwareVer) return NO;
 	// eg. 201407251445
 	scannedItemsRemote = sscanf(remoteFirmwareVer, "%04d%02d%02d%02d%02d", &remoteYear, &remoteMon, &remoteDay, &remoteHour, &remoteMin);
-	//scannedItemsLocal = sscanf(localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
+	scannedItemsLocal = sscanf(localFirmwareVer,  "%04d%02d%02d%02d%02d", &localYear, &localMon, &localDay, &localHour, &localMin);
 	do {
 		//if (scannedItemsRemote != 5 || scannedItemsLocal != 5) break;
 		if (scannedItemsRemote != 5) break;
@@ -194,6 +194,7 @@ int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmware
 		if (remoteYear == localYear && remoteMon == localMon && remoteDay < localDay) break;
 		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour < localHour) break;
 		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin < localMin) break;
+		//eprintf ("%s(%d): yes (%s vs %s)\n", __FUNCTION__, __LINE__, remoteFirmwareVer, localFirmwareVer);
 		return YES;
 	} while (0);
 	return NO;
