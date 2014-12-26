@@ -41,6 +41,8 @@
 #define FUSION_STUB "fusion://stub"
 #define FUSION_MIN_USLEEP 40
 
+#define FUSION_DEFAULT_BANDLIM_KBYTE (2048)
+
 typedef struct
 {
     int ErrorCode;

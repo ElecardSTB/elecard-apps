@@ -12,6 +12,7 @@
 
 static char g_usbRoot[PATH_MAX] = {0};
 static int gStatus = 0;
+int g_shaping = FUSION_DEFAULT_BANDLIM_KBYTE;
 
 interfaceFusionObject_t FusionObject;
 
@@ -167,7 +168,7 @@ void * fusion_threadDownloadFirmware(void * param)
 	}
 	*/
 	eprintf ("%s: Save %s to %s ...\n", __FUNCTION__, url, filepath);
-	sprintf (cmd, "wget -c -q \"%s\" -O %s ", url, filepath); // 2>/dev/null, quiet
+	sprintf (cmd, "wget --limit-rate=%dk -c -q \"%s\" -O %s ", g_shaping, url, filepath); // 2>/dev/null, quiet
 	system(cmd);
 
 	eprintf ("%s(%d): Exit.\n", __FUNCTION__, __LINE__);
@@ -200,6 +201,15 @@ int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmware
 	return NO;
 }
 
+int fusion_isServerUnavailable ()
+{
+	char result [512] = {0};
+	fusion_getCommandOutput ("ping -c 3 public.tv", result); //  | grep \", 0% packet loss\"
+	if (strstr(result, ", 0% packet loss") != NULL) return NO;
+	eprintf ("%s(%d): PING Failed. result = %s\n", __FUNCTION__, __LINE__, result);
+	return YES;
+}
+
 void * fusion_threadCheckReboot (void * param)
 {
 	time_t now;
@@ -207,29 +217,30 @@ void * fusion_threadCheckReboot (void * param)
 
 	while (1)
 	{
-		if (strlen(FusionObject.reboottime) && 
-			(strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN) != 0) && 
-			fusion_isRemoteFirmwareBetter(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer) == YES)
-		{
-			time (&now);
-			nowDate = *localtime (&now);
+		time (&now);
+		nowDate = *localtime (&now);
 
-			rebootDate.tm_year = nowDate.tm_year;
-			rebootDate.tm_mon = nowDate.tm_mon;
-			rebootDate.tm_mday = nowDate.tm_mday;
-			sscanf(FusionObject.reboottime, "%02d:%02d:%02d", &rebootDate.tm_hour, &rebootDate.tm_min, &rebootDate.tm_sec);
+		rebootDate.tm_year = nowDate.tm_year;
+		rebootDate.tm_mon = nowDate.tm_mon;
+		rebootDate.tm_mday = nowDate.tm_mday;
+		sscanf(FusionObject.reboottime, "%02d:%02d:%02d", &rebootDate.tm_hour, &rebootDate.tm_min, &rebootDate.tm_sec);
 /*
-			eprintf ("%s(%d): Reboot date is %04d-%02d-%02d %02d:%02d:%02d, now = %02d:%02d:%02d %02d:%02d:%02d, checktime = %d\n", 
-						  __FUNCTION__, __LINE__, 
-						rebootDate.tm_year, rebootDate.tm_mon, rebootDate.tm_mday,
-						rebootDate.tm_hour, rebootDate.tm_min, rebootDate.tm_sec,
-						nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday,
-						nowDate.tm_hour, nowDate.tm_min, nowDate.tm_sec, 
-						FusionObject.checktime);
+		eprintf ("%s(%d): Reboot date is %04d-%02d-%02d %02d:%02d:%02d, now = %02d:%02d:%02d %02d:%02d:%02d, checktime = %d\n", 
+					  __FUNCTION__, __LINE__, 
+					rebootDate.tm_year, rebootDate.tm_mon, rebootDate.tm_mday,
+					rebootDate.tm_hour, rebootDate.tm_min, rebootDate.tm_sec,
+					nowDate.tm_year, nowDate.tm_mon, nowDate.tm_mday,
+					nowDate.tm_hour, nowDate.tm_min, nowDate.tm_sec, 
+					FusionObject.checktime);
 */
-			double diff = difftime(mktime(&rebootDate), mktime(&nowDate));
-			//eprintf ("%s(%d): diff = %f\n", __FUNCTION__, __LINE__, diff);
-			if ((diff > 0) && (diff <= 60)){
+		double diff = difftime(mktime(&rebootDate), mktime(&nowDate));
+		//eprintf ("%s(%d): diff = %f\n", __FUNCTION__, __LINE__, diff);
+		if ((diff > 0) && (diff <= 60)){
+			if (strlen(FusionObject.reboottime) && 
+				(strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN) != 0) && 
+				(fusion_isRemoteFirmwareBetter(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer) == YES) ||
+				(fusion_isServerUnavailable() == YES))
+			{
 				//eprintf ("%s(%d): remoteTimestamp = %s, localTimestamp = %s, compare res = %d\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer, FusionObject.localFirmwareVer,
 				//	strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN));
 				eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
@@ -237,6 +248,7 @@ void * fusion_threadCheckReboot (void * param)
 				break;
 			}
 		}
+
 		fusion_wait(20 * 1000);
 	}
 
@@ -378,6 +390,11 @@ int fusion_readConfig()
 			eprintf (" %s: creep y = %d\n",   __FUNCTION__, FusionObject.creepY);
 		}
 		// --------- end creep coord section ------------------------- //
+		else if ((ptr = strcasestr((const char*) line, (const char*)"LIMIT ")) != NULL){
+			ptr += 6;
+			g_shaping = atoi(ptr);
+			eprintf (" %s: band limit = %d\n",   __FUNCTION__, g_shaping);
+		}
 	}
 	fclose (f);
 	return 0;
@@ -1279,7 +1296,7 @@ int fusion_getCreepAndLogo ()
 				system (cmd);
 
 				// check if we have wifi connection
-				char wifiStatus[8];
+				/*char wifiStatus[8];
 				fusion_getCommandOutput ("edcfg /var/etc/ifcfg-wlan0 get WAN_MODE", wifiStatus);
 				if (strncmp(wifiStatus, "1", 1) == 0){
 					// wifi is on and is used as external interface
@@ -1287,7 +1304,11 @@ int fusion_getCreepAndLogo ()
 					pthread_t handle;
 					pthread_create(&handle, NULL, fusion_threadDownloadFirmware, (void*)FusionObject.firmware);
 					pthread_detach(handle);
-				}
+				}*/
+				// download firmware anyway
+				pthread_t handle;
+				pthread_create(&handle, NULL, fusion_threadDownloadFirmware, (void*)FusionObject.firmware);
+				pthread_detach(handle);
 			}
 		}
 	}else {
