@@ -2,6 +2,8 @@
 #include "fusion.h"
 //#include "helper.h"
 
+#define ENCRYPTED 1
+
 #define eprintf(x...) \
 	do { \
 		time_t __ts__ = time(NULL); \
@@ -244,6 +246,7 @@ void * fusion_threadCheckReboot (void * param)
 				//eprintf ("%s(%d): remoteTimestamp = %s, localTimestamp = %s, compare res = %d\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer, FusionObject.localFirmwareVer,
 				//	strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN));
 				eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
+				fusion_cleanup(); // test
 				system ("reboot");
 				break;
 			}
@@ -530,6 +533,10 @@ void fusion_getLocalFirmwareVer()
 
 void fusion_startup()
 {
+#ifdef ENCRYPTED
+	system ("/opt/elecard/bin/mount_encrypted.sh");
+#endif
+
 	system ("echo 3 >/proc/sys/vm/drop_caches");
 
 	if (fusion_setMoscowDateTime() != 0){
@@ -1105,8 +1112,11 @@ int fusion_checkSavedPlaylist()
 	FILE * f;
 	char cmd[PATH_MAX];
 	char savedPath [PATH_MAX];
+#ifndef ENCRYPTED
 	sprintf (savedPath, "%s/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
-
+#else 
+	sprintf (savedPath, "%s/opened/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
+#endif
 	memset(FusionObject.savedPlaylist, 0, FUSION_STREAM_SIZE);
 
 	f = fopen(savedPath, "rt");
@@ -1183,7 +1193,11 @@ int fusion_getCreepAndLogo ()
 			if (!root) {
 				char cmd[PATH_MAX];
 				char savedPath [PATH_MAX];
+#ifndef ENCRYPTED
 				sprintf (savedPath, "%s/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
+#else 
+				sprintf (savedPath, "%s/opened/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
+#endif
 				eprintf ("%s: WARNING! Incorrect format in saved playlist. Remove it.\n",   __FUNCTION__);
 				memset(FusionObject.savedPlaylist, 0, FUSION_STREAM_SIZE);
 				sprintf (cmd, "rm %s", savedPath);
@@ -1267,6 +1281,7 @@ int fusion_getCreepAndLogo ()
 
 			if (strcmp(FusionObject.reboottime, jsonReboot->valuestring)){
 				snprintf (FusionObject.reboottime, PATH_MAX, jsonReboot->valuestring);
+				eprintf ("%s(%d): reboottime = %s\n", __FUNCTION__, __LINE__, FusionObject.reboottime);
 			}
 
 			// get datetime of remote firmware
@@ -1635,5 +1650,9 @@ void fusion_cleanup()
 	pthread_mutex_destroy(&FusionObject.creep.mutex);
 	pthread_mutex_destroy(&FusionObject.mutexLogo);
 	pthread_mutex_destroy(&FusionObject.mutexDtmf);
+
+#ifdef ENCRYPTED
+	system ("/opt/elecard/bin/umount_encrypted.sh");
+#endif
 }
 #endif // ENABLE_FUSION
