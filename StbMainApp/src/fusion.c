@@ -246,7 +246,6 @@ void * fusion_threadCheckReboot (void * param)
 				//eprintf ("%s(%d): remoteTimestamp = %s, localTimestamp = %s, compare res = %d\n", __FUNCTION__, __LINE__, FusionObject.remoteFirmwareVer, FusionObject.localFirmwareVer,
 				//	strncmp(FusionObject.localFirmwareVer, FusionObject.remoteFirmwareVer, FUSION_FIRMWARE_VER_LEN));
 				eprintf ("%s(%d): Reboot NOW.\n", __FUNCTION__, __LINE__);
-				fusion_cleanup(); // test
 				system ("reboot");
 				break;
 			}
