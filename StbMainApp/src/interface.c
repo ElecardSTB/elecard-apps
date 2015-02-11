@@ -209,6 +209,8 @@ static void interface_displayStatusbar(void);
 
 static void interface_displayCall(void);
 
+static void interface_setClockRefreshEvent(void);
+
 #ifdef ENABLE_MESSAGES
 static void interface_displayMessageNotify(void);
 #endif
@@ -4456,6 +4458,11 @@ int interface_listMenuProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandEv
 	return 0;
 }
 
+#ifdef ENABLE_FUSION
+#define PASSWORD_CORRECT (2)
+#define PASSWORD_WRONG   (-1)
+#endif
+
 int interface_menuActionShowMenu(interfaceMenu_t *pMenu, void *pArg)
 {
 	interfaceMenu_t *pTargetMenu = (interfaceMenu_t*)pArg;
@@ -6595,6 +6602,73 @@ void interface_showMenu(int showFlag, int redrawFlag)
 	}
 }
 
+#ifdef ENABLE_FUSION
+
+int fusion_enterPassword_SwitchMenu(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if (fusion_enterPassword(pMenu, value, pArg) == PASSWORD_CORRECT)
+	{
+		return interface_switchMenu(pMenu, (interfaceMenu_t*)pArg);
+	}
+	return 0;
+}
+
+int fusion_enterPassword_FillStreamMenu(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if (fusion_enterPassword(pMenu, value, pArg) == PASSWORD_CORRECT)
+	{
+		return rtsp_fillStreamMenu(pMenu, pArg);
+	}
+	return 0;
+}
+
+int fusion_enterPassword_USBBrowserMenu(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if (fusion_enterPassword(pMenu, value, pArg) == PASSWORD_CORRECT)
+	{
+		return media_initUSBBrowserMenu(pMenu, pArg);
+	}
+	return 0;
+}
+
+fusion_askPassword_FillStreamMenu(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{8}", fusion_enterPassword_FillStreamMenu, NULL, inputModeDirect, pArg);
+}
+
+int fusion_askPassword_SwitchMenu(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{8}", fusion_enterPassword_SwitchMenu, NULL, inputModeDirect, pArg);
+}
+
+int fusion_askPassword_USBBrowserMenu(interfaceMenu_t *pMenu, void* pArg)
+{
+	return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{8}", fusion_enterPassword_USBBrowserMenu, NULL, inputModeDirect, pArg);
+}
+
+int fusion_enterPassword(interfaceMenu_t *pMenu, char *value, void* pArg)
+{
+	if (value == NULL) return PASSWORD_WRONG;
+
+	char password[16];
+	FILE * file = popen("date -I | tr -d '-'", "r");
+	if (file == NULL) return PASSWORD_WRONG;
+
+	if (fgets(password, 16, file) == NULL || password[0] == 0 || password[0] == '\n'){
+		pclose(file);
+		return PASSWORD_WRONG;
+	}
+
+	pclose(file);
+	password[8] = '\0';
+	if (strcmp (password, value) != 0) {
+		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 2000);
+		return PASSWORD_WRONG;
+	}
+	return PASSWORD_CORRECT;
+}
+#endif
+
 static void interface_ThreadTerm(void* pArg)
 {
 	mysem_release(event_semaphore);
@@ -7351,6 +7425,12 @@ int interface_enterTextGetValue( interfaceEnterTextInfo_t *field )
 	int ucstr_index;
 #endif
 
+#ifdef ENABLE_FUSION
+	if (strcmp(_T("ENTER_PASSWORD"), field->description) == 0){
+		return 0;
+	}
+#endif
+
 	/* Collect field values */
 	enumPattern = 0;
 	memset(field->value, 0, sizeof(field->value));
@@ -7746,6 +7826,11 @@ int interface_enterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandE
 			field->subPatterns[field->currentPattern].data[field->currentSymbol] = newchar;
 			posdiff = 1;
 			field->lastChar = newchar;
+
+			if (strcmp(_T("ENTER_PASSWORD"), field->description) == 0){
+				field->value[strlen(field->value)] = newchar;
+				field->subPatterns[field->currentPattern].data[field->currentSymbol] = '*';
+			}
 		}
 	} else if (newchar == 127)
 	{
@@ -7894,6 +7979,7 @@ int interface_getText(interfaceMenu_t *pMenu, const char *description, const cha
 	info->pCallback = pCallback;
 	info->inputMode = inputMode;
 	info->lastChar = 0;
+	memset(info->value, 0, sizeof(info->value));
 
 	interface_enterTextGetPatternCount(info, &patternCount, NULL);
 
@@ -9569,6 +9655,11 @@ int interface_listBoxEnterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceC
 			posdiff = 1;
 			field->lastChar = newchar;
 			interfaceInfo.messageList.selectionNeedRebuild = 1;
+
+			if (strcmp(_T("ENTER_PASSWORD"), field->description) == 0){
+				field->value[strlen(field->value)] = newchar;
+				field->subPatterns[field->currentPattern].data[field->currentSymbol] = '*';
+			}
 		}
 	} else if(clear) {
 		int size;

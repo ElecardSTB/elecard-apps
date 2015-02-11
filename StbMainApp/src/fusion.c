@@ -196,7 +196,7 @@ int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmware
 		if (remoteYear == localYear && remoteMon < localMon) break;
 		if (remoteYear == localYear && remoteMon == localMon && remoteDay < localDay) break;
 		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour < localHour) break;
-		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin < localMin) break;
+		if (remoteYear == localYear && remoteMon == localMon && remoteDay == localDay && remoteHour == localHour && remoteMin <= localMin) break;
 		//eprintf ("%s(%d): yes (%s vs %s)\n", __FUNCTION__, __LINE__, remoteFirmwareVer, localFirmwareVer);
 		return YES;
 	} while (0);

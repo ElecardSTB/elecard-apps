@@ -86,6 +86,12 @@ static interfaceListMenu_t WebServicesMenu;
 
 interfaceListMenu_t interfaceMainMenu;
 
+#ifdef ENABLE_FUSION
+extern int fusion_askPassword_FillStreamMenu(interfaceMenu_t *pMenu, void* pArg);
+extern int fusion_askPassword_SwitchMenu(interfaceMenu_t *pMenu, void* pArg);
+extern int fusion_askPassword_USBBrowserMenu(interfaceMenu_t *pMenu, void* pArg);
+#endif
+
 /*******************************************************************
 * FUNCTION IMPLEMENTATION                                          *
 ********************************************************************/
@@ -214,8 +220,12 @@ void menu_buildMainMenu()
 #ifdef ENABLE_IPTV
 	rtp_buildMenu(_M &interfaceMainMenu);
 	str = _T("TV_CHANNELS");
+
+#ifdef ENABLE_FUSION
+	interface_addMenuEntry(_M &interfaceMainMenu, str, fusion_askPassword_FillStreamMenu, NULL, thumbnail_multicast);
+#else
 	interface_addMenuEntry(_M &interfaceMainMenu, str, rtp_initStreamMenu, NULL, thumbnail_multicast);
-	
+#endif
 #endif // #ifdef ENABLE_IPTV
 #ifdef ENABLE_PVR
 	pvr_buildPvrMenu((interfaceMenu_t *) &interfaceMainMenu);
@@ -223,24 +233,39 @@ void menu_buildMainMenu()
 #ifdef ENABLE_VOD
 	rtsp_buildMenu(_M &interfaceMainMenu);
 	str = _T("MOVIES");
+
+#ifdef ENABLE_FUSION
+	interface_addMenuEntry(_M &interfaceMainMenu, str, fusion_askPassword_FillStreamMenu, NULL, thumbnail_vod);
+#else
 	interface_addMenuEntry(_M &interfaceMainMenu, str, rtsp_fillStreamMenu, NULL, thumbnail_vod);
+#endif
 
 #endif // #ifdef ENABLE_VOD
 #ifdef ENABLE_FAVORITES
 	playlist_buildMenu(_M &interfaceMainMenu);
 	str = _T("PLAYLIST");
+
+#ifdef ENABLE_FUSION
+	interface_addMenuEntry(_M &interfaceMainMenu, str, fusion_askPassword_SwitchMenu, &playlistMenu, thumbnail_favorites);
+#else
 	interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &playlistMenu, thumbnail_favorites);
-	
+#endif
+
 #endif // #ifdef ENABLE_FAVORITES
 
 	media_buildMediaMenu(_M &interfaceMainMenu);
 #ifdef ENABLE_USB
 	str = _T("RECORDED");
+
+#ifdef ENABLE_FUSION
+	interface_addMenuEntry(_M &interfaceMainMenu, str, fusion_askPassword_USBBrowserMenu, SET_NUMBER(mediaVideo), thumbnail_usb);
+#else
 	interface_addMenuEntry(_M &interfaceMainMenu, str, media_initUSBBrowserMenu, SET_NUMBER(mediaVideo), thumbnail_usb);
-	
+#endif
 #endif // #ifdef ENABLE_USB
 
 #ifdef ENABLE_WEB_SERVICES
+#ifndef ENABLE_FUSION
 	{
 		str = _T("WEB_SERVICES");
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &WebServicesMenu, thumbnail_internet);
@@ -297,6 +322,7 @@ void menu_buildMainMenu()
 		interface_addMenuEntry((interfaceMenu_t *)&WebServicesMenu, str, smil_enterURL, SET_NUMBER(-1), thumbnail_add_url);
 #endif
 	}
+#endif // ifndef ENABLE_FUSION
 #endif // #ifdef ENABLE_WEB_SERVICES
 
 #ifdef ENABLE_VOIP
@@ -320,7 +346,12 @@ void menu_buildMainMenu()
 	{
 		output_buildMenu(_M &interfaceMainMenu);
 		str = _T("SETTINGS");
+
+#ifdef ENABLE_FUSION
+	interface_addMenuEntry(_M &interfaceMainMenu, str, fusion_askPassword_SwitchMenu, &OutputMenu, thumbnail_configure);
+#else
 		interface_addMenuEntry(_M &interfaceMainMenu, str, interface_menuActionShowMenu, &OutputMenu, thumbnail_configure);
+#endif
 	}
 #else // NOT ENABLE_VIDIMAX
 //#ifdef ENABLE_VIDIMAX	
