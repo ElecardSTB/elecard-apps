@@ -148,8 +148,11 @@ static pmysem_t  event_semaphore;
 static const int interface_confirmBoxIcons[4] =
 { statusbar_f1_cancel, statusbar_f2_ok, 0, 0 };
 static const int interface_textBoxIcons[4] =
-{ statusbar_f1_cancel, statusbar_f2_ok, statusbar_f3_keyboard, 0 };
-
+{ statusbar_f1_cancel, statusbar_f2_ok, 
+#ifndef ENABLE_FUSION
+	statusbar_f3_keyboard, 
+#endif
+	0 };
 static IDirectFBSurface *interface_splash = NULL;
 
 static button_t controlButtons[] = {
@@ -6589,6 +6592,9 @@ void interface_showMenu(int showFlag, int redrawFlag)
 
 	if ( !interfaceInfo.showMenu )
 	{
+		#ifdef ENABLE_FUSION
+			interfaceInfo.currentMenu = _M &interfaceMainMenu;
+		#endif
 		if (interfacePlayControl.showOnStart && (interfacePlayControl.enabled || interfaceSlideshowControl.enabled))
 		{
 			interface_playControlRefresh(0);
