@@ -1420,7 +1420,7 @@ int fusion_getCreepAndLogo ()
 		}
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 		interface_displayMenu(1);
-	}
+	}/*
 	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
 	if (jsonMarks){
 		char folderToSaveMarks[PATH_MAX];
@@ -1464,7 +1464,7 @@ int fusion_getCreepAndLogo ()
 		}
 		//fusion_removeOldMarkVideo(folderToSaveMarks);		// todo : remove symlinks and old video more correct
 	} // if (jsonMarks)
-
+*/
 
 	result = FUSION_SAME_CREEP;
 	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
