@@ -43,6 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "media.h"
 #include "helper.h"
 #include "bouquet.h"
+#include "dvbChannel.h"
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +64,22 @@ char *globalSmallFont = DEFAULT_SMALL_FONT;
 int   globalFontHeight = DEFAULT_FONT_HEIGHT;
 int   globalSmallFontHeight = DEFAULT_SMALL_FONT_HEIGHT;
 char *globalInfoFiles[] = RTSP_SERVER_FILES;
+const table_IntStr_t g_serviceSortNames[] = {
+	//this is key for l10n_getText() (aka _T)
+	{serviceSortNone,  "NONE"},
+	{serviceSortAlpha, "SORT_ALPHA"},
+	{serviceSortType,  "SORT_TYPE"},
+	{serviceSortFreq,  "SORT_FREQUENCY"},
+
+	//legacy names in settings
+	{serviceSortNone,  "none"},
+	{serviceSortAlpha, "alphabet"},
+	{serviceSortType,  "type"},
+	{serviceSortFreq,  "frequency"},
+
+	TABLE_INT_STR_END_VALUE,
+};
+
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -78,7 +96,6 @@ static const char *playbackModeNames[] = PLAYBACK_MODE_NAMES;
 static const char *slideshowModeNames[]= SLIDESHOW_MODE_NAMES;
 static const char *videoModeNames[]    = VIDEO_MODE_NAMES;
 #ifdef ENABLE_DVB
-static const char *serviceSortNames[]  = SERVICE_SORT_NAMES;
 static const char *diseqcSwictNames[]  = DISEQC_SWITCH_NAMES;
 #endif
 
@@ -299,12 +316,8 @@ int loadAppSettings()
 		else if (sscanf(buf, "DISEQC_UNCOMMITED=%hhu", &appControlInfo.dvbsInfo.diseqc.uncommited) == 1) {}
 		else if (sscanf(buf, "DVBSORTING=%[^\r\n ]", val ) == 1)
 		{
-			for( i = 0; i < serviceSortCount; i++ )
-				if( strcasecmp( val, serviceSortNames[i] ) == 0 )
-				{
-					appControlInfo.offairInfo.sorting = i;
-					break;
-				}
+			appControlInfo.offairInfo.sorting = table_IntStrLookupR(g_serviceSortNames, val, serviceSortNone);
+			dvbChannel_sort(appControlInfo.offairInfo.sorting);
 			//dprintf("%s: sorting %d\n", __FUNCTION__, appControlInfo.offairInfo.sorting);
 		}
 		else if (sscanf(buf, "DVBSERVICELIST=%[^\r\n]", appControlInfo.offairInfo.serviceList) == 1)
@@ -799,7 +812,7 @@ int saveAppSettings()
 	fprintf(fd, "DISEQC_PORT=%u\n",               appControlInfo.dvbsInfo.diseqc.port);
 	fprintf(fd, "DISEQC_UNCOMMITED=%u\n",         appControlInfo.dvbsInfo.diseqc.uncommited);
 	fprintf(fd, "SHOWSCRAMBLED=%d\n",             appControlInfo.offairInfo.dvbShowScrambled);
-	fprintf(fd, "DVBSORTING=%s\n",                serviceSortNames[appControlInfo.offairInfo.sorting]);
+	fprintf(fd, "DVBSORTING=%s\n",                table_IntStrLookup(g_serviceSortNames, appControlInfo.offairInfo.sorting, ""));
 	fprintf(fd, "DVBSERVICELIST=%s\n",            appControlInfo.offairInfo.serviceList);
 	fprintf(fd, "LASTDVBCHANNEL=%d\n",            appControlInfo.dvbInfo.channel);
 #endif

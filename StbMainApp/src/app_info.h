@@ -504,12 +504,6 @@ typedef enum __serviceSort_t
 	serviceSortCount
 } serviceSort_t;
 
-#define SERVICE_SORT_NAMES { \
-	"none", \
-	"alphabet", \
-	"type", \
-	"frequency" }
-
 #define SCRAMBLED_OFF    0
 #define SCRAMBLED_SHOW   1
 #define SCRAMBLED_PLAY   2
@@ -706,6 +700,8 @@ extern char *globalFont;
 extern char *globalSmallFont;
 extern int   globalFontHeight;
 extern int   globalSmallFontHeight;
+
+extern const table_IntStr_t g_serviceSortNames[];
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *

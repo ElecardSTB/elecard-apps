@@ -374,10 +374,9 @@ static int output_toggleDvbTuner(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDiseqcSwitch(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDiseqcPort(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleDiseqcUncommited(interfaceMenu_t *pMenu, void* pArg);
+static int output_toggleSortOrder(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
-static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
-static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 #endif // ENABLE_DVB
 
 #ifdef ENABLE_3D
@@ -2652,12 +2651,6 @@ static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg)
 	return 1;
 }
 
-static int output_clearOffairSettings(interfaceMenu_t *pMenu, void* pArg)
-{
-	interface_showConfirmationBox(_T("DVB_CLEAR_CHANNELS_CONFIRM"), thumbnail_question, output_confirmClearOffair, pArg);
-	return 1;
-}
-
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
 {
 	switch(cmd->command) {
@@ -2676,28 +2669,6 @@ static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent
 	}
 
 	return 1;
-}
-
-static int output_confirmClearOffair(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg)
-{
-	int32_t ret = 1;
-	switch(cmd->command) {
-		case interfaceCommandRed:
-		case interfaceCommandExit:
-		case interfaceCommandLeft:
-			ret = 0;
-			break;
-		case interfaceCommandGreen:
-		case interfaceCommandEnter:
-		case interfaceCommandOk:
-			dvbChannel_sort(serviceSortNone);
-			ret = 0;
-			break;
-		default:
-			break;
-	}
-
-	return ret;
 }
 
 #ifdef ENABLE_DVB_DIAG
@@ -2995,6 +2966,16 @@ static int output_toggleAtscModulation(interfaceMenu_t *pMenu, void* pArg)
 	return output_saveAndRedraw(saveAppSettings(), pMenu);
 }
 
+static int output_toggleSortOrder(interfaceMenu_t *pMenu, void* pArg)
+{
+	do {
+		appControlInfo.offairInfo.sorting = (appControlInfo.offairInfo.sorting + 1) % serviceSortCount;
+	} while(appControlInfo.offairInfo.sorting == serviceSortType);
+	dvbChannel_sort(appControlInfo.offairInfo.sorting);
+
+	return output_saveAndRedraw(saveAppSettings(), pMenu);
+}
+
 static inline char *get_HZprefix(fe_delivery_system_t delSys)
 {
 	return _T(delSys == SYS_DVBS ? "MHZ" : "KHZ");
@@ -3069,8 +3050,9 @@ int output_enterDVBMenu(interfaceMenu_t *dvbMenu, void* notused)
 	sprintf(buf, "%s (%d)", _T("DVB_CLEAR_SERVICES"), dvb_getNumberOfServices());
 	interface_addMenuEntry(dvbMenu, buf, output_clearDvbSettings, screenMain, thumbnail_scan);
 
-	str = _T("DVB_CLEAR_CHANNELS");
-	interface_addMenuEntry(dvbMenu, str, output_clearOffairSettings, screenMain, thumbnail_scan);
+	str = _T(table_IntStrLookup(g_serviceSortNames, appControlInfo.offairInfo.sorting, "NONE"));
+	sprintf(buf, "%s: %s", _T("SORT_ORDER_MENU_ITEM"), str);
+	interface_addMenuEntry(dvbMenu, buf, output_toggleSortOrder, screenMain, thumbnail_select);
 
 #ifdef ENABLE_DVB_DIAG
 	sprintf(buf, "%s: %s", _T("DVB_START_WITH_DIAGNOSTICS"), _T( appControlInfo.offairInfo.diagnosticsMode == DIAG_FORCED_OFF ? "OFF" : "ON" ) );

@@ -1191,8 +1191,6 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 	dvb_filtersFlush();
 	mysem_release(scan_semaphore);
 
-	dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
-
 	return -1;
 }
 
