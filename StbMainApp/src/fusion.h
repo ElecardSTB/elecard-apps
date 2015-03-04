@@ -54,5 +54,6 @@ typedef struct
 
 void fusion_startup();
 void fusion_cleanup();
+void fusion_fakeRestart();
 
 #endif //_FUSION_H_

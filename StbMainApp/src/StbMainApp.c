@@ -1494,6 +1494,7 @@ void *keyThread(void *pArg)
 					continue;
 				}
 #ifdef STSDK
+#ifndef ENABLE_FUSION
 				if(event.input.key_symbol == DIKS_CUSTOM0) { //VFMT
 					output_toggleOutputModes();
 					continue;
@@ -1502,6 +1503,7 @@ void *keyThread(void *pArg)
 					output_toggleInputs();
 					continue;
 				}
+#endif
 #endif
 
 				memcpy(&currentpress, &event.input.timestamp, sizeof(struct timeval));

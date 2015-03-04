@@ -172,8 +172,8 @@ int st_init(void)
 #ifdef ENABLE_FUSION
 
 #define FUSION_PREFERRED_FMT "1080i50"
-	eprintf("%s: st_setVideoFormat %s\n", __FUNCTION__, FUSION_PREFERRED_FMT);
-	st_setVideoFormat("main", FUSION_PREFERRED_FMT);
+	//eprintf("%s: st_setVideoFormat %s\n", __FUNCTION__, FUSION_PREFERRED_FMT);
+	//st_setVideoFormat("main", FUSION_PREFERRED_FMT);
 #endif
 	return res;
 }
@@ -704,6 +704,10 @@ int32_t st_changeOutputMode(videoOutput_t *p_videoOutput, const char *newOutputF
 	len = sizeof(p_videoOutput->currentFormat);
 	strncpy(p_videoOutput->currentFormat, newOutputFormat, len);
 	p_videoOutput->currentFormat[len - 1] = 0;
+
+#ifdef ENABLE_FUSION
+	fusion_fakeRestart();
+#endif
 
 	return 0;
 }

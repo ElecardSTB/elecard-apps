@@ -530,6 +530,12 @@ void fusion_getLocalFirmwareVer()
 	eprintf ("%s(%d): local firmware version = %s\n", __FUNCTION__, __LINE__, FusionObject.localFirmwareVer);
 }
 
+void fusion_fakeRestart()
+{
+	FusionObject.mode = FUSION_MODE_UNDEF;
+	return;
+}
+
 void fusion_startup()
 {
 #ifdef ENCRYPTED
