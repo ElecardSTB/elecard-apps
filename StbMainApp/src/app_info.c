@@ -970,10 +970,13 @@ void appInfo_init(void)
 	appControlInfo.mediaInfo.bufferingData        = 0;
 #endif
 	appControlInfo.soundInfo.muted                = 0;
+#ifdef ENABLE_FUSION
+	appControlInfo.soundInfo.volumeLevel = 0;
+#else
 	appControlInfo.soundInfo.volumeLevel          = 100;
+#endif
 	appControlInfo.soundInfo.rcaOutput            = 1;
 	appControlInfo.soundInfo.hardwareRevision     = 1;
-
 	appControlInfo.outputInfo.autoScale           = videoMode_scale;
 #ifdef STB225
 	appControlInfo.outputInfo.aspectRatio         = aspectRatio_16x9;
