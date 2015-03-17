@@ -105,6 +105,9 @@ typedef enum
 
 // todo: put new commands before this line,
 // then add matching entry to rpc_cmd_names array in rpc.c
+	elcmd_demuxCcErrorCount,
+	elcmd_demuxTsErrorCount,
+
 	elcmd_cmd_count,
 } elcdRpcCommand_t;
 

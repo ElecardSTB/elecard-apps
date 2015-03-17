@@ -1075,7 +1075,7 @@ void *testServerThread(void *pArg)
 						strcpy(obuf, "Tuner present\r\n");
 					} else
 					{
-						strcpy(obuf, "ERROR: Tuner not found\r\n");
+						strcpy(obuf, "Tuner not found\r\n");
 					}
 				} else if (strstr(ibuf, "dvbchannel ") == ibuf)
 				{
@@ -1134,7 +1134,7 @@ void *testServerThread(void *pArg)
 						offair_clearServiceList(0);
 						sprintf(obuf, "DVB Service list cleared\r\n");
 					} else {
-						sprintf(obuf, "ERROR: Incorrect value %d\r\n", todo);
+						sprintf(obuf, "Incorrect value %d\r\n", todo);
 					}
 				} else if (strstr(ibuf, "dvbscan ") == ibuf)
 				{
@@ -1174,7 +1174,7 @@ void *testServerThread(void *pArg)
 
 					} else
 					{
-						sprintf(obuf, "ERROR: DVB Channels cannot be scanned with %s\r\n", ptr);
+						sprintf(obuf, "DVB Channels cannot be scanned with %s\r\n", ptr);
 					}
 				} else if (strstr(ibuf, "dvblist") == ibuf)
 				{
@@ -1264,6 +1264,74 @@ void *testServerThread(void *pArg)
 				{
 					interface_showMessageBox(_T("RENEW_IN_PROGRESS"), settings_renew, 5000);
 				}
+
+#ifdef STSDK
+				else if (strcmp(ibuf, "demuxCcErrors") == 0){
+					int ccErrs = -1;
+					elcdRpcType_t type;
+					cJSON * res = NULL;
+					st_rpcSync (elcmd_demuxCcErrorCount, NULL, &type, &res);
+					if (type == elcdRpcResult){
+						ccErrs = objGetInt(res, "demuxCcErrors", 0);
+					}
+					cJSON_Delete(res);
+					sprintf(obuf, "%d", ccErrs);
+				}
+				else if (strcmp(ibuf, "demuxTsErrors") == 0){
+					int tsErrs = -1;
+					elcdRpcType_t type;
+					cJSON * res = NULL;
+					st_rpcSync (elcmd_demuxTsErrorCount, NULL, &type, &res);
+					if (type == elcdRpcResult){
+						tsErrs = objGetInt(res, "demuxTsErrors", 0);
+					}
+					cJSON_Delete(res);
+					sprintf(obuf, "%d", tsErrs);
+				}
+				else if (strcmp(ibuf, "dvbLocked") == 0){
+					int isLocked = 0;
+					tunerState_t state;
+					memset(&state, 0, sizeof(state));
+					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
+						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
+					}
+					if (state.fe_status & FE_HAS_LOCK) isLocked = 1;
+					sprintf(obuf, "%d", isLocked);
+				}
+				else if (strcmp(ibuf, "dvbSignalStrength") == 0){
+					int dvbSignalStrength = -1;
+					tunerState_t state;
+					memset(&state, 0, sizeof(state));
+					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
+						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
+					}
+					dvbSignalStrength = state.signal_strength;
+					eprintf("%s(%d): dvbSignalStrength = %d\n", __FUNCTION__, __LINE__, dvbSignalStrength);
+					sprintf(obuf, "%d", dvbSignalStrength);
+				}
+				else if (strcmp(ibuf, "dvbBitErrorRate") == 0){
+					int dvbBitErrorRate = -1;
+					tunerState_t state;
+					memset(&state, 0, sizeof(state));
+					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
+						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
+					}
+					dvbBitErrorRate = state.ber;
+					eprintf("%s(%d): dvbBitErrorRate = %d\n", __FUNCTION__, __LINE__, dvbBitErrorRate);
+					sprintf(obuf, "%d", dvbBitErrorRate);
+				}
+				else if (strcmp(ibuf, "dvbUncorrectedErrors") == 0){
+					int dvbUncorrectedErrors = -1;
+					tunerState_t state;
+					memset(&state, 0, sizeof(state));
+					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
+						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
+					}
+					dvbUncorrectedErrors = state.uncorrected_blocks;
+					eprintf("%s(%d): dvbUncorrectedErrors = %d\n", __FUNCTION__, __LINE__, dvbUncorrectedErrors);
+					sprintf(obuf, "%d", dvbUncorrectedErrors);
+				}
+#endif
 
 #ifdef ENABLE_MESSAGES
 				else if (strncmp(ibuf, "newmsg", 6) == 0)
