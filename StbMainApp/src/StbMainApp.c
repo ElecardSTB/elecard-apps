@@ -1305,8 +1305,8 @@ void *testServerThread(void *pArg)
 					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
 						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
 					}
-					dvbSignalStrength = state.signal_strength;
-					eprintf("%s(%d): dvbSignalStrength = %d\n", __FUNCTION__, __LINE__, dvbSignalStrength);
+					dvbSignalStrength = state.signal_strength * 100 / 0xFFFF; // in percent
+					eprintf("%s(%d): dvbSignalStrength = %d%\n", __FUNCTION__, __LINE__, dvbSignalStrength);
 					sprintf(obuf, "%d", dvbSignalStrength);
 				}
 				else if (strcmp(ibuf, "dvbBitErrorRate") == 0){
