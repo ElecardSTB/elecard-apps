@@ -91,7 +91,7 @@ char * getI2CPath()
 	FILE *fd;
 	int boardName = eSTB_unknown;
 	if((fd = fopen("/proc/board/id", "r")) == 0) {
-		eprintf("ERROR --> Can't get board id.");
+		//eprintf("ERROR --> Can't get board id.");
 		return NULL;
 	} 
 	fscanf(fd, "%d", &boardName);
@@ -106,7 +106,7 @@ char * getI2CPath()
 	{
 		return I2C_PREFIX"2";
 	}
-	eprintf("ERROR --> Unsupported board.\n");
+	//eprintf("ERROR --> Unsupported board.\n");
 	return NULL;
 }
 
@@ -180,6 +180,11 @@ int32_t getEepromData()
 	return 0;
 }
 
+void printAlternativeId()
+{
+	system("echo MAC=`cat /sys/class/net/eth0/address | tr -d '\n'`");
+	return;
+}
 
 int32_t getSerial(char * i2c_path)
 {
@@ -191,22 +196,24 @@ int32_t getSerial(char * i2c_path)
 	int32_t ret;
 
 	if (!i2c_path || !strlen(i2c_path)){
+		printAlternativeId();
 		return -1;
 	}
 
 	i2c_bus = open(i2c_path, O_RDWR);
 	if(!i2c_bus) {
-		eprintf("ERROR --> Cant open %s", i2c_path);
+		//eprintf("ERROR --> Cant open %s", i2c_path);
+		printAlternativeId();
 		return -1;
 	}
 
 	if (ioctl(i2c_bus, I2C_SLAVE, EEPROM_ADDR) < 0) {
 		if (errno == EBUSY) {
-			eprintf("ERROR --> eeprom is busy");
+			//eprintf("ERROR --> eeprom is busy");
 		} else {
-			eprintf ("ERROR --> Could not set address to 0x%02x: %s",
-								EEPROM_ADDR, strerror(errno));
+			//eprintf ("ERROR --> Could not set address to 0x%02x: %s", EEPROM_ADDR, strerror(errno));
 		}
+		printAlternativeId();
 		close(i2c_bus);
 		return -1;
 	}
@@ -215,9 +222,10 @@ int32_t getSerial(char * i2c_path)
 	for(i = 0; i < sizeof(struct eeprom_data); i++){
 		ret = i2c_smbus_read_byte_data(i2c_bus, i);
 		if (ret == -1){
-			char errMessage[256];
+			/*char errMessage[256];
 			snprintf (errMessage, 256, "ERROR --> I2C bus or EEPROM is corrupted (%s)", strerror(errno));
-			eprintf(errMessage);
+			eprintf(errMessage);*/
+			printAlternativeId();
 			close(i2c_bus);
 			return -1;
 		}
@@ -225,7 +233,8 @@ int32_t getSerial(char * i2c_path)
 	}
 
 	if(!isValidMagicNum(&eepromData)) {
-		eprintf("ERROR --> bad data in eeprom");
+		//eprintf("ERROR --> bad data in eeprom");
+		printAlternativeId();
 		close(i2c_bus);
 		return -1;
 	}
