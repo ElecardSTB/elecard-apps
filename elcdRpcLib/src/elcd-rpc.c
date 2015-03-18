@@ -107,6 +107,8 @@ static uintLookup_t rpc_commands[] = {
 	{elcmd_audparam,			"audparam"},
 	{elcmd_demuxCcErrorCount,	"demuxCcErrorCount"},
 	{elcmd_demuxTsErrorCount,	"demuxTsErrorCount"},
+	{elcmd_videoSkippedPictures,"videoSkippedPictures"},
+	{elcmd_videoInvalidStartCode,"videoInvalidStartCode"},
 
 	// todo: make sure this array match elcdRpcCommand_t enum in rpc.h
 	{elcmd_cmd_count,			NULL},

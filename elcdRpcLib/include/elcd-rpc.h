@@ -107,6 +107,8 @@ typedef enum
 // then add matching entry to rpc_cmd_names array in rpc.c
 	elcmd_demuxCcErrorCount,
 	elcmd_demuxTsErrorCount,
+	elcmd_videoSkippedPictures,
+	elcmd_videoInvalidStartCode,
 
 	elcmd_cmd_count,
 } elcdRpcCommand_t;

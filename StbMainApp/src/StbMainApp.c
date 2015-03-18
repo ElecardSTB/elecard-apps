@@ -1288,6 +1288,28 @@ void *testServerThread(void *pArg)
 					cJSON_Delete(res);
 					sprintf(obuf, "%d", tsErrs);
 				}
+				else if ((strcmp(ibuf, "H264Skip") == 0) || (strcmp(ibuf, "Mpeg2Skip") == 0)) {
+					int skipped = -1;
+					elcdRpcType_t type;
+					cJSON * res = NULL;
+					st_rpcSync (elcmd_videoSkippedPictures, NULL, &type, &res);
+					if (type == elcdRpcResult){
+						skipped = objGetInt(res, "videoSkippedPictures", 0);
+					}
+					cJSON_Delete(res);
+					sprintf(obuf, "%d", skipped);
+				}
+				else if (strcmp(ibuf, "invalidStartCode") == 0) {
+					int invalidCodes = -1;
+					elcdRpcType_t type;
+					cJSON * res = NULL;
+					st_rpcSync (elcmd_videoInvalidStartCode, NULL, &type, &res);
+					if (type == elcdRpcResult){
+						invalidCodes = objGetInt(res, "videoInvalidStartCode", 0);
+					}
+					cJSON_Delete(res);
+					sprintf(obuf, "%d", invalidCodes);
+				}
 				else if (strcmp(ibuf, "dvbLocked") == 0){
 					int isLocked = 0;
 					tunerState_t state;
