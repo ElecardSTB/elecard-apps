@@ -1328,7 +1328,6 @@ void *testServerThread(void *pArg)
 						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
 					}
 					dvbSignalStrength = state.signal_strength * 100 / 0xFFFF; // in percent
-					eprintf("%s(%d): dvbSignalStrength = %d%\n", __FUNCTION__, __LINE__, dvbSignalStrength);
 					sprintf(obuf, "%d", dvbSignalStrength);
 				}
 				else if (strcmp(ibuf, "dvbBitErrorRate") == 0){
@@ -1339,7 +1338,6 @@ void *testServerThread(void *pArg)
 						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
 					}
 					dvbBitErrorRate = state.ber;
-					eprintf("%s(%d): dvbBitErrorRate = %d\n", __FUNCTION__, __LINE__, dvbBitErrorRate);
 					sprintf(obuf, "%d", dvbBitErrorRate);
 				}
 				else if (strcmp(ibuf, "dvbUncorrectedErrors") == 0){
@@ -1350,7 +1348,6 @@ void *testServerThread(void *pArg)
 						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
 					}
 					dvbUncorrectedErrors = state.uncorrected_blocks;
-					eprintf("%s(%d): dvbUncorrectedErrors = %d\n", __FUNCTION__, __LINE__, dvbUncorrectedErrors);
 					sprintf(obuf, "%d", dvbUncorrectedErrors);
 				}
 #endif
