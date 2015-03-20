@@ -947,22 +947,20 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 
 				if(state.fe_status & FE_HAS_LOCK) {
 					if(!hasLock) {
+						// locked, give adapter even more time... 
 						dprintf("%s()[%d]: L\n", __func__, adapter);
 					} else {
 						break;
 					}
 					hasLock = 1;
-					// locked, give adapter even more time... 
-					usleep(appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 				} else if(state.fe_status & FE_HAS_SIGNAL) {
 					if(hasSignal == 0) {
 						eprintf("%s()[%d]: Has signal\n", __func__, adapter);
+						// found something above the noise level, increase timeout time 
 						timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
 						hasSignal = 1;
 					}
 					dprintf("%s()[%d]: S (%d)\n", __func__, adapter, timeout);
-					// found something above the noise level, increase timeout time 
-					usleep(appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 				} else {
 					dprintf("%s()[%d]: N (%d)\n", __func__, adapter, timeout);
 					// there's no and never was any signal, reach timeout faster 
@@ -980,12 +978,13 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 					eprintf("%s()[%d]: Something is out there... (ber %u)\n", __func__, adapter, state.ber);
 					us = 500000;
 				}
+				usleep(appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 
 				for(i = 0; i < us; i += SLEEP_QUANTUM) {
 					if(pFunction && (pFunction() == -1)) {
 						return -1;
 					}
-					if(dvbfe_getSignalInfo(adapter, NULL)) {
+					if(dvbfe_getSignalInfo(adapter, NULL) == 1) {
 						break;
 					}
 					usleep(SLEEP_QUANTUM);
@@ -1174,7 +1173,6 @@ int32_t dvbfe_getSignalInfo(uint32_t adapter, tunerState_t *state)
 					ioctl(frontend_fd, FE_READ_UNCORRECTED_BLOCKS, &(state->uncorrected_blocks));
 				}
 				mysem_release(dvbfe_semaphore);
-
 				ret = (status & FE_HAS_LOCK) == FE_HAS_LOCK;
 			} else {
 				eprintf("%s: failed opening frontend %d\n", __func__, adapter);
