@@ -48,6 +48,7 @@ extern interfaceListMenu_t interfaceMainMenu;
 *********************************/
 
 void menu_init(void);
+void menu_splash(void);
 void menu_cleanup(void);
 int  open_browser(interfaceMenu_t* pMenu, void* pArg);
 

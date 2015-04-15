@@ -75,7 +75,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*******************************************************************
 * STATIC DATA                                                      *
 ********************************************************************/
-
+static int show_splash = 0;
 #ifdef ENABLE_WEB_SERVICES
 static interfaceListMenu_t WebServicesMenu;
 #endif
@@ -473,34 +473,47 @@ void menu_buildMainMenu()
 
 void menu_init()
 {
-	int splash;
-	//interface_showSplash(interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.clientWidth, interfaceInfo.clientHeight, 0, 0);
-	splash = (0 == interface_showSplash(0, 0, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 0, 0));
+#if (defined ENABLE_SPLASH)
+	if(interface_showSplash(0, 0, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 0, 0) == 0) {
+		show_splash = 1;
+	}
+#endif
 
 	menu_buildMainMenu();
 
 	interfaceInfo.currentMenu = _M &interfaceMainMenu;
+
 #ifdef ENABLE_PROVIDER_PROFILES
 	output_checkProfile();
 #endif
+	menu_splash();
+}
 
-	if( splash
-#ifndef DEBUG
-		&& (appControlInfo.playbackInfo.bResumeAfterStart == 0 || appControlInfo.playbackInfo.streamSource == streamSourceNone)
-#endif
-	  )
-	{
+void menu_splash(void)
+{
+	int32_t hasAutoplay = 0;
+	if((appControlInfo.playbackInfo.bResumeAfterStart != 0) &&
+		(appControlInfo.playbackInfo.streamSource != streamSourceNone)/* &&
+		gfx_videoProviderIsActive(screenMain)*/) {
+		hasAutoplay = 1;
+	}
+#if (defined ENABLE_SPLASH)
+	if(show_splash && !hasAutoplay) {
 		interface_showMenu(1, 0);
-#ifndef ENABLE_VIDIMAX
-		interface_showSplash(interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.clientWidth, interfaceInfo.clientHeight, 1, 1);
-		//interface_showSplash(0, 0, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 1, 1);
-#else
+#if (defined ENABLE_VIDIMAX)
 		interface_showSplash(0, 0, interfaceInfo.screenWidth, interfaceInfo.screenHeight, 1, 1);
+#else
+		interface_showSplash(interfaceInfo.clientX, interfaceInfo.clientY, interfaceInfo.clientWidth, interfaceInfo.clientHeight, 1, 1);
 #endif
-	} else
+	} else {
 		interface_showMenu(1, 1);
+	}
+#else //#if (defined ENABLE_SPLASH)
+	interface_showMenu(!hasAutoplay, 1);
+#endif //#if (defined ENABLE_SPLASH)
 
 	interface_splashCleanup();
+	show_splash = 0;
 }
 
 void menu_cleanup()

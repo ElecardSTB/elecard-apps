@@ -117,6 +117,7 @@ ENABLE_TELETEXT ?= 0
 ENABLE_ANALOGTV ?= 0
 ENABLE_USE_DVB_APPS ?= 0
 ENABLE_MUDFLAP ?= 0
+ENABLE_SPLASH ?= 1
 
 TEST_SERVER ?= 1
 
@@ -163,7 +164,7 @@ LOCAL_CXXFLAGS += \
 #libmudflap should stay before libpthread in linker flags
 ifeq ($(ENABLE_MUDFLAP),1)
 #	LOCAL_CFLAGS += -fmudflap -fmudflapth -funwind-tables
-	SEP_FLAGS_StbMainApp.c = -fmudflap -fmudflapth -funwind-tables
+	SEP_FLAGS_StbMainApp.c += -fmudflap -fmudflapth -funwind-tables
 	LOCAL_LDFLAGS += -lmudflapth -rdynamic
 endif
 
@@ -391,6 +392,10 @@ endif
 ifeq ($(ENABLE_USE_DVB_APPS),1)
 	LOCAL_CFLAGS += -DENABLE_USE_DVB_APPS
 	LOCAL_LDFLAGS += -ldvbapi -lucsi
+endif
+
+ifeq ($(ENABLE_SPLASH),1)
+	SEP_FLAGS_menu_app.c += -DENABLE_SPLASH
 endif
 
 ifneq ($(SHOW_LOGO_IMAGE),)
