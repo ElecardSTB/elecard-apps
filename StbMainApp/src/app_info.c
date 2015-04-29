@@ -729,9 +729,11 @@ int saveAppSettings()
 	char *description = appControlInfo.playbackInfo.description;
 	char *thumbnail   = appControlInfo.playbackInfo.thumbnail;
 	stb810_streamSource streamSource = appControlInfo.playbackInfo.streamSource;
-	int dontUpdateSource = appControlInfo.mediaInfo.bHttp && 
-	                       appControlInfo.playbackInfo.playlistMode != playlistModeIPTV && 
-	                       appControlInfo.playbackInfo.streamSource != streamSourceYoutube;
+// 	int dontUpdateSource = appControlInfo.mediaInfo.bHttp && 
+// 	                       appControlInfo.playbackInfo.playlistMode != playlistModeIPTV && 
+// 	                       appControlInfo.playbackInfo.streamSource != streamSourceYoutube;
+// dont know why we couldnt save http source, so disable it
+	int dontUpdateSource = 0;
 
 	if( dontUpdateSource )
 	{
