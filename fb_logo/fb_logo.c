@@ -45,6 +45,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // USE_BITMAP_FILE
 
 #ifndef USE_BITMAP_FILE
+#ifdef ENABLE_FUSION
+#include "logo_fusion.c"
+#else
 #include "logo.c"
 #endif
 
@@ -235,6 +238,7 @@ int32_t drawImage_fromFile(fb_logo_t *config, char *filename)
 	bmp_h = bmp_info.height > 0 ? bmp_info.height : -bmp_info.height;
 
 	printf("%s: %dx%d @ %hu bbp\n", filename, bmp_w, bmp_h, bmp_info.bitspp);
+	fprintf(stderr, "%s: %dx%d @ %hu bbp\n", filename, bmp_w, bmp_h, bmp_info.bitspp);	// test
 
 	x = p_vinfo->xoffset + (p_vinfo->xres - p_vinfo->xoffset - bmp_w) / 2;
 	y = p_vinfo->yoffset + (p_vinfo->yres - p_vinfo->yoffset - bmp_h) / 2;
@@ -341,7 +345,8 @@ int main()
 		exit(3);
 	}
 
-	printf("Framebuffer: %ux%u @ %u bpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+	//printf("Framebuffer: %ux%u @ %u bpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+	printf("******************** Framebuffer: %ux%u @ %u bpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
 	// Figure out the size of the screen in bytes
 	screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8;
@@ -370,7 +375,7 @@ int main()
 #endif //USE_BITMAP_FILE
 
 #ifdef ANIMATE_ELECARD_LOGO
-	animateLogo(&fb_logo_config);
+	//animateLogo(&fb_logo_config);
 #endif
 
 	printf("Closing framebuffer\n");
