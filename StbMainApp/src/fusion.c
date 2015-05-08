@@ -538,6 +538,8 @@ void fusion_fakeRestart()
 
 void fusion_startup()
 {
+	system ("/opt/elecard/bin/mkfs_ext3.sh");
+
 #ifdef ENCRYPTED
 	system ("/opt/elecard/bin/mount_encrypted.sh");
 #endif
