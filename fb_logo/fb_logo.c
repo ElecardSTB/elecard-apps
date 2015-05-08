@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #else
 #include "logo.c"
 #endif
+#endif
 
 
 /******************************************************************
@@ -371,7 +372,7 @@ int main()
 #ifdef USE_BITMAP_FILE
 	drawImage_fromFile(&fb_logo_config, USE_BITMAP_FILE);
 #else
-	drawImage_fromBuffer(&fb_logo_config, bmp_data, sizeof(bmp_data));
+	drawImage_fromBuffer(&fb_logo_config, bmp_data_elecard, sizeof(bmp_data_elecard));
 #endif //USE_BITMAP_FILE
 
 #ifdef ANIMATE_ELECARD_LOGO
