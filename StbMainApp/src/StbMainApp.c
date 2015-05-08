@@ -1350,6 +1350,53 @@ void *testServerThread(void *pArg)
 					dvbUncorrectedErrors = state.uncorrected_blocks;
 					sprintf(obuf, "%d", dvbUncorrectedErrors);
 				}
+				// dvb record
+				else if (strstr(ibuf, "recstart ") == ibuf)
+				{
+					char url[PATH_MAX];
+					char filename[PATH_MAX];
+					memset(url, 0, PATH_MAX);
+					memset(filename, 0, PATH_MAX);
+
+					ptr = ibuf+strlen("recstart ");
+					ptr = skipSpacesInStr(ptr);
+
+					if (sscanf(ptr, "%s %s", url, filename) != 2) {
+						eprintf("%s[%d]: invalid args.\n", __FUNCTION__, __LINE__);
+						return -1;
+					}
+					elcdRpcType_t	type = elcdRpcInvalid;
+					cJSON			*result = NULL;
+					cJSON			*params = NULL;
+
+					params = cJSON_CreateObject();
+					if (!params) {
+						eprintf("%s[%d]: out of memory\n", __FUNCTION__, __LINE__);
+						return -1;
+					}
+					cJSON_AddStringToObject(params, "url", url);
+					cJSON_AddStringToObject(params, "filename", filename);
+
+					eprintf("%s(%d): st_rpcSync elcmd_recstart url=%s, filename=%s...\n", __FUNCTION__, __LINE__, url, filename);
+					st_rpcSync(elcmd_recstart, params, &type, &result);
+					if(type == elcdRpcResult && result && result->valuestring && (strcmp(result->valuestring, "ok") == 0)) {
+						eprintf("%s[%d]: Started dvb record.\n", __FUNCTION__, __LINE__);
+					}
+					cJSON_Delete(result);
+					cJSON_Delete(params);
+				}
+				else if (strcmp(ibuf, "recstop") == 0){
+					elcdRpcType_t	type = elcdRpcInvalid;
+					cJSON			*result = NULL;
+
+					eprintf("%s(%d): st_rpcSync elcmd_recstop...\n", __FUNCTION__, __LINE__);
+					st_rpcSync(elcmd_recstop, NULL, &type, &result);
+					if(type == elcdRpcResult && result && result->valuestring && (strcmp(result->valuestring, "ok") == 0)) {
+						eprintf("%s[%d]: Stopped dvb record.\n", __FUNCTION__, __LINE__);
+					}
+					cJSON_Delete(result);
+				}
+				// end dvb record
 #endif
 
 #ifdef ENABLE_MESSAGES
