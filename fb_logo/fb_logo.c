@@ -375,8 +375,9 @@ int main()
 	drawImage_fromBuffer(&fb_logo_config, bmp_data_elecard, sizeof(bmp_data_elecard));
 #endif //USE_BITMAP_FILE
 
-#ifdef ANIMATE_ELECARD_LOGO
-	//animateLogo(&fb_logo_config);
+//#ifdef ANIMATE_ELECARD_LOGO
+#ifndef ENABLE_FUSION
+	animateLogo(&fb_logo_config);
 #endif
 
 	printf("Closing framebuffer\n");

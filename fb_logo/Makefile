@@ -7,6 +7,7 @@ LOCAL_CFLAGS  = -Wall -Wextra
 LOCAL_LDFLAGS =
 
 FB_LOGO_ANIMATE_ELECARD_LOGO ?= 1
+ENABLE_FUSION ?= 0
 
 # To set logo file use environment:
 #  FB_LOGO_USE_FILE=/opt/elecard/share/elecard_logo.bmp
@@ -16,12 +17,10 @@ ifneq ($(FB_LOGO_USE_FILE),)
 	LOCAL_CFLAGS += -DUSE_BITMAP_FILE=\"$(FB_LOGO_USE_FILE)\"
 endif
 
-ifneq ($(ENABLE_FUSION),)
+ifeq ($(ENABLE_FUSION),1)
 	LOCAL_CFLAGS += -DENABLE_FUSION
-endif
-
+else
 ifeq ($(FB_LOGO_ANIMATE_ELECARD_LOGO),1)
-ifeq ($(ENABLE_FUSION),)
 	LOCAL_CFLAGS += -DANIMATE_ELECARD_LOGO
 endif
 endif
