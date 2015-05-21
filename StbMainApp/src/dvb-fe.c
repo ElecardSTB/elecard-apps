@@ -520,7 +520,6 @@ static int32_t dvbfe_openLinuxDVBtuner(uint32_t adapter)
 		snprintf(frontend_devname, sizeof(frontend_devname), "/dev/dvb%d.frontend%d", adapter, 0);
 		frontend_fd = open(frontend_devname, O_RDWR);
 		if(frontend_fd < 0) {
-//			printf("%s[%d]: %m\n", __FILE__, __LINE__);
 			eprintf("%s: failed to open adapter %d\n", __func__, adapter);
 		}
 	}
@@ -883,8 +882,12 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 //			g_adapterInfo[adapter].state.dvbtInfo.bandwidth = bandwidth;
 			break;
 		case SYS_DVBC_ANNEX_AC:
-// 			g_adapterInfo[adapter].state.dvbcInfo.modulation = modulation;
-// 			g_adapterInfo[adapter].state.dvbcInfo.symbolRate = symbol_rate;
+			if((g_adapterInfo[adapter].state.dvbcInfo.symbolRate != media->dvb_c.symbol_rate)
+			|| (g_adapterInfo[adapter].state.dvbcInfo.modulation != media->dvb_c.modulation)) {
+				g_adapterInfo[adapter].state.dvbcInfo.symbolRate = media->dvb_c.symbol_rate;
+				g_adapterInfo[adapter].state.dvbcInfo.modulation = media->dvb_c.modulation;
+				needTune = 1;
+			}
 			break;
 		case SYS_DVBS:
 		case SYS_DVBS2: {
@@ -906,6 +909,7 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 			needTune = 1;
 			break;
 	}
+
 	if(needTune) {
 		int32_t ret = -1;
 
