@@ -615,9 +615,6 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 			interface_showMessageBox(buf, thumbnail_warning, 5000);
 			return -1;
 		}
-// 		interface_sliderShow(0, 0);
-// 		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
-// 		interface_showMessageBox(buf, thumbnail_info, 5000);
 		if(freq_substep) {
 			uint32_t temp_step;
 			temp_step = freq_step;
@@ -625,6 +622,10 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 			freq_substep = temp_step;
 		}
 	}
+	interface_sliderShow(0, 0);
+	sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
+	interface_showMessageBox(buf, thumbnail_info, 5000);
+
 	return -1;
 
 /*	uint32_t adapter;
