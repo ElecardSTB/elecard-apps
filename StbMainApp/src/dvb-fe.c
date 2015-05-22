@@ -975,13 +975,13 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 				}
 
 				// If ber is not -1, then wait a bit more 
-				if(state.ber == 0xffffffff) {
+// 				if(state.ber == 0xffffffff) {
 					dprintf("%s()[%d]: All clear...\n", __func__, adapter);
 					us = 100000;
-				} else {
-					eprintf("%s()[%d]: Something is out there... (ber %u)\n", __func__, adapter, state.ber);
-					us = 500000;
-				}
+// 				} else {
+// 					eprintf("%s()[%d]: Something is out there... (ber %u)\n", __func__, adapter, state.ber);
+// 					us = 500000;
+// 				}
 				usleep(appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 
 				for(i = 0; i < us; i += SLEEP_QUANTUM) {
@@ -1006,7 +1006,7 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 	}
 
 	eprintf("%s(): g_adapterInfo[%d].fd=%d\n", __func__, adapter, g_adapterInfo[adapter].fd);
-	return 0;
+	return 1;//1 mean 'no lock'
 }
 
 int32_t dvbfe_checkFrequency(fe_delivery_system_t type, uint32_t frequency, uint32_t adapter,

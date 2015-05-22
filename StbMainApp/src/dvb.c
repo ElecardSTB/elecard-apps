@@ -1415,6 +1415,7 @@ int dvb_readServicesFromDump(char* filename)
 static int32_t dvb_frequencyScanOne(uint32_t adapter, EIT_media_config_t *media,
 						dvb_displayFunctionDef* pFunction, dvbfe_cancelFunctionDef* pCancelFunction, uint32_t enableNit)
 {
+	int32_t ret;
 	float freqMHz = (float)dvbfe_frequencyKHz(adapter, media->frequency) / (float)KHZ;
 
 	if(media == NULL) {
@@ -1422,10 +1423,12 @@ static int32_t dvb_frequencyScanOne(uint32_t adapter, EIT_media_config_t *media,
 		return -1;
 	}
 
-	if(dvbfe_setParam(adapter, 1, media, pCancelFunction) != 0) {
+	ret = dvbfe_setParam(adapter, 1, media, pCancelFunction);
+	if(ret != 0) {
 		eprintf("%s(): adapter=%d, failed to set frequency to %.3f MHz\n", __func__, adapter, freqMHz);
-		return -1;
+		return ret;
 	}
+
 	dvbfe_updateMediaToCurentState(adapter, media);
 
 	eprintf("%s(): adapter=%d, scanning %.3f MHz\n", __func__, adapter, freqMHz);
@@ -1477,7 +1480,6 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 {
 	int current_frequency_number = 1;
 	int max_frequency_number = 0;
-	int ret = 0;
 
 	if(!appControlInfo.dvbCommonInfo.streamerInput) {
 		struct dvb_frontend_info fe_info;
@@ -1495,7 +1497,7 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 				eprintf("%s(): Adapter=%d, frequency %u is out of range [%u:%u]!\n", __func__, adapter,
 					frequency, fe_info.frequency_min, fe_info.frequency_max);
 				dvbfe_close(adapter);
-				return 1;
+				return -1;
 			}
 		}
 
@@ -1533,12 +1535,10 @@ int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *med
 			if(save_service_list) {
 				dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
 			}
-		} else {
-			ret = -1;
 		}
 
 		dvbfe_close(adapter);
-		return ret;
+		return 0;
 #endif
 
 		ZERO_SCAN_MESAGE();

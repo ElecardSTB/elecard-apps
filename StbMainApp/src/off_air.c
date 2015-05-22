@@ -568,7 +568,7 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, ui
 		return -1;
 	}
 	
-	if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) != 0) {
+	if(dvb_frequencyScan(adapter, frequency, NULL, offair_updateDisplay, 1, NULL) < 0) {
 		return -2;
 	}
 
@@ -584,7 +584,7 @@ static int32_t offair_scanFrequency(interfaceMenu_t *pMenu, uint32_t adapter, ui
 
 
 int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
-{	
+{
 	uint32_t adapter;
 	uint32_t low_freq, high_freq, freq_step, freq_substep, frequency;
 	int32_t which = GET_NUMBER(pArg);
@@ -615,9 +615,9 @@ int offair_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 			interface_showMessageBox(buf, thumbnail_warning, 5000);
 			return -1;
 		}
-		interface_sliderShow(0, 0);
-		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
-		interface_showMessageBox(buf, thumbnail_info, 5000);
+// 		interface_sliderShow(0, 0);
+// 		sprintf(buf, _T("SCAN_COMPLETE_CHANNELS_FOUND"), dvb_getNumberOfServices());
+// 		interface_showMessageBox(buf, thumbnail_info, 5000);
 		if(freq_substep) {
 			uint32_t temp_step;
 			temp_step = freq_step;
