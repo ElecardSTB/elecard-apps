@@ -288,6 +288,7 @@ void rtp_buildMenu(interfaceMenu_t *pParent)
 	rtpEpgInfo.program.info[0] = 0;
 	rtpEpgInfo.showMenuOnExit = 0;
 	rtpEpgInfo.previousMenu = NULL;
+	memset(rtp_info, 0, sizeof(rtp_info));
 	DFBCHECK(pgfx_smallfont->GetStringWidth(pgfx_smallfont, "44:44", -1, &rtpEpgInfo.timestampWidth));
 }
 
@@ -1875,10 +1876,10 @@ static int rtp_setChannelFromURL(interfaceMenu_t *pMenu, char *value, char *desc
 
 		desc.media[0].fmt = payloadTypeMpegTS;
 		desc.media[0].type = mediaTypeVideo;
+		desc.media[0].port = url.port;
+
 		desc.connection.addrtype = addrTypeIPv4;
 		desc.connection.address.IPv4.s_addr = inet_addr(url.address);
-
-		desc.media[0].port = url.port;
 
 		strcpy(desc.session_name, value);
 
@@ -3174,7 +3175,10 @@ void rtp_cleanupEPG()
 		FREE( rtp_info[which].thumb );
 		FREE( rtp_info[which].poster );
 		//dprintf("%s: free schedule %d\n", __FUNCTION__, which);
-		free_elements( &rtp_info[which].schedule );
+
+		if(rtp_info[which].schedule) {
+			free_elements( &rtp_info[which].schedule );
+		}
 	}
 	mysem_release(rtp_epg_semaphore);
 }
