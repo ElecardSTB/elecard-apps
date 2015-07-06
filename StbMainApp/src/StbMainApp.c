@@ -1131,13 +1131,15 @@ void *testServerThread(void *pArg)
 					todo = atoi(ptr);
 
 					if(todo > 0) {
-						offair_clearServiceList(0);
+						//offair_clearServiceList(0);
+						offair_clearServiceList(1);
 						sprintf(obuf, "DVB Service list cleared\r\n");
 					} else {
 						sprintf(obuf, "Incorrect value %d\r\n", todo);
 					}
 				} else if (strstr(ibuf, "dvbscan ") == ibuf)
 				{
+					if (dvb_getNumberOfServices() == 0) {	// vika: don't scan if list is not empty
 					unsigned long from, to, step, speed;
 
 					ptr = ibuf+strlen("dvbscan ");
@@ -1148,9 +1150,43 @@ void *testServerThread(void *pArg)
 					{
 						int index = 0, item = 0;
 
-						appControlInfo.dvbtInfo.fe.lowFrequency = from;
-						appControlInfo.dvbtInfo.fe.highFrequency = to;
-						appControlInfo.dvbtInfo.fe.frequencyStep = step;
+						switch(dvbfe_getType(appControlInfo.dvbInfo.adapter)) {	// carefull without video stop
+							case SYS_DVBT:
+							case SYS_DVBT2:
+								appControlInfo.dvbtInfo.fe.lowFrequency = from;
+								appControlInfo.dvbtInfo.fe.highFrequency = to;
+								appControlInfo.dvbtInfo.fe.frequencyStep = step;
+								break;
+							case SYS_DVBC_ANNEX_AC:
+								appControlInfo.dvbcInfo.fe.lowFrequency = from;
+								appControlInfo.dvbcInfo.fe.highFrequency = to;
+								appControlInfo.dvbcInfo.fe.frequencyStep = step;
+								break;
+							case SYS_DVBS:
+							case SYS_DVBS2:
+								if(appControlInfo.dvbsInfo.band == dvbsBandC) {
+									appControlInfo.dvbsInfo.c_band.lowFrequency = from;
+									appControlInfo.dvbsInfo.c_band.highFrequency = to;
+									appControlInfo.dvbsInfo.c_band.frequencyStep = step;
+								} else {
+									appControlInfo.dvbsInfo.k_band.lowFrequency = from;
+									appControlInfo.dvbsInfo.k_band.highFrequency = to;
+									appControlInfo.dvbsInfo.k_band.frequencyStep = step;
+								}
+								break;
+							case SYS_ATSC:
+							case SYS_DVBC_ANNEX_B:
+								appControlInfo.atscInfo.fe.lowFrequency = from;
+								appControlInfo.atscInfo.fe.highFrequency = to;
+								appControlInfo.atscInfo.fe.frequencyStep = step;
+								break;
+							default :
+								break;
+						}
+
+						//appControlInfo.dvbtInfo.fe.lowFrequency = from;
+						//appControlInfo.dvbtInfo.fe.highFrequency = to;
+						//appControlInfo.dvbtInfo.fe.frequencyStep = step;
 						appControlInfo.dvbCommonInfo.adapterSpeed = speed;
 
 						gfx_stopVideoProviders(screenMain);
@@ -1171,11 +1207,14 @@ void *testServerThread(void *pArg)
 							}
 							index++;
 						}
-
 					} else
 					{
 						sprintf(obuf, "DVB Channels cannot be scanned with %s\r\n", ptr);
 					}
+					} else {
+						eprintf(obuf, "Clean DVB list and try again.\r\n");
+					}
+
 				} else if (strstr(ibuf, "dvblist") == ibuf)
 				{
 					int index = 0, item = 0;
@@ -1327,7 +1366,8 @@ void *testServerThread(void *pArg)
 					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
 						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
 					}
-					dvbSignalStrength = state.signal_strength * 100 / 0xFFFF; // in percent
+					dvbSignalStrength = state.signal_strength;	// todo : get maximum value and make percent
+					//dvbSignalStrength = state.signal_strength * 100 / 0xFFFF; // in percent
 					sprintf(obuf, "%d", dvbSignalStrength);
 				}
 				else if (strcmp(ibuf, "dvbBitErrorRate") == 0){
