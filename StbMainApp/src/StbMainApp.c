@@ -1360,14 +1360,13 @@ void *testServerThread(void *pArg)
 					sprintf(obuf, "%d", isLocked);
 				}
 				else if (strcmp(ibuf, "dvbSignalStrength") == 0){
-					int dvbSignalStrength = -1;
+					uint16_t dvbSignalStrength = 0;
 					tunerState_t state;
 					memset(&state, 0, sizeof(state));
 					if (dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state) == -1){
 						eprintf("%s(%d): dvbfe_getSignalInfo failed\n", __FUNCTION__, __LINE__);
 					}
-					dvbSignalStrength = state.signal_strength;	// todo : get maximum value and make percent
-					//dvbSignalStrength = state.signal_strength * 100 / 0xFFFF; // in percent
+					dvbSignalStrength = state.signal_strength * 100 / 0xFFFF; // in percent
 					sprintf(obuf, "%d", dvbSignalStrength);
 				}
 				else if (strcmp(ibuf, "dvbBitErrorRate") == 0){

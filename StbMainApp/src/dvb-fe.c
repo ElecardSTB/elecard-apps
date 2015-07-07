@@ -1207,7 +1207,10 @@ int32_t dvbfe_getSignalInfo(uint32_t adapter, tunerState_t *state)
 				if(state) {
 					state->fe_status = ret ? FE_HAS_LOCK : 0;
 					state->signal_strength = objGetInt(res, "RFLevel", 0);
-					if(dvbfe_getType(adapter) == SYS_DVBS) {//use fake signal strength based on snr, coz RFLevel allways 0
+					if(dvbfe_getType(adapter) == SYS_DVBS
+						|| dvbfe_getType(adapter) == SYS_DVBC_ANNEX_AC
+						|| dvbfe_getType(adapter) == SYS_DVBC_ANNEX_B
+					) {//use fake signal strength based on snr, coz RFLevel allways 0
 						state->signal_strength = objGetInt(res, "signalQuality", 0) * 0xffff / 20;//Let 20dB as 100%
 					}
 					state->ber = objGetInt(res, "bitErrorRate", 0);
