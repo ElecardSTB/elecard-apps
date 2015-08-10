@@ -2,7 +2,7 @@
 #include "fusion.h"
 //#include "helper.h"
 
-#define ENCRYPTED 1
+//#define ENCRYPTED 1
 
 #define eprintf(x...) \
 	do { \
@@ -38,7 +38,6 @@ void fusion_getLocalFirmwareVer();
 long fusion_getRemoteFileSize(char * url);
 int fusion_getSecret ();
 int fusion_getUsbRoot();
-int fusion_getUtc (char * utcBuffer, int size);
 CURLcode fusion_getVideoByCurl (char * url, void * fsink/*char * curlStream*/, int * pStreamLen, curlWriteCB cb);
 void fusion_ms2timespec(int ms, struct timespec * ts);
 int fusion_readConfig();
@@ -52,7 +51,10 @@ void * fusion_threadCreepline(void * param);
 void * fusion_threadDownloadFirmware(void * param);
 void * fusion_threadFlipCreep (void * param);
 void fusion_wait (unsigned int timeout_ms);
-int fusion_getUtcByCurl (char * utcBuffer, int size);
+
+int fusion_getUtcWithWget (char * utcBuffer, int size);
+int fusion_getUtcFromTimeapi (char * utcBuffer, int size);
+int fusion_getUtcFromEarthtools (char * utcBuffer, int size);
 
 void fusion_ms2timespec(int ms, struct timespec * ts)
 {
@@ -722,10 +724,16 @@ int fusion_setMoscowDateTime()
 	char utcBuffer [1024];
 	memset(utcBuffer, 0, 1024);
 
-	//if (fusion_getUtc(utcBuffer, 1024) != 0) {
-	if (fusion_getUtcByCurl(utcBuffer, 1024) != 0) {
-		eprintf ("%s(%d): WARNING! Couldn't get UTC datetime.\n", __FUNCTION__, __LINE__);
-		return -1;
+	if (fusion_getUtcFromEarthtools(utcBuffer, 1024) != 0) {
+		eprintf ("%s(%d): WARNING! Couldn't get UTC from www.earthtools.org.\n", __FUNCTION__, __LINE__);
+
+		if (fusion_getUtcFromTimeapi(utcBuffer, 1024) != 0) {
+			eprintf ("%s(%d): WARNING! Couldn't get UTC from www.timeapi.org.\n", __FUNCTION__, __LINE__);
+
+			// todo : use some extra ways to get UTC
+
+			return -1;
+		}
 	}
 	// format UTC: 2014-04-04 11:43:48
 	sprintf (setDateString, "date -u -s \"%s\"", utcBuffer);
@@ -749,44 +757,8 @@ int fusion_setMoscowDateTime()
 	return 0;
 }
 
-int fusion_getUtcByCurl (char * utcBuffer, int size)
-{
-	char request[256];
-	char ans[1024];
-	int buflen;
-	char * ptrStartUtc, * ptrEndUtc;
-	memset(utcBuffer, 0, size);
-	memset(ans, 0, 1024);
 
-	if (!utcBuffer) {
-		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
-		return -1;
-	}
-
-	// use earthtools instead timeapi.org which is currently dead
-	sprintf (request, "http://www.earthtools.org/timezone/0/0" );
-	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
-	fusion_getDataByCurl(request, ans, &buflen, (curlWriteCB)fusion_curlCallback);
-
-	eprintf ("%s(%d): ans: %s\n", __FUNCTION__, __LINE__, ans);
-	if (!strlen(ans) || !strchr(ans, ' ')) {
-		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
-		return -1;
-	}
-
-	ptrStartUtc = strstr(ans, "<utctime>");
-	if (ptrStartUtc) {
-		ptrStartUtc += 9;
-		ptrEndUtc = strstr(ptrStartUtc, "</utctime>");
-		if (ptrEndUtc){
-			snprintf (utcBuffer, (int)(ptrEndUtc - ptrStartUtc) + 1, "%s", ptrStartUtc);
-		}
-	}
-
-	return 0;
-}
-
-int fusion_getUtc (char * utcBuffer, int size)
+int fusion_getUtcWithWget (char * utcBuffer, int size)
 {
 	FILE * f;
 	char request[256];
@@ -844,6 +816,72 @@ int fusion_getUtc (char * utcBuffer, int size)
 		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
 		return -1;
 	}
+	return 0;
+}
+
+int fusion_getUtcFromEarthtools (char * utcBuffer, int size)
+{
+	char request[256];
+	char ans[1024];
+	int buflen;
+	char * ptrStartUtc, * ptrEndUtc;
+	memset(utcBuffer, 0, size);
+	memset(ans, 0, 1024);
+
+	if (!utcBuffer || size <= 0) {
+		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	// use earthtools instead timeapi.org which is currently dead
+	sprintf (request, "http://www.earthtools.org/timezone/0/0" );
+	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
+	fusion_getDataByCurl(request, ans, &buflen, (curlWriteCB)fusion_curlCallback);
+
+	eprintf ("%s(%d): ans: %s\n", __FUNCTION__, __LINE__, ans);
+	if (!strlen(ans) || !strchr(ans, ' ')) {
+		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
+		return -1;
+	}
+
+	ptrStartUtc = strstr(ans, "<utctime>");
+	if (ptrStartUtc) {
+		ptrStartUtc += 9;
+		ptrEndUtc = strstr(ptrStartUtc, "</utctime>");
+		if (ptrEndUtc){
+			snprintf (utcBuffer, (int)(ptrEndUtc - ptrStartUtc) + 1, "%s", ptrStartUtc);
+		}
+	}
+
+	return 0;
+}
+
+int fusion_getUtcFromTimeapi (char * utcBuffer, int size)
+{
+	char request[256];
+	char ans[1024];
+	int buflen;
+	char * ptrStartUtc, * ptrEndUtc;
+	memset(utcBuffer, 0, size);
+	memset(ans, 0, 1024);
+
+	if (!utcBuffer || size <= 0) {
+		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	//sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt");  // 2>/dev/null
+	sprintf (request, "http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S");
+	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
+	fusion_getDataByCurl(request, ans, &buflen, (curlWriteCB)fusion_curlCallback);
+
+	eprintf ("%s(%d): ans: %s\n", __FUNCTION__, __LINE__, ans);
+	if (!strlen(ans) || !strchr(ans, ' ')) {
+		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
+		return -1;
+	}
+	snprintf (utcBuffer, min(size, strlen (ans)), "%s", ans);
+	eprintf ("%s(%d): utcBuffer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
 	return 0;
 }
 
