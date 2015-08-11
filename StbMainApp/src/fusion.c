@@ -2,7 +2,8 @@
 #include "fusion.h"
 //#include "helper.h"
 
-//#define ENCRYPTED 1
+//#define FUSION_ENCRYPTED 1
+//#define FUSION_EXT3 1
 
 #define eprintf(x...) \
 	do { \
@@ -540,9 +541,11 @@ void fusion_fakeRestart()
 
 void fusion_startup()
 {
+#ifdef FUSION_EXT3
 	system ("/opt/elecard/bin/mkfs_ext3.sh");
+#endif
 
-#ifdef ENCRYPTED
+#ifdef FUSION_ENCRYPTED
 	system ("/opt/elecard/bin/mount_encrypted.sh");
 #endif
 
@@ -1157,7 +1160,7 @@ int fusion_checkSavedPlaylist()
 	FILE * f;
 	char cmd[PATH_MAX];
 	char savedPath [PATH_MAX];
-#ifndef ENCRYPTED
+#ifndef FUSION_ENCRYPTED
 	sprintf (savedPath, "%s/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
 #else 
 	sprintf (savedPath, "%s/opened/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
@@ -1238,7 +1241,7 @@ int fusion_getCreepAndLogo ()
 			if (!root) {
 				char cmd[PATH_MAX];
 				char savedPath [PATH_MAX];
-#ifndef ENCRYPTED
+#ifndef FUSION_ENCRYPTED
 				sprintf (savedPath, "%s/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
 #else 
 				sprintf (savedPath, "%s/opened/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
@@ -1696,7 +1699,7 @@ void fusion_cleanup()
 	pthread_mutex_destroy(&FusionObject.mutexLogo);
 	pthread_mutex_destroy(&FusionObject.mutexDtmf);
 
-#ifdef ENCRYPTED
+#ifdef FUSION_ENCRYPTED
 	system ("/opt/elecard/bin/umount_encrypted.sh");
 #endif
 }
