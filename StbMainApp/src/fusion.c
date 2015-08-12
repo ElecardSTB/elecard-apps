@@ -730,8 +730,8 @@ int fusion_setMoscowDateTime()
 	if (fusion_getUtcFromEarthtools(utcBuffer, 1024) != 0) {
 		eprintf ("%s(%d): WARNING! Couldn't get UTC from www.earthtools.org.\n", __FUNCTION__, __LINE__);
 
-		if (fusion_getUtcFromTimeapi(utcBuffer, 1024) != 0) {
-			eprintf ("%s(%d): WARNING! Couldn't get UTC from www.timeapi.org.\n", __FUNCTION__, __LINE__);
+		if (fusion_getUtcWithWget(utcBuffer, 1024) != 0) {
+			eprintf ("%s(%d): WARNING! Couldn't get UTC with wget from www.timeapi.org.\n", __FUNCTION__, __LINE__);
 
 			// todo : use some extra ways to get UTC
 
@@ -766,18 +766,18 @@ int fusion_getUtcWithWget (char * utcBuffer, int size)
 	FILE * f;
 	char request[256];
 	char ans[1024];
-	char * ptrStartUtc, * ptrEndUtc;
-	char utcData[64];
-	memset(utcData, 0, 64);
 
 	if (!utcBuffer) {
 		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 
-	// use earthtools instead timeapi.org which is currently dead
-	//sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt");  // 2>/dev/null
-	sprintf (request, "wget \"http://www.earthtools.org/timezone/0/0\" -O /tmp/utc.txt 2>/tmp/wget.log" );
+	// timeapi.org was dead recently
+	// earthtools is dead now
+	// use N instead of UTC because UTC is incorrect in timeapi.org
+	sprintf (request, "wget \"http://www.timeapi.org/n/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt 2>/tmp/wget.log");  // 2>/dev/null
+	//sprintf (request, "wget \"http://www.timeapi.org/utc/now?format=%%25Y-%%25m-%%25d%%20%%20%%25H:%%25M:%%25S\" -O /tmp/utc.txt 2>/tmp/wget.log");  // 2>/dev/null
+	//sprintf (request, "wget \"http://www.earthtools.org/timezone/0/0\" -O /tmp/utc.txt 2>/tmp/wget.log" );
 	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
 	system (request);
 
@@ -804,16 +804,6 @@ int fusion_getUtcWithWget (char * utcBuffer, int size)
 	fclose(f);
 
 	eprintf ("ans: %s\n", utcBuffer);
-
-	ptrStartUtc = strstr(utcBuffer, "<utctime>");
-	if (ptrStartUtc) {
-		ptrStartUtc += 9;
-		ptrEndUtc = strstr(ptrStartUtc, "</utctime>");
-		if (ptrEndUtc){
-			snprintf (utcData, (int)(ptrEndUtc - ptrStartUtc) + 1, "%s", ptrStartUtc);
-		}
-	}
-	sprintf (utcBuffer, "%s", utcData);
 
 	if (!strlen(utcBuffer) || !strchr(utcBuffer, ' ')) {
 		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
@@ -864,7 +854,6 @@ int fusion_getUtcFromTimeapi (char * utcBuffer, int size)
 	char request[256];
 	char ans[1024];
 	int buflen;
-	char * ptrStartUtc, * ptrEndUtc;
 	memset(utcBuffer, 0, size);
 	memset(ans, 0, 1024);
 
