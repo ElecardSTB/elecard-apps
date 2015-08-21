@@ -79,16 +79,16 @@ listHead_t *bouquet_getNameList(typeBouquet_t btype);
 const char *bouquet_getCurrentName(typeBouquet_t btype);
 void        bouquet_setCurrentName(typeBouquet_t btype, const char *name);
 
-int32_t bouquet_isDownloaded   (typeBouquet_t btype, const char *name);
-int32_t bouquet_open           (typeBouquet_t btype, const char *name, int32_t force);
-int32_t bouquet_create         (typeBouquet_t btype, const char *name);
-int32_t bouquet_save           (typeBouquet_t btype, const char *name);
-int32_t bouquet_remove         (typeBouquet_t btype, const char *name);
+int32_t bouquet_isExist       (typeBouquet_t btype, const char *name);
+int32_t bouquet_open          (typeBouquet_t btype, const char *name, int32_t force);
+int32_t bouquet_create        (typeBouquet_t btype, const char *name);
+int32_t bouquet_save          (typeBouquet_t btype, const char *name);
+int32_t bouquet_remove        (typeBouquet_t btype, const char *name);
 
 //work with server
-int32_t bouquet_updateNameList (typeBouquet_t btype, int32_t isDownload);
-int32_t bouquet_update         (typeBouquet_t btype, const char *name);
-int32_t bouquet_upload         (typeBouquet_t btype, const char *name);
+int32_t bouquet_updateNameList(typeBouquet_t btype, int32_t isDownload);
+int32_t bouquet_update        (typeBouquet_t btype, const char *name);
+int32_t bouquet_upload        (typeBouquet_t btype, const char *name);
 
 void bouquet_init(void);
 void bouquet_terminate(void);

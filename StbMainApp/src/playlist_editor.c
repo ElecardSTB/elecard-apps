@@ -489,7 +489,7 @@ static int32_t playlistEditor_createNewBouquet(interfaceMenu_t *pMenu, char *val
 
 	if(strList_isExist(bouquet_getNameList(btype), value)) {
 		interface_showMessageBox(_T("PLAYLIST_NAME_EXIST"), thumbnail_loading, 0);
-		if(!bouquet_isDownloaded(btype, value)) {
+		if(!bouquet_isExist(btype, value)) {
 			interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 			bouquet_update(btype, value);
 		}
@@ -563,7 +563,7 @@ static int32_t playlistEditor_setBouquet(interfaceMenu_t *pMenu, playlistEditorM
 	}
 	gfx_stopVideoProvider(screenMain, 1, 1);
 
-	if(!bouquet_isDownloaded(btype, newBouquetName)) {
+	if(!bouquet_isExist(btype, newBouquetName)) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		bouquet_update(btype, newBouquetName);
 		interface_hideMessageBox();
