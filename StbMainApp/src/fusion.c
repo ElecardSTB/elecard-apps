@@ -31,9 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_FUSION
 #include "fusion.h"
 
-//#define FUSION_ENCRYPTED 1
-//#define FUSION_EXT3 1
-
 #define eprintf(x...) \
 	do { \
 		time_t __ts__ = time(NULL); \
@@ -41,6 +38,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		printf("[%02d:%02d:%02d]: ", __tsm__->tm_hour, __tsm__->tm_min, __tsm__->tm_sec); \
 		printf(x); \
 	} while(0)
+
+
+#ifdef FUSION_ENCRYPTED
+#define FUSION_TODAY_PLAYLIST_PATH "opened/fusion/"FUSION_PLAYLIST_NAME
+#else
+#define FUSION_TODAY_PLAYLIST_PATH "fusion/"FUSION_PLAYLIST_NAME
+#endif
 
 static char g_usbRoot[PATH_MAX] = {0};
 static int gStatus = 0;
@@ -62,7 +66,7 @@ size_t fusion_curlCallbackVideo(char * data, size_t size, size_t nmemb, void * s
 int fusion_downloadMarkFile(int index, char * folderPath);
 int fusion_downloadPlaylist(char * url, cJSON ** ppRoot);
 int fusion_getCommandOutput (char * cmd, char * result);
-int fusion_getCreepAndLogo ();
+int fusion_getAndParsePlaylist ();
 CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, curlWriteCB cb);
 void fusion_getLocalFirmwareVer();
 long fusion_getRemoteFileSize(char * url);
@@ -303,7 +307,7 @@ void * fusion_threadCreepline(void * param)
 
 	while (1){
 
-		FusionObject.creep.status = fusion_getCreepAndLogo();
+		FusionObject.creep.status = fusion_getAndParsePlaylist();
 		fusion_clearMemCache();
 
 		if (FusionObject.creep.status == FUSION_FAIL){
@@ -530,7 +534,6 @@ int fusion_getUsbRoot()
 	return 0; // no
 }
 
-
 int fusion_removeFirmwareFormFlash()
 {
 	char command[PATH_MAX];
@@ -570,7 +573,7 @@ void fusion_fakeRestart()
 
 void fusion_startup()
 {
-#ifdef FUSION_EXT3
+#ifdef FUSION_EXT2
 	system ("/opt/elecard/bin/mkfs_ext3.sh");
 #endif
 
@@ -710,7 +713,6 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 
 int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 {
-	char * playlistBuffer = NULL;
 	int res;
 	int buflen;
 
@@ -1178,11 +1180,8 @@ int fusion_checkSavedPlaylist()
 	FILE * f;
 	char cmd[PATH_MAX];
 	char savedPath [PATH_MAX];
-#ifndef FUSION_ENCRYPTED
-	sprintf (savedPath, "%s/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
-#else 
-	sprintf (savedPath, "%s/opened/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
-#endif
+
+	sprintf (savedPath, "%s/"FUSION_TODAY_PLAYLIST_PATH, g_usbRoot);
 	memset(FusionObject.savedPlaylist, 0, FUSION_STREAM_SIZE);
 
 	f = fopen(savedPath, "rt");
@@ -1204,81 +1203,10 @@ int fusion_checkSavedPlaylist()
 	return 1;
 }
 
-int fusion_getCreepAndLogo ()
+int fusion_parsePlaylistMode (cJSON * root)
 {
-	cJSON * root;
-	char request[FUSION_URL_LEN];
-	int i;
-	time_t now;
-	struct tm nowDate;
-	int result = 0;
 	int oldMode;
-
-	time (&now);
-	nowDate = *localtime (&now);
-	if (nowDate.tm_year + 1900 == 2000){ // date was not set earlier
-		if (fusion_setMoscowDateTime() == 0){
-			time (&now);
-			nowDate = *localtime (&now);
-		}
-	}
-
-	if (strlen(FusionObject.demoUrl)){
-		sprintf (request, "%s", FusionObject.demoUrl);
-	}
-	else {
-		sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", FusionObject.server, FusionObject.secret, 
-		         nowDate.tm_year + 1900, nowDate.tm_mon+1, nowDate.tm_mday);
-	}
-/*
-	result = fusion_checkLastModified(request);
-	if (result == FUSION_NOT_MODIFIED){
-		eprintf ("%s(%d): Playlist not modified.\n",   __FILE__, __LINE__);
-		return FUSION_SAME_CREEP;
-	}
-	else if (result == FUSION_ERR_FILETIME){
-		eprintf ("%s(%d): WARNING! Problem getting playlist modification time.\n",   __FILE__, __LINE__);
-		//return FUSION_SAME_CREEP;
-	}
-	else eprintf ("%s(%d): Playlist modified.\n",   __FILE__, __LINE__);
-	*/
-
-	if (fusion_downloadPlaylist(request, &root) != 0) {
-		eprintf ("%s(%d): WARNING! download playlist failed. Search for saved one.\n",   __FILE__, __LINE__);
-		// test - use saved playlist
-		// test - we may have usb here already
-		if (strlen(g_usbRoot) == 0){
-			if (fusion_getUsbRoot() == 0){
-				eprintf ("%s: ERROR! No flash found.\n", __FUNCTION__);
-				return FUSION_FAIL;
-			}
-		}
-		// end test usb
-		if (fusion_checkSavedPlaylist() == 1){
-			root = cJSON_Parse(FusionObject.savedPlaylist);
-			if (!root) {
-				char cmd[PATH_MAX];
-				char savedPath [PATH_MAX];
-#ifndef FUSION_ENCRYPTED
-				sprintf (savedPath, "%s/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
-#else 
-				sprintf (savedPath, "%s/opened/fusion/"FUSION_PLAYLIST_NAME, g_usbRoot);
-#endif
-				eprintf ("%s: WARNING! Incorrect format in saved playlist. Remove it.\n",   __FUNCTION__);
-				memset(FusionObject.savedPlaylist, 0, FUSION_STREAM_SIZE);
-				sprintf (cmd, "rm %s", savedPath);
-				system(cmd);
-				return FUSION_FAIL;
-			}
-			eprintf ("%s(%d): Got valid saved playlist.\n",   __FUNCTION__, __LINE__);
-		}
-		else {
-			eprintf ("%s(%d): WARNING! No saved playlist.\n",   __FUNCTION__, __LINE__);
-			// todo : no connection, no saved one, what to do ?
-			return FUSION_FAIL;
-		}
-		// end test saved
-	}
+	if (!root) return -1;
 
 	oldMode = FusionObject.mode;
 	cJSON* jsonMode = cJSON_GetObjectItem(root, "mode");
@@ -1337,6 +1265,12 @@ int fusion_getCreepAndLogo ()
 	else {
 		// do nothing
 	}
+	return 0;
+}
+
+int fusion_parsePlaylistReboot(cJSON * root)
+{
+	if (!root) return -1;
 
 	cJSON * jsonFirmware = cJSON_GetObjectItem(root, "firmware");
 	cJSON * jsonReboot = cJSON_GetObjectItem(root, "reboot_time");
@@ -1397,6 +1331,13 @@ int fusion_getCreepAndLogo ()
 		FusionObject.reboottime[0] = '\0';
 		system("hwconfigManager f 0 UPURL 1");	// remove update url
 	}
+	return 0;
+}
+
+int fusion_parsePlaylistLogo(cJSON * root)
+{
+	int i;
+	if (!root) return -1;
 
 	cJSON * jsonLogo = cJSON_GetObjectItem(root, "logo");
 	if (jsonLogo){
@@ -1487,51 +1428,15 @@ int fusion_getCreepAndLogo ()
 		}
 		pthread_mutex_unlock(&FusionObject.mutexLogo);
 		interface_displayMenu(1);
-	}/*
-	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
-	if (jsonMarks){
-		char folderToSaveMarks[PATH_MAX];
-		fusion_createMarksDirectory(folderToSaveMarks);
+	}
+	return 0;
+}
 
-		int markCount = cJSON_GetArraySize(jsonMarks);
-		for (i=0; i<markCount; i++)
-		{
-			cJSON * jsonItem = cJSON_GetArrayItem(jsonMarks, i);
-			if (jsonItem){
-				long fileIndex = -1;
-				cJSON * jsonMarkLink = cJSON_GetObjectItem(jsonItem, "link");
-				cJSON * jsonMarkDuration = cJSON_GetObjectItem(jsonItem, "duration");
-
-				if (jsonItem->string){
-					char * err;
-					fileIndex = strtol(jsonItem->string, &err, 10);
-					if ((*err) || (fileIndex < 0) || (fileIndex > FUSION_MAX_MARKS)){
-						eprintf ("%s(%d): WARNING! file index in marks is incorrect: %s.\n", __FUNCTION__, __LINE__, jsonItem->string);
-						continue;
-					}
-					fileIndex = fileIndex - 1; // because it starts from 1
-				}
-
-				if (jsonMarkDuration && jsonMarkDuration->valuestring){
-					int markIndex = atoi(jsonMarkDuration->valuestring);
-					if (markIndex > 0){
-						FusionObject.marks[fileIndex].duration = markIndex;
-					}
-					else FusionObject.marks[fileIndex].duration = 0;
-				}
-
-				if (jsonMarkLink && jsonMarkLink->valuestring){
-					if (strcmp(FusionObject.marks[fileIndex].link, jsonMarkLink->valuestring))
-					{
-						sprintf (FusionObject.marks[fileIndex].link, "%s", jsonMarkLink->valuestring);
-						fusion_downloadMarkFile(fileIndex, folderToSaveMarks);
-					}
-				}
-			}
-		}
-		//fusion_removeOldMarkVideo(folderToSaveMarks);		// todo : remove symlinks and old video more correct
-	} // if (jsonMarks)
-*/
+int fusion_parsePlaylistCreep(cJSON * root)
+{
+	int i;
+	int result = 0;
+	if (!root) return -1;
 
 	result = FUSION_SAME_CREEP;
 	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
@@ -1672,6 +1577,82 @@ int fusion_getCreepAndLogo ()
 		}
 		pthread_mutex_unlock(&FusionObject.creep.mutex);
 	}
+	return 0;
+}
+
+int fusion_getAndParsePlaylist ()
+{
+	cJSON * root;
+	char request[FUSION_URL_LEN];
+	time_t now;
+	struct tm nowDate;
+	int result = 0;
+
+	time (&now);
+	nowDate = *localtime (&now);
+	if (nowDate.tm_year + 1900 == 2000){ // date was not set earlier
+		if (fusion_setMoscowDateTime() == 0){
+			time (&now);
+			nowDate = *localtime (&now);
+		}
+	}
+
+	if (strlen(FusionObject.demoUrl)){
+		sprintf (request, "%s", FusionObject.demoUrl);
+	}
+	else {
+		sprintf (request, "%s/?s=%s&c=playlist_full&date=%04d-%02d-%02d", FusionObject.server, FusionObject.secret, 
+		         nowDate.tm_year + 1900, nowDate.tm_mon+1, nowDate.tm_mday);
+	}
+/*
+	result = fusion_checkLastModified(request);
+	if (result == FUSION_NOT_MODIFIED){
+		eprintf ("%s(%d): Playlist not modified.\n",   __FILE__, __LINE__);
+		return FUSION_SAME_CREEP;
+	}
+	else if (result == FUSION_ERR_FILETIME){
+		eprintf ("%s(%d): WARNING! Problem getting playlist modification time.\n",   __FILE__, __LINE__);
+		//return FUSION_SAME_CREEP;
+	}
+	else eprintf ("%s(%d): Playlist modified.\n",   __FILE__, __LINE__);
+	*/
+
+	if (fusion_downloadPlaylist(request, &root) != 0) {
+		eprintf ("%s(%d): WARNING! download playlist failed. Search for saved one.\n",   __FILE__, __LINE__);
+		// use saved playlist
+		if (strlen(g_usbRoot) == 0){
+			if (fusion_getUsbRoot() == 0){
+				eprintf ("%s: ERROR! No flash found.\n", __FUNCTION__);
+				return FUSION_FAIL;
+			}
+		}
+
+		if (fusion_checkSavedPlaylist() == 1){
+			root = cJSON_Parse(FusionObject.savedPlaylist);
+			if (!root) {
+				char cmd[PATH_MAX];
+				char savedPath [PATH_MAX];
+				eprintf ("%s: WARNING! Incorrect format in saved playlist. Remove it.\n",   __FUNCTION__);
+				memset(FusionObject.savedPlaylist, 0, FUSION_STREAM_SIZE);
+
+				sprintf (savedPath, "%s/"FUSION_TODAY_PLAYLIST_PATH, g_usbRoot);
+				sprintf (cmd, "rm %s", savedPath);
+				system(cmd);
+				return FUSION_FAIL;
+			}
+			eprintf ("%s(%d): Got valid saved playlist.\n",   __FUNCTION__, __LINE__);
+		}
+		else {
+			eprintf ("%s(%d): WARNING! No saved playlist.\n",   __FUNCTION__, __LINE__);
+			// todo : no connection, no saved one, what to do ?
+			return FUSION_FAIL;
+		}
+	}
+
+	fusion_parsePlaylistMode(root);
+	fusion_parsePlaylistReboot(root);
+	fusion_parsePlaylistLogo(root);
+	result = fusion_parsePlaylistCreep(root);
 
 	cJSON_Delete(root);
 	return result;
