@@ -97,8 +97,8 @@ typedef struct {
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
 static void analogChannelList_release(void);
-static analog_service_t *analogChannelList_getElement(int index);
-static analog_service_t *analogChannelList_getElementVisible(int index);
+static analog_service_t *analogChannelList_getElement(int32_t index);
+static analog_service_t *analogChannelList_getElementVisible(int32_t index);
 static int32_t analogtv_parseConfigFile(void);
 static analog_service_t *analogList_add(struct list_head *listHead);
 static int32_t analogtv_saveConfigFile(void);
@@ -317,7 +317,7 @@ int32_t analogtv_findOnFrequency(uint32_t frequency)
 }
 
 #define RPC_ANALOG_SCAN_TIMEOUT      (180)
-int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
+int32_t analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 {
 	dprintf("%s[%d]\n", __func__, __LINE__);
 #ifdef STSDK
@@ -353,7 +353,7 @@ int analogtv_serviceScan(interfaceMenu_t *pMenu, void* pArg)
 	cJSON_AddItemToObject(params, "delsys", cJSON_CreateString(analogtv_delSysName[appControlInfo.tvInfo.delSys]));
 	cJSON_AddItemToObject(params, "audio", cJSON_CreateString(analogtv_audioName[appControlInfo.tvInfo.audioMode]));
 
-	int res = st_rpcSyncTimeout(elcmd_tvscan, params, RPC_ANALOG_SCAN_TIMEOUT, &type, &result );
+	int32_t res = st_rpcSyncTimeout(elcmd_tvscan, params, RPC_ANALOG_SCAN_TIMEOUT, &type, &result );
 	(void)res;
 	if(result && result->valuestring != NULL && strcmp (result->valuestring, "ok") == 0) {
 		/// TODO
@@ -380,7 +380,7 @@ void analogtv_stop(void)
 	}
 }
 
-int analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
+int32_t analogtv_clearServiceList(interfaceMenu_t * pMenu, void *pArg)
 {
 	(void)pArg;
 
@@ -410,7 +410,7 @@ void analogtv_sortRecheck(void)
 	}
 }
 
-int32_t analogtv_setChannelsData(char *Name, int visible,  int index)
+int32_t analogtv_setChannelsData(char *Name, int32_t visible,  int32_t index)
 {
 	analog_service_t *element = analogChannelList_getElement(index);
 	if (element == NULL)
@@ -434,7 +434,7 @@ int32_t analogtv_applyUpdates(void)
 	return 0;
 }
 
-int32_t analogtv_swapService(int first, int second)
+int32_t analogtv_swapService(int32_t first, int32_t second)
 {
 	if (first == second)
 		return 0;
@@ -518,7 +518,7 @@ int32_t analogtv_setNextAudioMode()
 	return analogtv_saveConfigFile();
 }
 
-int analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
+int32_t analogtv_playControlProcessCommand(pinterfaceCommandEvent_t cmd, void *pArg)
 {
 	switch(cmd->command) {
 		case interfaceCommandUp:
@@ -560,10 +560,10 @@ int32_t analogtv_startNextChannel(int32_t direction, void* pArg)
 	int32_t id = appControlInfo.tvInfo.id;
 	id += direction ? -1 : 1;
 
-	if ((int)id >= (int)analogBouquet.channelCountVisible) {
+	if ((int32_t)id >= (int32_t)analogBouquet.channelCountVisible) {
 		id = 0;
 	}
-	if ((int)id < 0) {
+	if ((int32_t)id < 0) {
 		id = analogBouquet.channelCountVisible - 1;
 	}
 	analogtv_activateChannel(interfaceInfo.currentMenu, (void *)id);
@@ -571,14 +571,14 @@ int32_t analogtv_startNextChannel(int32_t direction, void* pArg)
 }
 //-----------------------------------------------------------------------
 
-int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
+int32_t analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 {
 	uint32_t id = (uint32_t)pArg;
 	uint32_t freq;
 	char cmd[32];
 	int32_t buttons;
 	int32_t previousChannel;
-	int result = 0;
+	int32_t result = 0;
 
 	dprintf("%s[%d] id = %d\n",__func__, __LINE__, id);
 	analog_service_t *element = analogChannelList_getElementVisible(id);
@@ -634,7 +634,7 @@ int analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 	return 0;
 }
 
-uint32_t analogtv_getChannelCount(int visible)
+uint32_t analogtv_getChannelCount(int32_t visible)
 {
 	if (visible == 1) {
 		return analogBouquet.channelCountVisible;
@@ -642,7 +642,7 @@ uint32_t analogtv_getChannelCount(int visible)
 	return analogBouquet.channelCount;
 }
 
-void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
+void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int32_t startIndex)
 {
 	dprintf("%s[%d]\n", __func__, __LINE__);
 	uint32_t i = 0;
@@ -672,29 +672,27 @@ void analogtv_addChannelsToMenu(interfaceMenu_t *pMenu, int startIndex)
 	}
 }
 
-int menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int index)
+int32_t menu_entryIsAnalogTv(interfaceMenu_t *pMenu, int32_t index)
 {
 	return pMenu->menuEntry[pMenu->selectedItem].pAction == analogtv_activateChannel;
 }
 
-int analogtv_getServiceDescription(uint32_t index, char *buf)
+int32_t analogtv_getServiceDescription(uint32_t index, char *buf, size_t size)
 {
-	if (index >= analogBouquet.channelCountVisible) {
+	if(index >= analogBouquet.channelCountVisible) {
 		buf[0] = 0;
 		return -1;
 	}
 	analog_service_t *element = analogChannelList_getElementVisible(index);
-	sprintf(buf,"\"%s\"\n", element->customCaption);
-	buf += strlen(buf);
+	snprintf(buf, size, "\"%s\"\n"
+                      "   %s: %u MHz\n"
+                      "   %s\n"
+                      "   audio:%s",
+                      element->customCaption,
+                      _T("DVB_FREQUENCY"), element->frequency / 1000000,
+                      element->sysEncode,
+                      element->audio);
 
-	sprintf(buf, "   %s: %u MHz\n", _T("DVB_FREQUENCY"), element->frequency / 1000000);
-	buf += strlen(buf);
-
-	sprintf(buf, "   %s\n", element->sysEncode);
-	buf += strlen(buf);
-
-	sprintf(buf, "   audio:%s", element->audio);
-	buf += strlen(buf);
 	return 0;
 }
 
@@ -737,9 +735,9 @@ void analogChannelList_release(void)
 	}
 }
 
-analog_service_t *analogChannelList_getElement(int index)
+analog_service_t *analogChannelList_getElement(int32_t index)
 {
-	int i = 0;
+	int32_t i = 0;
 	struct list_head *pos;
 	list_for_each(pos, &analogBouquet.channelList) {
 		if (i == index) {
@@ -750,9 +748,9 @@ analog_service_t *analogChannelList_getElement(int index)
 	return NULL;
 }
 
-analog_service_t *analogChannelList_getElementVisible(int index)
+analog_service_t *analogChannelList_getElementVisible(int32_t index)
 {
-	int i = 0;
+	int32_t i = 0;
 	struct list_head *pos;
 	list_for_each(pos, &analogBouquet.channelList) {
 		analog_service_t *element = list_entry(pos, analog_service_t, channelList);
@@ -915,7 +913,7 @@ int32_t analogNames_load(void)
 	}
 	FILE *fd = fopen(ANALOGTV_CONFIG_DIR "/tvchannels.txt", "r");
 	if(fd != NULL) {
-		int i = 0;
+		int32_t i = 0;
 		while(!feof(fd)) {
 			char buf[256];
 			int32_t id;

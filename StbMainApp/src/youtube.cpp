@@ -975,7 +975,7 @@ static int youtubeSearchHist_save()
 	int32_t i;
 	int32_t fd;
 	
-	fd = open(YOUTUBE_SEARCH_FILE, O_WRONLY | O_CREAT | O_TRUNC);
+	fd = open(YOUTUBE_SEARCH_FILE, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if(fd == NULL) {
 		eprintf("File with searches can't open!\n");
 		return -1;

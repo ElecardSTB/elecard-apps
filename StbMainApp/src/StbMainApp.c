@@ -1402,7 +1402,7 @@ void *testServerThread(void *pArg)
 
 					if (sscanf(ptr, "%s %s", url, filename) != 2) {
 						eprintf("%s[%d]: invalid args.\n", __FUNCTION__, __LINE__);
-						return -1;
+						return NULL;
 					}
 					elcdRpcType_t	type = elcdRpcInvalid;
 					cJSON			*result = NULL;
@@ -1411,7 +1411,7 @@ void *testServerThread(void *pArg)
 					params = cJSON_CreateObject();
 					if (!params) {
 						eprintf("%s[%d]: out of memory\n", __FUNCTION__, __LINE__);
-						return -1;
+						return NULL;
 					}
 					cJSON_AddStringToObject(params, "url", url);
 					cJSON_AddStringToObject(params, "filename", filename);

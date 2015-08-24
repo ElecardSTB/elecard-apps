@@ -5590,9 +5590,9 @@ int  interface_changeMenuEntryInfo(interfaceMenuEntry_t *pMenuEntry, char *data,
 	return 0;
 }
 
-int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *data, size_t dataSize)
+int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *data)
 {
-	snprintf (pMenuEntry->label, dataSize, data);
+	snprintf(pMenuEntry->label, sizeof(pMenuEntry->label), "%s", data);
 	return 0;
 }
 

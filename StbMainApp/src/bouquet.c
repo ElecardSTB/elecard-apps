@@ -43,7 +43,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "server.h"
 
 #include "stsdk.h"
+#if (defined STSDK)
 #include <cJSON.h>
+#endif
 
 /***********************************************
 * LOCAL MACROS                                 *

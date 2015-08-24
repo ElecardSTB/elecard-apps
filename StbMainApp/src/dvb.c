@@ -1442,7 +1442,6 @@ static int32_t dvb_frequencyScanOne(uint32_t adapter, EIT_media_config_t *media,
 
 	return 0;
 }
-#endif
 
 static int32_t dvb_isFrequencyesEqual(uint32_t adapter, uint32_t freq1, uint32_t freq2)
 {
@@ -1473,6 +1472,7 @@ static int32_t dvb_isFrequencyesEqual(uint32_t adapter, uint32_t freq1, uint32_t
 	}
 	return 0;
 }
+#endif
 
 int dvb_frequencyScan(uint32_t adapter, __u32 frequency, EIT_media_config_t *media,
 						dvb_displayFunctionDef* pFunction,

@@ -37,8 +37,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "debug.h"
 #include "off_air.h"
 
+#ifdef ENABLE_USE_CJSON
 #include <cJSON.h>
 #include <elcd-rpc.h>
+#endif
 
 /***********************************************
 * LOCAL MACROS                                 *
@@ -322,6 +324,7 @@ int32_t dvbChannel_remove(service_index_t *srvIdx)
 
 static int32_t dvbChannel_readOrderConfig()
 {
+#ifdef ENABLE_USE_CJSON
 	FILE *fd = NULL;
 	cJSON *root;
 	cJSON *format;
@@ -374,11 +377,13 @@ static int32_t dvbChannel_readOrderConfig()
 	}
 	cJSON_Delete(root);
 	dprintf("%s imported services: %s\n", __func__, OFFAIR_SERVICES_FILENAME);
+#endif
 	return 0;
 }
 
 static int32_t dvbChannel_writeOrderConfig(void)
 {
+#ifdef ENABLE_USE_CJSON
 	cJSON* format;
 	cJSON* root;
 	char *render;
@@ -433,6 +438,7 @@ static int32_t dvbChannel_writeOrderConfig(void)
 		}
 		free(render);
 	}
+#endif
 	return 0;
 }
 
