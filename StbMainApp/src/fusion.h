@@ -71,6 +71,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define FUSION_STUB "fusion://stub"
 #define FUSION_MIN_USLEEP 40
 
+#define FUSION_LOCK_FILE    "/tmp/fusion_adverts.lock"
+
 #define FUSION_DEFAULT_BANDLIM_KBYTE (2048)
 
 typedef struct
@@ -80,7 +82,6 @@ typedef struct
     char digits[MAX_SAVED_DIGITS];
     int count;
 } STAUD_Ioctl_GetDtmf_t;
-
 
 void fusion_startup();
 void fusion_cleanup();

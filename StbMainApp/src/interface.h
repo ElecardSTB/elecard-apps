@@ -986,7 +986,7 @@ typedef struct
 #define FUSION_MODE_HLS   (2)
 #define FUSION_MODE_TV    (3)
 
-#define FUSION_MAX_MARKS 100
+#define FUSION_MAX_MARKS 256
 
 typedef enum {
 	FUSION_TOP_LEFT = 0,
@@ -1004,6 +1004,7 @@ typedef struct {
 typedef struct {
 	char link[PATH_MAX];
 	int duration;
+	char filename[PATH_MAX];
 } fusion_mark_t;
 
 typedef struct {

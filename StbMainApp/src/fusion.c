@@ -39,7 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		printf(x); \
 	} while(0)
 
-
 #ifdef FUSION_ENCRYPTED
 #define FUSION_TODAY_PLAYLIST_PATH "opened/fusion/"FUSION_PLAYLIST_NAME
 #else
@@ -49,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 static char g_usbRoot[PATH_MAX] = {0};
 static int gStatus = 0;
 int g_shaping = FUSION_DEFAULT_BANDLIM_KBYTE;
+static char g_adsPath[PATH_MAX] = {0};
 
 interfaceFusionObject_t FusionObject;
 
@@ -60,10 +60,8 @@ int fusion_checkFileIsDownloaded(char * remotePath, char * localPath);
 int fusion_checkLastModified (char * url);
 int fusion_checkResponse (char * curlStream, cJSON ** ppRoot);
 int fusion_checkSavedPlaylist();
-int fusion_createMarksDirectory(char * folderPath);
 size_t fusion_curlCallback(char * data, size_t size, size_t nmemb, void * stream);
 size_t fusion_curlCallbackVideo(char * data, size_t size, size_t nmemb, void * stream);
-int fusion_downloadMarkFile(int index, char * folderPath);
 int fusion_downloadPlaylist(char * url, cJSON ** ppRoot);
 int fusion_getCommandOutput (char * cmd, char * result);
 int fusion_getAndParsePlaylist ();
@@ -78,7 +76,6 @@ int fusion_readConfig();
 int fusion_refreshDtmfEvent(void *pArg);
 int fusion_removeFirmwareFormFlash();
 void fusion_removeHwconfigUrl();
-int fusion_removeOldMarkVideo(char * folderPath);
 int fusion_setMoscowDateTime();
 void * fusion_threadCheckReboot (void * param);
 void * fusion_threadCreepline(void * param);
@@ -89,6 +86,14 @@ void fusion_wait (unsigned int timeout_ms);
 int fusion_getUtcWithWget (char * utcBuffer, int size);
 int fusion_getUtcFromTimeapi (char * utcBuffer, int size);
 int fusion_getUtcFromEarthtools (char * utcBuffer, int size);
+
+static char helper_checkAdsOnUsb ();
+int fusion_makeAdsPathFromUrl (char * fileUrl, char * resultPath, int duration, int size);
+int fusion_saveFileByWget (char * url, char * filepath, int dtmf);
+int fusion_checkAdIsComplete(char * filepath);
+int fusion_waitAdIsDownloaded (char * filepath, int dtmf);
+
+extern int  helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar);
 
 void fusion_ms2timespec(int ms, struct timespec * ts)
 {
@@ -102,6 +107,18 @@ void fusion_ms2timespec(int ms, struct timespec * ts)
         ts->tv_sec++;
         ts->tv_nsec -= 1000000000;
     }
+}
+
+static int helper_fileExists (const char* filename)
+{
+	int file;
+	int ret = 0;
+	file = open(filename, O_RDONLY);
+	if(file >= 0) {
+		close(file);
+		ret = 1;
+	}
+	return ret;
 }
 
 void fusion_wait (unsigned int timeout_ms)
@@ -220,7 +237,6 @@ int fusion_isRemoteFirmwareBetter(char * localFirmwareVer, char * remoteFirmware
 	int remoteMon, remoteDay, remoteYear, remoteHour, remoteMin;
 	int localMon, localDay, localYear, localHour, localMin;
 	int scannedItemsRemote, scannedItemsLocal;
-	//if (!localFirmwareVer || !remoteFirmwareVer) return NO;
 	if (!remoteFirmwareVer) return NO;
 	// eg. 201407251445
 	scannedItemsRemote = sscanf(remoteFirmwareVer, "%04d%02d%02d%02d%02d", &remoteYear, &remoteMon, &remoteDay, &remoteHour, &remoteMin);
@@ -776,7 +792,7 @@ int fusion_setMoscowDateTime()
 
 	// set timezone
 	char buf[1024];
-	if (helperFileExists("/var/etc/localtime") && 
+	if (helper_fileExists("/var/etc/localtime") &&
 	    helperParseLine("/tmp/info.txt", "readlink " "/var/etc/localtime", "zoneinfo/", buf, 0))
 	{
 		eprintf ("%s: Current timezone - %s.\n", __FUNCTION__, buf);
@@ -903,7 +919,7 @@ int fusion_getUtcFromTimeapi (char * utcBuffer, int size)
 		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
 		return -1;
 	}
-	snprintf (utcBuffer, min(size, strlen (ans)), "%s", ans);
+	snprintf (utcBuffer, min((unsigned)size, strlen (ans)), "%s", ans);
 	eprintf ("%s(%d): utcBuffer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
 	return 0;
 }
@@ -1030,17 +1046,6 @@ int fusion_checkFileIsDownloaded(char * remotePath, char * localPath)
 	return 0;
 }
 
-int fusion_createMarksDirectory(char * folderPath)
-{
-	if (!folderPath) return -1;
-	if (fusion_checkDirectory("/tmp/fusionmarks") != 1){
-		system ("mkdir /tmp/fusionmarks");
-		sprintf (folderPath, "/tmp/fusionmarks");
-		eprintf ("%s(%d): Created folderToSaveMarks = %s.\n", __FUNCTION__, __LINE__, folderPath);
-	}
-	return 0;
-}
-
 CURLcode fusion_getVideoByCurl (char * url, void * fsink/*char * curlStream*/, int * pStreamLen, curlWriteCB cb)
 {
 	CURLcode retCode = CURLE_OK;
@@ -1080,99 +1085,6 @@ CURLcode fusion_getVideoByCurl (char * url, void * fsink/*char * curlStream*/, i
 	}
 	*pStreamLen = fusion_videoStreamPos;
 	return CURLE_OK;
-}
-
-int fusion_downloadMarkFile(int index, char * folderPath)
-{
-	char url[PATH_MAX];
-	char localTsPath[PATH_MAX];
-	char localPathInProgress[PATH_MAX];
-	char symlinkPath[PATH_MAX];
-	char command[PATH_MAX];
-	int buflen = 0;
-	char * ptr, *ptrSlash;
-	FILE * f;
-
-	if (index < 0 || index > FUSION_MAX_MARKS) return -1;
-	if (!strlen(FusionObject.marks[index].link)) return 0;
-
-	// make filename from url
-	sprintf (url, "%s", FusionObject.marks[index].link);
-	ptr = strstr(url, "http:");
-	if (ptr == NULL) return -1;
-	ptr += 7;
-
-	// replace / with _
-	while ((ptrSlash = strchr(ptr, '/')) != NULL){
-		ptrSlash[0] = '_';
-	}
-
-	sprintf (localTsPath, "%s/%s", folderPath, ptr);
-	sprintf (symlinkPath, "%s/%d_%d.ts", folderPath, index, FusionObject.marks[index].duration);
-	//eprintf ("%s(%d): localTsPath is %s.\n", __FUNCTION__, __LINE__, localTsPath);
-	if (fusion_checkFileIsDownloaded(FusionObject.marks[index].link, localTsPath) != 1)  // file is ok
-	{
-		// make name with *.part to indicate that it is not ready
-		sprintf (localPathInProgress, "%s.part", localTsPath);
-		f = fopen (localPathInProgress, "wb");
-		if (!f){
-			eprintf ("%s(%d): ERROR! Couldn't open file %s for writing.\n", __FUNCTION__, __LINE__, localPathInProgress);
-			return -1;
-		}
-		fusion_getVideoByCurl(FusionObject.marks[index].link, (void*)f, &buflen, (curlWriteCB)fusion_curlCallbackVideo);
-		eprintf ("%s(%d): Got %s file of size %d.\n", __FUNCTION__, __LINE__, FusionObject.marks[index].link, buflen);
-		fclose (f);
-		// rename file to indicate it is ready
-		snprintf (command, PATH_MAX, "mv %s %s", localPathInProgress, localTsPath);
-	}
-
-	// create symlink, remove old one if exists
-	//eprintf ("%s(%d): create new symlink %s to %s.\n", __FUNCTION__, __LINE__, symlinkPath, localTsPath);
-	sprintf (command, "ln -sf %s %s", localTsPath, symlinkPath);
-	system (command);
-	return 0;
-}
-
-
-int fusion_removeOldMarkVideo(char * folderPath)
-{
-	DIR *d;
-	struct dirent *dir;
-	if (!folderPath) return -1;
-
-	d = opendir(folderPath);
-	if (!d) return -1;
-
-	while ((dir = readdir(d)) != NULL)
-	{
-		if (dir->d_type == DT_REG && strstr(dir->d_name, ".ts"))
-		{
-			char filepath [PATH_MAX];
-			sprintf (filepath, "%s/%s", folderPath, dir->d_name);
-
-			// find index from dir->d_name
-			char * ptrTs = strstr(dir->d_name, ".ts");
-			if (ptrTs){
-				char indexString[PATH_MAX];
-				int index;
-				snprintf (indexString, (int)(ptrTs - dir->d_name + 1), "%s", dir->d_name);
-				//eprintf ("%s(%d): TS found: %s\n", __FUNCTION__, __LINE__, indexString);
-				index = atoi(indexString);
-				if ((index > 0) && (index < FUSION_MAX_MARKS)){
-					if (FusionObject.marks[index].duration == 0)
-					{
-						char cmd[PATH_MAX];
-						snprintf (cmd, PATH_MAX, "rm -f %s", filepath);
-						eprintf ("%s(%d): Remove %s\n", __FUNCTION__, __LINE__, cmd);
-						system (cmd);
-					}
-				}
-			}
-		}
-	}
-	closedir(d);
-
-	return 0;
 }
 
 int fusion_checkSavedPlaylist()
@@ -1580,6 +1492,89 @@ int fusion_parsePlaylistCreep(cJSON * root)
 	return 0;
 }
 
+int fusion_touchLockFile()
+{
+	system ("touch "FUSION_LOCK_FILE);
+	return 0;
+}
+
+int fusion_removeAdLockFile()
+{
+	system ("rm -f "FUSION_LOCK_FILE);
+	return 0;
+}
+
+int fusion_parsePlaylistMarks(cJSON * root)
+{
+	int i;
+	if (!root) return -1;
+
+	cJSON * jsonMarks = cJSON_GetObjectItem(root, "mark");
+	if (jsonMarks){
+
+		if (strlen(g_adsPath) == 0){
+			if (helper_checkAdsOnUsb() == NO){
+				eprintf ("%s(%d): No ads folder.\n", __FUNCTION__, __LINE__);
+				return -1;
+			}
+		}
+
+		int markCount = cJSON_GetArraySize(jsonMarks);
+		if (markCount) {
+			fusion_touchLockFile();
+		}
+
+		for (i=0; i<markCount; i++)
+		{
+			char filepath[PATH_MAX];
+			int dtmfIndex = -1;
+
+			cJSON * jsonItem = cJSON_GetArrayItem(jsonMarks, i);
+			if (!jsonItem) continue;
+
+			cJSON * jsonLink = cJSON_GetObjectItem(jsonItem, "link");
+			cJSON * jsonDuration = cJSON_GetObjectItem(jsonItem, "duration");
+
+			if (!jsonItem->string || 
+			    !jsonLink || !jsonLink->valuestring || 
+			    !jsonDuration || !jsonDuration->valuestring)
+			{
+				eprintf ("%s(%d): WARNING! Incorrect mark format (%s). Skip.\n", __FUNCTION__, __LINE__, jsonItem->string);
+				continue;
+			}
+			dtmfIndex = atoi(jsonItem->string);
+			if (dtmfIndex < 0 || dtmfIndex >= FUSION_MAX_MARKS){
+				eprintf ("%s(%d): WARNING! Incorrect mark index (%d). Skip.\n", __FUNCTION__, __LINE__, dtmfIndex);
+				continue;
+			}
+			// dtmfIndex is ok
+
+			int duration = atoi(jsonDuration->valuestring);
+			if (duration < 0){
+				eprintf ("%s(%d): WARNING! Incorrect mark duration (%s). Skip.\n", __FUNCTION__, __LINE__, jsonDuration->valuestring);
+				continue;
+			}
+			int remoteSize = fusion_getRemoteFileSize(jsonLink->valuestring);
+			if (remoteSize == 0){
+				eprintf ("%s(%d): WARNING! Couldn't get remoteFileSize for %s. Skip\n", __FUNCTION__, __LINE__, jsonLink->valuestring);
+				continue;
+			}
+
+			if (fusion_makeAdsPathFromUrl(jsonLink->valuestring, filepath, duration, remoteSize) == 0){
+				fusion_saveFileByWget(jsonLink->valuestring, filepath, dtmfIndex);
+				fusion_waitAdIsDownloaded(filepath, dtmfIndex);
+			}
+			FusionObject.marks[dtmfIndex].duration = duration;
+			snprintf (FusionObject.marks[dtmfIndex].link, PATH_MAX, "%s", jsonLink->valuestring);
+			snprintf (FusionObject.marks[dtmfIndex].filename, PATH_MAX, "%s", filepath);
+		}
+
+		fusion_removeAdLockFile();
+		// todo : remove old ad videos in ads folder
+	}
+	return 0;
+}
+
 int fusion_getAndParsePlaylist ()
 {
 	cJSON * root;
@@ -1652,6 +1647,7 @@ int fusion_getAndParsePlaylist ()
 	fusion_parsePlaylistMode(root);
 	fusion_parsePlaylistReboot(root);
 	fusion_parsePlaylistLogo(root);
+	fusion_parsePlaylistMarks(root);
 	result = fusion_parsePlaylistCreep(root);
 
 	cJSON_Delete(root);
@@ -1701,5 +1697,172 @@ void fusion_cleanup()
 #ifdef FUSION_ENCRYPTED
 	system ("/opt/elecard/bin/umount_encrypted.sh");
 #endif
+}
+
+static char helper_checkAdsOnUsb ()
+{
+	if (strlen(g_usbRoot) == 0){
+		if (fusion_getUsbRoot() == NO) return NO;
+	}
+
+	if (strlen(g_adsPath) == 0){
+		sprintf (g_adsPath, "%s/ads", g_usbRoot);
+	}
+	if (fusion_checkDirectory(g_adsPath) == NO){
+		char command[PATH_MAX];
+		sprintf (command, "mkdir %s", g_adsPath);
+		system(command);
+	}
+
+	eprintf("%s: Ads: path = %s\n", __FUNCTION__, g_adsPath);
+	return YES;
+}
+
+void fusion_echoFilepath(char * symlinkPath, char * filepath)
+{
+	char command[PATH_MAX];
+	sprintf (command, "echo %s > %s", filepath, symlinkPath);
+	system (command);
+	return;
+}
+
+int fusion_makeAdsSymlink (char * filepath, int dtmf)
+{
+	char symlinkPath[PATH_MAX];
+	if (!filepath || dtmf < 0) return -1;
+
+	snprintf (symlinkPath, PATH_MAX, "%s/dtmf_%d.txt", g_adsPath, dtmf);
+
+	if (helper_fileExists(symlinkPath)){
+		if (strcmp(FusionObject.marks[dtmf].filename, filepath) == 0){
+			// filename for this dtmf did not change
+			return 0;
+		}
+		else { // new filepath for this dtmf
+			fusion_echoFilepath(symlinkPath, filepath);
+		}
+	}
+	else { // symlink was not created yet
+		fusion_echoFilepath(symlinkPath, filepath);
+	}
+	return 0;
+}
+
+int fusion_makeAdsPathFromUrl (char * fileUrl, char * resultPath, int duration, int size)
+{
+	char *ptr, *ptrSlash, *ptrDot;
+	char url[PATH_MAX];
+	char ext[16];
+	if (!fileUrl || !resultPath) return -1;
+
+	sprintf (url, fileUrl);
+
+	ptrDot = strrchr(url, '.');
+	if (ptrDot){
+		snprintf (ext, 16, "%s", ptrDot + 1);
+		*ptrDot = '\0';
+	}
+
+	ptr = strstr(url, "http:");
+	if (ptr == NULL) {
+		eprintf ("%s: ERROR! incorrect url %s\n", __FUNCTION__, url);
+		return -1;
+	}
+	ptr += 7;
+
+	// replace / with _
+	while ((ptrSlash = strchr(ptr, '/')) != NULL){
+		ptrSlash[0] = '_';
+	}
+
+	snprintf (resultPath, PATH_MAX, "%s/%s_sec%d_size%d_.%s", g_adsPath, ptr, duration, size, ext);
+	return 0;
+}
+
+int fusion_saveFileByWget (char * url, char * filepath, int dtmf)
+{
+	char cmd[PATH_MAX];
+
+	if (fusion_checkAdIsComplete(filepath) == NO)
+	{
+		sprintf (cmd, "wget --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
+		eprintf ("%s(%d): %s ...\n",   __FUNCTION__, __LINE__, cmd);
+	}
+
+	return 0;
+}
+
+static int helper_cutStringPiece (char * haystack, char * needle, char * piece, int maxPieceLen)
+{
+	if (!haystack || !needle || !piece) return -1;
+
+	char * ptrStartPiece = strstr(haystack, needle);
+	if (ptrStartPiece == NULL){
+		eprintf ("%s(%d): No %s found in %s.\n", __FUNCTION__, __LINE__, needle, haystack);
+		return -1;
+	}
+
+	ptrStartPiece += strlen (needle);
+
+	char * ptrUnderline = strchr(ptrStartPiece, '_');
+	if (ptrUnderline == NULL){
+		eprintf ("%s(%d): Incorrect format (%s).\n", __FUNCTION__, __LINE__, haystack);
+		return -1;
+	}
+	int pieceLen = (int)(ptrUnderline - ptrStartPiece + 1);
+	if (pieceLen > maxPieceLen){
+		eprintf ("%s(%d): Incorrect format (%s).\n", __FUNCTION__, __LINE__, haystack);
+		return -1;
+	}
+	snprintf (piece, pieceLen, "%s", ptrStartPiece);
+	return 0;
+}
+
+int fusion_checkAdIsComplete(char * filepath)
+{
+	long int localSize = 0;
+	int declaredSize = 0;
+	char strSize[32];
+
+	if (!filepath) return NO;
+
+	FILE * f = fopen(filepath, "rb");
+	if (!f) return NO;
+	fseek(f, 0, SEEK_END);
+	localSize = ftell(f);
+	fclose(f);
+
+	if (localSize == 1024){
+		eprintf ("%s(%d): WARNING! %s is too small (%ld bytes)\n", __FUNCTION__, __LINE__, filepath, localSize);
+		return NO;
+	}
+
+	if (helper_cutStringPiece(filepath, "_size", strSize, 32) != 0){
+		eprintf ("%s(%d): WARNING! Couldnot get size form path %s\n", __FUNCTION__, __LINE__, filepath);
+		return NO;
+	}
+	declaredSize = atoi(strSize);
+	if (declaredSize <= 0) {
+		eprintf ("%s(%d): WARNING! Couldnot get size form path %s\n", __FUNCTION__, __LINE__, filepath);
+		return NO;
+	}
+
+	if (declaredSize == localSize) return YES;
+	return NO;
+}
+
+int fusion_waitAdIsDownloaded (char * filepath, int dtmf)
+{
+	if (!filepath || dtmf < 0) return -1;
+
+	while (1){ // todo : aux break condition?
+		if (fusion_checkAdIsComplete(filepath) == YES){
+			//eprintf ("%s(%d): %s downloaded OK.\n", __FUNCTION__, __LINE__, filepath);
+			fusion_makeAdsSymlink(filepath, dtmf);
+			break;
+		}
+		fusion_wait(1000 * 3);
+	}
+	return 0;
 }
 #endif // ENABLE_FUSION
