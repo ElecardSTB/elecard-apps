@@ -1787,6 +1787,7 @@ int fusion_saveFileByWget (char * url, char * filepath, int dtmf)
 	{
 		sprintf (cmd, "wget --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
 		eprintf ("%s(%d): %s ...\n",   __FUNCTION__, __LINE__, cmd);
+		system(cmd);
 	}
 
 	return 0;
