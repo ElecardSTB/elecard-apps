@@ -974,6 +974,7 @@ void appInfo_init(void)
 	appControlInfo.soundInfo.muted                = 0;
 #ifdef ENABLE_FUSION
 	appControlInfo.soundInfo.volumeLevel = 0;
+	appControlInfo.soundInfo.muted                = 1;
 #else
 	appControlInfo.soundInfo.volumeLevel          = 100;
 #endif
