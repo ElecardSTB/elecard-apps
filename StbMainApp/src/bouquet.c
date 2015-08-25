@@ -65,9 +65,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define CHANNEL_BUFFER_NAME              64
 #define MAX_TEXT                         512
 
-#define GARB_DIR                         "/var/etc/garb"
-#define GARB_CONFIG                      GARB_DIR "/config"
-
 #define TMP_BATCH_FILE                   "/tmp/cmd_bouquet"
 
 #define PARENT_CONTROL_FILE              CONFIG_DIR "/parentcontrol.hash"
@@ -953,7 +950,9 @@ static int32_t bouquet_parseNameListFile(typeBouquet_t btype, const char *path)
 		char name[256];
 
 		if(sscanf(buf, fmt, name) == 1) {
-			if(!strList_isExist(bouquet_getNameList(btype), name)) {
+			if(!strList_isExist(bouquet_getNameList(btype), name)
+				&& bouquet_isExist(btype, name))
+			{
 				strList_add(bouquet_getNameList(btype), name);
 			}
 		}
@@ -1242,9 +1241,10 @@ void bouquet_setCurrentName(typeBouquet_t btype, const char *name)
 			if(bouqueteCurrentName[btype]) {
 				free(bouqueteCurrentName[btype]);
 			}
-			bouqueteCurrentName[btype] = NULL;
 			if(name) {
 				bouqueteCurrentName[btype] = strdup(name);
+			} else {
+				bouqueteCurrentName[btype] = NULL;
 			}
 			break;
 		default:
@@ -1489,10 +1489,9 @@ int32_t bouquet_remove(typeBouquet_t btype, const char *bouquetName)
 	}
 
 	if(btype == eBouquet_digital) {
-		//remove files
 		char buffName[256];
 		//remove dir
-		sprintf(buffName, "rm -r %s/%s/", BOUQUET_CONFIG_DIR, bouquetName);
+		sprintf(buffName, "rm -rf %s/%s/", BOUQUET_CONFIG_DIR, bouquetName);
 		dbg_cmdSystem(buffName);
 
 	} else if(btype == eBouquet_analog) {
