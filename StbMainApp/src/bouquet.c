@@ -1343,7 +1343,7 @@ int32_t bouquet_open(typeBouquet_t btype, const char *name, int32_t force)
 	}
 
 	//TODO: Check if this need here
-	if(name && !bouquet_isDownloaded(btype, name)) {
+	if(name && !bouquet_isExist(btype, name)) {
 		eprintf("%s(): Need download first!!! btype=%d, name=%s\n", __func__, btype, name);
 		return -1;
 	}
@@ -1387,28 +1387,39 @@ int32_t bouquet_update(typeBouquet_t btype, const char *name)
 	if(btype == eBouquet_digital) {
 		char bouqueteDir[256];
 		char bouqueteDir_temp[256];
-		char from[256];
-		char cmd[1024];
+		char *bouquet_postfixes[] = {".STB", ""};
+		uint32_t i;
+		int32_t hasPrevious = 0;
+		int32_t hasNew = 0;
 
 		snprintf(bouqueteDir, sizeof(bouqueteDir), BOUQUET_CONFIG_DIR "/%s", name);
-
-		snprintf(bouqueteDir_temp, sizeof(bouqueteDir_temp), "%s_temp", bouqueteDir);
-		rename(bouqueteDir, bouqueteDir_temp);
-
-		snprintf(from, sizeof(from), "../bouquet/%s.STB", name);
-		server_get(from, bouqueteDir);
-
-		if(!bouquet_isDownloaded(eBouquet_digital, name)) {
-			snprintf(from, sizeof(from), "../bouquet/%s", name);
-			server_get(from, bouqueteDir);
+		if(bouquet_isExist(eBouquet_digital, name)) {
+			snprintf(bouqueteDir_temp, sizeof(bouqueteDir_temp), "%s_temp", bouqueteDir);
+			rename(bouqueteDir, bouqueteDir_temp);
+			hasPrevious = 1;
 		}
 
-		if(!bouquet_isDownloaded(eBouquet_digital, name)) {
-			rename(bouqueteDir_temp, bouqueteDir);
-		} else {
-			snprintf(cmd, sizeof(cmd), "rm -rf %s_temp/", bouqueteDir);
+		for(i = 0; i < ARRAY_SIZE(bouquet_postfixes); i++) {
+			char from[256];
+			int32_t ret;
+
+			snprintf(from, sizeof(from), "../bouquet/%s%s", name, bouquet_postfixes[i]);
+			ret = server_get(from, bouqueteDir);
+			if((ret == 0) && bouquet_isExist(eBouquet_digital, name)) {
+				hasNew = 1;
+				break;
+			}
 		}
-		dbg_cmdSystem(cmd);
+
+		if(hasPrevious) {
+			if(hasNew) {
+				char cmd[1024];
+				snprintf(cmd, sizeof(cmd), "rm -rf %s", bouqueteDir_temp);
+				dbg_cmdSystem(cmd);
+			} else {
+				rename(bouqueteDir_temp, bouqueteDir);
+			}
+		}
 	} else if(btype == eBouquet_analog) {
 		char from[256];
 		char to[256];
@@ -1441,7 +1452,7 @@ int32_t bouquet_upload(typeBouquet_t btype, const char *name)
 	return 0;
 }
 
-int32_t bouquet_isDownloaded(typeBouquet_t btype, const char *name)
+int32_t bouquet_isExist(typeBouquet_t btype, const char *name)
 {
 	char buffName[256];
 	if(name == NULL) {
