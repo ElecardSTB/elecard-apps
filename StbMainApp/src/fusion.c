@@ -600,6 +600,8 @@ void fusion_startup()
 
 	system ("echo 3 >/proc/sys/vm/drop_caches");
 
+	fusion_removeAdLockFile();
+
 	if (fusion_setMoscowDateTime() != 0){
 		eprintf ("%s(%d): WARNING! use preset datetime.\n", __FUNCTION__, __LINE__);
 	}
@@ -1750,7 +1752,7 @@ int fusion_makeAdsSymlink (char * filepath, int dtmf)
 	char symlinkPath[PATH_MAX];
 	if (!filepath || dtmf < 0) return -1;
 
-	snprintf (symlinkPath, PATH_MAX, "%s/dtmf_%d.txt", g_adsPath, dtmf);
+	snprintf (symlinkPath, PATH_MAX, "%s/dtmf_%d_.txt", g_adsPath, dtmf);
 
 	if (helper_fileExists(symlinkPath)){
 		if (strcmp(FusionObject.marks[dtmf].filename, filepath) == 0){
