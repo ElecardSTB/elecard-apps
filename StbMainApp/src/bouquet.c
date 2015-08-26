@@ -950,9 +950,7 @@ static int32_t bouquet_parseNameListFile(typeBouquet_t btype, const char *path)
 		char name[256];
 
 		if(sscanf(buf, fmt, name) == 1) {
-			if(!strList_isExist(bouquet_getNameList(btype), name)
-				&& bouquet_isExist(btype, name))
-			{
+			if(!strList_isExist(bouquet_getNameList(btype), name)) {
 				strList_add(bouquet_getNameList(btype), name);
 			}
 		}
@@ -1134,48 +1132,55 @@ void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 			if(fgets(service_name, BUFFER_SIZE, fd) == NULL) {
 				break;
 			}
-			service_name[strlen(service_name) - 1] = '\0';
+			service_name[sizeof(service_name) - 1] = '\0';
 			sprintf(lamedb_data.channelsName, "%s", service_name);
 
 			//parese bouquet pName
-			char bouquetBuf[CHANNEL_BUFFER_NAME];
 			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
 			}
 
-			memset(bouquetBuf, 0, strlen(bouquetBuf));
-			char *buffer;
-			uint32_t videoPID;
-			uint32_t audioPID;
+			if(strncasecmp(buf, "p:", 2) == 0) {
+				char *buffer = NULL;
 
-			if (strncasecmp(buf, "p:", 2) == 0) {
 				buffer = strchr(buf, ',');
-				if (buffer != NULL) {
-					strncpy(lamedb_data.transponderName, buf + 2, buffer - buf - 2);
-					buffer = buf + 3 + strlen(lamedb_data.transponderName);
+				if(buffer != NULL) {
+					uint32_t videoPID;
+					uint32_t audioPID;
+					uint32_t nameLen = buffer - buf - 2;
+
+					buffer++;
+					if(nameLen >= sizeof(lamedb_data.transponderName)) {
+						nameLen = sizeof(lamedb_data.transponderName) - 1;
+					}
+					strncpy(lamedb_data.transponderName, buf + 2, nameLen);
+					lamedb_data.transponderName[nameLen] = 0;
+					
+
+					if(strncasecmp(buffer, "c:00", 4) == 0) {
+						sscanf(buffer + 4, "%04x",&videoPID);
+						buffer = buffer + 9;
+					}
+					if(strncasecmp(buffer, "c:01", 4) == 0) {
+						sscanf(buffer + 4, "%04x",&audioPID);
+						buffer = buffer + 9;
+					}
+					if(strncasecmp(buffer, "c:02", 4) == 0) {
+						buffer = buffer + 9;
+					}
+					if(strncasecmp(buffer, "c:03", 4) == 0) {
+						buffer = buffer + 9;
+					}
+					if(strncasecmp(buffer, "c:04", 4) == 0) {
+						buffer = buffer + 9;
+					}
+					if(strncasecmp(buffer, "f:44", 4) == 0) {
+						lamedb_data.audioPID = audioPID;
+						lamedb_data.videoPID = videoPID;
+					}
 				}
 			}
-			if (buffer != NULL && strncasecmp(buffer, "c:00", 4) == 0) {
-				sscanf(buffer + 4, "%04x",&videoPID);
-				buffer = buffer + 9;
-			}
-			if (buffer != NULL && strncasecmp(buffer, "c:01", 4) == 0) {
-				sscanf(buffer + 4, "%04x",&audioPID);
-				buffer = buffer + 9;
-			}
-			if (buffer != NULL && strncasecmp(buffer, "c:02", 4) == 0) {
-				buffer = buffer + 9;
-			}
-			if (buffer != NULL && strncasecmp(buffer, "c:03", 4) == 0) {
-				buffer = buffer + 9;
-			}
-			if (buffer != NULL && strncasecmp(buffer, "c:04", 4) == 0) {
-				buffer = buffer + 9;
-			}
-			if (buffer != NULL && strncasecmp(buffer, "f:44", 4) == 0) {
-				lamedb_data.audioPID = audioPID;
-				lamedb_data.videoPID = videoPID;
-			}
+
 
 			if(fgets(buf, BUFFER_SIZE, fd) == NULL) {
 				break;
@@ -1599,15 +1604,16 @@ bouquet_element_list_t *digitalList_add(struct list_head *listHead)
 static int32_t digitalList_release(void)
 {
 	struct list_head *pos;
+	struct list_head *n;
 	dprintf("%s[%d]\n", __func__, __LINE__);
-	list_for_each(pos, &digitalBouquet.channelsList) {
+	list_for_each_safe(pos, n, &digitalBouquet.channelsList) {
 		bouquet_element_list_t *el = list_entry(pos, bouquet_element_list_t, channelsList);
 		if(!list_empty(&el->channelsList)) {
 			list_del(&el->channelsList);
 		}
 		free(el);
 	}
-	list_for_each(pos, &digitalBouquet.transponderList) {
+	list_for_each_safe(pos, n, &digitalBouquet.transponderList) {
 		transpounder_t *el = list_entry(pos, transpounder_t, transponderList);
 		if(!list_empty(&el->transponderList)) {
 			list_del(&el->transponderList);

@@ -699,7 +699,9 @@ int32_t dvbChannel_save(void)
 int32_t dvbChannel_clear(void)
 {
 	struct list_head *pos;
-	list_for_each(pos, &g_dvb_channels.orderHead) {
+	struct list_head *n;
+
+	list_for_each_safe(pos, n, &g_dvb_channels.orderHead) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 		dvbChannel_remove(srvIdx);
 	}
