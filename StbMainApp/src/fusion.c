@@ -92,6 +92,7 @@ int fusion_makeAdsPathFromUrl (char * fileUrl, char * resultPath, int duration, 
 int fusion_saveFileByWget (char * url, char * filepath, int dtmf);
 int fusion_checkAdIsComplete(char * filepath);
 int fusion_waitAdIsDownloaded (char * filepath, int dtmf);
+int fusion_savePlaylistToFile(char * path, char * playlistBuffer, int size);
 
 extern int  helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar);
 
@@ -709,10 +710,6 @@ CURLcode fusion_getDataByCurl (char * url, char * curlStream, int * pStreamLen, 
 	retCode = curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 	curl = NULL;
-/*#ifdef FUSION_TEST
-	eprintf ("ans: %.*s ...\n", 256, curlStream);
-#endif
-*/
 
 	if (retCode != CURLE_OK && retCode != CURLE_WRITE_ERROR)
 	{
@@ -746,15 +743,20 @@ int fusion_downloadPlaylist(char * url, cJSON ** ppRoot)
 	eprintf ("%s(%d): rq: %s ...\n",   __FUNCTION__, __LINE__, url);
 	fusion_getDataByCurl(url, FusionObject.playlistBuffer, &buflen, (curlWriteCB)fusion_curlCallback);
 
-#ifdef FUSION_TEST
-	eprintf ("ans: %.*s ...\n", 256, FusionObject.playlistBuffer);
-#endif
-	
+	//eprintf ("ans: %.*s ...\n", 256, FusionObject.playlistBuffer);
+
 	if (strlen(FusionObject.playlistBuffer) == 0) {
 		eprintf (" %s: ERROR! empty response.\n",   __FUNCTION__);
 		return -1;
 	}
 	res = fusion_checkResponse(FusionObject.playlistBuffer, ppRoot);
+
+	if (res == 0){	// todo : don't save if it is the same
+		char savedPath [PATH_MAX];
+		sprintf (savedPath, "%s/"FUSION_TODAY_PLAYLIST_PATH, g_usbRoot);
+		fusion_savePlaylistToFile(savedPath, FusionObject.playlistBuffer, buflen);
+	}
+
 	return res;
 }
 
@@ -1113,6 +1115,23 @@ int fusion_checkSavedPlaylist()
 		return -1;
 	}
 	return 1;
+}
+
+int fusion_savePlaylistToFile(char * path, char * playlistBuffer, int size)
+{
+	FILE * f;
+	if (!playlistBuffer) {
+		eprintf ("%s(%d): \n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	f = fopen(path, "wt");
+	if (!f) {
+		eprintf ("%s(%d): WARNING! Couldn't create file %s.\n", __FUNCTION__, __LINE__, path);
+		return -1;
+	}
+	fwrite(playlistBuffer, size, 1, f);
+	fclose(f);
+	return 0;
 }
 
 int fusion_parsePlaylistMode (cJSON * root)
