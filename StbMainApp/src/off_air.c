@@ -959,7 +959,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		offair_dvbInfo(which);
 		return 0;
 	} else
-#if 0 // !STSDK
+#if !STSDK
 	if(button == interfacePlayControlAudioTracks) {
 		//dprintf("%S: request change tracks\n", __FUNCTION__);
 		if(dvb_getAudioCount(current_service()) > 0) {
@@ -1310,7 +1310,7 @@ void offair_displayPlayControl(void)
 		tunerState_t state;
 
 		memset(&state, 0, sizeof(state));
-		dvbfe_getSignalInfo(adapter, &state);
+		dvbfe_getSignalInfo(appControlInfo.dvbInfo.adapter, &state);
 
 		state.signal_strength &= SIGNAL_MASK;
 
@@ -4126,7 +4126,7 @@ static int offair_keyCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t c
 		case interfaceCommandInfo:
 		case interfaceCommandGreen:
 			if(menu_entryIsAnalogTv(pMenu, pMenu->selectedItem)) {
-				analogtv_getServiceDescription(channelNumber, URL);
+				analogtv_getServiceDescription(channelNumber, URL, sizeof(URL));
 			} else {
 				dvb_getServiceDescription(service, URL);
 			}

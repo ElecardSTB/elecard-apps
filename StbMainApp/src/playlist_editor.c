@@ -113,8 +113,8 @@ static void load_channels(typeBouquet_t index, struct list_head *listHead)
 		return;
 	}
 	if (index == eBouquet_digital) {
-		editorDigital_t *element;
 		list_for_each(pos, dvbChannel_getSortList()) {
+			editorDigital_t *element;
 			service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
 
 			if(srvIdx == NULL)
@@ -137,17 +137,22 @@ static void load_channels(typeBouquet_t index, struct list_head *listHead)
 			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
 		}
 	} else if (index == eBouquet_analog) {
-		playListEditorAnalog_t *element;
-		list_for_each(pos, analogtv_getChannelList()) {
-			analog_service_t *srvIdx = list_entry(pos, analog_service_t, channelList);
+		struct list_head *head = analogtv_getChannelList();
+		if(head) {
+			list_for_each(pos, head) {
+				playListEditorAnalog_t *element;
 
-			if(srvIdx == NULL)
-				continue;
+				analog_service_t *srvIdx = list_entry(pos, analog_service_t, channelList);
 
-			element = editorAnalogList_add(listHead);
-			element->frequency = srvIdx->frequency;
-			element->data.visible = srvIdx->visible;
-			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->customCaption);
+				if(srvIdx == NULL) {
+					continue;
+				}
+
+				element = editorAnalogList_add(listHead);
+				element->frequency = srvIdx->frequency;
+				element->data.visible = srvIdx->visible;
+				snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->customCaption);
+			}
 		}
 	}
 }
@@ -256,7 +261,7 @@ static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, typeBouq
 			element->data.visible = true;
 			snprintf(desc, sizeof(desc), "VISIBLE");
 		}
-		interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+		interface_changeMenuEntryLabel(pMenuEntry, desc);
 		interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? (element->scrambled ? thumbnail_billed : (element->radio ? thumbnail_radio : thumbnail_channels)) : thumbnail_not_selected);
 //		interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
 		return;
@@ -272,7 +277,7 @@ static void playList_nextChannelState(interfaceMenuEntry_t *pMenuEntry, typeBouq
 			element->data.visible = true;
 			snprintf(desc, sizeof(desc), "VISIBLE");
 		}
-		interface_changeMenuEntryLabel(pMenuEntry, desc, strlen(desc) + 1);
+		interface_changeMenuEntryLabel(pMenuEntry, desc);
 		interface_changeMenuEntryThumbnail(pMenuEntry, element->data.visible ? thumbnail_tvstandard : thumbnail_not_selected);
 		//				interface_changeMenuEntrySelectable(pMenuEntry, element->data.visible);
 		return;
@@ -314,8 +319,9 @@ static void merge_editorList(typeBouquet_t editorType)
 			}
 
 			first = analogtv_findOnFrequency(element->frequency);
-			if (first == -1)
+			if(first == -1) {
 				continue;
+			}
 
 			analogtv_setChannelsData(element->data.channelsName, element->data.visible, first);
 
@@ -489,7 +495,7 @@ static int32_t playlistEditor_createNewBouquet(interfaceMenu_t *pMenu, char *val
 
 	if(strList_isExist(bouquet_getNameList(btype), value)) {
 		interface_showMessageBox(_T("PLAYLIST_NAME_EXIST"), thumbnail_loading, 0);
-		if(!bouquet_isDownloaded(btype, value)) {
+		if(!bouquet_isExist(btype, value)) {
 			interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 			bouquet_update(btype, value);
 		}
@@ -563,7 +569,7 @@ static int32_t playlistEditor_setBouquet(interfaceMenu_t *pMenu, playlistEditorM
 	}
 	gfx_stopVideoProvider(screenMain, 1, 1);
 
-	if(!bouquet_isDownloaded(btype, newBouquetName)) {
+	if(!bouquet_isExist(btype, newBouquetName)) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		bouquet_update(btype, newBouquetName);
 		interface_hideMessageBox();

@@ -602,7 +602,7 @@ static int toggleStandby(void)
 	}
 }
 
-static int checkPowerOff(DFBEvent *pEvent)
+static int checkPowerOff(const DFBEvent *pEvent)
 {
 #if (!defined DISABLE_STANDBY)
 	int isFrontpanelPower = 0;
@@ -648,7 +648,7 @@ static int checkPowerOff(DFBEvent *pEvent)
 			timediff = (currentPress.tv_sec - prevPressTime.tv_sec) * 1000000 + (currentPress.tv_usec - prevPressTime.tv_usec);
 		}
 
-		if(timediff == 0 || timediff > REPEAT_TIMEOUT) {
+		if((timediff == 0) || (timediff > REPEAT_TIMEOUT)) {
 			//dprintf("%s: reset\n, __FUNCTION__");
 			memcpy(&poweroffTriggerTime, &currentPress, sizeof(struct timeval));
 			poweroffTriggerTime.tv_sec += POWEROFF_TIMEOUT;
@@ -663,15 +663,14 @@ static int checkPowerOff(DFBEvent *pEvent)
 			//dprintf("%s: repeat 3 sec - halt\n", __FUNCTION__);
 			/* Standby button has been held for 3 seconds. Power off. */
 //			PowerOff(NULL);
-		} else if(!repeat && Helper_IsTimeGreater(currentPress, validStandbySwitchTime))
-		{
+		} else if(!repeat && Helper_IsTimeGreater(currentPress, validStandbySwitchTime)) {
 			int ret = toggleStandby();
 
 			memcpy(&validStandbySwitchTime, &currentPress, sizeof(struct timeval));
 			validStandbySwitchTime.tv_sec += STANDBY_TIMEOUT;
 			return ret;
 		}
-	} else if(pEvent->input.button == 9) {// PSU button, just do power off
+	} else if((pEvent->input.flags & DIEF_BUTTONS) && (pEvent->input.button == 9)) {// PSU button, just do power off
 		PowerOff(NULL);
 	}
 #endif
@@ -1402,7 +1401,7 @@ void *testServerThread(void *pArg)
 
 					if (sscanf(ptr, "%s %s", url, filename) != 2) {
 						eprintf("%s[%d]: invalid args.\n", __FUNCTION__, __LINE__);
-						return -1;
+						return NULL;
 					}
 					elcdRpcType_t	type = elcdRpcInvalid;
 					cJSON			*result = NULL;
@@ -1411,7 +1410,7 @@ void *testServerThread(void *pArg)
 					params = cJSON_CreateObject();
 					if (!params) {
 						eprintf("%s[%d]: out of memory\n", __FUNCTION__, __LINE__);
-						return -1;
+						return NULL;
 					}
 					cJSON_AddStringToObject(params, "url", url);
 					cJSON_AddStringToObject(params, "filename", filename);
@@ -1595,6 +1594,7 @@ void *keyThread(void *pArg)
 		DFBEvent event;
 		DFBResult result;
 
+		memset(&event, 0, sizeof(event));
 		//dprintf("%s: WaitForEventWithTimeout\n", __FUNCTION__);
 		if (flushEventsFlag)
 		{
@@ -2158,6 +2158,7 @@ void process()
 {
 	DFBEvent event;
 
+	memset(&event, 0, sizeof(event));
 	event.clazz = DFEC_INPUT;
 	event.input.type = DIET_KEYPRESS;
 	event.input.flags = DIEF_KEYSYMBOL;

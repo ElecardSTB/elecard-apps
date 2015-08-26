@@ -1952,7 +1952,7 @@ int interface_setMenuEntryId(interfaceMenuEntry_t *pMenuEntry, int entryId);
 interfaceMenuEntry_t * interface_getMenuEntry(interfaceMenu_t *pMenu, int entryId);
 
 int  interface_changeMenuEntryInfo(interfaceMenuEntry_t *pMenuEntry, char *data, size_t dataSize);
-int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *label, size_t dataSize);
+int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *label);
 int  interface_changeMenuEntryType(interfaceMenuEntry_t *pMenuEntry, interfaceMenuEntryType_t type);
 int  interface_changeMenuEntryArgs(interfaceMenuEntry_t *pMenuEntry, void *pArg);
 int  interface_changeMenuEntryFunc(interfaceMenuEntry_t *pMenuEntry, menuActionFunction pFunc);

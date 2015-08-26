@@ -290,6 +290,17 @@ int32_t strList_init(listHead_t *commonList, int32_t isCaseSensivity)
 	return commonList_init(commonList, strList_compareFunc, (void *)isCaseSensivity, 0, strList_getLengthFunc);
 }
 
+static void commonList_resetLast(listHead_t *commonList)
+{
+	commonList->last.pos = NULL;
+	commonList->last.id = 0;
+}
+
+static void commonList_removeElement(listHead_t *commonList, struct list_head *pos)
+{
+	list_del(pos);
+	free((void *)pos);
+}
 
 /* Asume the next struct for constant objects size:
  * struct {
@@ -310,6 +321,7 @@ int32_t commonList_init(listHead_t *commonList, compareFunc_t *compar, void *pAr
 	commonList->len = len;
 	commonList->pArg = pArg;
 	commonList->objSize = objSize;
+	commonList_resetLast(commonList);
 	if((commonList->objSize == 0) && (commonList->len == NULL)) {
 		eprintf("%s(): Error, objSize=0 and len() function not defined!", __func__);
 		return -1;
@@ -326,9 +338,10 @@ int32_t commonList_release(listHead_t *commonList)
 		return -1;
 	}
 	list_for_each_safe(pos, n, &commonList->head) {
-		list_del(pos);
-		free((void *)pos);
+		commonList_removeElement(commonList, pos);
 	}
+	commonList_resetLast(commonList);
+
 	return 0;
 }
 
@@ -376,6 +389,7 @@ const void *commonList_add_head(listHead_t *commonList, const void *pArg)
 	}
 
 	list_add(listItem, &commonList->head);
+	commonList_resetLast(commonList);
 	return commonList_getPtrToObj(listItem);
 }
 
@@ -388,6 +402,7 @@ const void *commonList_add(listHead_t *commonList, const void *pArg)
 	}
 
 	list_add_tail(listItem, &commonList->head);
+	commonList_resetLast(commonList);
 	return commonList_getPtrToObj(listItem);
 }
 
@@ -404,8 +419,8 @@ int32_t commonList_remove(listHead_t *commonList, const void *pArg)
 	}
 	list_for_each(pos, &commonList->head) {
 		if(commonList->compar(commonList_getPtrToObj(pos), pArg, commonList->pArg) == 0) {
-			list_del(pos);
-			free((void *)pos);
+			commonList_removeElement(commonList, pos);
+			commonList_resetLast(commonList);
 			return 1;
 		}
 	}
@@ -415,16 +430,22 @@ int32_t commonList_remove(listHead_t *commonList, const void *pArg)
 
 int32_t commonList_remove_last(listHead_t *commonList)
 {
+	struct list_head *pos;
+
 	if(!commonList_isValid(commonList)) {
 		eprintf("%s(): Wrong arguments!\n", __func__);
 		return -1;
 	}
-	if(!list_empty(&commonList->head)) {
-		struct list_head *pos = commonList->head.prev;
-		list_del(pos);
-		free((void *)pos);
-		return 1;
+	if(list_empty(&commonList->head)) {
+		return 0;
 	}
+
+	pos = commonList->head.prev;
+	commonList_removeElement(commonList, pos);
+
+//	if(commonList.last.pos == pos) {
+		commonList_resetLast(commonList);
+//	}
 
 	return 0;
 }
@@ -513,20 +534,19 @@ const void *commonList_get(listHead_t *commonList, uint32_t number)
 		eprintf("%s(): Wrong argument!\n", __func__);
 		return NULL;
 	}
-	if((commonList->last.id + 1) == number) {
-		pos = commonList->last.pos->next;
-	} else if(commonList->last.id == number) {
-		pos = commonList->last.pos;
-	} else if((commonList->last.id - 1) == number) {
-		pos = commonList->last.pos->prev;
-	}
-	if(pos) {
-		if(pos == &commonList->head) {
-			return NULL;
+	if(commonList->last.pos) {
+		if((commonList->last.id + 1) == number) {
+			pos = commonList->last.pos->next;
+		} else if(commonList->last.id == number) {
+			pos = commonList->last.pos;
+		} else if((commonList->last.id - 1) == number) {
+			pos = commonList->last.pos->prev;
 		}
-		commonList->last.id = number;
-		commonList->last.pos = pos;
-		return commonList_getPtrToObj(pos);
+		if(pos && (pos != &commonList->head)) {
+			commonList->last.id = number;
+			commonList->last.pos = pos;
+			return commonList_getPtrToObj(pos);
+		}
 	}
 	list_for_each(pos, &commonList->head) {
 		if(id == number) {
@@ -580,6 +600,7 @@ int32_t commonList_sort(listHead_t *commonList)
 		list_del(pos);
 		list_add_tail(pos, &commonList->head);
 	}
+	commonList_resetLast(commonList);
 	free(array);
 	return 0;
 }

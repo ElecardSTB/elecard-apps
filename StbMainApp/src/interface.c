@@ -5590,9 +5590,9 @@ int  interface_changeMenuEntryInfo(interfaceMenuEntry_t *pMenuEntry, char *data,
 	return 0;
 }
 
-int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *data, size_t dataSize)
+int  interface_changeMenuEntryLabel(interfaceMenuEntry_t *pMenuEntry, char *data)
 {
-	snprintf (pMenuEntry->label, dataSize, data);
+	snprintf(pMenuEntry->label, sizeof(pMenuEntry->label), "%s", data);
 	return 0;
 }
 
@@ -7681,6 +7681,7 @@ int interface_enterTextProcessCommand(interfaceMenu_t *pMenu, pinterfaceCommandE
 	{
 		interfaceCommandEvent_t newcmd;
  		//eprintf("%s: repeat symbol\n", __FUNCTION__);
+		newcmd.original = interfaceCommandNone;
 		newcmd.command = 8;
 		newcmd.repeat  = 0;
 		newcmd.source  = DID_KEYBOARD;

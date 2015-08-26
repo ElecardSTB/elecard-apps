@@ -246,14 +246,12 @@ typedef struct
 	int showAdvanced;
 } outputWifiInfo_t;
 
-typedef struct
-{
-	char inputName[20];
-	char inputType[20];
-	int inputSelect1;
-} outputInputMode_t;
-
 #endif
+
+typedef struct {
+	char inputName[20];
+	int deviceSelect;
+} inputMode_t;
 
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
@@ -405,10 +403,10 @@ static void output_fillFormatMenu(void);
 static void output_fillBlankingMenu(void);
 #endif
 
-#ifdef STSDK
-
 static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg);
 static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg);
+
+#ifdef STSDK
 
 static int output_enterUpdateMenu(interfaceMenu_t *pMenu, void* notused);
 
@@ -423,9 +421,11 @@ static const char* output_getLanModeName(lanMode_t mode);
 static void output_setIfaceMenuName(interfaceMenu_t *pMenu, const char *ifaceName, int wan, lanMode_t lanMode);
 static int  output_isIfaceDhcp(stb810_networkInterface_t iface);
 
+#if (defined ENABLE_PPP) || (defined ENABLE_MOBILE)
 static void* output_refreshLoop(void *pMenu);
 static int   output_refreshStop(interfaceMenu_t *pMenu, void *pArg);
 static int   output_refreshStart(interfaceMenu_t *pMenu, void *pArg);
+#endif
 
 /** Display message box if failed is non-zero and no previous failures occured.
  *  Return non-zero if message was displayed (and display updated). */
@@ -468,9 +468,7 @@ static interfaceListMenu_t GraphicsModeMenu;
 static interfaceListMenu_t TimeZoneMenu;
 static interfaceListMenu_t InterfaceMenu;
 static interfaceListMenu_t PlaybackMenu;
-#ifdef STSDK
 static interfaceListMenu_t InputsSubMenu;
-#endif
 #ifdef ENABLE_ANALOGTV
 static interfaceListMenu_t AnalogTvSubMenu;
 #endif
@@ -551,6 +549,15 @@ static struct {
 	{ "SMALL",  "1920x1080" },
 };
 
+static table_IntStr_t inputDeviceNames[] = {
+	{1, "DVD"},
+	{2, "VCR"},
+	{3, "GAME"},
+	{4, "PC"},
+	{5, "OTHER"},
+	TABLE_INT_STR_END_VALUE
+};
+
 #ifdef ENABLE_MOBILE
 static struct {
 	char apn  [MENU_ENTRY_INFO_LENGTH];
@@ -561,7 +568,9 @@ static struct {
 };
 #endif // ENABLE_MOBILE
 
+#if (defined ENABLE_PPP) || (defined ENABLE_MOBILE)
 static pthread_t output_refreshThread = 0;
+#endif
 
 /**
  * @brief Useful DFB macros to have Strings and Values in an array.
@@ -825,172 +834,6 @@ static int output_tryNewVideoMode_Event(void* pArg)
 	return 1;
 }
 
-static int32_t output_inputFilmTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
-{
-	outputInputMode_t *input = (outputInputMode_t *)pArg;
-	int32_t selected;
-
-	switch(cmd->command) {
-		case interfaceCommand1:
-		case interfaceCommand2:
-		case interfaceCommand5:
-		case interfaceCommand3:
-		case interfaceCommand4:
-		case interfaceCommand6: {
-			char text[60];
-			sprintf(text, "%s:%d%d", input->inputType, input->inputSelect1, cmd->command - interfaceCommand1 + 1);
-			extInput_set(input->inputName, text);
-
-			break;
-		}
-		case DIKS_HOME:
-		case interfaceCommandExit:
-		case interfaceCommandGreen:
-		case interfaceCommandRed:
-		default:
-			break;
-	}
-	selected = extInput_getSelectedId();
-	interface_setSelectedItem(&InputsSubMenu.baseMenu, (selected >= 0) ? selected + 1 : 0);
-	return 0;
-}
-
-static int32_t output_inputTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
-{
-	int32_t selected;
-	static outputInputMode_t input;
-	char menuText[] = "Choose type of film:\n\n"
-		"1. Thriller\n"
-		"2. Drama\n"
-		"3. Romance\n"
-		"4. Comedy\n"
-		"5. Sports\n"
-		"6. Documentary\n";
-
-	input.inputSelect1 = cmd->command - interfaceCommand1 + 1;
-	strcpy(input.inputName, (char*)pArg);
-
-	switch(cmd->command) {
-		case interfaceCommand1:
-		case interfaceCommand2: {
-			table_IntStr_t names[] = {
-				{interfaceCommand1, "DVD"},
-				{interfaceCommand2, "VCR"},
-				TABLE_INT_STR_END_VALUE
-			};
-			strcpy(input.inputType, table_IntStrLookup(names, cmd->command, "-"));
-			interface_showConfirmationBox(menuText, thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
-			return 1;
-		}
-		case interfaceCommand3:
-		case interfaceCommand4:
-		case interfaceCommand5: {
-			char text[60];
-			table_IntStr_t names[] = {
-				{interfaceCommand3, "GAME"},
-				{interfaceCommand4, "PC"},
-				{interfaceCommand5, "OTHER"},
-				TABLE_INT_STR_END_VALUE
-			};
-			sprintf(text, "%s:%d%d", table_IntStrLookup(names, cmd->command, "-"), input.inputSelect1, 0);
-			extInput_set(pArg, text);
-			break;
-		}
-		case interfaceCommandMainMenu:
-		case interfaceCommandExit:
-		case interfaceCommandGreen:
-		case interfaceCommandRed:
-		default:
-			break;
-	}
-	selected = extInput_getSelectedId();
-	interface_setSelectedItem(&InputsSubMenu.baseMenu, (selected >= 0) ? selected + 1 : 0);
-
-	return 0;
-}
-
-static int32_t output_disableInput(interfaceMenu_t *pMenu, void *pArg)
-{
-	(void)pMenu;
-	(void)pArg;
-	extInput_disble();
-
-	return 0;
-}
-
-static int32_t output_setInput(interfaceMenu_t *pMenu, void *pArg)
-{
-	if(!pArg) {
-		eprintf ("%s: Error setting input.\n", __FUNCTION__);
-		return 0;
-	}
-
-	interface_showConfirmationBox("Choose using device:\n"
-						"\n1. DVD"
-						"\n2. VCR"
-						"\n3. Video Game"
-						"\n4. PC"
-						"\n5. Other\n", thumbnail_account_active, output_inputTypeCallback, pArg);
-	return 0;
-}
-
-static void output_fillInputsMenu(interfaceListMenu_t *pMenu, void *pArg)
-{
-	interfaceMenu_t	*inputsMenu = &(pMenu->baseMenu);
-	listHead_t *inputNamesList;
-	int32_t icon = thumbnail_channels;
-	int32_t i;
-	int32_t selected;
-	const char *name;
-
-	(void)pArg;
-	interface_clearMenuEntries(inputsMenu);
-
-	interface_addMenuEntry(inputsMenu, _T("OFF"), output_disableInput, NULL, icon);
-	inputNamesList = extInput_getList();
-	i = 0;
-	while((name = strList_get(inputNamesList, i)) != NULL) {
-		//in next line force cast name to (void *) for avoiding compile warning
-		interface_addMenuEntry(inputsMenu, name, output_setInput, (void *)name, icon);
-		i++;
-	}
-	selected = extInput_getSelectedId();
-	interface_setSelectedItem(&InputsSubMenu.baseMenu, (selected >= 0) ? selected + 1 : 0);
-}
-
-int32_t output_toggleInputs(void)
-{
-	listHead_t *inputNamesList;
-	int32_t inputCurId;
-	int32_t inputNextId;
-	interfaceMenu_t *inputsMenu = &InputsSubMenu.baseMenu; 
-
-	inputCurId = extInput_getSelectedId();
-	if(inputCurId >= 0) {
-		inputNextId = inputCurId + 1;
-	} else {
-		inputNextId = 0;
-	}
-	extInput_disble();
-
-	interface_menuActionShowMenu(interfaceInfo.currentMenu, inputsMenu);
-	inputNamesList = extInput_getList();
-	if(inputNextId >= strList_count(inputNamesList)) {
-		//we reach end of list, just disable
-		interface_setSelectedItem(inputsMenu, 0);
-		interface_displayMenu(1);
-		return 0;
-	}
-	interface_setSelectedItem(inputsMenu, inputNextId + 1);
-	interface_displayMenu(1);
-
-	output_setInput(inputsMenu, (void *)strList_get(inputNamesList, inputNextId));
-
-	return 0;
-}
-
-
-
 /**
  * This function switch into "Output format" menu and toggle output video modes.
  */
@@ -1191,6 +1034,161 @@ static int output_enterVideoOutputMenu(interfaceMenu_t *pMenu, void *pArg)
 	return 0;
 }
 #endif // STSDK
+
+static int32_t output_inputFilmTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	inputMode_t *input = (inputMode_t *)pArg;
+	int32_t selected;
+
+	switch(cmd->command) {
+		case interfaceCommand1:
+		case interfaceCommand2:
+		case interfaceCommand5:
+		case interfaceCommand3:
+		case interfaceCommand4:
+		case interfaceCommand6: {
+			char text[60];
+			sprintf(text, "%s:%d%d", table_IntStrLookup(inputDeviceNames, input->deviceSelect, "-"), input->deviceSelect, cmd->command - interfaceCommand1 + 1);
+			extInput_set(input->inputName, text);
+
+			break;
+		}
+		case DIKS_HOME:
+		case interfaceCommandExit:
+		case interfaceCommandGreen:
+		case interfaceCommandRed:
+		default:
+			break;
+	}
+	selected = extInput_getSelectedId();
+	interface_setSelectedItem(&InputsSubMenu.baseMenu, (selected >= 0) ? selected + 1 : 0);
+	return 0;
+}
+
+static int32_t output_inputTypeCallback(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg)
+{
+	int32_t selected;
+	int32_t deviceSelect = cmd->command - interfaceCommand1 + 1;
+
+	switch(cmd->command) {
+		case interfaceCommand1:
+		case interfaceCommand2: {
+			char menuText[] = "Choose type of film:\n\n"
+				"1. Thriller\n"
+				"2. Drama\n"
+				"3. Romance\n"
+				"4. Comedy\n"
+				"5. Sports\n"
+				"6. Documentary\n";
+			static inputMode_t input;
+
+			input.deviceSelect = deviceSelect;
+			strcpy(input.inputName, (char*)pArg);
+			interface_showConfirmationBox(menuText, thumbnail_account_active, output_inputFilmTypeCallback, (void*)&input);
+			return 1;
+		}
+		case interfaceCommand3:
+		case interfaceCommand4:
+		case interfaceCommand5: {
+			char text[60];
+
+			sprintf(text, "%s:%d%d", table_IntStrLookup(inputDeviceNames, deviceSelect, "-"), deviceSelect, 0);
+			extInput_set(pArg, text);
+			break;
+		}
+		case interfaceCommandMainMenu:
+		case interfaceCommandExit:
+		case interfaceCommandGreen:
+		case interfaceCommandRed:
+		default:
+			break;
+	}
+	selected = extInput_getSelectedId();
+	interface_setSelectedItem(&InputsSubMenu.baseMenu, (selected >= 0) ? selected + 1 : 0);
+
+	return 0;
+}
+
+static int32_t output_disableInput(interfaceMenu_t *pMenu, void *pArg)
+{
+	(void)pMenu;
+	(void)pArg;
+	extInput_disble();
+
+	return 0;
+}
+
+static int32_t output_setInput(interfaceMenu_t *pMenu, void *pArg)
+{
+	if(!pArg) {
+		eprintf ("%s: Error setting input.\n", __FUNCTION__);
+		return 0;
+	}
+
+	interface_showConfirmationBox("Choose using device:\n"
+						"\n1. DVD"
+						"\n2. VCR"
+						"\n3. Video Game"
+						"\n4. PC"
+						"\n5. Other\n", thumbnail_account_active, output_inputTypeCallback, pArg);
+	return 0;
+}
+
+static void output_fillInputsMenu(interfaceListMenu_t *pMenu, void *pArg)
+{
+	interfaceMenu_t	*inputsMenu = &(pMenu->baseMenu);
+	listHead_t *inputNamesList;
+	int32_t icon = thumbnail_channels;
+	int32_t i;
+	int32_t selected;
+	const char *name;
+
+	(void)pArg;
+	interface_clearMenuEntries(inputsMenu);
+
+	interface_addMenuEntry(inputsMenu, _T("OFF"), output_disableInput, NULL, icon);
+	inputNamesList = extInput_getList();
+	i = 0;
+	while((name = strList_get(inputNamesList, i)) != NULL) {
+		//in next line force cast name to (void *) for avoiding compile warning
+		interface_addMenuEntry(inputsMenu, name, output_setInput, (void *)name, icon);
+		i++;
+	}
+	selected = extInput_getSelectedId();
+	interface_setSelectedItem(&InputsSubMenu.baseMenu, (selected >= 0) ? selected + 1 : 0);
+}
+
+int32_t output_toggleInputs(void)
+{
+	listHead_t *inputNamesList;
+	int32_t inputCurId;
+	int32_t inputNextId;
+	interfaceMenu_t *inputsMenu = &InputsSubMenu.baseMenu; 
+
+	inputCurId = extInput_getSelectedId();
+	if(inputCurId >= 0) {
+		inputNextId = inputCurId + 1;
+	} else {
+		inputNextId = 0;
+	}
+	extInput_disble();
+
+	interface_menuActionShowMenu(interfaceInfo.currentMenu, inputsMenu);
+	inputNamesList = extInput_getList();
+	if(inputNextId >= strList_count(inputNamesList)) {
+		//we reach end of list, just disable
+		interface_setSelectedItem(inputsMenu, 0);
+		interface_displayMenu(1);
+		return 0;
+	}
+	interface_setSelectedItem(inputsMenu, inputNextId + 1);
+	interface_displayMenu(1);
+
+	output_setInput(inputsMenu, (void *)strList_get(inputNamesList, inputNextId));
+
+	return 0;
+}
+
 
 
 #ifdef STB82
@@ -2367,7 +2365,6 @@ static int output_statusReport(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t 
 	return 0;
 }
 
-#ifdef STSDK
 static int output_enterCalibrateMenu(interfaceMenu_t *pMenu, void * pArg)
 {
 	int32_t selected = MENU_ITEM_BACK;
@@ -2410,7 +2407,6 @@ static int output_calibrateCurrentMeter(interfaceMenu_t *pMenu, void* pArg)
 
 	return 1;
 }
-#endif
 
 static int output_resetSettings(interfaceMenu_t *pMenu, void* pArg)
 {
@@ -5141,7 +5137,8 @@ int output_fillWANMenu(interfaceMenu_t *wanMenu, void* pIface)
 	return 0;
 }
 
-void* output_refreshLoop(void *pMenu)
+#if (defined ENABLE_PPP) || (defined ENABLE_MOBILE)
+static void* output_refreshLoop(void *pMenu)
 {
 	for (;;)
 	{
@@ -5151,7 +5148,7 @@ void* output_refreshLoop(void *pMenu)
 	pthread_exit(NULL);
 }
 
-int output_refreshStart(interfaceMenu_t* pMenu, void* pArg)
+static int output_refreshStart(interfaceMenu_t* pMenu, void* pArg)
 {
 	int err = 0;
 	if (output_refreshThread == 0) {
@@ -5164,7 +5161,7 @@ int output_refreshStart(interfaceMenu_t* pMenu, void* pArg)
 	return err;
 }
 
-int output_refreshStop(interfaceMenu_t* pMenu, void* pArg)
+static int output_refreshStop(interfaceMenu_t* pMenu, void* pArg)
 {
 	if (output_refreshThread != 0) {
 		pthread_cancel(output_refreshThread);
@@ -5173,6 +5170,7 @@ int output_refreshStop(interfaceMenu_t* pMenu, void* pArg)
 	}
 	return 0;
 }
+#endif
 
 #ifdef ENABLE_PPP
 static char* output_getPPPPassword(int field, void* pArg)
@@ -6171,12 +6169,11 @@ void output_fillOutputMenu(void)
 	str = _T("VIDEO_CONFIG");
 	interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &VideoSubMenu, settings_video);
 #endif
-#if (defined STSDK)
+
 	if(strList_count(extInput_getList()) > 0) {
 		str = _T("INPUTS_CONFIG");
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &InputsSubMenu, settings_video);
 	}
-#endif
 
 #ifdef ENABLE_ANALOGTV
 	if(analogtv_hasTuner()) {
@@ -6225,8 +6222,6 @@ void output_fillOutputMenu(void)
 #ifdef STSDK
 	if(currentmeter_isExist()) {
 		str = _T("CURRENTMETER_CALIBRATE");
-		//interface_addMenuEntry(outputMenu, str, output_calibrateCurrentMeter, NULL, thumbnail_configure);
-		//interface_addMenuEntry(outputMenu, str, output_enterCalibrateMenu, &CurrentmeterSubMenu, thumbnail_configure);
 		interface_addMenuEntry(outputMenu, str, interface_menuActionShowMenu, &CurrentmeterSubMenu, thumbnail_configure);
 	}
 
