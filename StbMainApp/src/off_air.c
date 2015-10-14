@@ -216,6 +216,7 @@ static struct {
 	.visible = 0,
 };
 
+static int32_t l_epg_thread_alive = 0;
 static pmysem_t epg_semaphore = 0;
 static pmysem_t offair_semaphore = 0;
 
@@ -252,7 +253,7 @@ static int  offair_updatePSI(void* pArg);
 #endif
 static int  offair_confirmAutoScan(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
 
-static void offair_getServiceDescription(EIT_service_t *service, char *desc, char *mode);
+static void offair_getServiceDescription(EIT_service_t *service, char *desc, const char *prefix);
 #ifdef ENABLE_PVR
 static int  offair_confirmStopRecording(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void *pArg);
 static int  offair_stopRecording(interfaceMenu_t *pMenu, void *pArg);
@@ -780,7 +781,10 @@ void offair_stopVideo(int which, int reset)
 #ifdef ENABLE_DVB_DIAG
 		interface_removeEvent(offair_updatePSI, NULL);
 #endif
-		interface_removeEvent(offair_updateEPG, NULL);
+        mysem_get(epg_semaphore);
+        l_epg_thread_alive = 0;
+        interface_removeEvent(offair_updateEPG, NULL);
+        mysem_release(epg_semaphore);
 #ifdef ENABLE_STATS
 		interface_removeEvent(offair_updateStatsEvent, NULL);
 		offair_updateStats(which);
@@ -1632,6 +1636,7 @@ void offair_startVideo(int which)
 	interface_addEvent(offair_updatePSI, SET_NUMBER(which), 1000, 1);
 #endif
 
+    l_epg_thread_alive = 1;
 	interface_addEvent(offair_updateEPG, SET_NUMBER(which), 1000 * 5, 1);
 #ifdef ENABLE_STATS
 	time(&statsInfo.endTime);
@@ -1798,7 +1803,7 @@ static int offair_debugToggle(interfaceMenu_t *pMenu, void* pArg)
 }
 #endif
 
-static void offair_getServiceDescription(EIT_service_t *service, char *desc, char *mode)
+static void offair_getServiceDescription(EIT_service_t *service, char *desc, const char *prefix)
 {
 	list_element_t *event_element;
 	EIT_event_t *event;
@@ -1807,9 +1812,9 @@ static void offair_getServiceDescription(EIT_service_t *service, char *desc, cha
 
 	if( service != NULL )
 	{
-		if (mode != NULL)
+		if (prefix != NULL)
 		{
-			sprintf(desc, "%s: %s",mode, dvb_getServiceName(service));
+			sprintf(desc, "%s: %s", prefix, dvb_getServiceName(service));
 		} else
 		{
 			desc[0] = 0;
@@ -3757,6 +3762,10 @@ static int offair_updateEPG(void* pArg)
     }
 
     mysem_get(epg_semaphore);
+    if(l_epg_thread_alive == 0) {
+        mysem_release(epg_semaphore);
+        return 0;
+    }
 /*    dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
     if(appControlInfo.dvbInfo.scanPSI) {
         offair_updatePSI(pArg);

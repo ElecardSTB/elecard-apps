@@ -425,7 +425,7 @@ static int32_t bouquet_removeBouquet(interfaceMenu_t *pMenu, void *pArg)
 {
 	const char *bouquetName;
 	bouquetName = bouquet_getCurrentName(eBouquet_digital);
-	gfx_stopVideoProvider(screenMain, 1, 1);
+    offair_stopVideo(screenMain, 1);
 	if(bouquetName != NULL) {
 		interface_showMessageBox(_T("PLAYLIST_UPDATE_MESSAGE"), thumbnail_loading, 0);
 		bouquet_remove(eBouquet_digital, bouquetName);
