@@ -65,13 +65,13 @@ typedef struct {
 *******************************************************************/
 #ifdef ENABLE_DVB
 static dvb_channels_t g_dvb_channels = {
-    .orderHead	= LIST_HEAD_INIT(g_dvb_channels.orderHead),
+    .orderHead    = LIST_HEAD_INIT(g_dvb_channels.orderHead),
 
-    .viewedCount	= 0,
-    .totalCount		= 0,
-    .curOrderType	= serviceSortNone,
-    .newOrderType	= serviceSortNone,
-//	.initialized	= 0,
+    .viewedCount  = 0,
+    .totalCount   = 0,
+    .curOrderType = serviceSortNone,
+    .newOrderType = serviceSortNone,
+//     .initialized  = 0,
 };
 
 static registeredChangeCallback_t changeCallbacks[2] = {
@@ -79,6 +79,12 @@ static registeredChangeCallback_t changeCallbacks[2] = {
 	{NULL, NULL},
 };
 #endif // ENABLE_DVB
+
+
+/******************************************************************
+* STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
+*******************************************************************/
+static int32_t dvbChannel_clear(void);
 
 /*******************************************************************************
 * FUNCTION IMPLEMENTATION  <Module>[_<Word>+] for static functions             *
@@ -263,17 +269,19 @@ static service_index_t *dvbChannel_add(void)
 	g_dvb_channels.totalCount++;
 	g_dvb_channels.viewedCount++;
 
+    g_dvb_channels.curOrderType = serviceSortNone;
+    g_dvb_channels.newOrderType = serviceSortNone;
+    appControlInfo.offairInfo.sorting = serviceSortNone;
 	return new;
 }
 
-int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_t *data, uint8_t flag)
+static int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_t *data, uint8_t flag)
 {
 	service_index_t *new = dvbChannel_add();
 	if(new) {
 		memcpy(&new->common, common, sizeof(EIT_common_t));
 		memcpy(&new->data, data, sizeof(service_index_data_t));
 		new->flag = flag;
-		g_dvb_channels.curOrderType = serviceSortNone;
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -302,7 +310,6 @@ int32_t dvbChannel_addService(EIT_service_t *service, service_index_data_t *data
 		memcpy(&new->data, data, sizeof(service_index_data_t));
 		new->flag = flag;
 		dvbChannel_setName(new, (char *)service->service_descriptor.service_name);
-		g_dvb_channels.curOrderType = serviceSortNone;
 	} else {
 		eprintf("%s()[%d]: Cant add channel with common!\n", __func__, __LINE__);
 		return -1;
@@ -322,7 +329,7 @@ int32_t dvbChannel_remove(service_index_t *srvIdx)
 	return 0;
 }
 
-static int32_t dvbChannel_readOrderConfig()
+static int32_t dvbChannel_readOrderConfig(void)
 {
 #ifdef ENABLE_USE_CJSON
 	FILE *fd = NULL;
@@ -677,6 +684,20 @@ int32_t dvbChannel_changed(void)
 	return 0;
 }
 
+static int32_t dvbChannel_clear(void)
+{
+	struct list_head *pos;
+	struct list_head *n;
+
+	list_for_each_safe(pos, n, &g_dvb_channels.orderHead) {
+		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+		dvbChannel_remove(srvIdx);
+	}
+	dvb_clearServiceList(0);
+	dvbChannel_changed();
+	return 0;
+}
+
 int32_t dvbChannel_load(void)
 {
 	dvbChannel_clear();
@@ -684,8 +705,6 @@ int32_t dvbChannel_load(void)
 	if(helperFileExists(appControlInfo.dvbCommonInfo.channelConfigFile)) {
 		dvb_readServicesFromDump(appControlInfo.dvbCommonInfo.channelConfigFile);
 		dprintf("%s(): loaded %d services\n", __func__, dvb_getNumberOfServices());
-	} else {
-		dvb_clearServiceList(0);
 	}
 	dvbChannel_initServices();
 	return 0;
@@ -695,19 +714,6 @@ int32_t dvbChannel_save(void)
 {
 	dvbChannel_writeOrderConfig();
 
-	return 0;
-}
-
-int32_t dvbChannel_clear(void)
-{
-	struct list_head *pos;
-	struct list_head *n;
-
-	list_for_each_safe(pos, n, &g_dvb_channels.orderHead) {
-		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
-		dvbChannel_remove(srvIdx);
-	}
-	dvbChannel_changed();
 	return 0;
 }
 

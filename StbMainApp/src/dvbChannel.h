@@ -81,7 +81,6 @@ typedef struct {
 *******************************************************************/
 #ifdef ENABLE_DVB
 int32_t dvbChannel_addService(EIT_service_t *service, service_index_data_t *data, uint8_t flag);
-//int32_t dvbChannel_addServiceIndexData(EIT_common_t *common, service_index_data_t *data, uint8_t flag);
 int32_t dvbChannel_remove(service_index_t *srvIdx);
 service_index_t *dvbChannel_getServiceIndexVisible(uint32_t id, uint32_t visible);
 service_index_t *dvbChannel_findServiceCommon(EIT_common_t *header);
@@ -109,7 +108,6 @@ int32_t dvbChannel_changed(void);
 
 int32_t dvbChannel_load(void);
 int32_t dvbChannel_save(void);
-int32_t dvbChannel_clear(void);
 
 void dvbChannel_init(void);
 void dvbChannel_terminate(void);
