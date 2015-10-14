@@ -2243,6 +2243,22 @@ static void interface_animateMenu(int flipFB, int animate)
 #ifdef SCREEN_TRACE
 	unsigned long long cur, start;
 #endif
+    if(0) {//this prints in terminal menu name and selected item for debug purposes
+        if(interfaceInfo.showMenu) {
+            interfaceMenu_t *curMenu = interfaceInfo.currentMenu;
+            if((curMenu->selectedItem < curMenu->menuEntryCount) && curMenu->menuEntry) {
+                interfaceMenuEntry_t *item = curMenu->menuEntry + curMenu->selectedItem;
+                eprintf("\n  menu=%s, curitem: %02d/%02d, info=%s, label=%s\n",
+                        curMenu->name, curMenu->selectedItem, curMenu->menuEntryCount,
+                        item->info, item->label);
+            } else {
+                eprintf("\n  name=%s, curitem: %02d/%02d\n",
+                        curMenu->name, curMenu->selectedItem, curMenu->menuEntryCount);
+            }
+        } else {
+            eprintf("\n  playcontrol\n");
+        }
+    }
 
 	if(appControlInfo.inStandby) return;
 	if(interfaceInfo.cleanUpState) return;
