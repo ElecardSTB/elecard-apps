@@ -602,7 +602,8 @@ static int32_t dvbChannel_update(void)
 		dvbChannel_invalidateServices();
 	}
 
-	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+    dvb_lockSrvices();
+	for(service_element = dvb_getSrvices(); service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
@@ -622,6 +623,7 @@ static int32_t dvbChannel_update(void)
 			dvbChannel_addService(curService, &data, 0);
 		}
 	}
+    dvb_unlockSrvices();
 
 	//remove elements without service pointer
 	list_for_each_safe(pos, n, &g_dvb_channels.orderHead) {

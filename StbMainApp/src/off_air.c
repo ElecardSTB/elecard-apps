@@ -3228,7 +3228,7 @@ void offair_fillDVBTMenu(void)
 	}
 
 	if(dvbChannel_hasAnyEPG()) {
-		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_services != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
+		interface_addMenuEntry2(dvbtMenu, _T("EPG_MENU"), dvb_getSrvices() != NULL, interface_menuActionShowMenu, &EPGMenu, thumbnail_epg);
 	} /*else {
 		interface_addMenuEntryDisabled(dvbtMenu, _T("EPG_UNAVAILABLE"), thumbnail_not_selected);
 	}*/
@@ -3354,10 +3354,12 @@ void offair_sortEvents(list_element_t **event_list)
 
 void offair_sortSchedule(void)
 {
-	for(list_element_t *s = dvb_services; s != NULL; s = s->next ) {
-		EIT_service_t * service = s->data;
-		offair_sortEvents(&service->schedule);
-	}
+    dvb_lockSrvices();
+    for(list_element_t *s = dvb_getSrvices(); s != NULL; s = s->next ) {
+        EIT_service_t *service = s->data;
+        offair_sortEvents(&service->schedule);
+    }
+    dvb_unlockSrvices();
 }
 
 void offair_clearServiceList(int permanent)
@@ -3452,7 +3454,7 @@ static int offair_fillEPGMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	interface_clearMenuEntries((interfaceMenu_t*)&EPGMenu);
 
-	if(dvb_services == NULL) {
+	if(dvb_getSrvices() == NULL) {
 		str = _T("NONE");
 		interface_addMenuEntryDisabled((interfaceMenu_t*)&EPGMenu, str, thumbnail_not_selected);
 		return 0;
@@ -3568,39 +3570,43 @@ static int offair_checkSignal(int which, list_element_t **pPSI)
 		list_element_t *element, *found;
 
 		/* find new */
-		element = running_program_map;
-		while(element != NULL) {
-			EIT_service_t *service = (EIT_service_t *)element->data;
-			if(service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT)) {
-				found = find_element_by_header(dvb_services, (unsigned char*)&service->common, sizeof(EIT_common_t), NULL);
-				if(found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT)) {
-					dprintf("%s: Found new channel!\n", __FUNCTION__);
-					has_new_channels = 1;
-					break;
-				}
-			}
-			element = element->next;
-		}
+        element = running_program_map;
+        while(element != NULL) {
+            EIT_service_t *service = (EIT_service_t *)element->data;
+            if(service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT)) {
+                dvb_lockSrvices();
+                found = find_element_by_header(dvb_getSrvices(), (unsigned char*)&service->common, sizeof(EIT_common_t), NULL);
+                if(found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT)) {
+                    dprintf("%s: Found new channel!\n", __FUNCTION__);
+                    has_new_channels = 1;
+                    break;
+                }
+                dvb_unlockSrvices();
+            }
+            element = element->next;
+        }
 
-		/* find missing */
-		element = dvb_services;
-		while(element != NULL) {
-			EIT_service_t *service = (EIT_service_t *)element->data;
-			if(service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT)) {
-				found = find_element_by_header(running_program_map, (unsigned char*)&service->common, sizeof(EIT_common_t), NULL);
-				if (found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT))
-				{
-					dprintf("%s: Some channels are missing!\n", __FUNCTION__);
-					missing_old_channels = 1;
-					break;
-				}
-			}
-			element = element->next;
-		}
+        /* find missing */
+        dvb_lockSrvices();
+        element = dvb_getSrvices();
+        while(element != NULL) {
+            EIT_service_t *service = (EIT_service_t *)element->data;
+            if(service != NULL && (service->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) == (serviceFlagHasPAT|serviceFlagHasPMT)) {
+                found = find_element_by_header(running_program_map, (unsigned char*)&service->common, sizeof(EIT_common_t), NULL);
+                if (found == NULL || (((EIT_service_t *)found->data)->flags & (serviceFlagHasPAT|serviceFlagHasPMT)) != (serviceFlagHasPAT|serviceFlagHasPMT))
+                {
+                    dprintf("%s: Some channels are missing!\n", __FUNCTION__);
+                    missing_old_channels = 1;
+                    break;
+                }
+            }
+            element = element->next;
+        }
+        dvb_unlockSrvices();
 
-		if(has_new_channels || missing_old_channels) {
-			lastSignalStatus = signalStatusNewServices;
-		}
+        if(has_new_channels || missing_old_channels) {
+            lastSignalStatus = signalStatusNewServices;
+        }
 	} else if((running_program_map == NULL) && (pPSI != NULL) && (state.uncorrected_blocks == 0)) {
 		lastSignalStatus = signalStatusNoPSI;
 	}
@@ -3739,47 +3745,52 @@ static int  offair_updatePSI(void* pArg)
 
 static int offair_updateEPG(void* pArg)
 {
-	char desc[BUFFER_SIZE];
-	int my_channel = appControlInfo.dvbInfo.channel;
-	EIT_service_t *service = current_service();
+    char desc[BUFFER_SIZE];
+    int my_channel = appControlInfo.dvbInfo.channel;
+    EIT_service_t *service = current_service();
 
-	dprintf("%s: in\n", __FUNCTION__);
+    dprintf("%s: in\n", __FUNCTION__);
 
-	if(service == NULL) {
-		dprintf("offair: Can't update EPG: service %d is null\n",appControlInfo.dvbInfo.channel);
-		return -1;
-	}
+    if(service == NULL) {
+        dprintf("offair: Can't update EPG: service %d is null\n",appControlInfo.dvbInfo.channel);
+        return -1;
+    }
 
-	mysem_get(epg_semaphore);
-/*	dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
-	if(appControlInfo.dvbInfo.scanPSI) {
-		offair_updatePSI(pArg);
-	}*/
+    mysem_get(epg_semaphore);
+/*    dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
+    if(appControlInfo.dvbInfo.scanPSI) {
+        offair_updatePSI(pArg);
+    }*/
 
-	if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel) {// can be 0 if we switched from DVB when already updating
-		dprintf("%s: scan for epg\n", __FUNCTION__);
+    if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel) {// can be 0 if we switched from DVB when already updating
+        dprintf("%s: scan for epg\n", __FUNCTION__);
 
-		dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
-		dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
-		dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
+        dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
+        dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
+        dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
 
-		dprintf("%s: if active\n", __FUNCTION__);
+        dprintf("%s: if active\n", __FUNCTION__);
 
-		if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel ) {// can be 0 if we switched from DVB when already updating
-			dprintf("%s: refresh event\n", __FUNCTION__);
+        if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel ) {// can be 0 if we switched from DVB when already updating
+            dprintf("%s: refresh event\n", __FUNCTION__);
 
-			if(appControlInfo.dvbInfo.active) {
-				offair_getServiceDescription(service, desc, _T("DVB_CHANNELS"));
-				interface_playControlUpdateDescription(desc);
-				interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
-			}
-		}
-	}
+            if(appControlInfo.dvbInfo.active) {
+                dvb_lockSrvices();
+                service = current_service();
+                if(service) {
+                    offair_getServiceDescription(service, desc, _T("DVB_CHANNELS"));
+                    interface_playControlUpdateDescription(desc);
+                    interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
+                }
+                dvb_unlockSrvices();
+            }
+        }
+    }
 
-	dprintf("%s: update epg out\n", __FUNCTION__);
-	mysem_release(epg_semaphore);
+    dprintf("%s: update epg out\n", __FUNCTION__);
+    mysem_release(epg_semaphore);
 
-	return 0;
+    return 0;
 }
 
 int  offair_tunerPresent(void)
@@ -4906,39 +4917,41 @@ static int wizard_show(int allowExit, int displayMenu, interfaceMenu_t *pFallbac
 
 		wizardSettings->frequencyCount = 0;
 
-		cur = dvb_services;
-		while (cur != NULL)
-		{
-			service = (EIT_service_t*)cur->data;
-			freq = service->media.frequency;
+        dvb_lockSrvices();
+        cur = dvb_getSrvices();
+        while (cur != NULL)
+        {
+            service = (EIT_service_t*)cur->data;
+            freq = service->media.frequency;
 
-			found = 0;
-			for (i=0; i<wizardSettings->frequencyCount; i++)
-			{
-				if (freq == wizardSettings->frequency[i])
-				{
-					found = 1;
-					break;
-				}
-				if (freq < wizardSettings->frequency[i])
-				{
-					break;
-				}
-			}
+            found = 0;
+            for (i=0; i<wizardSettings->frequencyCount; i++)
+            {
+                if (freq == wizardSettings->frequency[i])
+                {
+                    found = 1;
+                    break;
+                }
+                if (freq < wizardSettings->frequency[i])
+                {
+                    break;
+                }
+            }
 
-			if (!found)
-			{
-				wizardSettings->frequencyCount++;
-				for (; i<wizardSettings->frequencyCount; i++)
-				{
-					found = wizardSettings->frequency[i];
-					wizardSettings->frequency[i] = freq;
-					freq = found;
-				}
-			}
+            if (!found)
+            {
+                wizardSettings->frequencyCount++;
+                for (; i<wizardSettings->frequencyCount; i++)
+                {
+                    found = wizardSettings->frequency[i];
+                    wizardSettings->frequency[i] = freq;
+                    freq = found;
+                }
+            }
 
-			cur = cur->next;
-		}
+            cur = cur->next;
+        }
+        dvb_unlockSrvices();
 
 		for (i=0; i<wizardSettings->frequencyCount; i++)
 		{

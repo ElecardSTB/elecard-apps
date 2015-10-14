@@ -223,14 +223,11 @@ struct section_buf {
 #endif
 };
 
-/***********************************************
-* EXPORTED DATA                                *
-************************************************/
-list_element_t *dvb_services = NULL;
 
 /******************************************************************
 * STATIC DATA                                                     *
 *******************************************************************/
+static list_element_t *l_dvb_services = NULL;
 
 static LIST_HEAD(running_filters);
 static LIST_HEAD(waiting_filters);
@@ -251,6 +248,8 @@ static NIT_table_t dvb_scan_network;
 /******************************************************************
 * STATIC FUNCTION PROTOTYPES                  <Module>_<Word>+    *
 *******************************************************************/
+static list_element_t **dvb_getSrvicesPP(void);
+
 static int dvb_hasPayloadTypeNB(EIT_service_t *service, payload_type p_type);
 static int dvb_hasMediaTypeNB(EIT_service_t *service, media_type m_type);
 static int dvb_hasMediaNB(EIT_service_t *service);
@@ -850,6 +849,7 @@ static int dvb_sectionParse(struct section_buf *s)
 	int updated = 0;
 	uint32_t network_id;
 	int32_t frequency = 0;
+    int32_t needUnlockServices = 0;
 
 	if(s->media == NULL) {
 		eprintf("%s(): Error, media not defined!\n", __func__);
@@ -867,7 +867,7 @@ static int dvb_sectionParse(struct section_buf *s)
 	if(s->service_list != NULL) {
 		services = s->service_list;
 	} else {
-		services = &dvb_services;
+		services = dvb_getSrvicesPP();
 	}
 
 	table_id = s->buf[0];
@@ -898,6 +898,11 @@ static int dvb_sectionParse(struct section_buf *s)
 		s->next_seg = next_seg;
 	}
 
+    if(services && *services && (*services == dvb_getSrvices())) {
+        needUnlockServices = 1;
+        dvb_lockSrvices();
+    }
+
 	if(!get_bit(s->section_done, section_number)) {
 		set_bit (s->section_done, section_number);
 
@@ -909,7 +914,6 @@ static int dvb_sectionParse(struct section_buf *s)
 		switch (table_id) {
 			case 0x00:
 				verbose("%s: PAT\n", __FUNCTION__);
-				mysem_get(dvb_semaphore);
 				updated = parse_pat(services, (unsigned char *)s->buf, network_id, s->media);
 				cur = *services;
 				while(cur != NULL) {
@@ -934,12 +938,10 @@ static int dvb_sectionParse(struct section_buf *s)
 					}
 					cur = cur->next;
 				}
-				mysem_release(dvb_semaphore);
 				break;
 
 			case 0x02:
 				dprintf("%s: got pmt filter ts %d, pid %d for service 0x%04x\n", __FUNCTION__, s->transport_stream_id, s->pid, table_id_ext);
-				mysem_get(dvb_semaphore);
 				cur = *services;
 				while(cur != NULL) {
 					service = ((EIT_service_t*)cur->data);
@@ -962,23 +964,18 @@ static int dvb_sectionParse(struct section_buf *s)
 					}
 					cur = cur->next;
 				}
-				mysem_release(dvb_semaphore);
 				break;
 
 			case 0x40:
 				verbose("%s: NIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
-				mysem_get(dvb_semaphore);
 				updated = parse_nit(services, (unsigned char *)s->buf, network_id, s->media, &dvb_scan_network);
-				mysem_release(dvb_semaphore);
 				break;
 
 			case 0x42:
 			case 0x46:
 				verbose("%s: SDT (%s TS)\n", __FUNCTION__, table_id == 0x42 ? "actual":"other");
-				mysem_get(dvb_semaphore);
 				//parse_sdt(services, (unsigned char *)s->buf, network_id, &media);
 				updated = parse_sdt_with_nit(services, (unsigned char *)s->buf, network_id, s->media, NULL);
-				mysem_release(dvb_semaphore);
 				break;
 			case 0x4E:
 			case 0x50:
@@ -998,20 +995,16 @@ static int dvb_sectionParse(struct section_buf *s)
 			case 0x5E:
 			case 0x5F:
 				verbose("%s: EIT 0x%04x for service 0x%04x\n", __FUNCTION__, s->pid, table_id_ext);
-				mysem_get(dvb_semaphore);
 				updated = parse_eit(services, (unsigned char *)s->buf, network_id, s->media);
 				if(updated) {
 					s->timeout = 5;
 				}
-				mysem_release(dvb_semaphore);
 				can_count_sections = 0;
 				break;
 #if (defined ENABLE_USE_DVB_APPS)
 			case stag_atsc_terrestrial_virtual_channel:
 			case stag_atsc_cable_virtual_channel:
-				mysem_get(dvb_semaphore);
 				parse_atsc_section(services, network_id, s->buf, ((s->buf[1] & 0x0f) << 8) | s->buf[2], s->pid);
-				mysem_release(dvb_semaphore);
 				break;
 #endif
 			default:
@@ -1035,6 +1028,10 @@ static int dvb_sectionParse(struct section_buf *s)
 			}
 		}
 	}
+
+    if(needUnlockServices) {
+        dvb_unlockSrvices();
+    }
 
 	if(updated) {
 		s->was_updated = 1;
@@ -1133,7 +1130,7 @@ static void dvb_filtersRead(void)
 static void dvb_filterServices(list_element_t **head)
 {
 	list_element_t *service_element;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	service_element = *head;
 	while (service_element != NULL)
 	{
@@ -1148,12 +1145,13 @@ static void dvb_filterServices(list_element_t **head)
 			service_element = service_element->next;
 		}
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 }
 */
 
 static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *service)
 {
+    list_element_t **pp_dvb_services = dvb_getSrvicesPP();
 	if(service == NULL) {
 		return -1;
 	}
@@ -1169,17 +1167,17 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 				service->common.service_id,
 				service->common.media_id,
 				service->media.frequency);
-		dvb_filterSetup(&pmt_filter, adapter, service->program_map.program_map_PID, 0x02, 2, &dvb_services, &service->media);   /* PMT */
+		dvb_filterSetup(&pmt_filter, adapter, service->program_map.program_map_PID, 0x02, 2, pp_dvb_services, &service->media);   /* PMT */
 		pmt_filter.transport_stream_id = service->common.transport_stream_id;
 		dvb_filterAdd(&pmt_filter);
 	} else {
 		struct section_buf pat_filter;
-		dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services, &service->media); /* PAT */
+		dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, pp_dvb_services, &service->media); /* PAT */
 		dvb_filterAdd(&pat_filter);
 	}
 /*	if((service->flags & serviceFlagHasSDT) == 0) {
 		struct section_buf sdt_filter;
-		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, &dvb_services, &service->media);
+		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, pp_dvb_services, &service->media);
 		dvb_filterAdd(&sdt_filter);
 	}*/
 
@@ -1196,7 +1194,7 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 
 static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_config_t *media)
 {
-	extern pmysem_t dvb_semaphore;
+    list_element_t **pp_dvb_services = dvb_getSrvicesPP();
 
 	struct section_buf pat_filter;
 	//struct section_buf sdt1_filter;
@@ -1209,9 +1207,9 @@ static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_
 	/**
 	*  filter timeouts > min repetition rates specified in ETR211
 	*/
-	dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, &dvb_services, media); /* PAT */
-	//dvb_filterSetup(&sdt1_filter, adapter, 0x11, 0x46, 5, &dvb_services, media); /* SDT other */
-	dvb_filterSetup(&eit_filter, adapter, 0x12,   -1, 5, &dvb_services, media); /* EIT */
+	dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, pp_dvb_services, media); /* PAT */
+	//dvb_filterSetup(&sdt1_filter, adapter, 0x11, 0x46, 5, pp_dvb_services, media); /* SDT other */
+	dvb_filterSetup(&eit_filter, adapter, 0x12,   -1, 5, pp_dvb_services, media); /* EIT */
 
 	dvb_filterAdd(&pat_filter);
 	//dvb_filterAdd(&sdt1_filter);
@@ -1221,20 +1219,20 @@ static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_
 #if (defined ENABLE_USE_DVB_APPS)
 		struct section_buf tvct_filter;
 		struct section_buf cvct_filter;
-		dvb_filterSetup(&tvct_filter, adapter, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, &dvb_services, media); //Terrestrial Virtual Channel Table (TVCT)
+		dvb_filterSetup(&tvct_filter, adapter, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, pp_dvb_services, media); //Terrestrial Virtual Channel Table (TVCT)
 		dvb_filterAdd(&tvct_filter);
-		dvb_filterSetup(&cvct_filter, adapter, 0x1ffb, stag_atsc_cable_virtual_channel, 5, &dvb_services, media); //Cable Virtual Channel Table (CVCT)
+		dvb_filterSetup(&cvct_filter, adapter, 0x1ffb, stag_atsc_cable_virtual_channel, 5, pp_dvb_services, media); //Cable Virtual Channel Table (CVCT)
 		dvb_filterAdd(&cvct_filter);
 #endif
 	} else {
 		struct section_buf sdt_filter;
-		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, &dvb_services, media); /* SDT actual */
+		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, pp_dvb_services, media); /* SDT actual */
 		dvb_filterAdd(&sdt_filter);
 	}
 
 	if(enableNit) {
 		dvb_clearNIT(&dvb_scan_network);
-		dvb_filterSetup(&nit_filter, adapter, 0x10, 0x40, 5, &dvb_services, media); /* NIT */
+		dvb_filterSetup(&nit_filter, adapter, 0x10, 0x40, 5, pp_dvb_services, media); /* NIT */
 		dvb_filterAdd(&nit_filter);
 	}
 
@@ -1246,7 +1244,7 @@ static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_
 	dvb_filtersLock();
 	mysem_release(scan_semaphore);
 
-	//dvb_filterServices(&dvb_services);
+	//dvb_filterServices(pp_dvb_services);
 }
 
 int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service)
@@ -1274,12 +1272,13 @@ int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service)
 
 void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media)
 {
+    list_element_t **pp_dvb_services = dvb_getSrvicesPP();
 	struct section_buf eit_filter;
 	int counter = 0;
 
 	dvb_filtersUnlock();
 
-	dvb_filterSetup(&eit_filter, adapter, 0x12, -1, 2, &dvb_services, media); /* EIT */
+	dvb_filterSetup(&eit_filter, adapter, 0x12, -1, 2, pp_dvb_services, media); /* EIT */
 	eit_filter.running_counter = &counter;
 	dvb_filterAdd(&eit_filter);
 	do {
@@ -1289,7 +1288,7 @@ void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media)
 		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
 	} while((eit_filter.start_time == 0) || (counter > 0));
-	//dvb_filterServices(&dvb_services);
+	//dvb_filterServices(pp_dvb_services);
 
 	dvb_filtersLock();
 
@@ -1305,7 +1304,7 @@ void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t 
 	int counter = 0;
 
 	if(out_list == NULL) {
-		out_list = &dvb_services;
+		out_list = dvb_getSrvicesPP();
 	}
 	dvb_filtersUnlock();
 
@@ -1330,8 +1329,10 @@ char *dvb_getTempServiceName(int index)
 	list_element_t *service_element;
 	EIT_service_t *service;
 	int i = 0;
+    char *ret = NULL;
 
-	service_element = dvb_services;
+	dvb_lockSrvices();
+	service_element = dvb_getSrvices();
 	while( service_element != NULL )
 	{
 		if (dvb_hasMedia(service_element->data))
@@ -1343,25 +1344,28 @@ char *dvb_getTempServiceName(int index)
 				{
 					if (service->service_descriptor.service_name[0])
 					{
-						return (char *)&service->service_descriptor.service_name[0];
+						ret = (char *)&service->service_descriptor.service_name[0];
+                        break;
 					}
-					return "N/A";
+					ret = "N/A";
+                    break;
 				}
-				return NULL;
+                break;
 			}
 			i++;
 		}
 		service_element = service_element->next;
 	}
-	return NULL;
+	dvb_unlockSrvices();
+	return ret;
 }
 
 void dvb_exportServiceList(char* filename)
 {
 	dprintf("%s: in\n", __FUNCTION__);
-	mysem_get(dvb_semaphore);
-	dump_services(dvb_services, filename);
-	mysem_release(dvb_semaphore);
+	dvb_lockSrvices();
+	dump_services(dvb_getSrvices(), filename);
+	dvb_unlockSrvices();
 	dprintf("%s: out\n", __FUNCTION__);
 }
 
@@ -1374,8 +1378,8 @@ void dvb_clearNIT(NIT_table_t *nit)
 void dvb_clearServiceList(int permanent)
 {
 	dprintf("%s: %d\n", __FUNCTION__, permanent);
-	mysem_get(dvb_semaphore);
-	free_services(&dvb_services);
+	dvb_lockSrvices();
+	free_services(dvb_getSrvicesPP());
 	if(permanent) {
 		FILE *fd;
 
@@ -1397,16 +1401,16 @@ void dvb_clearServiceList(int permanent)
 		}
 #endif
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 }
 
 int dvb_readServicesFromDump(char* filename)
 {
 	int res;
-	mysem_get(dvb_semaphore);
-	free_services(&dvb_services);
-	res = services_load_from_dump(&dvb_services, filename);
-	mysem_release(dvb_semaphore);
+	dvb_lockSrvices();
+	free_services(dvb_getSrvicesPP());
+	res = services_load_from_dump(dvb_getSrvicesPP(), filename);
+	dvb_unlockSrvices();
 	return res;
 }
 
@@ -2203,13 +2207,13 @@ int dvb_getNumberOfServices(void)
 {
 	list_element_t *service_element;
 	int serviceCount = 0;
-	mysem_get(dvb_semaphore);
-	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+	dvb_lockSrvices();
+	for(service_element = dvb_getSrvices(); service_element != NULL; service_element = service_element->next) {
 		if(dvb_hasMediaNB(service_element->data)) {
 			serviceCount++;
 		}
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return serviceCount;
 }
 
@@ -2217,11 +2221,11 @@ int32_t dvb_getCountOfServices(void)
 {
     list_element_t *service_element;
     int serviceCount = 0;
-    mysem_get(dvb_semaphore);
-    for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+    dvb_lockSrvices();
+    for(service_element = dvb_getSrvices(); service_element != NULL; service_element = service_element->next) {
         serviceCount++;
     }
-    mysem_release(dvb_semaphore);
+    dvb_unlockSrvices();
     return serviceCount;
 }
 
@@ -2231,17 +2235,17 @@ EIT_service_t* dvb_getService(int which)
 	list_element_t *service_element;
 	if( which < 0 )
 		return NULL;
-	mysem_get(dvb_semaphore);
-	for( service_element = dvb_services; service_element != NULL; service_element = service_element->next )
+	dvb_lockSrvices();
+	for( service_element = dvb_getSrvices(); service_element != NULL; service_element = service_element->next )
 	{
 		if(which == 0)
 		{
-			mysem_release(dvb_semaphore);
+			dvb_unlockSrvices();
 			return (EIT_service_t*)service_element->data;
 		}
 		which--;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return NULL;
 }
 
@@ -2249,19 +2253,19 @@ int dvb_getServiceIndex( EIT_service_t* service )
 {
 	list_element_t *service_element;
 	int i;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 
-	for( service_element = dvb_services, i = 0;
+	for( service_element = dvb_getSrvices(), i = 0;
 		service_element != NULL;
 		service_element = service_element->next, i++ )
 	{
 		if( (EIT_service_t*)service_element->data == service )
 		{
-			mysem_release(dvb_semaphore);
+			dvb_unlockSrvices();
 			return i;
 		}
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return -1;
 }
 
@@ -2299,7 +2303,7 @@ static PID_info_t* dvb_getVideoStream(EIT_service_t *service)
 	if (service == NULL)
 		return NULL;
 	PID_info_t* stream = NULL;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	for (list_element_t *stream_element = service->program_map.map.streams;
 	     stream_element;
 	     stream_element = stream_element->next)
@@ -2312,11 +2316,11 @@ static PID_info_t* dvb_getVideoStream(EIT_service_t *service)
 			case streamTypeVideoMPEG4:
 			case streamTypeVideoH264:
 			case streamTypeVideoVC1:
-				mysem_release(dvb_semaphore);
+				dvb_unlockSrvices();
 				return stream;
 		}
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return NULL;
 }
 
@@ -2339,7 +2343,7 @@ static PID_info_t* dvb_getAudioStream(EIT_service_t *service, int audio)
 		return NULL;
 	}
 	audio = audio < 0 ? 1 : audio + 1;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	stream_element = service->program_map.map.streams;
 	while( stream_element != NULL)
 	{
@@ -2356,12 +2360,12 @@ static PID_info_t* dvb_getAudioStream(EIT_service_t *service, int audio)
 		}
 		if( audio == 0 )
 		{
-			mysem_release(dvb_semaphore);
+			dvb_unlockSrvices();
 			return stream;
 		}
 		stream_element = stream_element->next;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return NULL;
 }
 
@@ -2428,13 +2432,13 @@ int dvb_getAudioCount(EIT_service_t *service)
 int dvb_getSubtitleCount(EIT_service_t *service)
 {
 	int count = 0;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	for (list_element_t *s = service->program_map.map.streams; s; s = s->next) {
 		PID_info_t* stream = s->data;
 		if (isSubtitle(stream))
 			count++;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return count;
 }
 
@@ -2453,16 +2457,16 @@ list_element_t* dvb_getNextSubtitleStream(EIT_service_t *service, list_element_t
 uint16_t dvb_getNextSubtitle(EIT_service_t *service, uint16_t subtitle_pid)
 {
 	assert (service);
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	for (list_element_t *s = service->program_map.map.streams; s; s = s->next) {
 		PID_info_t* stream = s->data;
 		if ((isSubtitle(stream)) && (subtitle_pid == 0 ||
 						(stream->elementary_PID == subtitle_pid))) {
-			mysem_release(dvb_semaphore);
+			dvb_unlockSrvices();
 			return stream->elementary_PID;
 		}
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return 0;
 }
 
@@ -2486,9 +2490,9 @@ int dvb_getScrambled(EIT_service_t *service)
 int dvb_hasPayloadType(EIT_service_t *service, payload_type p_type)
 {
 	int res;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	res = dvb_hasPayloadTypeNB(service, p_type);
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return res;
 }
 
@@ -2516,9 +2520,9 @@ int dvb_hasPayloadTypeNB(EIT_service_t *service, payload_type p_type)
 int dvb_hasMedia(EIT_service_t *service)
 {
 	int res;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	res = dvb_hasMediaNB(service);
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return res;
 }
 
@@ -2536,9 +2540,9 @@ int dvb_hasMediaNB(EIT_service_t *service)
 int dvb_hasMediaType(EIT_service_t *service, media_type m_type)
 {
 	int res;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	res = dvb_hasMediaTypeNB(service, m_type);
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return res;
 }
 
@@ -2581,7 +2585,7 @@ int dvb_getPIDs(EIT_service_t *service, int audio, uint16_t* pVideo, uint16_t* p
 		return -1;
 
 	audio = audio < 0 ? 1 : audio + 1;
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	if (pPcr != NULL)
 		*pPcr = service->program_map.map.PCR_PID;
 	stream_element = service->program_map.map.streams;
@@ -2612,7 +2616,7 @@ int dvb_getPIDs(EIT_service_t *service, int audio, uint16_t* pVideo, uint16_t* p
 		}
 		stream_element = stream_element->next;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return 0;
 }
 
@@ -2623,7 +2627,7 @@ int dvb_getServiceFrequency(EIT_service_t *service, uint32_t *pFrequency)
 		return -1;
 	}
 
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	switch(service->media.type) {
 		case serviceMediaDVBT:
 		case serviceMediaDVBC:
@@ -2635,7 +2639,7 @@ int dvb_getServiceFrequency(EIT_service_t *service, uint32_t *pFrequency)
 		default:
 			break;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return ret;
 }
 
@@ -2651,7 +2655,7 @@ int dvb_getServiceURL(EIT_service_t *service, char* URL)
 		URL[0]=0;
 		return -1;
 	}
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	switch(service->media.type)
 	{
 		case serviceMediaDVBT:
@@ -2717,7 +2721,7 @@ int dvb_getServiceURL(EIT_service_t *service, char* URL)
 		}
 		stream_element = stream_element->next;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	return 0;
 }
 
@@ -2742,7 +2746,7 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 		buf[0] = 0;
 		return -1;
 	}
-	mysem_get(dvb_semaphore);
+	dvb_lockSrvices();
 	sprintf(buf, "\"%s\"\n%s: %s\n",
 		service->service_descriptor.service_name,
 		_T("DVB_PROVIDER"), service->service_descriptor.service_provider_name);
@@ -2848,7 +2852,7 @@ int dvb_getServiceDescription(EIT_service_t *service, char* buf)
 		}
 		stream_element = stream_element->next;
 	}
-	mysem_release(dvb_semaphore);
+	dvb_unlockSrvices();
 	buf[-1] = 0;
 	return 0;
 }
@@ -3064,7 +3068,7 @@ void dvb_terminate(void)
 	dvbChannel_terminate();
 	dvbfe_terminate();
 
-	free_services(&dvb_services);
+	free_services(dvb_getSrvicesPP());
 
 	mysem_destroy(dvb_semaphore);
 	mysem_destroy(scan_semaphore);
@@ -3134,5 +3138,31 @@ int dvb_getPvrRate(int which)
 	return DEFAULT_PVR_RATE;
 }
 #endif // ENABLE_DVB_PVR
+
+list_element_t *dvb_getSrvices(void)
+{
+    return l_dvb_services;
+}
+
+static list_element_t **dvb_getSrvicesPP(void)
+{
+    return &l_dvb_services;
+}
+
+int32_t dvb_setSrvices(list_element_t *new_services)
+{
+    l_dvb_services = new_services;
+    return 0;
+}
+
+int32_t dvb_lockSrvices(void)
+{
+    return mysem_get(dvb_semaphore);
+}
+
+int32_t dvb_unlockSrvices(void)
+{
+    return mysem_release(dvb_semaphore);
+}
 
 #endif /* ENABLE_DVB */

@@ -254,27 +254,38 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 		}
 	}
 
-	if(el == NULL) {
-		list_element_t *cur_element = NULL;
-		if(dvb_services == NULL) {
-			dvb_services = cur_element = allocate_element(sizeof(EIT_service_t));
-		} else {
-			cur_element = append_new_element(dvb_services, sizeof(EIT_service_t));
-		}
-		if(!cur_element) {
-			return -1;
-		}
-		service_index_data_t data;
-		el = (EIT_service_t *)cur_element->data;
-		el->common.media_id = element->data.network_id;
-		el->common.service_id = element->service_id;
-		el->common.transport_stream_id = element->data.transport_stream_id;
-		el->original_network_id = element->data.network_id;
-		strncpy((char *)el->service_descriptor.service_name, element->lamedbData.channelsName, strlen(element->lamedbData.channelsName));
-		data.visible = 1;
-		data.parent_control = element->parent_control;
-		dvbChannel_addService(el, &data, 1);
-	}
+    if(el == NULL) {
+        list_element_t *cur_element = NULL;
+        list_element_t *dvb_services;
+
+        dvb_lockSrvices();
+        dvb_services = dvb_getSrvices();
+        if(dvb_services == NULL) {
+            cur_element = allocate_element(sizeof(EIT_service_t));
+            dvb_setSrvices(cur_element);
+        } else {
+            cur_element = append_new_element(dvb_services, sizeof(EIT_service_t));
+        }
+        dvb_unlockSrvices();
+
+        if(!cur_element) {
+            return -1;
+        }
+
+        el = (EIT_service_t *)cur_element->data;
+        el->common.media_id = element->data.network_id;
+        el->common.service_id = element->service_id;
+        el->common.transport_stream_id = element->data.transport_stream_id;
+        el->original_network_id = element->data.network_id;
+        strncpy((char *)el->service_descriptor.service_name, element->lamedbData.channelsName, strlen(element->lamedbData.channelsName));
+
+        service_index_data_t data;
+        memset(&data, 0, sizeof(data));
+        data.visible = 1;
+        data.parent_control = element->parent_control;
+
+        dvbChannel_addService(el, &data, 1);
+    }
 
 	if(element->transpounder.media.type == serviceMediaDVBC) {
 		el->media.type = element->transpounder.media.type;
@@ -460,9 +471,10 @@ list_element_t *list_getElement(int count, list_element_t **head)
 
 void bouquet_addScanChannels(void)
 {
-	list_element_t		*service_element;
+    list_element_t *service_element;
 
-	for(service_element = dvb_services; service_element != NULL; service_element = service_element->next) {
+    dvb_lockSrvices();
+	for(service_element = dvb_getSrvices(); service_element != NULL; service_element = service_element->next) {
 		service_index_t *p_srvIdx;
 		EIT_service_t *curService = (EIT_service_t *)service_element->data;
 		p_srvIdx = dvbChannel_findServiceCommon(&curService->common);
@@ -480,6 +492,7 @@ void bouquet_addScanChannels(void)
 			dvbChannel_addService(curService, &data, 1);
 		}
 	}
+    dvb_unlockSrvices();
 
 	dvbChannel_changed();
 	dvbChannel_save();
@@ -977,7 +990,7 @@ int32_t bouquet_updateNameList(typeBouquet_t btype, int32_t download)
 	strList_release(bouquet_getNameList(btype));
 	if(download == 1) {
 		char *tmpFile = "/tmp/" BOUQUET_CONFIG_FILE;
-		
+
 		remove(tmpFile);
 		server_get(serverPath, tmpFile);
 		bouquet_parseNameListFile(btype, tmpFile);

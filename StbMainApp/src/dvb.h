@@ -134,11 +134,6 @@ typedef struct {
 	__u32 frequency;
 } DvbParam_t;
 
-/***********************************************
-* EXPORTED DATA                                *
-************************************************/
-extern list_element_t *dvb_services;
-
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 ******************************************************************/
@@ -461,6 +456,14 @@ void dvb_getPvrPosition(int which, DvbFilePosition_t *pPosition);
 int dvb_getPvrRate(int which);
 #endif // LINUX_DVB_API_DEMUX
 
+/** @} */
+
+/** Function return if there has teletext in playing program
+ *   @param[out]  dvr_fd     DVR file descriptor
+ *   @return 1 if has teletext
+ */
+int32_t dvb_getTeletextFD(uint32_t adapter, int32_t *dvr_fd);
+
 uint16_t dvb_getNextSubtitle(EIT_service_t *service, uint16_t subtitle_pid);
 list_element_t* dvb_getNextSubtitleStream(EIT_service_t *service, list_element_t *subtitle);
 uint16_t dvb_getStreamPid(PID_info_t *stream)
@@ -469,11 +472,15 @@ uint16_t dvb_getStreamPid(PID_info_t *stream)
 }
 
 
-/** Function return if there has teletext in playing program
- *   @param[out]  dvr_fd     DVR file descriptor
- *   @return 1 if has teletext
+/** @defgroup dvb_services Workflof with DVB Services list
+ *  @ingroup dvb
+ *  @{
  */
-int32_t dvb_getTeletextFD(uint32_t adapter, int32_t *dvr_fd);
+
+list_element_t *dvb_getSrvices(void);
+int32_t dvb_setSrvices(list_element_t *new_services);
+int32_t dvb_lockSrvices(void);
+int32_t dvb_unlockSrvices(void);
 
 /** @} */
 
