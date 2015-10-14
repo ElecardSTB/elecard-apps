@@ -183,7 +183,7 @@ static int32_t bouquet_uploadAnalogBouquet(const char *bouquetName);
 /*******************************************************************
 * FUNCTION IMPLEMENTATION                                          *
 ********************************************************************/
-static void bouquet_copyToList(typeBouquet_t type, struct list_head *listHead)
+static void bouquet_copyToList(typeBouquet_t type)
 {
 	switch(type) {
 		case eBouquet_digital:
@@ -244,7 +244,7 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 						srvIdx->service->media.dvb_t.plp_id == element->transpounder.media.dvb_t.plp_id) {
 					return 0;
 				}
-				memset(srvIdx->service, 0, sizeof(EIT_service_t));
+                memset(&(srvIdx->service->media), 0, sizeof(EIT_media_config_t));
 			} else {
 				eprintf("ERROR: service not allocated!!!");
 				return -1;
@@ -1371,7 +1371,7 @@ int32_t bouquet_open(typeBouquet_t btype, const char *name, int32_t force)
 		dvbChannel_load();
 		if(name) {
 			bouquet_loadFromFile(eBouquet_digital, name);
-			bouquet_copyToList(eBouquet_digital, dvbChannel_getSortList());
+			bouquet_copyToList(eBouquet_digital);
 
 			//TODO: here need to remove extra services from dvb_services and save channels.conf
 			dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
