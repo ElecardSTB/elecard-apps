@@ -1326,38 +1326,38 @@ void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t 
 
 char *dvb_getTempServiceName(int index)
 {
-	list_element_t *service_element;
-	EIT_service_t *service;
-	int i = 0;
+    list_element_t *service_element;
+    EIT_service_t *service;
+    int i = 0;
     char *ret = NULL;
 
-	dvb_lockSrvices();
-	service_element = dvb_getSrvices();
-	while( service_element != NULL )
-	{
-		if (dvb_hasMedia(service_element->data))
-		{
-			if (i == index)
-			{
-				service = (EIT_service_t *)service_element->data;
-				if (service->common.service_id)
-				{
-					if (service->service_descriptor.service_name[0])
-					{
-						ret = (char *)&service->service_descriptor.service_name[0];
+    dvb_lockSrvices();
+    service_element = dvb_getSrvices();
+    while( service_element != NULL )
+    {
+        if (dvb_hasMediaNB(service_element->data))
+        {
+            if (i == index)
+            {
+                service = (EIT_service_t *)service_element->data;
+                if (service->common.service_id)
+                {
+                    if (service->service_descriptor.service_name[0])
+                    {
+                        ret = (char *)&service->service_descriptor.service_name[0];
                         break;
-					}
-					ret = "N/A";
+                    }
+                    ret = "N/A";
                     break;
-				}
+                }
                 break;
-			}
-			i++;
-		}
-		service_element = service_element->next;
-	}
-	dvb_unlockSrvices();
-	return ret;
+            }
+            i++;
+        }
+        service_element = service_element->next;
+    }
+    dvb_unlockSrvices();
+    return ret;
 }
 
 void dvb_exportServiceList(char* filename)
