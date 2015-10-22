@@ -963,7 +963,7 @@ int offair_play_callback(interfacePlayControlButton_t button, void *pArg)
 		offair_dvbInfo(which);
 		return 0;
 	} else
-#if !STSDK
+#if !(defined STSDK)
 	if(button == interfacePlayControlAudioTracks) {
 		//dprintf("%S: request change tracks\n", __FUNCTION__);
 		if(dvb_getAudioCount(current_service()) > 0) {
@@ -2965,10 +2965,11 @@ static int offair_EPGRecordMenuProcessCommand(interfaceMenu_t *pMenu, pinterface
 			{
 				list_element_t *job_element = NULL;
 				pvrJob_t job;
+				time_t eventOffset = 0;
 				EIT_service_t *service = dvbChannel_getService(pEpg->highlightedService);
 
-				event = (EIT_event_t*)pEpg->highlightedEvent->data;
-				offair_getLocalEventTime(event,&t,&eventOffset);
+				EIT_event_t *event = (EIT_event_t*)pEpg->highlightedEvent->data;
+				offair_getLocalEventTime(event,NULL,&eventOffset);
 				job.type         = pvrJobTypeDVB;
 				job.start_time   = eventOffset;
 				job.end_time     = eventOffset + offair_getEventDuration(event);

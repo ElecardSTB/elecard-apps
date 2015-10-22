@@ -50,7 +50,7 @@ ENABLE_PVR ?= 1
 endif
 
 ENABLE_BROWSER ?= 1
-ENABLE_USE_CJSON := 1
+ENABLE_USE_CJSON := 0
 #KDIR ?= $(KSRC)
 endif #ifeq ($(ARCH),mips)
 

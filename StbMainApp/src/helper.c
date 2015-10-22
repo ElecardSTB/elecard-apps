@@ -569,6 +569,33 @@ static int commonList_cmp_qsort_r(const void *p1, const void *p2, void *pArg)
 	return commonList->compar(*((const void **)p1), *((const void **)p2), commonList->pArg);
 }
 
+#if defined(STBPNX)
+//emulate qsort_r()
+// getted from https://github.com/mozilla/libadb.js/blob/d90624bef3830b357ab907b7b26f1f5f954efbcd/android-tools/libcutils/qsort_r_compat.c
+// TODO: assume this cant be called several times in parallel
+//    otherwise need to add locking by mutex
+
+struct compar_data {
+    void* arg;
+    int (*compar)(const void *, const void *, void *);
+};
+static struct compar_data compar_data;
+
+static int compar_wrapper(const void* a, const void* b) {
+  return compar_data.compar(a, b, compar_data.arg);
+}
+
+static void qsort_r(void *base, size_t nmemb, size_t size,
+            int (*compar)(const void *, const void *, void *),
+            void* arg)
+{
+  compar_data.arg = arg;
+  compar_data.compar = compar;
+  qsort(base, nmemb, size, compar_wrapper);
+}
+
+#endif //#if defined(STBPNX)
+
 
 int32_t commonList_sort(listHead_t *commonList)
 {
