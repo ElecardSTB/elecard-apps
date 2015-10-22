@@ -155,20 +155,20 @@ static const table_IntStr_t delivery_system_desc[] = {
 };
 
 const table_IntStr_t fe_modulationName[] = {
-	{QPSK,		"QPSK"},
-	{QAM_16,	"QAM_16"},
-	{QAM_32,	"QAM_32"},
-	{QAM_64,	"QAM_64"},
-	{QAM_128,	"QAM_128"},
-	{QAM_256,	"QAM_256"},
-	{QAM_AUTO,	"QAM_AUTO"},
-	{VSB_8,		"VSB_8"},
-	{VSB_16,	"VSB_16"},
-	{PSK_8,		"PSK_8"},
-	{APSK_16,	"APSK_16"},
-	{APSK_32,	"APSK_32"},
-	{DQPSK,		"DQPSK"},
-	{QAM_4_NR,	"QAM_4_NR"},
+	{QPSK,		"QPSK"},     //  0
+	{QAM_16,	"QAM_16"},   //  1
+	{QAM_32,	"QAM_32"},   //  2
+	{QAM_64,	"QAM_64"},   //  3
+	{QAM_128,	"QAM_128"},  //  4
+	{QAM_256,	"QAM_256"},  //  5
+	{QAM_AUTO,	"QAM_AUTO"}, //  6
+	{VSB_8,		"VSB_8"},    //  7
+	{VSB_16,	"VSB_16"},   //  8
+	{PSK_8,		"PSK_8"},    //  9
+	{APSK_16,	"APSK_16"},  // 10
+	{APSK_32,	"APSK_32"},  // 11
+	{DQPSK,		"DQPSK"},    // 12
+	{QAM_4_NR,	"QAM_4_NR"}, // 13
 
 	TABLE_INT_STR_END_VALUE,
 };
@@ -842,9 +842,14 @@ static int32_t dvbfe_setParamSTAPISDK(uint32_t adapter, fe_delivery_system_t del
 int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 						EIT_media_config_t *media, dvbfe_cancelFunctionDef* pFunction)
 {
-	uint8_t needTune = 0;
-	fe_delivery_system_t delSys;
-	uint32_t frequency;
+    uint8_t needTune = 0;
+    fe_delivery_system_t delSys;
+    uint32_t frequency;
+    int32_t ret;
+    int32_t hasLock;
+    int32_t hasSignal;
+    int32_t timeout;
+
 
 	if(media == NULL) {
 		eprintf("%s(): Error on tuning adapter%d, bad params!\n", __func__, adapter);
@@ -910,103 +915,113 @@ int32_t dvbfe_setParam(uint32_t adapter, int32_t wait_for_lock,
 			break;
 	}
 
-	if(needTune) {
-		int32_t ret = -1;
+    if(needTune == 0) {
+        //check if tuner locked
+        tunerState_t state;
 
-		eprintf("%s(): Tune adapter=%d tuner, frequency=%uHz\n", __func__, adapter, frequency);
-		switch(g_adapterInfo[adapter].driverType) {
-			case eTunerDriver_linuxDVBapi:
-				ret = dvbfe_setParamLinuxDVBapi(adapter, delSys, frequency, media);
-				break;
-			case eTunerDriver_STAPISDK:
-				ret = dvbfe_setParamSTAPISDK(adapter, delSys, frequency, media);
-				break;
-			default:
-				break;
-		}
-		if(ret != 0) {
-			eprintf("%s(): Tuner %d not tuned on %u\n", __func__, adapter, frequency);
-		}
+        memset(&state, 0, sizeof(state));
+        dvbfe_getSignalInfo(adapter, &state);
+        if(state.fe_status & FE_HAS_LOCK) {
+            //no need to reconfigure tuner
+            return 0;
+        }
+    }
 
-		if(appControlInfo.dvbCommonInfo.adapterSpeed < 0) {
-			wait_for_lock = 0;
-		}
-		if(wait_for_lock) {
-			int32_t hasLock = 0;
-			int32_t hasSignal = 0;
-			int32_t timeout = (appControlInfo.dvbCommonInfo.adapterSpeed + 1);
+    ret = -1;
+    eprintf("%s(): Tune adapter=%d tuner, frequency=%uHz\n", __func__, adapter, frequency);
+    switch(g_adapterInfo[adapter].driverType) {
+        case eTunerDriver_linuxDVBapi:
+            ret = dvbfe_setParamLinuxDVBapi(adapter, delSys, frequency, media);
+            break;
+        case eTunerDriver_STAPISDK:
+            ret = dvbfe_setParamSTAPISDK(adapter, delSys, frequency, media);
+            break;
+        default:
+            break;
+    }
+    if(ret != 0) {
+        eprintf("%s(): Tuner %d not tuned on %u\n", __func__, adapter, frequency);
+    }
 
+    if(appControlInfo.dvbCommonInfo.adapterSpeed < 0) {//is this can happen?
+        wait_for_lock = 0;
+    }
+    if(wait_for_lock == 0) {
+//        eprintf("%s(): g_adapterInfo[%d].fd=%d\n", __func__, adapter, g_adapterInfo[adapter].fd);
+        return 1;//1 mean 'no lock'
+    }
+
+    hasLock = 0;
+    hasSignal = 0;
+    timeout = (appControlInfo.dvbCommonInfo.adapterSpeed + 1);
 #ifdef STBTI
-			timeout *= 10;
+    timeout *= 10;
 #endif
 
-			do {
-				tunerState_t state;
-				uint32_t us;
-				uint32_t i;
+    do {
+        tunerState_t state;
+        uint32_t us;
+        uint32_t i;
 
-				memset(&state, 0, sizeof(state));
-				state.ber = BER_THRESHOLD;
-				dvbfe_getSignalInfo(adapter, &state);
+        memset(&state, 0, sizeof(state));
+        state.ber = BER_THRESHOLD;
+        dvbfe_getSignalInfo(adapter, &state);
 
-				if(state.fe_status & FE_HAS_LOCK) {
-					if(!hasLock) {
-						// locked, give adapter even more time... 
-						dprintf("%s()[%d]: L\n", __func__, adapter);
-					} else {
-						break;
-					}
-					hasLock = 1;
-				} else if(state.fe_status & FE_HAS_SIGNAL) {
-					if(hasSignal == 0) {
-						eprintf("%s()[%d]: Has signal\n", __func__, adapter);
-						// found something above the noise level, increase timeout time 
-						timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
-						hasSignal = 1;
-					}
-					dprintf("%s()[%d]: S (%d)\n", __func__, adapter, timeout);
-				} else {
-					dprintf("%s()[%d]: N (%d)\n", __func__, adapter, timeout);
-					// there's no and never was any signal, reach timeout faster 
-					if(hasSignal == 0) {
-						eprintf("%s()[%d]: Skip\n", __func__, adapter);
-						--timeout;
-					}
-				}
+        if(state.fe_status & FE_HAS_LOCK) {
+            if(!hasLock) {
+                // locked, give adapter even more time... 
+                dprintf("%s()[%d]: L\n", __func__, adapter);
+            } else {
+                break;
+            }
+            hasLock = 1;
+        } else if(state.fe_status & FE_HAS_SIGNAL) {
+            if(hasSignal == 0) {
+                eprintf("%s()[%d]: Has signal\n", __func__, adapter);
+                // found something above the noise level, increase timeout time 
+                timeout += appControlInfo.dvbCommonInfo.adapterSpeed;
+                hasSignal = 1;
+            }
+            dprintf("%s()[%d]: S (%d)\n", __func__, adapter, timeout);
+        } else {
+            dprintf("%s()[%d]: N (%d)\n", __func__, adapter, timeout);
+            // there's no and never was any signal, reach timeout faster 
+            if(hasSignal == 0) {
+                eprintf("%s()[%d]: Skip\n", __func__, adapter);
+                --timeout;
+            }
+        }
 
-				// If ber is not -1, then wait a bit more 
-// 				if(state.ber == 0xffffffff) {
-					dprintf("%s()[%d]: All clear...\n", __func__, adapter);
-					us = 100000;
-// 				} else {
-// 					eprintf("%s()[%d]: Something is out there... (ber %u)\n", __func__, adapter, state.ber);
-// 					us = 500000;
-// 				}
-				usleep(appControlInfo.dvbCommonInfo.adapterSpeed*10000);
+        // If ber is not -1, then wait a bit more 
+//         if(state.ber == 0xffffffff) {
+            dprintf("%s()[%d]: All clear...\n", __func__, adapter);
+            us = 100000;
+//         } else {
+//             eprintf("%s()[%d]: Something is out there... (ber %u)\n", __func__, adapter, state.ber);
+//             us = 500000;
+//         }
+        usleep(appControlInfo.dvbCommonInfo.adapterSpeed*10000);
 
-				for(i = 0; i < us; i += SLEEP_QUANTUM) {
-					if(pFunction && (pFunction() == -1)) {
-						return -1;
-					}
-					if(dvbfe_getSignalInfo(adapter, NULL) == 1) {
-						break;
-					}
-					usleep(SLEEP_QUANTUM);
-				}
+        for(i = 0; i < us; i += SLEEP_QUANTUM) {
+            if(pFunction && (pFunction() == -1)) {
+                return -1;
+            }
+            if(dvbfe_getSignalInfo(adapter, NULL) == 1) {
+                break;
+            }
+            usleep(SLEEP_QUANTUM);
+        }
 
-/*				if((state.ber > 0) && (state.ber < BER_THRESHOLD)) {
-					break;
-				}*/
-			} while(--timeout > 0);
-			dprintf("%s[%d]: %u timeout %d, ber %u\n", __func__, adapter, frequency, timeout, ber);
+//         if((state.ber > 0) && (state.ber < BER_THRESHOLD)) {
+//             break;
+//         }
+    } while(--timeout > 0);
 
-			eprintf("%s(): Frequency set: adapter=%d, hasLock=%d, wait_for_lock=%d\n", __func__, adapter, hasLock, wait_for_lock);
-			return !hasLock;
-		}
-	}
+    dprintf("%s[%d]: %u timeout %d, ber %u\n", __func__, adapter, frequency, timeout, ber);
+    eprintf("%s(): Frequency set: adapter=%d, frequency=%ud, hasLock=%d, wait_for_lock=%d\n",
+            __func__, adapter, frequency, hasLock, wait_for_lock);
 
-	eprintf("%s(): g_adapterInfo[%d].fd=%d\n", __func__, adapter, g_adapterInfo[adapter].fd);
-	return 1;//1 mean 'no lock'
+    return !hasLock;
 }
 
 int32_t dvbfe_checkFrequency(fe_delivery_system_t type, uint32_t frequency, uint32_t adapter,

@@ -1627,7 +1627,7 @@ void offair_startVideo(int which)
 #endif //#if (defined STSDK)
 
 		interface_hideMessageBox();
-    }
+	}
 
 	int audio_type = dvb_getAudioType(service, srvIdx->data.audio_track);
 	int video_type = dvb_getVideoType(service);
@@ -1669,7 +1669,7 @@ static void offair_checkParentControl(int which, DvbParam_t *pParam, int audio_t
 
 	if(srvIdx->data.parent_control == 1) {
 		const char *mask = "\\d{6}";
-		offair_confDvbStart_t start;
+		static offair_confDvbStart_t start;//TODO: use of static variable
 		start.which = which;
 		start.pParam = *pParam;
 		start.audio_type = audio_type;
