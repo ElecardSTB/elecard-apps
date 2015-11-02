@@ -773,62 +773,62 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 
 void offair_stopVideo(int which, int reset)
 {
-	mysem_get(offair_semaphore);
+    mysem_get(offair_semaphore);
 
-	if(appControlInfo.dvbInfo.active) {
-		interface_playControlSelect(interfacePlayControlStop);
+    if(appControlInfo.dvbInfo.active) {
+        interface_playControlSelect(interfacePlayControlStop);
 
 #ifdef ENABLE_DVB_DIAG
-		interface_removeEvent(offair_updatePSI, NULL);
+        interface_removeEvent(offair_updatePSI, NULL);
 #endif
-        mysem_get(epg_semaphore);
+//         mysem_get(epg_semaphore);
         l_epg_thread_alive = 0;
+//         mysem_release(epg_semaphore);
         interface_removeEvent(offair_updateEPG, NULL);
-        mysem_release(epg_semaphore);
 #ifdef ENABLE_STATS
-		interface_removeEvent(offair_updateStatsEvent, NULL);
-		offair_updateStats(which);
+        interface_removeEvent(offair_updateStatsEvent, NULL);
+        offair_updateStats(which);
 #endif
 
 #ifdef ENABLE_MULTI_VIEW
-		offair_multiviewInstance_t multiviewStopInstance;
-		int thread_create = -1;
-		/* Force stop provider in multiview mode */
-		if((appControlInfo.multiviewInfo.count > 0) && (appControlInfo.multiviewInfo.source == streamSourceDVB)) {
-			multiviewStopInstance.stop = 0;
-			multiviewStopInstance.exit = 0;
-			thread_create = pthread_create(&multiviewStopInstance.thread, NULL,  offair_multiviewStopThread,  &multiviewStopInstance);
-		}
-		/* Force stop provider in multiview mode */
-		gfx_stopVideoProvider(which, reset || (appControlInfo.multiviewInfo.count > 0), 1);
-		if(!thread_create) {
-			appControlInfo.multiviewInfo.count = 0;
-			multiviewStopInstance.stop = 1;
-			while(!multiviewStopInstance.exit) {
-				usleep(100000);
-			}
-		}
+        offair_multiviewInstance_t multiviewStopInstance;
+        int thread_create = -1;
+        /* Force stop provider in multiview mode */
+        if((appControlInfo.multiviewInfo.count > 0) && (appControlInfo.multiviewInfo.source == streamSourceDVB)) {
+            multiviewStopInstance.stop = 0;
+            multiviewStopInstance.exit = 0;
+            thread_create = pthread_create(&multiviewStopInstance.thread, NULL,  offair_multiviewStopThread,  &multiviewStopInstance);
+        }
+        /* Force stop provider in multiview mode */
+        gfx_stopVideoProvider(which, reset || (appControlInfo.multiviewInfo.count > 0), 1);
+        if(!thread_create) {
+            appControlInfo.multiviewInfo.count = 0;
+            multiviewStopInstance.stop = 1;
+            while(!multiviewStopInstance.exit) {
+                usleep(100000);
+            }
+        }
 #else
-		gfx_stopVideoProvider(which, reset, 1);
+        gfx_stopVideoProvider(which, reset, 1);
 #endif
+
 #ifdef ENABLE_PVR
-		if(pvr_isRecordingDVB()) {
-			pvr_stopPlayback(screenMain);
-		}
+        if(pvr_isRecordingDVB()) {
+            pvr_stopPlayback(screenMain);
+        }
 #endif
+        dprintf("%s: Stop video \n", __FUNCTION__);
+        teletext_stop();
+        dvb_stopDVB(appControlInfo.dvbInfo.adapter, reset);
+        appControlInfo.dvbInfo.active = 0;
 
-		dprintf("%s: Stop video \n", __FUNCTION__);
-		teletext_stop();
-		dvb_stopDVB(appControlInfo.dvbInfo.adapter, reset);
-		appControlInfo.dvbInfo.active = 0;
+        offair_setStateCheckTimer(which, 0);
+        offair_setInfoUpdateTimer(which, 0);
 
-		offair_setStateCheckTimer(which, 0);
-		offair_setInfoUpdateTimer(which, 0);
+        interface_disableBackground();
+    }
 
-		interface_disableBackground();
-	}
-
-	mysem_release(offair_semaphore);
+    mysem_release(offair_semaphore);
 }
 
 #if !(defined STSDK)
@@ -3758,44 +3758,44 @@ static int offair_updateEPG(void* pArg)
     dprintf("%s: in\n", __FUNCTION__);
 
     if(service == NULL) {
-        dprintf("offair: Can't update EPG: service %d is null\n",appControlInfo.dvbInfo.channel);
+        dprintf("offair: Can't update EPG: service %d is null\n", appControlInfo.dvbInfo.channel);
         return -1;
     }
 
     mysem_get(epg_semaphore);
-    if(l_epg_thread_alive == 0) {
+    // can be 0 if we switched from DVB when already updating
+    if(!appControlInfo.dvbInfo.active
+       || (my_channel != appControlInfo.dvbInfo.channel)
+       || (l_epg_thread_alive == 0))
+    {
         mysem_release(epg_semaphore);
         return 0;
     }
-/*    dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
-    if(appControlInfo.dvbInfo.scanPSI) {
-        offair_updatePSI(pArg);
-    }*/
+//     dprintf("%s: Check PSI: %d, diag mode %d\n", __FUNCTION__, appControlInfo.dvbInfo.scanPSI, appControlInfo.offairInfo.diagnosticsMode);
+//     if(appControlInfo.dvbInfo.scanPSI) {
+//         offair_updatePSI(pArg);
+//     }
 
-    if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel) {// can be 0 if we switched from DVB when already updating
-        dprintf("%s: scan for epg\n", __FUNCTION__);
+    dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
+    dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
+    dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
 
-        dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
-        dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
-        dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
-
-        dprintf("%s: if active\n", __FUNCTION__);
-
-        if(appControlInfo.dvbInfo.active && my_channel == appControlInfo.dvbInfo.channel ) {// can be 0 if we switched from DVB when already updating
-            dprintf("%s: refresh event\n", __FUNCTION__);
-
-            if(appControlInfo.dvbInfo.active) {
-                dvb_lockSrvices();
-                service = current_service();
-                if(service) {
-                    offair_getServiceDescription(service, desc, _T("DVB_CHANNELS"));
-                    interface_playControlUpdateDescription(desc);
-                    interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
-                }
-                dvb_unlockSrvices();
-            }
-        }
+    //double check after dvb_scanForEPG()
+    // can be 0 if we switched from DVB when already updating
+    if(!appControlInfo.dvbInfo.active
+       || (my_channel != appControlInfo.dvbInfo.channel)
+       || (l_epg_thread_alive == 0))
+    {
+        mysem_release(epg_semaphore);
+        return 0;
     }
+
+    dvb_lockSrvices();
+    offair_getServiceDescription(service, desc, _T("DVB_CHANNELS"));
+    dvb_unlockSrvices();
+    dprintf("%s: refresh event\n", __FUNCTION__);
+    interface_playControlUpdateDescription(desc);
+    interface_addEvent(offair_updateEPG, pArg, EPG_UPDATE_INTERVAL, 1);
 
     dprintf("%s: update epg out\n", __FUNCTION__);
     mysem_release(epg_semaphore);
