@@ -155,22 +155,22 @@ static const table_IntStr_t delivery_system_desc[] = {
 };
 
 const table_IntStr_t fe_modulationName[] = {
-	{QPSK,		"QPSK"},     //  0
-	{QAM_16,	"QAM_16"},   //  1
-	{QAM_32,	"QAM_32"},   //  2
-	{QAM_64,	"QAM_64"},   //  3
-	{QAM_128,	"QAM_128"},  //  4
-	{QAM_256,	"QAM_256"},  //  5
-	{QAM_AUTO,	"QAM_AUTO"}, //  6
-	{VSB_8,		"VSB_8"},    //  7
-	{VSB_16,	"VSB_16"},   //  8
-	{PSK_8,		"PSK_8"},    //  9
-	{APSK_16,	"APSK_16"},  // 10
-	{APSK_32,	"APSK_32"},  // 11
-	{DQPSK,		"DQPSK"},    // 12
-	{QAM_4_NR,	"QAM_4_NR"}, // 13
+    {QPSK,     "QPSK"},     //  0
+    {QAM_16,   "QAM_16"},   //  1
+    {QAM_32,   "QAM_32"},   //  2
+    {QAM_64,   "QAM_64"},   //  3
+    {QAM_128,  "QAM_128"},  //  4
+    {QAM_256,  "QAM_256"},  //  5
+    {QAM_AUTO, "QAM_AUTO"}, //  6
+    {VSB_8,    "VSB_8"},    //  7
+    {VSB_16,   "VSB_16"},   //  8
+    {PSK_8,    "PSK_8"},    //  9
+    {APSK_16,  "APSK_16"},  // 10
+    {APSK_32,  "APSK_32"},  // 11
+    {DQPSK,    "DQPSK"},    // 12
+    {QAM_4_NR, "QAM_4_NR"}, // 13
 
-	TABLE_INT_STR_END_VALUE,
+    TABLE_INT_STR_END_VALUE,
 };
 
 /******************************************************************

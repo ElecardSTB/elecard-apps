@@ -353,15 +353,17 @@ int st_rpcSyncTimeout(elcdRpcCommand_t cmd, cJSON* params, int timeout , elcdRpc
 
 int st_isOk(elcdRpcType_t type, cJSON *res, const char *msg)
 {
-	if ( type != elcdRpcResult || !res || res->type != cJSON_String ) {
-		eprintf("%s failed: %s\n", msg, res&&res->type==cJSON_String?res->valuestring:"unknown error");
-		return 0;
-	}
-	if ( strcmp(res->valuestring, "ok") ) {
-		eprintf("%s not successfull: %s\n", msg, res->valuestring);
-		return 0;
-	}
-	return 1;
+    int32_t res_hasString = (res && (res->type == cJSON_String) && res->valuestring) ? 1 : 0;
+
+    if((type != elcdRpcResult) || !res_hasString) {
+        eprintf("%s failed: %s\n", msg, res_hasString ? res->valuestring : "unknown error");
+        return 0;
+    }
+    if(strcmp(res->valuestring, "ok") != 0) {
+        eprintf("%s not successfull: %s\n", msg, res->valuestring);
+        return 0;
+    }
+    return 1;
 }
 
 static void st_poolThreadCleanup(void* pArg)
