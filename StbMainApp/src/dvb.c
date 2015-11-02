@@ -194,32 +194,32 @@ struct dvb_instance {
 
 
 struct section_buf {
-	struct list_head list;
-	uint32_t adapter;
-	int fd;
-	int pid;
-	int table_id;
-	int table_id_ext;
-	int section_version_number;
-	uint8_t section_done[32];
-	int sectionfilter_done;
-	uint8_t buf[BUFFER_SIZE];
-	time_t timeout;
-	time_t start_time;
-	time_t running_time;
-	uint16_t transport_stream_id;
-	int is_dynamic;
-	int was_updated;
-	list_element_t **service_list;
-	EIT_media_config_t *media;
-	int *running_counter; // if not null, used as reference counter by this and child (PAT->PMT) filters
-	struct section_buf *next_seg;  /* this is used to handle
-									* segmented tables (like NIT-other)
-									*/
+    struct list_head list;
+    uint32_t adapter;
+    int32_t  fd;
+    int32_t  pid;
+    int32_t  table_id;
+    int32_t  table_id_ext;
+    int32_t  section_version_number;
+    uint8_t  section_done[32];
+    int32_t  sectionfilter_done;
+    uint8_t  buf[BUFFER_SIZE];
+    time_t   timeout;
+    time_t   start_time;
+    time_t   running_time;
+    uint16_t transport_stream_id;
+    int32_t  is_dynamic;
+    int32_t  was_updated;
+    list_element_t **service_list;
+    EIT_media_config_t *media;
 
-	struct pollfd	*poll_fd;
+    // the next is used to handle
+    // segmented tables (like NIT-other)
+    struct section_buf *next_seg;
+
+    struct pollfd	*poll_fd;
 #if (defined STSDK)
-	int32_t	pipeId;
+    int32_t  pipeId;
 #endif
 };
 
@@ -232,15 +232,14 @@ static list_element_t *l_dvb_services = NULL;
 static LIST_HEAD(running_filters);
 static LIST_HEAD(waiting_filters);
 static int n_running = 0;
-static int lock_filters = 1;
-static inline void dvb_filtersLock(void)   { lock_filters = 1; }
-static inline void dvb_filtersUnlock(void) { lock_filters = 0; }
+static int l_filtersEnabled = 0;
 
 static struct dvb_instance dvbInstances[MAX_ADAPTER_SUPPORTED];
 
 static pmysem_t dvb_semaphore;
-static pmysem_t scan_semaphore;
 static pmysem_t dvb_filter_semaphore;
+static pmysem_t dvb_filter_running_list_semaphore;
+static pmysem_t dvb_filter_waiting_list_semaphore;
 static NIT_table_t dvb_scan_network;
 
 //char scan_messages[64*1024];
@@ -256,51 +255,65 @@ static int dvb_hasMediaNB(EIT_service_t *service);
 
 static inline int isSubtitle( PID_info_t* stream)
 {
-	return stream->component_descriptor.stream_content == 0x03 &&
-	       stream->component_descriptor.component_type >= 0x10 &&
-	       stream->component_descriptor.component_type <= 0x15;
+    return stream->component_descriptor.stream_content == 0x03 &&
+           stream->component_descriptor.component_type >= 0x10 &&
+           stream->component_descriptor.component_type <= 0x15;
 }
 
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
+static inline void dvb_filtersEnable(void)
+{
+//    mysem_get(dvb_filter_semaphore);
+    l_filtersEnabled = 1;
+}
+
+static inline void dvb_filtersDisable(void)
+{
+    l_filtersEnabled = 0;
+//    mysem_release(dvb_filter_semaphore);
+}
 
 static int32_t dvb_getPollFds(struct pollfd **fds, nfds_t *count)
 {
-	struct list_head *pos;
-	struct section_buf* s;
-	int32_t i;
-	int32_t ret = 0;
-	static struct pollfd poll_fds[MAX_RUNNING];
+    struct list_head *pos;
+    struct section_buf* s;
+    int32_t i;
+    int32_t ret = 0;
+    static struct pollfd poll_fds[MAX_RUNNING];
 
-/*	for(i = 0; i < MAX_RUNNING; i++) {
-		poll_fds[i].fd = -1;
-	}*/
-	i = 0;
-	list_for_each(pos, &running_filters) {
-		if(i >= MAX_RUNNING) {
-			fatal("%s: too many poll_fds\n", __FUNCTION__);
-		}
-		s = list_entry(pos, struct section_buf, list);
-		if(s->fd == -1) {
-			fatal("%s: s->fd == -1 on running_filters\n", __FUNCTION__);
-		}
-		poll_fds[i].fd = s->fd;
-		poll_fds[i].events = POLLIN;
-		poll_fds[i].revents = 0;
-		s->poll_fd = poll_fds + i;
-		i++;
-	}
+//     for(i = 0; i < MAX_RUNNING; i++) {
+//         poll_fds[i].fd = -1;
+//     }
 
-	if(i != n_running) {
-		fatal("%s: n_running is hosed: i=%d, n_running=%d\n", __FUNCTION__, i, n_running);
-		n_running = i;
-		ret = -1;
-	}
-	*fds = poll_fds;
-	*count = n_running;
+    i = 0;
+    mysem_get(dvb_filter_running_list_semaphore);
+    list_for_each(pos, &running_filters) {
+        if(i >= MAX_RUNNING) {
+            fatal("%s: too many poll_fds\n", __FUNCTION__);
+        }
+        s = list_entry(pos, struct section_buf, list);
+        if(s->fd == -1) {
+            fatal("%s: s->fd == -1 on running_filters\n", __FUNCTION__);
+        }
+        poll_fds[i].fd = s->fd;
+        poll_fds[i].events = POLLIN;
+        poll_fds[i].revents = 0;
+        s->poll_fd = poll_fds + i;
+        i++;
+    }
+    mysem_release(dvb_filter_running_list_semaphore);
 
-	return ret;
+    if(i != n_running) {
+        fatal("%s: n_running is hosed: i=%d, n_running=%d\n", __FUNCTION__, i, n_running);
+        n_running = i;
+        ret = -1;
+    }
+    *fds = poll_fds;
+    *count = n_running;
+
+    return ret;
 }
 
 #if (defined LINUX_DVB_API_DEMUX)
@@ -468,8 +481,7 @@ static int32_t dvb_filterStart_arch(struct section_buf* s)
 	}
 
 	st_rpcSync(elcmd_TSsectionStreamOn, params, &type, &result);
-	if(result && (result->valuestring != NULL) &&
-		(strcmp(result->valuestring, "ok") == 0)) {
+	if(st_isOk(type, result, "elcmd_TSsectionStreamOn")) {
 		ret = 0;
 	}
 
@@ -509,9 +521,6 @@ static int dvb_filterStart(struct section_buf* s)
 
 	s->sectionfilter_done = 0;
 	time(&s->start_time);
-	if(s->running_counter != NULL) {
-		(*s->running_counter)++;
-	}
 	s->poll_fd = NULL;
 
 	n_running++;
@@ -531,9 +540,6 @@ static int32_t dvb_filterStop(struct section_buf *s)
 	(void)ret;
 
 	s->running_time += time(NULL) - s->start_time;
-	if(s->running_counter != NULL) {
-		(*s->running_counter)--;
-	}
 
 	n_running--;
 
@@ -542,56 +548,67 @@ static int32_t dvb_filterStop(struct section_buf *s)
 
 static int32_t dvb_filterRemove(struct section_buf *s)
 {
-	dvb_filterStop(s);
-	list_del(&s->list);
-	if(s->is_dynamic) {
-		debug("%s: free dynamic filter\n", __FUNCTION__);
-		dfree(s);
-	}
-	debug("%s: start waiting filters\n", __FUNCTION__);
+    dvb_filterStop(s);
+    list_del(&s->list);
+    if(s->is_dynamic) {
+        debug("%s: free dynamic filter\n", __FUNCTION__);
+        dfree(s);
+    }
+    debug("%s: start waiting filters\n", __FUNCTION__);
 
-	return 0;
+    return 0;
 }
 
 static void dvb_filterAdd(struct section_buf *s)
 {
-	if(!lock_filters) {
-		if(dvb_filterStart(s) == 0) {
-			list_add(&s->list, &running_filters);
-		} else {
-			if(!list_empty(&running_filters)) {
-				//add to waiting queue if there are any filter started
-				//to prevent infinty loop
-				list_add_tail(&s->list, &waiting_filters);
-			}
-		}
-	} else {
-		dvb_filterRemove(s);
-	}
+    int32_t ret;
+    if(!l_filtersEnabled) {
+        return;
+    }
+    ret = dvb_filterStart(s);
+    mysem_get(dvb_filter_running_list_semaphore);
+    if(ret == 0) {
+        list_add(&s->list, &running_filters);
+    } else {
+        if(!list_empty(&running_filters)) {
+            //add to waiting queue if there are any filter started
+            //to prevent infinty loop
+            mysem_get(dvb_filter_waiting_list_semaphore);
+            list_add_tail(&s->list, &waiting_filters);
+            mysem_release(dvb_filter_waiting_list_semaphore);
+        }
+    }
+    mysem_release(dvb_filter_running_list_semaphore);
 }
 
 static int32_t dvb_filterPushWaiters(void)
 {
-	struct list_head *pos;
-	struct list_head *n;
+    struct list_head *pos;
+    struct list_head *n;
 
-	list_for_each_safe(pos, n, &waiting_filters) {
-		struct section_buf *s;
-		s = list_entry(pos, struct section_buf, list);
+    mysem_get(dvb_filter_waiting_list_semaphore);
+    list_for_each_safe(pos, n, &waiting_filters) {
+        int32_t ret;
+        struct section_buf *s;
+        s = list_entry(pos, struct section_buf, list);
 
-		//dvb_filterAdd(s);
-		if(dvb_filterStart(s) == 0) {
-			list_del(pos);//remove from waiting_filters
-			list_add(&s->list, &running_filters);
-		} else {
-			if(list_empty(&running_filters)) {
-				printf("%s:%s()[%d]: Dropping: s->pid=0x%04x, s->table_id=0x%02x, table_id_ext=0x%04x\n", __FILE__, __func__, __LINE__, s->pid, s->table_id, s->table_id_ext);
-				dvb_filterRemove(s);
-			}
-		}
-	}
+        //dvb_filterAdd(s);
+        ret = dvb_filterStart(s);
+        mysem_get(dvb_filter_running_list_semaphore);
+        if(ret == 0) {
+            list_del(pos);//remove from waiting_filters
+            list_add(&s->list, &running_filters);
+        } else {
+            if(list_empty(&running_filters)) {
+                printf("%s:%s()[%d]: Dropping: s->pid=0x%04x, s->table_id=0x%02x, table_id_ext=0x%04x\n", __FILE__, __func__, __LINE__, s->pid, s->table_id, s->table_id_ext);
+                dvb_filterRemove(s);
+            }
+        }
+        mysem_release(dvb_filter_running_list_semaphore);
+    }
+    mysem_release(dvb_filter_waiting_list_semaphore);
 
-	return 0;
+    return 0;
 }
 
 static void dvb_filterSetup(struct section_buf* s, uint32_t adapter,
@@ -615,22 +632,28 @@ static void dvb_filterSetup(struct section_buf* s, uint32_t adapter,
 
 static int32_t dvb_filtersFlush(void)
 {
-	struct list_head *pos;
-	struct list_head *n;
+    struct list_head *pos;
+    struct list_head *n;
 
-	dvb_filtersLock();
+    l_filtersEnabled = 0;
 
-	/* Flush waiting filter pool */
-	list_for_each_safe(pos, n, &waiting_filters) {
-		struct section_buf *s = list_entry(pos, struct section_buf, list);
-		dvb_filterRemove(s);
-	};
-	/* Flush running filter pool */
-	list_for_each_safe(pos, n, &running_filters) {
-		struct section_buf *s = list_entry(pos, struct section_buf, list);
-		dvb_filterRemove(s);
-	};
-	return 0;
+    /* Flush waiting filter pool */
+    mysem_get(dvb_filter_waiting_list_semaphore);
+    list_for_each_safe(pos, n, &waiting_filters) {
+        struct section_buf *s = list_entry(pos, struct section_buf, list);
+        dvb_filterRemove(s);
+    };
+    mysem_release(dvb_filter_waiting_list_semaphore);
+
+    /* Flush running filter pool */
+    mysem_get(dvb_filter_running_list_semaphore);
+    list_for_each_safe(pos, n, &running_filters) {
+        struct section_buf *s = list_entry(pos, struct section_buf, list);
+        dvb_filterRemove(s);
+    };
+    mysem_release(dvb_filter_running_list_semaphore);
+
+    return 0;
 }
 
 static int get_bit (unsigned char *bitfield, int bit)
@@ -932,8 +955,10 @@ static int dvb_sectionParse(struct section_buf *s)
 							dvb_filterSetup(pmt_filter, s->adapter, service->program_map.program_map_PID, 0x02, 2, services, s->media);
 							pmt_filter->transport_stream_id = service->common.transport_stream_id;
 							pmt_filter->is_dynamic = 1;
-							pmt_filter->running_counter = s->running_counter;
-							dvb_filterAdd(pmt_filter);
+
+                            mysem_get(dvb_filter_waiting_list_semaphore);
+                            list_add_tail(&pmt_filter->list, &waiting_filters);
+                            mysem_release(dvb_filter_waiting_list_semaphore);
 						}
 					}
 					cur = cur->next;
@@ -1087,43 +1112,49 @@ static int32_t dvb_sectionRead(struct section_buf *s)
 
 static void dvb_filtersRead(void)
 {
-	struct list_head *pos;
-	struct list_head *n;
-	struct pollfd *fds;
-	nfds_t nfds;
-//	int32_t ret;
+    struct list_head *pos;
+    struct list_head *n;
+    struct pollfd *fds;
+    nfds_t nfds;
 
-	mysem_get(dvb_filter_semaphore);
+    dvb_getPollFds(&fds, &nfds);
+    if(poll(fds, nfds, 1000) == -1) {
+        PERROR("%s: filter poll failed", __FUNCTION__);
+    }
 
-	dvb_getPollFds(&fds, &nfds);
-	if(poll(fds, nfds, 1000) == -1) {
-		PERROR("%s: filter poll failed", __FUNCTION__);
-	}
+    mysem_get(dvb_filter_running_list_semaphore);
+    list_for_each_safe(pos, n, &running_filters) {
+        int32_t done = 0;
+        struct section_buf *s = list_entry(pos, struct section_buf, list);
 
-	list_for_each_safe(pos, n, &running_filters) {
-		int32_t done = 0;
-		struct section_buf *s = list_entry(pos, struct section_buf, list);
+        if(s->poll_fd && s->poll_fd->revents) {
+            if(dvb_sectionRead(s) == 1) {
+                done = 1;
+            }
+        }
 
-		if(!s) {
-			fatal("%s: s is NULL\n", __FUNCTION__);
-			continue;
-		}
+        if(done) {
+            dvb_filterRemove(s);
+        } else if(time(NULL) > (s->start_time + s->timeout)) {
+            SCAN_MESSAGE("DVB: filter timeout pid 0x%04x\n", s->pid);
+            debug("%s: filter timeout pid 0x%04x\n", __FUNCTION__, s->pid);
+            dvb_filterRemove(s);
+        }
+    }
+    mysem_release(dvb_filter_running_list_semaphore);
+    dvb_filterPushWaiters();
+}
 
-		if(s->poll_fd && s->poll_fd->revents && (dvb_sectionRead(s) == 1)) {
-			done = 1;
-		}
+static int32_t dvb_filtersHasAny(void)
+{
+    int32_t hasAny;
+    mysem_get(dvb_filter_running_list_semaphore);
+    mysem_get(dvb_filter_waiting_list_semaphore);
+    hasAny = list_empty(&running_filters) && list_empty(&waiting_filters);
+    mysem_release(dvb_filter_waiting_list_semaphore);
+    mysem_release(dvb_filter_running_list_semaphore);
 
-		if(done) {
-			dvb_filterRemove(s);
-		} else if(time(NULL) > (s->start_time + s->timeout)) {
-			SCAN_MESSAGE("DVB: filter timeout pid 0x%04x\n", s->pid);
-			debug("%s: filter timeout pid 0x%04x\n", __FUNCTION__, s->pid);
-			dvb_filterRemove(s);
-		}
-		dvb_filterPushWaiters();
-	}
-
-	mysem_release(dvb_filter_semaphore);
+    return hasAny ? 1 : 0;
 }
 
 /*
@@ -1156,8 +1187,8 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 		return -1;
 	}
 
-	mysem_get(scan_semaphore);
-	dvb_filtersUnlock();
+	mysem_get(dvb_filter_semaphore);
+	dvb_filtersEnable();
 
 	if(service->flags & serviceFlagHasPAT) {
 		struct section_buf pmt_filter;
@@ -1183,11 +1214,10 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 
 	do {
 		dvb_filtersRead();
-	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
+	} while(dvb_filtersHasAny());
 
-	dvb_filtersLock();
-	dvb_filtersFlush();
-	mysem_release(scan_semaphore);
+	dvb_filtersDisable();
+	mysem_release(dvb_filter_semaphore);
 
 	return -1;
 }
@@ -1196,55 +1226,55 @@ static void dvb_scanForServices(uint32_t adapter, uint32_t enableNit, EIT_media_
 {
     list_element_t **pp_dvb_services = dvb_getSrvicesPP();
 
-	struct section_buf pat_filter;
-	//struct section_buf sdt1_filter;
-	struct section_buf eit_filter;
-	struct section_buf nit_filter;
+    struct section_buf pat_filter;
+    //struct section_buf sdt1_filter;
+    struct section_buf eit_filter;
 
-	mysem_get(scan_semaphore);
-	dvb_filtersUnlock();
+    mysem_get(dvb_filter_semaphore);
+    dvb_filtersEnable();
 
-	/**
-	*  filter timeouts > min repetition rates specified in ETR211
-	*/
-	dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, pp_dvb_services, media); /* PAT */
-	//dvb_filterSetup(&sdt1_filter, adapter, 0x11, 0x46, 5, pp_dvb_services, media); /* SDT other */
-	dvb_filterSetup(&eit_filter, adapter, 0x12,   -1, 5, pp_dvb_services, media); /* EIT */
+    /**
+    *  filter timeouts > min repetition rates specified in ETR211
+    */
+    dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 5, pp_dvb_services, media); /* PAT */
+    //dvb_filterSetup(&sdt1_filter, adapter, 0x11, 0x46, 5, pp_dvb_services, media); /* SDT other */
+    dvb_filterSetup(&eit_filter, adapter, 0x12,   -1, 5, pp_dvb_services, media); /* EIT */
 
-	dvb_filterAdd(&pat_filter);
-	//dvb_filterAdd(&sdt1_filter);
-	dvb_filterAdd(&eit_filter);
+    dvb_filterAdd(&pat_filter);
+    //dvb_filterAdd(&sdt1_filter);
+    dvb_filterAdd(&eit_filter);
 
-	if((dvbfe_getType(adapter) == SYS_ATSC) || (dvbfe_getType(adapter) == SYS_DVBC_ANNEX_B)) {
+    if((dvbfe_getType(adapter) == SYS_ATSC) || (dvbfe_getType(adapter) == SYS_DVBC_ANNEX_B)) {
 #if (defined ENABLE_USE_DVB_APPS)
-		struct section_buf tvct_filter;
-		struct section_buf cvct_filter;
-		dvb_filterSetup(&tvct_filter, adapter, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, pp_dvb_services, media); //Terrestrial Virtual Channel Table (TVCT)
-		dvb_filterAdd(&tvct_filter);
-		dvb_filterSetup(&cvct_filter, adapter, 0x1ffb, stag_atsc_cable_virtual_channel, 5, pp_dvb_services, media); //Cable Virtual Channel Table (CVCT)
-		dvb_filterAdd(&cvct_filter);
+        struct section_buf tvct_filter;
+        struct section_buf cvct_filter;
+        dvb_filterSetup(&tvct_filter, adapter, 0x1ffb, stag_atsc_terrestrial_virtual_channel, 5, pp_dvb_services, media); //Terrestrial Virtual Channel Table (TVCT)
+        dvb_filterAdd(&tvct_filter);
+        dvb_filterSetup(&cvct_filter, adapter, 0x1ffb, stag_atsc_cable_virtual_channel, 5, pp_dvb_services, media); //Cable Virtual Channel Table (CVCT)
+        dvb_filterAdd(&cvct_filter);
 #endif
-	} else {
-		struct section_buf sdt_filter;
-		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, pp_dvb_services, media); /* SDT actual */
-		dvb_filterAdd(&sdt_filter);
-	}
+    } else {
+        struct section_buf sdt_filter;
+        dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, pp_dvb_services, media); /* SDT actual */
+        dvb_filterAdd(&sdt_filter);
+    }
 
-	if(enableNit) {
-		dvb_clearNIT(&dvb_scan_network);
-		dvb_filterSetup(&nit_filter, adapter, 0x10, 0x40, 5, pp_dvb_services, media); /* NIT */
-		dvb_filterAdd(&nit_filter);
-	}
+    if(enableNit) {
+        struct section_buf nit_filter;
+        dvb_clearNIT(&dvb_scan_network);
+        dvb_filterSetup(&nit_filter, adapter, 0x10, 0x40, 5, pp_dvb_services, media); /* NIT */
+        dvb_filterAdd(&nit_filter);
+    }
 
-	do {
-		dvb_filtersRead();
-	} while(!list_empty(&running_filters) || !list_empty(&waiting_filters));
+    do {
+        dvb_filtersRead();
+    } while(dvb_filtersHasAny());
 
-	dvb_filtersFlush();
-	dvb_filtersLock();
-	mysem_release(scan_semaphore);
+    dvb_filtersDisable();
+    mysem_release(dvb_filter_semaphore);
 
-	//dvb_filterServices(pp_dvb_services);
+
+    //dvb_filterServices(pp_dvb_services);
 }
 
 int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service)
@@ -1273,53 +1303,50 @@ int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service)
 void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media)
 {
     list_element_t **pp_dvb_services = dvb_getSrvicesPP();
-	struct section_buf eit_filter;
-	int counter = 0;
+    struct section_buf eit_filter;
 
-	dvb_filtersUnlock();
+    dvb_filtersEnable();
 
-	dvb_filterSetup(&eit_filter, adapter, 0x12, -1, 2, pp_dvb_services, media); /* EIT */
-	eit_filter.running_counter = &counter;
-	dvb_filterAdd(&eit_filter);
-	do {
-		mysem_get(scan_semaphore);
-		dvb_filtersRead();
-		mysem_release(scan_semaphore);
-		//dprintf("DVB: eit %d, counter %d\n", eit_filter.start_time, counter);
-		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
-	} while((eit_filter.start_time == 0) || (counter > 0));
-	//dvb_filterServices(pp_dvb_services);
+    dvb_filterSetup(&eit_filter, adapter, 0x12, -1, 2, pp_dvb_services, media); /* EIT */
+    dvb_filterAdd(&eit_filter);
 
-	dvb_filtersLock();
+    do {
+        mysem_get(dvb_filter_semaphore);
+        dvb_filtersRead();
+        mysem_release(dvb_filter_semaphore);
+        //dprintf("DVB: eit %d\n", eit_filter.start_time);
+        usleep(1); // pass control to other threads that may want to call dvb_filtersRead
+    } while(dvb_filtersHasAny());
+    //dvb_filterServices(pp_dvb_services);
 
-	if(eit_filter.was_updated) {
-		/* Write the channel list to the root file system */
-		dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
-	}
+    dvb_filtersDisable();
+
+    if(eit_filter.was_updated) {
+        /* Write the channel list to the root file system */
+        dvb_exportServiceList(appControlInfo.dvbCommonInfo.channelConfigFile);
+    }
 }
 
 void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t **out_list)
 {
 	struct section_buf pat_filter;
-	int counter = 0;
 
 	if(out_list == NULL) {
 		out_list = dvb_getSrvicesPP();
 	}
-	dvb_filtersUnlock();
+	dvb_filtersEnable();
 
 	dvb_filterSetup(&pat_filter, adapter, 0x00, 0x00, 2, out_list, media); /* PAT */
-	pat_filter.running_counter = &counter;
 	dvb_filterAdd(&pat_filter);
 	do {
-		mysem_get(scan_semaphore);
+		mysem_get(dvb_filter_semaphore);
 		dvb_filtersRead();
-		mysem_release(scan_semaphore);
-		//dprintf("DVB: pat %d, counter %d\n", pat_filter.start_time, counter);
+		mysem_release(dvb_filter_semaphore);
+		//dprintf("DVB: pat %d\n", pat_filter.start_time);
 		usleep(1); // pass control to other threads that may want to call dvb_filtersRead
-	} while((pat_filter.start_time == 0) || (counter > 0));
+	} while(dvb_filtersHasAny());
 
-	dvb_filtersLock();
+	dvb_filtersDisable();
 
 	//dvb_filterServices(out_list);
 }
@@ -2920,7 +2947,6 @@ int dvb_startDVB(DvbParam_t *pParam)
 	}
 
 	dvb_filtersFlush();
-	dvb_filtersUnlock();
 
 	struct dvb_instance *dvb = &dvbInstances[pParam->adapter];
 	dvb_instanceReset(dvb, pParam->adapter);
@@ -3043,37 +3069,38 @@ void dvb_stopDVB(uint32_t adapter, int reset)
 
 void dvb_init(void)
 {
-	dprintf("%s: in\n", __FUNCTION__);
+    dprintf("%s: in\n", __FUNCTION__);
 
-	mysem_create(&dvb_semaphore);
-	mysem_create(&scan_semaphore);
-	mysem_create(&dvb_filter_semaphore);
+    mysem_create(&dvb_semaphore);
+    mysem_create(&dvb_filter_semaphore);
+    mysem_create(&dvb_filter_running_list_semaphore);
+    mysem_create(&dvb_filter_waiting_list_semaphore);
 
-	dvbfe_init();
-	dvbChannel_init();
-	bouquet_init();
+    dvbfe_init();
+    dvbChannel_init();
+    bouquet_init();
 
-	dprintf("%s: out\n", __FUNCTION__);
+    dprintf("%s: out\n", __FUNCTION__);
 }
 
 void dvb_terminate(void)
 {
-	int i;
+    int i;
 
-	for(i = 0; i < MAX_ADAPTER_SUPPORTED; i++) {
-		dvb_stopDVB(i, 1);
-	}
+    for(i = 0; i < MAX_ADAPTER_SUPPORTED; i++) {
+        dvb_stopDVB(i, 1);
+    }
 
-	bouquet_terminate();
-	dvbChannel_terminate();
-	dvbfe_terminate();
+    bouquet_terminate();
+    dvbChannel_terminate();
+    dvbfe_terminate();
 
-	free_services(dvb_getSrvicesPP());
+    free_services(dvb_getSrvicesPP());
 
-	mysem_destroy(dvb_semaphore);
-	mysem_destroy(scan_semaphore);
-	mysem_destroy(dvb_filter_semaphore);
-
+    mysem_destroy(dvb_semaphore);
+    mysem_destroy(dvb_filter_semaphore);
+    mysem_destroy(dvb_filter_running_list_semaphore);
+    mysem_destroy(dvb_filter_waiting_list_semaphore);
 }
 
 #ifdef ENABLE_DVB_PVR
