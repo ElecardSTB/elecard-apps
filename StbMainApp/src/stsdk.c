@@ -448,7 +448,10 @@ type_known:
 				for( i = 0; i < RPC_POOL_SIZE; i++ )
 					if( (unsigned int)id->valueint == pool.waiting[i].id )
 					{
-						pool.waiting[i].callback( type, value, pool.waiting[i].pArg );
+                        if(pool.waiting[i].callback)
+                        {
+                            pool.waiting[i].callback( type, value, pool.waiting[i].pArg );
+                        }
 						st_poolFreeAt(i);
 						break;
 					}
