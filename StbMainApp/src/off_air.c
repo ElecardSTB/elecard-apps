@@ -2352,7 +2352,8 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	GLAW_EFFECT;
 	/* Timeline stamps */
 	event_tt = pEpg->curOffset;
-	strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
+	//strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
+	strftime( buf, 25, "%d-%m-%Y", localtime(&event_tt));
 	gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, interfaceInfo.clientX + interfaceInfo.paddingSize, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
 	for(i = 0; i < pEpg->displayingHours; i++) {
 		strftime( buf, 10, "%H:%M", localtime(&event_tt));
@@ -2604,7 +2605,8 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 
 			if(offair_getLocalEventTime(event, &event_tm, &event_tt) == 0)
 			{
-				strftime( buf, 25, _T("DATESTAMP"), &event_tm);
+				//strftime( buf, 25, _T("DATESTAMP"), &event_tm);
+				strftime( buf, 25, "%d-%m-%Y", &event_tm);
 				DFBCHECK( pgfx_font->GetStringExtents(pgfx_font, buf, -1, &rect, NULL) );
 				gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, x, y+rect.h - interfaceInfo.paddingSize, str, 0, 0);
 // 				x += ERM_CHANNEL_NAME_LENGTH + interfaceInfo.paddingSize;
