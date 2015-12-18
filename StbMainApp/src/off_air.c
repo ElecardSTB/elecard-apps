@@ -2351,8 +2351,18 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 	gfx_drawRectangle(DRAWING_SURFACE, r, g, b, a, x, y, w, fh);
 	GLAW_EFFECT;
 	/* Timeline stamps */
-	event_tt = pEpg->curOffset;
-	strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
+	if(pEpg->highlightedEvent == NULL) {
+		event_tt = pEpg->curOffset;
+		strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
+	}
+	else {
+		// show top-left date for selected program
+		memset (buf, 0, MAX_TEXT);
+		event = (EIT_event_t*)pEpg->highlightedEvent->data;
+		if(offair_getLocalEventTime (event, NULL, &event_tt) == 0) {
+			strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
+		}
+	}
 	gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, interfaceInfo.clientX + interfaceInfo.paddingSize, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
 	for(i = 0; i < pEpg->displayingHours; i++) {
 		strftime( buf, 10, "%H:%M", localtime(&event_tt));
@@ -2468,7 +2478,6 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			while( event_element != NULL )
 			{
 				event = (EIT_event_t*)event_element->data;
-
 				if(offair_getLocalEventTime(event, &event_tm, &event_tt) == 0)
 				{
 					event_len = offair_getEventDuration(event);
