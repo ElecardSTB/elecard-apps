@@ -2363,6 +2363,7 @@ static void offair_EPGRecordMenuDisplay(interfaceMenu_t *pMenu)
 			strftime( buf, 25, _T("DATESTAMP"), localtime(&event_tt));
 		}
 	}
+	event_tt = pEpg->curOffset;
 	gfx_drawText(DRAWING_SURFACE, pgfx_font, INTERFACE_BOOKMARK_RED, INTERFACE_BOOKMARK_GREEN, INTERFACE_BOOKMARK_BLUE, INTERFACE_BOOKMARK_ALPHA, interfaceInfo.clientX + interfaceInfo.paddingSize, y+fh - interfaceInfo.paddingSize, buf, 0, 0);
 	for(i = 0; i < pEpg->displayingHours; i++) {
 		strftime( buf, 10, "%H:%M", localtime(&event_tt));
