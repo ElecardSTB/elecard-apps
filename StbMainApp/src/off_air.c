@@ -3425,6 +3425,9 @@ static int offair_showScheduleMenu(interfaceMenu_t *pMenu, void* pArg)
 
 	buffer[0] = 0;
 	str = buffer;
+	str[0] = '\n';
+	str ++;
+	buf_length = 1;
 	for(event_element = service->schedule; event_element != NULL; event_element = event_element->next) {
 		event = (EIT_event_t *)event_element->data;
 		event_length = strlen( (char*)event->description.event_name );
@@ -3440,8 +3443,10 @@ static int offair_showScheduleMenu(interfaceMenu_t *pMenu, void* pArg)
 				/* 64 - approximate max datestamp length in most languages */
 				if( (buf_length + 64 + 11 + event_length) > MAX_MESSAGE_BOX_LENGTH )
 					break;
+				str[0] = '\n';
+				str ++;
 				strftime(str, 64, _T("SCHEDULE_TIME_FORMAT"), &event_tm);
-				buf_length += strlen(str);
+				buf_length += strlen(str) + 1;
 				str = &buffer[buf_length];
 				*str = '\n';
 				buf_length++;
