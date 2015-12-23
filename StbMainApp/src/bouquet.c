@@ -569,12 +569,14 @@ static void bouquet_loadServicesFromFile(struct list_head *listHead, char *bouqu
 		eprintf("%s: Failed to open '%s'\n", __FUNCTION__, bouquet_file);
 		return;
 	}
+	memset(buf, 0, BUFFER_SIZE);
+
 	if(fgets(buf, BUFFER_SIZE, fd) != NULL) {
 		sscanf(buf, "#NAME  %s\n", pName);
 	}
 
-	while(fgets(buf, BUFFER_SIZE, fd) != NULL) {
-		if(sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
+	do {
+		if (sscanf(buf, "#SERVICE %x:%x:%x:%04x:%04x:%x:%x:%x:%x:%x:\n",   &type,
 				  &flags,
 				  &serviceType,
 				  &service_id,
@@ -583,24 +585,25 @@ static void bouquet_loadServicesFromFile(struct list_head *listHead, char *bouqu
 				  &name_space,
 				  &index_8,
 				  &index_9,
-				  &index_10) != 10) {
-			continue;
+				  &index_10) == 10)
+		{
+			bouquet_element_list_t *element = digitalList_add(listHead);
+			if (element) {
+				element->type = type;
+				element->flags = flags;
+				element->serviceType = serviceType;
+				element->service_id = service_id;
+				element->data.transport_stream_id = transport_stream_id;
+				element->data.network_id = network_id;
+				element->data.name_space = name_space;
+				element->index_8 = index_8;
+				element->index_9 = index_9;
+				element->index_10 = index_10;
+				element->parent_control = 0;
+			}
 		}
-		bouquet_element_list_t *element = digitalList_add(listHead);
-		if (element) {
-			element->type = type;
-			element->flags = flags;
-			element->serviceType = serviceType;
-			element->service_id = service_id;
-			element->data.transport_stream_id = transport_stream_id;
-			element->data.network_id = network_id;
-			element->data.name_space = name_space;
-			element->index_8 = index_8;
-			element->index_9 = index_9;
-			element->index_10 = index_10;
-			element->parent_control = 0;
-		}
-	}
+		if (fgets(buf, BUFFER_SIZE, fd) == NULL) break;
+	} while (1);
 	fclose(fd);
 }
 
