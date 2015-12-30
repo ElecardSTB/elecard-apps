@@ -1148,7 +1148,7 @@ void bouquet_loadLamedb(const char *bouquet_file, struct list_head *listHead)
 			if(fgets(service_name, BUFFER_SIZE, fd) == NULL) {
 				break;
 			}
-			service_name[sizeof(service_name) - 1] = '\0';
+			service_name[strlen(service_name) - 1] = '\0';
 			sprintf(lamedb_data.channelsName, "%s", service_name);
 
 			//parese bouquet pName
