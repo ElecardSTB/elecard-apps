@@ -113,6 +113,7 @@ static void load_channels(typeBouquet_t index, struct list_head *listHead)
 		return;
 	}
 	if (index == eBouquet_digital) {
+
 		list_for_each(pos, dvbChannel_getSortList()) {
 			editorDigital_t *element;
 			service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
@@ -134,7 +135,10 @@ static void load_channels(typeBouquet_t index, struct list_head *listHead)
 				element->radio = 0;
 			}
 			element->scrambled = dvb_getScrambled(srvIdx->service);
-			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->service->service_descriptor.service_name);
+
+			if (srvIdx->data.channelsName){
+				snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->data.channelsName);
+			}
 		}
 	} else if (index == eBouquet_analog) {
 		struct list_head *head = analogtv_getChannelList();
