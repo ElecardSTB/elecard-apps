@@ -217,8 +217,8 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 			&& (srvIdx->common.transport_stream_id == element->data.transport_stream_id)
 			&& (srvIdx->common.media_id == element->data.network_id))
 		{
-			if (strncasecmp(srvIdx->service->service_descriptor.service_name, element->lamedbData.channelsName, 64) != 0) {
-				strcpy(srvIdx->service->service_descriptor.service_name, element->lamedbData.channelsName);
+			if (strncasecmp((char*)srvIdx->service->service_descriptor.service_name, (char*)element->lamedbData.channelsName, 64) != 0) {
+				strcpy((char*)srvIdx->service->service_descriptor.service_name, (char*)element->lamedbData.channelsName);
 			}
 
 			srvIdx->flag = 1;
@@ -527,7 +527,6 @@ static void bouquet_loadNamesFromFile(listHead_t *listHead, char *bouquet_file)
 			sscanf(ptr + 1, "%s \n", name); //get bouquet_name type: name" (with ")
 			name[strlen(name) - 1] = '\0'; //get bouquet_name type: name
 			strList_add(listHead, name);
-
 			dprintf("Get bouquet file name: %s\n", name);
 		}
 	}
@@ -865,6 +864,12 @@ void bouquet_saveBouquetsConf(const char *bouquetName)
 
 	list_for_each(pos, dvbChannel_getSortList()) {
 		service_index_t *srvIdx = list_entry(pos, service_index_t, orderNone);
+
+		// update srvIdx->service->service_descriptor.service_name
+		if (strcasecmp((char*)srvIdx->service->service_descriptor.service_name, (char*)srvIdx->data.channelsName) != 0) {
+			strcpy((char*)srvIdx->service->service_descriptor.service_name, (char*)srvIdx->data.channelsName);
+		}
+
 		if(srvIdx->data.visible) {
 			if (srvIdx->service->service_descriptor.service_type  == 0) {
 				if (dvb_hasMediaType(srvIdx->service, mediaTypeAudio) && !dvb_hasMediaType(srvIdx->service, mediaTypeVideo)) {
@@ -1552,7 +1557,6 @@ int32_t bouquet_save(typeBouquet_t btype, const char *name)
 
 	if(btype == eBouquet_digital) {
 		bouquet_createDirectory(btype, name);
-
 		bouquet_saveBouquets(name, "tv");
 		bouquet_saveBouquets(name, "radio");
 		bouquet_createTransponderList();
