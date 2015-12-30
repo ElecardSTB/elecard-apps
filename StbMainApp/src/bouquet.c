@@ -218,7 +218,7 @@ static int bouquet_find_or_AddChannels(const bouquet_element_list_t *element)
 			&& (srvIdx->common.media_id == element->data.network_id))
 		{
 			if (strncasecmp(srvIdx->service->service_descriptor.service_name, element->lamedbData.channelsName, 64) != 0) {
-				strncpy(srvIdx->service->service_descriptor.service_name, element->lamedbData.channelsName, strlen(element->lamedbData.channelsName));
+				strcpy(srvIdx->service->service_descriptor.service_name, element->lamedbData.channelsName);
 			}
 
 			srvIdx->flag = 1;
