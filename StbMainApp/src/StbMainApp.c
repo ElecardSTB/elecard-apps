@@ -1358,6 +1358,7 @@ void *testServerThread(void *pArg)
 					if (state.fe_status & FE_HAS_LOCK) isLocked = 1;
 					sprintf(obuf, "%d", isLocked);
 				}
+#ifdef ENABLE_DVB
 				else if (strcmp(ibuf, "dvbSignalStrength") == 0){
 					uint16_t dvbSignalStrength = 0;
 					tunerState_t state;
@@ -1388,6 +1389,7 @@ void *testServerThread(void *pArg)
 					dvbUncorrectedErrors = state.uncorrected_blocks;
 					sprintf(obuf, "%d", dvbUncorrectedErrors);
 				}
+#endif // ENABLE_DVB
 				// dvb record
 				else if (strstr(ibuf, "recstart ") == ibuf)
 				{
