@@ -1348,6 +1348,7 @@ void *testServerThread(void *pArg)
 					cJSON_Delete(res);
 					sprintf(obuf, "%d", invalidCodes);
 				}
+#ifdef ENABLE_DVB
 				else if (strcmp(ibuf, "dvbLocked") == 0){
 					int isLocked = 0;
 					tunerState_t state;
@@ -1388,6 +1389,7 @@ void *testServerThread(void *pArg)
 					dvbUncorrectedErrors = state.uncorrected_blocks;
 					sprintf(obuf, "%d", dvbUncorrectedErrors);
 				}
+#endif // ENABLE_DVB
 				// dvb record
 				else if (strstr(ibuf, "recstart ") == ibuf)
 				{
