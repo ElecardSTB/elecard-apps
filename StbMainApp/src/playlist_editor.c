@@ -135,10 +135,7 @@ static void load_channels(typeBouquet_t index, struct list_head *listHead)
 				element->radio = 0;
 			}
 			element->scrambled = dvb_getScrambled(srvIdx->service);
-
-			if (srvIdx->data.channelsName){
-				snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->data.channelsName);
-			}
+			snprintf(element->data.channelsName, MENU_ENTRY_INFO_LENGTH, "%s", srvIdx->data.channelsName);
 		}
 	} else if (index == eBouquet_analog) {
 		struct list_head *head = analogtv_getChannelList();
