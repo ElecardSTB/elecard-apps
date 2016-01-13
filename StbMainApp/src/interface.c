@@ -6653,7 +6653,7 @@ int fusion_enterPassword_USBBrowserMenu(interfaceMenu_t *pMenu, char *value, voi
 	return 0;
 }
 
-fusion_askPassword_FillStreamMenu(interfaceMenu_t *pMenu, void* pArg)
+int fusion_askPassword_FillStreamMenu(interfaceMenu_t *pMenu, void* pArg)
 {
 	return interface_getText(pMenu, _T("ENTER_PASSWORD"), "\\d{8}", fusion_enterPassword_FillStreamMenu, NULL, inputModeDirect, pArg);
 }

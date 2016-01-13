@@ -353,9 +353,11 @@ static int32_t playlistEditor_saveInternal(playlistEditorMenuParam_t *pParam)
 static int32_t playList_checkParentControlPass(interfaceMenu_t *pMenu, char *value, void *pArg)
 {
 	(void)pMenu;
+	playlistEditorMenuParam_t * pParam = (playlistEditorMenuParam_t *)pArg;
 
 	if(parentControl_checkPass(value) == 0) {
 		playlistEditor_saveInternal(pArg);
+		bouquet_save(pParam->type, bouquet_getCurrentName(pParam->type));
 	} else {
 		interface_showMessageBox(_T("ERR_WRONG_PASSWORD"), thumbnail_error, 3000);
 		return 1;
@@ -379,8 +381,8 @@ static int32_t playlistEditor_save(playlistEditorMenuParam_t *pParam)
 			if(element->service_index != NULL) {
 				if(element->data.parent_control != element->service_index->data.parent_control) {
 					const char *mask = "\\d{6}";
-					interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("ENTER_PASSWORD"), mask, playList_checkParentControlPass, NULL, inputModeDirect, (void *)pParam);
-					return 0;
+					return interface_getText((interfaceMenu_t*)&InterfacePlaylistEditorDigital, _T("PARENTCONTROL_CHECK_PASSWORD"), mask, // password can be seen, no *
+						playList_checkParentControlPass, NULL, inputModeDirect, (void *)pParam);
 				}
 			}
 		}
@@ -782,9 +784,8 @@ static int32_t playlistEditor_wantSaveConfirm(interfaceMenu_t *pMenu, pinterface
 		case interfaceCommandGreen:
 		case interfaceCommandEnter:
 		case interfaceCommandOk:
-			playlistEditor_save(pArg);
-			return 0;
-			break;
+			return playlistEditor_save(pArg);
+
 		case interfaceCommandRed:
 		case interfaceCommandExit:
 		case interfaceCommandLeft:

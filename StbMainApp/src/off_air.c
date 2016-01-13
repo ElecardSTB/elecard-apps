@@ -1674,7 +1674,7 @@ static void offair_checkParentControl(int which, DvbParam_t *pParam, int audio_t
 		start.pParam = *pParam;
 		start.audio_type = audio_type;
 		start.video_type = video_type;
-		interface_getText(pMenu, _T("ENTER_PASSWORD"), mask, offair_checkParentControlPass, NULL, inputModeDirect, &start);
+		interface_getText(pMenu, _T("PARENTCONTROL_CHECK_PASSWORD"), mask, offair_checkParentControlPass, NULL, inputModeDirect, &start);
 	} else {
 		offair_startDvbVideo(which, pParam, audio_type, video_type);
 	}
