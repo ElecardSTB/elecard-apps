@@ -1424,7 +1424,7 @@ static void offair_showBulgarianSubtitlesIfExist(void)
 			PID_info_t *info = subtitle.stream->data;
 			if (info->ISO_639_language_code[0])
 			{
-				if (strcasecmp("bul", info->ISO_639_language_code)){
+				if (strcasecmp("bul", info->ISO_639_language_code) == 0){
 					// turn on bulgarian subs
 					eprintf ("%s(%d): Turn ON bulgarian subs: : PID = %d, index = %d, lang = %s\n", __FUNCTION__, __LINE__,
 						dvb_getStreamPid(subtitle.stream->data), subtitle.index, info->ISO_639_language_code);
