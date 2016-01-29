@@ -55,10 +55,16 @@ typedef struct {
 } bouquet_data_t;
 
 typedef struct {
-	uint16_t audio_track;
-	uint16_t visible;
-	uint16_t parent_control;
-	char     channelsName[MENU_ENTRY_INFO_LENGTH];
+	uint16_t index;
+	uint16_t pid;
+} subtitle_t;
+
+typedef struct {
+	uint16_t   audio_track;
+	subtitle_t subtitle;
+	uint16_t   visible;
+	uint16_t   parent_control;
+	char       channelsName[MENU_ENTRY_INFO_LENGTH];
 } service_index_data_t;
 
 typedef struct {
