@@ -600,6 +600,8 @@ void fusion_startup()
 
 	system ("echo 3 >/proc/sys/vm/drop_caches");
 
+	system ("/opt/elecard/bin/elcd-watchdog.sh &");
+
 	fusion_removeAdLockFile();
 
 	if (fusion_setMoscowDateTime() != 0){
