@@ -1802,9 +1802,14 @@ static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, 
 		}
 	}
 #ifdef STSDK
-	// Always use 0 index for Linux tuners
-	sprintf(filename, "dvb://%d@%d", current_service()->common.service_id, pParam->adapter);
-	qualifier[0] = 0;
+    // Always use 0 index for Linux tuners
+    sprintf(filename, "dvb://%d:%d:%d:%d@%d",
+            current_service()->common.service_id,
+            current_service()->common.transport_stream_id,
+            current_service()->common.media_id,
+            current_service()->original_network_id,
+            pParam->adapter);
+    qualifier[0] = 0;
 #endif // STSDK
 
 	if(gfx_startVideoProvider(filename, which, 0, qualifier) != 0) {

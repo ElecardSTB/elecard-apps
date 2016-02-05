@@ -1374,21 +1374,24 @@ int gfx_resumeVideoProvider(int videoLayer)
 		return 0;
 	}
 
-//	elcdRpcType_t type;
-	cJSON        *param = NULL;
+    cJSON *param = NULL;
+    param = cJSON_CreateObject();
+    if(param) {
+        if(gfx_videoProvider.savedPos > 0) {
+            cJSON_AddItemToObject(param, "position", cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
+        }
+        pprintf("%s: elcmd_play, posInSec = %d\n",
+            __FUNCTION__, (int)gfx_videoProvider.savedPos);
+    } else {
+        eprintf("%s: cant allocate json object!!!\n", __FUNCTION__);
+    }
 
-	if (gfx_videoProvider.savedPos > 0){
-		param = cJSON_CreateNumber((int)gfx_videoProvider.savedPos);
-		pprintf("%s: elcmd_play, startPos = %d, play\n", __func__, (int)gfx_videoProvider.savedPos);
-	}
-	else {
-		pprintf("%s: elcmd_play, play\n", __func__);
-	}
-
-	gfx_videoProvider.waiting = st_rpcAsync( elcmd_play, param, gfx_videoProviderStarted, NULL);
-	if (gfx_videoProvider.waiting >= 0)
-		gfx_videoProvider.active = providerInit;
-	cJSON_Delete(param);
+    gfx_videoProvider.waiting = st_rpcAsync(elcmd_play, param, gfx_videoProviderStarted, NULL);
+    if(gfx_videoProvider.waiting >= 0)
+    {
+        gfx_videoProvider.active = providerInit;
+    }
+    cJSON_Delete(param);
 
 #endif
 #ifdef ENABLE_GSTREAMER
@@ -1628,23 +1631,19 @@ int gfx_startVideoProvider(const char* videoSource, int videoLayer, int force, c
 #ifdef STSDK
 		gfx_videoProvider.active = providerInit;
 
-		cJSON *param = NULL;
-
-		if (gfx_videoProvider.savedPos > 0)
-		{
-			pprintf("%s: elcmd_play %s, posInSec = %d\n",
-			    __func__, videoSource, (int)gfx_videoProvider.savedPos);
-			param = cJSON_CreateArray();
-
-			cJSON_AddItemToArray (param, cJSON_CreateString(videoSource) );
-			cJSON_AddItemToArray (param, cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
-		} else
-		{
-			pprintf("%s: elcmd_play %s\n",
-				__func__, videoSource);
-			param = cJSON_CreateString(videoSource);
-		}
-		gfx_videoProvider.waiting = st_rpcAsync( elcmd_play, param, gfx_videoProviderStarted, NULL);
+        cJSON *param = NULL;
+        param = cJSON_CreateObject();
+        if(param) {
+            if(gfx_videoProvider.savedPos > 0) {
+                cJSON_AddItemToObject(param, "position", cJSON_CreateNumber((int)gfx_videoProvider.savedPos));
+            }
+            pprintf("%s: elcmd_play %s, posInSec = %d\n",
+                __FUNCTION__, videoSource, (int)gfx_videoProvider.savedPos);
+            cJSON_AddItemToObject(param, "source", cJSON_CreateString(videoSource));
+        } else {
+            eprintf("%s: cant allocate json object!!!\n", __FUNCTION__);
+        }
+        gfx_videoProvider.waiting = st_rpcAsync(elcmd_play, param, gfx_videoProviderStarted, NULL);
 
 		if (gfx_videoProvider.waiting >= 0)
 		{
