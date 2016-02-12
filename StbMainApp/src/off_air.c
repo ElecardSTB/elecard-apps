@@ -1409,6 +1409,72 @@ void offair_displayPlayControl(void)
 	interface_slideshowControlDisplay();
 }
 
+static void offair_showBulgarianSubtitlesIfExist(void)
+{
+	// save old index
+	int oldIndex = subtitle.index;
+
+	while (1)
+	{
+		subtitle.stream = dvb_getNextSubtitleStream(current_service(), subtitle.stream);
+		if (subtitle.stream == NULL && subtitle.index == 0) {
+			break;
+		}
+		if (subtitle.stream) {
+			PID_info_t *info = subtitle.stream->data;
+			if (info->ISO_639_language_code[0])
+			{
+				if (strcasecmp("bul", info->ISO_639_language_code) == 0){
+					// turn on bulgarian subs
+					eprintf ("%s(%d): Turn ON bulgarian subs: : PID = %d, index = %d, lang = %s\n", __FUNCTION__, __LINE__,
+						dvb_getStreamPid(subtitle.stream->data), subtitle.index, info->ISO_639_language_code);
+					offair_subtitleShow(subtitle.stream ? dvb_getStreamPid(subtitle.stream->data) : 0);
+					// dont restore old subs, just set bulg and show them
+					return;
+				}
+			}
+			subtitle.index++;
+		}
+		else {
+			subtitle.index = 0;
+		}
+	}
+	// restore index
+	subtitle.index = oldIndex;
+	return;
+}
+
+static int offair_searchSubtitles(void)
+{
+	if(appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
+		service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+		if(srvIdx == NULL) {
+			return -1;
+		}
+		while (1){
+			subtitle.stream = dvb_getNextSubtitleStream(current_service(), subtitle.stream);
+			if (subtitle.stream == NULL && subtitle.index == 0) {
+				return 0;
+			}
+			if (subtitle.stream){
+				subtitle.index++;
+				if (dvb_getStreamPid(subtitle.stream->data) == srvIdx->data.subtitle.pid)
+				{
+					PID_info_t *info = subtitle.stream->data;
+					eprintf("%s(%d): Start subtitles pid = %d %s\n", __func__, __LINE__,
+						srvIdx->data.subtitle.pid, info->ISO_639_language_code ? info->ISO_639_language_code : "");
+
+					offair_subtitleShow(srvIdx->data.subtitle.pid);
+					return 1;
+				}
+			}
+			else
+				subtitle.index = 0;
+		}
+	}
+	return 0;
+}
+
 static int offair_toggleSubtitles(void)
 {
 	subtitle.stream = dvb_getNextSubtitleStream(current_service(), subtitle.stream);
@@ -1421,6 +1487,18 @@ static int offair_toggleSubtitles(void)
 	else
 		subtitle.index = 0;
 	offair_subtitleShow(subtitle.stream ? dvb_getStreamPid(subtitle.stream->data) : 0);
+
+	// save current subt index and pid
+	if(appControlInfo.dvbInfo.channel != CHANNEL_CUSTOM) {
+		service_index_t *srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+		if(srvIdx == NULL) {
+			return -1;
+		}
+		srvIdx->data.subtitle.index = subtitle.index;
+		srvIdx->data.subtitle.pid = subtitle.stream ? dvb_getStreamPid(subtitle.stream->data) : 0;
+		dvbChannel_save();
+	}
+
 	return 0;
 }
 
@@ -1724,9 +1802,14 @@ static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, 
 		}
 	}
 #ifdef STSDK
-	// Always use 0 index for Linux tuners
-	sprintf(filename, "dvb://%d@%d", current_service()->common.service_id, pParam->adapter);
-	qualifier[0] = 0;
+    // Always use 0 index for Linux tuners
+    sprintf(filename, "dvb://%d:%d:%d:%d@%d",
+            current_service()->common.service_id,
+            current_service()->common.transport_stream_id,
+            current_service()->common.media_id,
+            current_service()->original_network_id,
+            pParam->adapter);
+    qualifier[0] = 0;
 #endif // STSDK
 
 	if(gfx_startVideoProvider(filename, which, 0, qualifier) != 0) {
@@ -1779,6 +1862,17 @@ static void offair_startDvbVideo(int which, DvbParam_t *pParam, int audio_type, 
 	interface_displayMenu(1);
 
 	teletext_start(pParam);
+
+#ifdef STSDK
+	// get saved subtitle, for GARB Bug #562
+	srvIdx = dvbChannel_getServiceIndex(appControlInfo.dvbInfo.channel);
+	if (srvIdx && srvIdx->data.subtitle.pid) {
+		offair_searchSubtitles();
+	}
+	else {
+		offair_showBulgarianSubtitlesIfExist();
+	}
+#endif
 
 	dprintf("%s: done\n", __FUNCTION__);
 }

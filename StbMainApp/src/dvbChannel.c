@@ -377,6 +377,11 @@ static int32_t dvbChannel_readOrderConfig(void)
 				strncpy(data.channelsName, objGetString(subitem, "channels_name", ""), sizeof(data.channelsName));
 				data.audio_track = objGetInt(subitem, "audio_track", 0);
 				data.visible = objGetInt(subitem, "visible", 1);
+
+				// subtitle
+				data.subtitle.index = objGetInt(subitem, "subt_index", 0);
+				data.subtitle.pid = objGetInt(subitem, "subt_pid", 0);
+
 				data.parent_control = objGetInt(subitem, "parent_control", 0);
 				dvbChannel_addServiceIndexData(&common, &data, 0);
 			}
@@ -423,6 +428,8 @@ static int32_t dvbChannel_writeOrderConfig(void)
 				cJSON_AddStringToObject(fld, "channels_name", srvIdx->data.channelsName);
 				cJSON_AddNumberToObject(fld, "audio_track", srvIdx->data.audio_track);
 				cJSON_AddNumberToObject(fld, "visible", srvIdx->data.visible);
+				cJSON_AddNumberToObject(fld, "subt_index", srvIdx->data.subtitle.index);
+				cJSON_AddNumberToObject(fld, "subt_pid", srvIdx->data.subtitle.pid);
 
 				cJSON_AddNumberToObject(fld, "parent_control", srvIdx->data.parent_control);
 				cJSON_AddItemToArray(format, fld);
