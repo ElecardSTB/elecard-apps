@@ -643,7 +643,8 @@ socketClient_t* gfx_stSocket(void);
 #endif
 
 #ifdef ENABLE_FUSION
-#define FUSION_FONT_HEIGHT 34
+#define FUSION_FONT_HEIGHT 38
+#define FUSION_SURF_HEIGHT 68
 #endif
 
 #ifdef __cplusplus

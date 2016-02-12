@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  
 #ifdef ENABLE_FUSION
 #include "fusion.h"
+#include <directfb.h>
 
 #define eprintf(x...) \
 	do { \
@@ -78,7 +79,8 @@ int fusion_removeFirmwareFormFlash();
 void fusion_removeHwconfigUrl();
 int fusion_setMoscowDateTime();
 void * fusion_threadCheckReboot (void * param);
-void * fusion_threadCreepline(void * param);
+void * fusion_threadGetCreepline(void * param);
+void * fusion_threadMonitorCreep(void * param);
 void * fusion_threadDownloadFirmware(void * param);
 void * fusion_threadFlipCreep (void * param);
 void fusion_wait (unsigned int timeout_ms);
@@ -224,7 +226,8 @@ void * fusion_threadDownloadFirmware(void * param)
 	}
 	*/
 	eprintf ("%s: Save %s to %s ...\n", __FUNCTION__, url, filepath);
-	sprintf (cmd, "wget --limit-rate=%dk -c -q \"%s\" -O %s ", g_shaping, url, filepath); // 2>/dev/null, quiet
+	//sprintf (cmd, "wget --limit-rate=%dk -c -q \"%s\" -O %s ", g_shaping, url, filepath); // 2>/dev/null, quiet
+	sprintf (cmd, "wget -c -q \"%s\" -O %s ", url, filepath); // 2>/dev/null, quiet
 	system(cmd);
 
 	eprintf ("%s(%d): Exit.\n", __FUNCTION__, __LINE__);
@@ -316,36 +319,52 @@ void fusion_clearMemCache()
 	system ("echo 3 >/proc/sys/vm/drop_caches");
 }
 
-void * fusion_threadCreepline(void * param)
+void * fusion_threadMonitorCreep(void * param)
 {
 	struct timeval tv;
 
-	fusion_readConfig();
+	while (1)
+	{
+		fusion_wait(1000);
+		//eprintf ("%s(%d): FusionObject.creep.status = %d.\n", __FUNCTION__, __LINE__, FusionObject.creep.status);
 
-	while (1){
-
-		FusionObject.creep.status = fusion_getAndParsePlaylist();
-		fusion_clearMemCache();
-
-		if (FusionObject.creep.status == FUSION_FAIL){
-			fusion_wait(FusionObject.checktime * 1000);
+		if (FusionObject.creep.status == FUSION_FAIL || FusionObject.creep.status == FUSION_OK){
 			continue;
 		}
 		else if (FusionObject.creep.status == FUSION_NEW_CREEP){
 			gettimeofday(&tv, NULL);
 			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
-			eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
+			//eprintf ("%s(%d): FusionObject.creep.status = FUSION_NEW_CREEP. startTime = %lld.\n", __FUNCTION__, __LINE__, FusionObject.creep.startTime);
+			//eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
 			FusionObject.creep.deltaTime = 0;
+			FusionObject.creep.status = FUSION_SAME_CREEP;
 		}
 		else if (FusionObject.creep.status == FUSION_SAME_CREEP && FusionObject.creep.isShown)
 		{
-			//eprintf ("%s(%d): creepShown got. Wait pause and start again.\n", __FUNCTION__, __LINE__);
+			//eprintf ("%s(%d): creepShown got. Wait pause = %d sec and start again.\n", __FUNCTION__, __LINE__, FusionObject.creep.pause);
 			fusion_wait(FusionObject.creep.pause * 1000);
 			gettimeofday(&tv, NULL);
 			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 			FusionObject.creep.isShown = 0;
 			FusionObject.creep.deltaTime = 0;
 		}
+		fusion_wait(1000);
+	}
+
+	pthread_exit((void *)&gStatus);
+	return (void*)NULL;
+}
+
+void * fusion_threadGetCreepline(void * param)
+{
+	fusion_readConfig();
+
+	while (1)
+	{
+		FusionObject.creep.status = fusion_getAndParsePlaylist();
+		//eprintf ("%s(%d): FusionObject.creep.status = %d.\n", __FUNCTION__, __LINE__, FusionObject.creep.status);
+
+		fusion_clearMemCache();
 		fusion_wait(FusionObject.checktime * 1000);
 	}
 
@@ -370,9 +389,9 @@ int fusion_readConfig()
 	FusionObject.logoBotLeftY  = interfaceInfo.screenHeight - 200;
 	FusionObject.logoBotRightX = -1;
 	FusionObject.logoBotRightY = interfaceInfo.screenHeight - 200;
-	FusionObject.creepY = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT * 2;
+	FusionObject.creepY = interfaceInfo.screenHeight - FUSION_SURF_HEIGHT;
 
-	FusionObject.demoUrl[0] = '\0'; // test
+	FusionObject.demoUrl[0] = '\0';
 
 	f = fopen(FUSION_HWCONFIG, "rt");
 	if (!f) return -1;
@@ -623,7 +642,8 @@ void fusion_startup()
 	FusionObject.currentDtmfDigit = '_';
 	FusionObject.creep.isShown = 1;
 
-	pthread_create(&FusionObject.threadCreepHandle, NULL, fusion_threadCreepline, (void*)NULL);
+	pthread_create(&FusionObject.threadGetCreepHandle, NULL, fusion_threadGetCreepline, (void*)NULL);
+	pthread_create(&FusionObject.threadMonCreepHandle, NULL, fusion_threadMonitorCreep, (void*)NULL);
 	pthread_create(&FusionObject.threadCheckReboot, NULL, fusion_threadCheckReboot, (void*)NULL);
 	pthread_create(&FusionObject.threadFlipCreep, NULL, fusion_threadFlipCreep, (void*)NULL);
 
@@ -1376,134 +1396,8 @@ int fusion_parsePlaylistCreep(cJSON * root)
 	result = FUSION_SAME_CREEP;
 	//cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep\u00adline");
 	cJSON * jsonCreep = cJSON_GetObjectItem(root, "creep-line");
-	if (jsonCreep){
-
-		// todo : manage more than 6 large creeps
-		int creepCount = cJSON_GetArraySize(jsonCreep);
-		int allCreepsLen = 0;
-		int allCreepsWithSpaceLen = 0;
-		char * allCreeps;
-		for (i=0; i<creepCount; i++){
-			cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
-			if (!jsonItem) continue;
-			cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
-			if (!jsonText) continue;
-			allCreepsLen += FUSION_MAX_CREEPLEN;
-		}
-		allCreepsWithSpaceLen = allCreepsLen + (creepCount-1)*strlen(FUSION_CREEP_SPACES);
-		allCreeps = (char*)malloc(allCreepsWithSpaceLen);
-		allCreeps[0] = '\0';
-		if (!allCreeps) {
-			eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes.\n", __FUNCTION__, __LINE__, allCreepsLen);
-			cJSON_Delete(root);
-			return FUSION_SAME_CREEP;
-		}
-		for (i=0; i<creepCount; i++){
-			cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
-			if (!jsonItem) continue;
-			cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
-			if (!jsonText) continue;
-
-			// todo : now count and pause are rewritten
-			// do something with it
-			cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "count");
-			if (!jsonPause) FusionObject.creep.pause = FUSION_DEFAULT_CREEP_PAUSE;
-			else {
-				FusionObject.creep.pause = atoi(jsonPause->valuestring);
-			}
-
-			if (i) strncat(allCreeps, FUSION_CREEP_SPACES, strlen(FUSION_CREEP_SPACES));
-			strncat(allCreeps, jsonText->valuestring, FUSION_MAX_CREEPLEN);  // strlen(jsonText->valuestring)
-		}
-		for (int k=0; k<allCreepsWithSpaceLen; k++){
-			if (allCreeps[k] == '\n' || allCreeps[k] == '\r') allCreeps[k] = ' ';
-		}
-
-		if (!FusionObject.creepline){
-			result = FUSION_NEW_CREEP;
-
-			pthread_mutex_lock(&FusionObject.creep.mutex);
-			FusionObject.creepline = (char*)malloc(allCreepsWithSpaceLen);
-			if (!FusionObject.creepline) {
-				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
-				cJSON_Delete(root);
-				pthread_mutex_unlock(&FusionObject.creep.mutex);
-				return FUSION_SAME_CREEP;
-			}
-			FusionObject.creepline[0] = '\0';
-			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
-			pthread_mutex_unlock(&FusionObject.creep.mutex);
-			eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
-		}
-		else if (strcmp(FusionObject.creepline, allCreeps)) {
-			// todo : wait event current creepline is chown
-			result = FUSION_NEW_CREEP;
-			pthread_mutex_lock(&FusionObject.creep.mutex);
-			if (FusionObject.creepline) {
-				free (FusionObject.creepline);
-				FusionObject.creepline = NULL;
-			}
-			FusionObject.creepline = (char*)malloc(allCreepsWithSpaceLen);
-			if (!FusionObject.creepline) {
-				eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, allCreepsWithSpaceLen);
-				cJSON_Delete(root);
-				pthread_mutex_unlock(&FusionObject.creep.mutex);
-				return FUSION_SAME_CREEP;
-			}
-			snprintf (FusionObject.creepline, allCreepsWithSpaceLen, "%s", allCreeps);
-			pthread_mutex_unlock(&FusionObject.creep.mutex);
-			eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
-		}
-		fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
-
-		if (FusionObject.creepWidth && (result == FUSION_NEW_CREEP)){
-
-			int surfaceHeight = FUSION_FONT_HEIGHT * 2;
-			int surfaceWidth = FusionObject.creepWidth + interfaceInfo.screenWidth;
-
-			pthread_mutex_lock(&FusionObject.mutexDtmf);
-			if (FusionObject.preallocSurface){
-				free (FusionObject.preallocSurface);
-				FusionObject.preallocSurface = NULL;
-			}
-			//eprintf ("%s(%d): malloc preallocSurface of size %d bytes...\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * interfaceInfo.screenHeight * 4);
-			FusionObject.preallocSurface = malloc (surfaceWidth * surfaceHeight * 4);
-			if (FusionObject.preallocSurface)
-			{
-				DFBSurfaceDescription fusion_desc;
-				fusion_desc.flags = DSDESC_PREALLOCATED | DSDESC_PIXELFORMAT | DSDESC_WIDTH | DSDESC_HEIGHT;
-				//fusion_desc.caps = DSCAPS_SYSTEMONLY | DSCAPS_STATIC_ALLOC | DSCAPS_DOUBLE | DSCAPS_FLIPPING;
-				fusion_desc.caps = DSCAPS_NONE;
-				fusion_desc.pixelformat = DSPF_ARGB;
-				fusion_desc.width = surfaceWidth;
-				fusion_desc.height = surfaceHeight;
-
-				fusion_desc.preallocated[0].data = FusionObject.preallocSurface;
-				fusion_desc.preallocated[0].pitch = fusion_desc.width * 4;
-				fusion_desc.preallocated[1].data = NULL;
-				fusion_desc.preallocated[1].pitch = 0;
-
-				if (fusion_surface){
-					fusion_surface->Release(fusion_surface);
-					fusion_surface = NULL;
-				}
-
-				DFBCHECK (pgfx_dfb->CreateSurface (pgfx_dfb, &fusion_desc, &fusion_surface));
-				fusion_surface->GetSize (fusion_surface, &fusion_desc.width, &fusion_desc.height);
-
-				int x = 0;
-				int y = FUSION_FONT_HEIGHT;
-				gfx_drawText(fusion_surface, fusion_font, 255, 255, 255, 255, x, y, FusionObject.creepline, 0, 1);
-				// clear fusion_surface after creep tail
-				gfx_drawRectangle(fusion_surface, 0x0, 0x0, 0x0, 0x0, x+FusionObject.creepWidth, 0, fusion_desc.width - (x + FusionObject.creepWidth), fusion_desc.height);
-			}
-			else {
-				eprintf("%s(%d): ERROR malloc %d bytes\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * surfaceHeight * 4);
-			}
-			pthread_mutex_unlock(&FusionObject.mutexDtmf);
-		}
-	}
-	else {
+	if (!jsonCreep)
+	{
 		//eprintf("%s(%d): No creepline field on playlist.\n", __FUNCTION__, __LINE__);
 		pthread_mutex_lock(&FusionObject.creep.mutex);
 		if (FusionObject.creepline) {
@@ -1511,8 +1405,139 @@ int fusion_parsePlaylistCreep(cJSON * root)
 			FusionObject.creepline = NULL;
 		}
 		pthread_mutex_unlock(&FusionObject.creep.mutex);
+		return FUSION_FAIL;
 	}
-	return 0;
+
+	// todo : manage more than 6 large creeps
+	int creepCount = cJSON_GetArraySize(jsonCreep);
+	int allCreepsLen = 0;
+	int allCreepsWithSpaceLen = 0;
+	char * allCreeps;
+	for (i=0; i<creepCount; i++){
+		cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
+		if (!jsonItem) continue;
+		cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
+		if (!jsonText) continue;
+		allCreepsLen += FUSION_MAX_CREEPLEN;
+	}
+	allCreepsWithSpaceLen = allCreepsLen + (creepCount-1)*strlen(FUSION_CREEP_SPACES);
+	allCreeps = (char*)malloc(allCreepsWithSpaceLen);
+	if (!allCreeps) {
+		eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes.\n", __FUNCTION__, __LINE__, allCreepsLen);
+		cJSON_Delete(root);
+		return FUSION_SAME_CREEP;
+	}
+	allCreeps[0] = '\0';
+	for (i=0; i<creepCount; i++){
+		cJSON * jsonItem = cJSON_GetArrayItem(jsonCreep, i);
+		if (!jsonItem) continue;
+		cJSON * jsonText = cJSON_GetObjectItem(jsonItem, "text");
+		if (!jsonText) continue;
+
+		// todo : now count and pause are rewritten
+		// do something with it
+		cJSON * jsonPause = cJSON_GetObjectItem(jsonItem, "count");
+		if (!jsonPause) FusionObject.creep.pause = FUSION_DEFAULT_CREEP_PAUSE;
+		else {
+			FusionObject.creep.pause = atoi(jsonPause->valuestring);
+		}
+		if (i) strncat(allCreeps, FUSION_CREEP_SPACES, strlen(FUSION_CREEP_SPACES));
+		strncat(allCreeps, jsonText->valuestring, FUSION_MAX_CREEPLEN); // truncate
+	}
+
+	for (int k=0; k<allCreepsWithSpaceLen; k++){
+		if (allCreeps[k] == '\n' || allCreeps[k] == '\r') allCreeps[k] = ' ';
+	}
+	int creepLen = strlen(allCreeps) + 32;
+
+	if (!FusionObject.creepline){
+		result = FUSION_NEW_CREEP;
+
+		pthread_mutex_lock(&FusionObject.creep.mutex);
+		FusionObject.creepline = (char*)malloc(creepLen);
+
+		if (!FusionObject.creepline) {
+			eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, creepLen);
+			cJSON_Delete(root);
+			pthread_mutex_unlock(&FusionObject.creep.mutex);
+			return FUSION_SAME_CREEP;
+		}
+		FusionObject.creepline[0] = '\0';
+		snprintf (FusionObject.creepline, creepLen, "%s", allCreeps);
+		pthread_mutex_unlock(&FusionObject.creep.mutex);
+		eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
+	}
+	else if (strcmp(FusionObject.creepline, allCreeps)) {
+		// todo : wait event current creepline is chown
+		result = FUSION_NEW_CREEP;
+		pthread_mutex_lock(&FusionObject.creep.mutex);
+		if (FusionObject.creepline) {
+			free (FusionObject.creepline);
+			FusionObject.creepline = NULL;
+		}
+		FusionObject.creepline = (char*)malloc(creepLen);
+		if (!FusionObject.creepline) {
+			eprintf ("%s(%d): ERROR! Couldn't malloc %d bytes\n", __FUNCTION__, __LINE__, creepLen);
+			cJSON_Delete(root);
+			pthread_mutex_unlock(&FusionObject.creep.mutex);
+			return FUSION_SAME_CREEP;
+		}
+		snprintf (FusionObject.creepline, creepLen, "%s", allCreeps);
+		pthread_mutex_unlock(&FusionObject.creep.mutex);
+		eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
+	}
+	free (allCreeps);
+
+	fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
+
+	if (FusionObject.creepWidth && (result == FUSION_NEW_CREEP)){
+
+		int surfaceHeight = FUSION_SURF_HEIGHT;
+		int surfaceWidth = FusionObject.creepWidth + interfaceInfo.screenWidth;
+
+		pthread_mutex_lock(&FusionObject.mutexDtmf);
+		if (FusionObject.preallocSurface){
+			free (FusionObject.preallocSurface);
+			FusionObject.preallocSurface = NULL;
+		}
+		FusionObject.preallocSurface = malloc (surfaceWidth * surfaceHeight * 4);
+		if (FusionObject.preallocSurface == NULL)
+		{
+			pthread_mutex_unlock(&FusionObject.mutexDtmf);
+			eprintf("%s(%d): ERROR malloc %d bytes\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * surfaceHeight * 4);
+			return FUSION_FAIL;
+		}
+
+		DFBSurfaceDescription fusion_desc;
+		fusion_desc.flags = DSDESC_PREALLOCATED | DSDESC_PIXELFORMAT | DSDESC_WIDTH | DSDESC_HEIGHT;
+		//fusion_desc.caps = DSCAPS_SYSTEMONLY | DSCAPS_STATIC_ALLOC | DSCAPS_DOUBLE | DSCAPS_FLIPPING;
+		fusion_desc.caps = DSCAPS_NONE;
+		fusion_desc.pixelformat = DSPF_ARGB;
+		fusion_desc.width = surfaceWidth;
+		fusion_desc.height = surfaceHeight;
+
+		fusion_desc.preallocated[0].data = FusionObject.preallocSurface;
+		fusion_desc.preallocated[0].pitch = fusion_desc.width * 4;
+		fusion_desc.preallocated[1].data = NULL;
+		fusion_desc.preallocated[1].pitch = 0;
+
+		if (fusion_surface){
+			fusion_surface->Release(fusion_surface);
+			fusion_surface = NULL;
+		}
+
+		DFBCHECK (pgfx_dfb->CreateSurface (pgfx_dfb, &fusion_desc, &fusion_surface));
+		fusion_surface->GetSize (fusion_surface, &fusion_desc.width, &fusion_desc.height);
+
+		int x = 0;
+		int y = FUSION_FONT_HEIGHT;
+		gfx_drawText(fusion_surface, fusion_font, 255, 255, 255, 255, x, y, FusionObject.creepline, 0, 1);
+		// clear fusion_surface after creep tail
+		gfx_drawRectangle(fusion_surface, 0x0, 0x0, 0x0, 0x0, x+FusionObject.creepWidth, 0, fusion_desc.width - (x + FusionObject.creepWidth), fusion_desc.height);
+
+		pthread_mutex_unlock(&FusionObject.mutexDtmf);
+	}
+	return result;
 }
 
 int fusion_touchLockFile()
@@ -1679,9 +1704,13 @@ int fusion_getAndParsePlaylist ()
 
 void fusion_cleanup()
 {
-	if (FusionObject.threadCreepHandle){
-		pthread_cancel(FusionObject.threadCreepHandle);
-		pthread_join(FusionObject.threadCreepHandle, NULL);
+	if (FusionObject.threadGetCreepHandle){
+		pthread_cancel(FusionObject.threadGetCreepHandle);
+		pthread_join(FusionObject.threadGetCreepHandle, NULL);
+	}
+	if (FusionObject.threadMonCreepHandle){
+		pthread_cancel(FusionObject.threadMonCreepHandle);
+		pthread_join(FusionObject.threadMonCreepHandle, NULL);
 	}
 	if (FusionObject.threadCheckReboot){
 		pthread_cancel(FusionObject.threadCheckReboot);
@@ -1808,7 +1837,8 @@ int fusion_saveFileByWget (char * url, char * filepath, int dtmf)
 
 	if (fusion_checkAdIsComplete(filepath) == NO)
 	{
-		sprintf (cmd, "wget --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
+		//sprintf (cmd, "wget --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
+		sprintf (cmd, "wget -c -q %s -O %s", url, filepath); // quiet mode
 		eprintf ("%s(%d): %s ...\n",   __FUNCTION__, __LINE__, cmd);
 		system(cmd);
 	}

@@ -962,14 +962,10 @@ typedef struct
 #define FUSION_BOTTOM_LEFT_STR       "bottom_left"
 #define FUSION_BOTTOM_RIGHT_STR      "bottom_right"
 
-#define FUSION_DEFAULT_CREEP_PAUSE    (10)
+//#define FUSION_DEFAULT_CREEP_PAUSE    (10)
+#define FUSION_DEFAULT_CREEP_PAUSE    (0)
 #define FUSION_DEFAULT_CREEP_REPEATS  (1)
-#define FUSION_CREEP_SPACES           \
-"\
-                               \
-                               \
-                               \
-                               "
+#define FUSION_CREEP_SPACES  "                                          "
 
 #define FUSION_SECRET                "secretKey81"
 
@@ -1052,7 +1048,8 @@ typedef struct _interfaceFusionObject_t {
 	int logoBotRightX;
 	int logoBotRightY;
 
-	pthread_t threadCreepHandle;
+	pthread_t threadGetCreepHandle;
+	pthread_t threadMonCreepHandle;
 	pthread_t threadCheckReboot;
 	pthread_t threadFlipCreep;
 	int checktime;

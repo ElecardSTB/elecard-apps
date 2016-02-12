@@ -793,7 +793,7 @@ void interface_flipStatusbarSurface()
 {
 	DFBRegion region;
 	region.x1 = 0;
-	region.y1 = interfaceInfo.screenHeight - FUSION_FONT_HEIGHT*2;
+	region.y1 = interfaceInfo.screenHeight - FUSION_SURF_HEIGHT;
 	region.x2 = interfaceInfo.screenWidth;
 	region.y2 = interfaceInfo.screenHeight;
 	DFBCHECK(DRAWING_SURFACE->Flip(DRAWING_SURFACE, &region, DSFLIP_NONE));
@@ -2142,9 +2142,11 @@ void interface_updateFusionCreepSurface()
 	if (!fusion_surface) return;
 	if (FusionObject.creep.startTime <= 0) return;
 
-	FusionObject.creep.deltaTime += 1;
+	//FusionObject.creep.deltaTime += 1;
+	FusionObject.creep.deltaTime += 2;
 	positionDst = interfaceInfo.screenWidth - FusionObject.creep.deltaTime;
 	positionSrc = 0;
+
 	if (positionDst < 0){
 		positionSrc = - positionDst;
 		positionDst = 0;
@@ -2170,13 +2172,13 @@ void interface_updateFusionCreepSurface()
 	srcRect.x = positionSrc;
 	srcRect.y = 0;
 	srcRect.w = min(interfaceInfo.screenWidth - positionDst, FusionObject.creepWidth - positionSrc);
-	srcRect.h = FUSION_FONT_HEIGHT * 2;
+	srcRect.h = FUSION_SURF_HEIGHT;
 */
 
 	srcRect.x = positionSrc;
 	srcRect.y = 0;
 	srcRect.w = FusionObject.creepWidth + 10;//min(interfaceInfo.screenWidth - positionDst, FusionObject.creepWidth - positionSrc);
-	srcRect.h = FUSION_FONT_HEIGHT * 2;
+	srcRect.h = FUSION_SURF_HEIGHT;
 
 	if ((positionSrc > 0) && (srcRect.w < interfaceInfo.screenWidth)){
 		srcRect.w = interfaceInfo.screenWidth;
@@ -2188,7 +2190,7 @@ void interface_updateFusionCreepSurface()
 	region.x1 = dstX;
 	region.x2 = dstX + FusionObject.creepWidth;
 	region.y1 = FusionObject.creepY;
-	region.y2 = FusionObject.creepY + FUSION_FONT_HEIGHT * 2;
+	region.y2 = FusionObject.creepY + FUSION_SURF_HEIGHT;
 
 	mysem_get(interface_semaphore);
 
