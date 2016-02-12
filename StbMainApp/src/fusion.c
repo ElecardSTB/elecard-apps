@@ -321,34 +321,32 @@ void fusion_clearMemCache()
 
 void * fusion_threadMonitorCreep(void * param)
 {
-	struct timeval tv;
-
 	while (1)
 	{
 		fusion_wait(1000);
-		//eprintf ("%s(%d): FusionObject.creep.status = %d.\n", __FUNCTION__, __LINE__, FusionObject.creep.status);
 
 		if (FusionObject.creep.status == FUSION_FAIL || FusionObject.creep.status == FUSION_OK){
 			continue;
 		}
+		/*
 		else if (FusionObject.creep.status == FUSION_NEW_CREEP){
 			gettimeofday(&tv, NULL);
 			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
-			//eprintf ("%s(%d): FusionObject.creep.status = FUSION_NEW_CREEP. startTime = %lld.\n", __FUNCTION__, __LINE__, FusionObject.creep.startTime);
+			eprintf ("%s(%d): FusionObject.creep.status = FUSION_NEW_CREEP. startTime = %lld.\n", __FUNCTION__, __LINE__, FusionObject.creep.startTime);
 			//eprintf ("%s(%d): New creep got. Start it.\n", __FUNCTION__, __LINE__);
 			FusionObject.creep.deltaTime = 0;
 			FusionObject.creep.status = FUSION_SAME_CREEP;
-		}
+		}*/
 		else if (FusionObject.creep.status == FUSION_SAME_CREEP && FusionObject.creep.isShown)
 		{
-			//eprintf ("%s(%d): creepShown got. Wait pause = %d sec and start again.\n", __FUNCTION__, __LINE__, FusionObject.creep.pause);
+			struct timeval tv;
+			//eprintf ("%s(%d): FUSION_SAME_CREEP. isShown = 1. Wait pause = %d sec and start again.\n", __FUNCTION__, __LINE__, FusionObject.creep.pause);
 			fusion_wait(FusionObject.creep.pause * 1000);
 			gettimeofday(&tv, NULL);
 			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 			FusionObject.creep.isShown = 0;
 			FusionObject.creep.deltaTime = 0;
 		}
-		fusion_wait(1000);
 	}
 
 	pthread_exit((void *)&gStatus);
@@ -362,7 +360,27 @@ void * fusion_threadGetCreepline(void * param)
 	while (1)
 	{
 		FusionObject.creep.status = fusion_getAndParsePlaylist();
-		//eprintf ("%s(%d): FusionObject.creep.status = %d.\n", __FUNCTION__, __LINE__, FusionObject.creep.status);
+		eprintf ("%s(%d): FusionObject.creep.status = %d.\n", __FUNCTION__, __LINE__, FusionObject.creep.status);
+
+		if (FusionObject.creep.status == FUSION_NEW_CREEP)
+		{
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+			//eprintf ("%s(%d): FUSION_NEW_CREEP -> FUSION_SAME_CREEP. Set iShown = 0. startTime = %lld.\n", __FUNCTION__, __LINE__, FusionObject.creep.startTime);
+			FusionObject.creep.deltaTime = 0;
+			FusionObject.creep.isShown = 0;	// test
+			FusionObject.creep.status = FUSION_SAME_CREEP;
+		}/*
+		else if (FusionObject.creep.status == FUSION_SAME_CREEP && FusionObject.creep.isShown)
+		{
+			eprintf ("%s(%d): FusionObject.creep.status = FUSION_SAME_CREEP, creepShown got. Wait pause = %d sec and start again.\n", __FUNCTION__, __LINE__, FusionObject.creep.pause);
+			fusion_wait(FusionObject.creep.pause * 1000);
+			gettimeofday(&tv, NULL);
+			FusionObject.creep.startTime = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+			FusionObject.creep.isShown = 0;
+			FusionObject.creep.deltaTime = 0;
+		}*/
 
 		fusion_clearMemCache();
 		fusion_wait(FusionObject.checktime * 1000);
@@ -1387,6 +1405,58 @@ int fusion_parsePlaylistLogo(cJSON * root)
 	return 0;
 }
 
+int fusion_createCreeplineSurface()
+{
+	if (FusionObject.creepWidth == 0) return -1;
+
+	int surfaceHeight = FUSION_SURF_HEIGHT;
+	int surfaceWidth = FusionObject.creepWidth + interfaceInfo.screenWidth;
+
+	pthread_mutex_lock(&FusionObject.mutexDtmf);
+	if (FusionObject.preallocSurface){
+		free (FusionObject.preallocSurface);
+		FusionObject.preallocSurface = NULL;
+	}
+	FusionObject.preallocSurface = malloc (surfaceWidth * surfaceHeight * 4);
+	if (FusionObject.preallocSurface == NULL)
+	{
+		pthread_mutex_unlock(&FusionObject.mutexDtmf);
+		eprintf("%s(%d): ERROR malloc %d bytes\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * surfaceHeight * 4);
+		return FUSION_FAIL;
+	}
+
+	DFBSurfaceDescription fusion_desc;
+	fusion_desc.flags = DSDESC_PREALLOCATED | DSDESC_PIXELFORMAT | DSDESC_WIDTH | DSDESC_HEIGHT;
+	//fusion_desc.caps = DSCAPS_SYSTEMONLY | DSCAPS_STATIC_ALLOC | DSCAPS_DOUBLE | DSCAPS_FLIPPING;
+	fusion_desc.caps = DSCAPS_NONE;
+	fusion_desc.pixelformat = DSPF_ARGB;
+	fusion_desc.width = surfaceWidth;
+	fusion_desc.height = surfaceHeight;
+
+	fusion_desc.preallocated[0].data = FusionObject.preallocSurface;
+	fusion_desc.preallocated[0].pitch = fusion_desc.width * 4;
+	fusion_desc.preallocated[1].data = NULL;
+	fusion_desc.preallocated[1].pitch = 0;
+
+	if (fusion_surface){
+		fusion_surface->Release(fusion_surface);
+		fusion_surface = NULL;
+	}
+
+	DFBCHECK (pgfx_dfb->CreateSurface (pgfx_dfb, &fusion_desc, &fusion_surface));
+	fusion_surface->GetSize (fusion_surface, &fusion_desc.width, &fusion_desc.height);
+
+	int x = 0;
+	int y = FUSION_FONT_HEIGHT;
+	gfx_drawText(fusion_surface, fusion_font, 255, 255, 255, 255, x, y, FusionObject.creepline, 0, 1);
+	// clear fusion_surface after creep tail
+	gfx_drawRectangle(fusion_surface, 0x0, 0x0, 0x0, 0x0, x+FusionObject.creepWidth, 0, fusion_desc.width - (x + FusionObject.creepWidth), fusion_desc.height);
+
+	pthread_mutex_unlock(&FusionObject.mutexDtmf);
+
+	return 0;
+}
+
 int fusion_parsePlaylistCreep(cJSON * root)
 {
 	int i;
@@ -1441,6 +1511,7 @@ int fusion_parsePlaylistCreep(cJSON * root)
 		else {
 			FusionObject.creep.pause = atoi(jsonPause->valuestring);
 		}
+
 		if (i) strncat(allCreeps, FUSION_CREEP_SPACES, strlen(FUSION_CREEP_SPACES));
 		strncat(allCreeps, jsonText->valuestring, FUSION_MAX_CREEPLEN); // truncate
 	}
@@ -1450,9 +1521,8 @@ int fusion_parsePlaylistCreep(cJSON * root)
 	}
 	int creepLen = strlen(allCreeps) + 32;
 
-	if (!FusionObject.creepline){
-		result = FUSION_NEW_CREEP;
-
+	if (!FusionObject.creepline)
+	{
 		pthread_mutex_lock(&FusionObject.creep.mutex);
 		FusionObject.creepline = (char*)malloc(creepLen);
 
@@ -1464,14 +1534,29 @@ int fusion_parsePlaylistCreep(cJSON * root)
 		}
 		FusionObject.creepline[0] = '\0';
 		snprintf (FusionObject.creepline, creepLen, "%s", allCreeps);
-		pthread_mutex_unlock(&FusionObject.creep.mutex);
-		eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
-	}
-	else if (strcmp(FusionObject.creepline, allCreeps)) {
-		// todo : wait event current creepline is chown
+		fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
+
+		fusion_createCreeplineSurface();
 		result = FUSION_NEW_CREEP;
+		pthread_mutex_unlock(&FusionObject.creep.mutex);
+		free (allCreeps);
+
+		eprintf ("%s(%d): Creepline (initial) = %s, pause = %d\n", __FUNCTION__, __LINE__, 
+			FusionObject.creepline, FusionObject.creep.pause);
+	}
+	else if (strcmp(FusionObject.creepline, allCreeps))
+	{
 		pthread_mutex_lock(&FusionObject.creep.mutex);
-		if (FusionObject.creepline) {
+		if (FusionObject.creepline) 
+		{
+			if (FusionObject.creep.isShown == 0) {
+				eprintf ("%s(%d): Got new creep. Wait till current creep ends...\n", __FUNCTION__, __LINE__);
+			}
+			while (FusionObject.creep.isShown == 0){
+				fusion_wait(500);
+			}
+			eprintf ("%s(%d): End wait.\n", __FUNCTION__, __LINE__);
+
 			free (FusionObject.creepline);
 			FusionObject.creepline = NULL;
 		}
@@ -1483,60 +1568,21 @@ int fusion_parsePlaylistCreep(cJSON * root)
 			return FUSION_SAME_CREEP;
 		}
 		snprintf (FusionObject.creepline, creepLen, "%s", allCreeps);
+		fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
+
+		fusion_createCreeplineSurface();
+		result = FUSION_NEW_CREEP;
 		pthread_mutex_unlock(&FusionObject.creep.mutex);
-		eprintf ("%s(%d): creepline = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
+		free (allCreeps);
+
+		eprintf ("%s(%d): Creepline (updated) = %s, pause = %d\n", __FUNCTION__, __LINE__, FusionObject.creepline, FusionObject.creep.pause);
 	}
-	free (allCreeps);
-
-	fusion_font->GetStringWidth(fusion_font, FusionObject.creepline, -1, &FusionObject.creepWidth);
-
-	if (FusionObject.creepWidth && (result == FUSION_NEW_CREEP)){
-
-		int surfaceHeight = FUSION_SURF_HEIGHT;
-		int surfaceWidth = FusionObject.creepWidth + interfaceInfo.screenWidth;
-
-		pthread_mutex_lock(&FusionObject.mutexDtmf);
-		if (FusionObject.preallocSurface){
-			free (FusionObject.preallocSurface);
-			FusionObject.preallocSurface = NULL;
-		}
-		FusionObject.preallocSurface = malloc (surfaceWidth * surfaceHeight * 4);
-		if (FusionObject.preallocSurface == NULL)
-		{
-			pthread_mutex_unlock(&FusionObject.mutexDtmf);
-			eprintf("%s(%d): ERROR malloc %d bytes\n", __FUNCTION__, __LINE__, FusionObject.creepWidth * surfaceHeight * 4);
-			return FUSION_FAIL;
-		}
-
-		DFBSurfaceDescription fusion_desc;
-		fusion_desc.flags = DSDESC_PREALLOCATED | DSDESC_PIXELFORMAT | DSDESC_WIDTH | DSDESC_HEIGHT;
-		//fusion_desc.caps = DSCAPS_SYSTEMONLY | DSCAPS_STATIC_ALLOC | DSCAPS_DOUBLE | DSCAPS_FLIPPING;
-		fusion_desc.caps = DSCAPS_NONE;
-		fusion_desc.pixelformat = DSPF_ARGB;
-		fusion_desc.width = surfaceWidth;
-		fusion_desc.height = surfaceHeight;
-
-		fusion_desc.preallocated[0].data = FusionObject.preallocSurface;
-		fusion_desc.preallocated[0].pitch = fusion_desc.width * 4;
-		fusion_desc.preallocated[1].data = NULL;
-		fusion_desc.preallocated[1].pitch = 0;
-
-		if (fusion_surface){
-			fusion_surface->Release(fusion_surface);
-			fusion_surface = NULL;
-		}
-
-		DFBCHECK (pgfx_dfb->CreateSurface (pgfx_dfb, &fusion_desc, &fusion_surface));
-		fusion_surface->GetSize (fusion_surface, &fusion_desc.width, &fusion_desc.height);
-
-		int x = 0;
-		int y = FUSION_FONT_HEIGHT;
-		gfx_drawText(fusion_surface, fusion_font, 255, 255, 255, 255, x, y, FusionObject.creepline, 0, 1);
-		// clear fusion_surface after creep tail
-		gfx_drawRectangle(fusion_surface, 0x0, 0x0, 0x0, 0x0, x+FusionObject.creepWidth, 0, fusion_desc.width - (x + FusionObject.creepWidth), fusion_desc.height);
-
-		pthread_mutex_unlock(&FusionObject.mutexDtmf);
+	else if (strcmp(FusionObject.creepline, allCreeps) == 0)
+	{
+		free (allCreeps);
+		return FUSION_SAME_CREEP;
 	}
+
 	return result;
 }
 
