@@ -360,7 +360,6 @@ void * fusion_threadGetCreepline(void * param)
 	while (1)
 	{
 		FusionObject.creep.status = fusion_getAndParsePlaylist();
-		eprintf ("%s(%d): FusionObject.creep.status = %d.\n", __FUNCTION__, __LINE__, FusionObject.creep.status);
 
 		if (FusionObject.creep.status == FUSION_NEW_CREEP)
 		{
