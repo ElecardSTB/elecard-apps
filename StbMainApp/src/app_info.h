@@ -603,6 +603,9 @@ typedef struct __stb810_playbackInfo
 	int                  channel;
 	char                 description[MENU_ENTRY_INFO_LENGTH];
 	char                 thumbnail[MAX_URL];
+#ifdef ENABLE_ANALOGTV
+	int                  analogStandby;
+#endif
 } stb810_playbackInfo;
 
 typedef struct __stb810_networkInfo

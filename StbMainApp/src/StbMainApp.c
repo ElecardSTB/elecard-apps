@@ -574,6 +574,14 @@ static int toggleStandby(void)
 			offair_stopVideo(screenMain, 1);
 		}
 #endif
+#ifdef ENABLE_ANALOGTV
+		appControlInfo.playbackInfo.analogStandby = 0;
+		if (appControlInfo.tvInfo.active) {
+			analogtv_stop();
+			appControlInfo.playbackInfo.analogStandby = 1;
+			gfx_stopVideoProvider(screenMain, GFX_STOP, 1);
+		}
+#endif
 		interface_displayMenu(1);
 
 		system("standbyon");
@@ -587,6 +595,13 @@ static int toggleStandby(void)
 			cmd.command = interfaceCommandPlay;
 			interface_processCommand(&cmd);
 		}
+#ifdef ENABLE_ANALOGTV
+		if (appControlInfo.playbackInfo.analogStandby == 1){
+			appControlInfo.playbackInfo.streamSource = streamSourceAnalogTV;
+			appControlInfo.playbackInfo.analogStandby = 0;
+		}
+#endif
+
 #ifdef ENABLE_DVB
 		if(inStandbyActiveVideo<0)
 			offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
