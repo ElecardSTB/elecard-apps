@@ -420,6 +420,10 @@ ifneq ($(SHOW_LOGO_TEXT),)
 	SEP_FLAGS_interface.c += -DSHOW_LOGO_TEXT=\"$(SHOW_LOGO_TEXT)\"
 endif
 
+ifneq ($(DEFAULT_SUBTITLE_LANGUAGE),)
+	LOCAL_CFLAGS += -DDEFAULT_SUBTITLE_LANGUAGE=\"$(DEFAULT_SUBTITLE_LANGUAGE)\"
+endif
+
 # -----------------------------------------------------------------------------
 # File layout
 # -----------------------------------------------------------------------------
