@@ -560,8 +560,19 @@ static int toggleStandby(void)
 		}
 #endif
 
-		inStandbyActiveVideo = gfx_videoProviderIsActive(screenMain);
+		appControlInfo.playbackInfo.savedStandbySource = streamSourceNone;
+#ifdef ENABLE_DVB
+		if (appControlInfo.dvbInfo.active) {
+			appControlInfo.playbackInfo.savedStandbySource = streamSourceDVB;
+		}
+#endif
+#ifdef ENABLE_ANALOGTV
+		if (appControlInfo.tvInfo.active) {
+			appControlInfo.playbackInfo.savedStandbySource = streamSourceAnalogTV;
+		}
+#endif
 
+		inStandbyActiveVideo = gfx_videoProviderIsActive(screenMain);
 		if(inStandbyActiveVideo) {
 			memset(&cmd, 0, sizeof(interfaceCommandEvent_t));
 			cmd.source = DID_STANDBY;
@@ -575,10 +586,8 @@ static int toggleStandby(void)
 		}
 #endif
 #ifdef ENABLE_ANALOGTV
-		appControlInfo.playbackInfo.analogStandby = 0;
 		if (appControlInfo.tvInfo.active) {
 			analogtv_stop();
-			appControlInfo.playbackInfo.analogStandby = 1;
 			gfx_stopVideoProvider(screenMain, GFX_STOP, 1);
 		}
 #endif
@@ -596,15 +605,19 @@ static int toggleStandby(void)
 			interface_processCommand(&cmd);
 		}
 #ifdef ENABLE_ANALOGTV
-		if (appControlInfo.playbackInfo.analogStandby == 1){
+		if (appControlInfo.playbackInfo.savedStandbySource == streamSourceAnalogTV){
 			appControlInfo.playbackInfo.streamSource = streamSourceAnalogTV;
-			appControlInfo.playbackInfo.analogStandby = 0;
+			appControlInfo.playbackInfo.savedStandbySource = streamSourceNone;
 		}
 #endif
 
 #ifdef ENABLE_DVB
-		if(inStandbyActiveVideo<0)
+		if (appControlInfo.playbackInfo.savedStandbySource == streamSourceDVB)
+		{
+			appControlInfo.playbackInfo.streamSource = streamSourceDVB;
+			appControlInfo.playbackInfo.savedStandbySource = streamSourceNone;
 			offair_channelChange(interfaceInfo.currentMenu, CHANNEL_INFO_SET(screenMain, appControlInfo.dvbInfo.channel));
+		}
 #endif
 		//dprintf("%s: return from standby\n", __FUNCTION__);
 		appControlInfo.inStandby = 0;
