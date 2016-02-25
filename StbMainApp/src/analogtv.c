@@ -377,6 +377,7 @@ void analogtv_stop(void)
 	if(appControlInfo.playbackInfo.streamSource == streamSourceAnalogTV) {
 		offair_stopVideo(screenMain, 1);
 		appControlInfo.tvInfo.active = 0;
+		eprintf ("%s(%d): tvInfo.active <- 0\n", __FUNCTION__, __LINE__);
 	}
 }
 
@@ -605,8 +606,11 @@ int32_t analogtv_activateChannel(interfaceMenu_t *pMenu, void *pArg)
 //	saveAppSettings();
 
 	snprintf(cmd, sizeof(cmd), URL_ANALOGTV_MEDIA "%u@%s:%s", freq, element->sysEncode, element->audio);
-	gfx_startVideoProvider(cmd, 0, 0, NULL);
 
+	if (gfx_startVideoProvider(cmd, 0, 0, NULL) != 0){
+		appControlInfo.tvInfo.active = 0;
+		return 0;
+	}
 
 	if(appControlInfo.tvInfo.active != 0 && result == 0) {
 		appControlInfo.playbackInfo.channel = id + dvbChannel_getCount();

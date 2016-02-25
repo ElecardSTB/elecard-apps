@@ -2035,6 +2035,12 @@ int offair_channelChange(interfaceMenu_t *pMenu, void* pArg)
 	int32_t		buttons;
 	int32_t		previousChannel;
 
+#ifdef ENABLE_ANALOGTV
+	if (appControlInfo.tvInfo.active) {
+		appControlInfo.tvInfo.active = 0;
+	}
+#endif
+
 	EIT_service_t *service = dvbChannel_getService(channelNumber);
 
 	dprintf("%s: channelNumber = %d\n", __FUNCTION__, channelNumber);
