@@ -227,7 +227,8 @@ void * fusion_threadDownloadFirmware(void * param)
 	*/
 	eprintf ("%s: Save %s to %s ...\n", __FUNCTION__, url, filepath);
 	//sprintf (cmd, "wget --limit-rate=%dk -c -q \"%s\" -O %s ", g_shaping, url, filepath); // 2>/dev/null, quiet
-	sprintf (cmd, "/usr/sbin/wget1.12 --limit-rate=%dk -c -q \"%s\" -O %s ", g_shaping, url, filepath); // 2>/dev/null, quiet
+	//sprintf (cmd, "/usr/sbin/wget1.12 --limit-rate=%dk -c -q \"%s\" -O %s ", g_shaping, url, filepath); // 2>/dev/null, quiet
+	sprintf (cmd, "wget -c -q \"%s\" -O %s ", url, filepath); // 2>/dev/null, quiet
 	system(cmd);
 
 	eprintf ("%s(%d): Exit.\n", __FUNCTION__, __LINE__);
@@ -1883,7 +1884,8 @@ int fusion_saveFileByWget (char * url, char * filepath, int dtmf)
 	if (fusion_checkAdIsComplete(filepath) == NO)
 	{
 		//sprintf (cmd, "wget --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
-		sprintf (cmd, "/usr/sbin/wget1.12 --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
+		//sprintf (cmd, "/usr/sbin/wget1.12 --limit-rate=%dk -c -q %s -O %s", g_shaping, url, filepath); // quiet mode
+		sprintf (cmd, "wget -c -q %s -O %s", url, filepath); // quiet mode
 		eprintf ("%s(%d): %s ...\n",   __FUNCTION__, __LINE__, cmd);
 		system(cmd);
 	}
