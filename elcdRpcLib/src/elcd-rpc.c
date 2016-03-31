@@ -91,6 +91,7 @@ static uintLookup_t rpc_commands[] = {
 	{elcmd_tvscan,				"tvscan"},
 	{elcmd_tvtune,				"tvtune"},
 	{elcmd_subtitle,			"subtitle"},
+	{elcmd_stopsubtitle,		"stopsubtitle"},
 	{elcmd_recstart,			"recstart"},
 	{elcmd_recstop,				"recstop"},
 	{elcmd_reclist,				"reclist"},

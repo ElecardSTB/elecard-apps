@@ -559,7 +559,8 @@ static int toggleStandby(void)
 			offair_stopVideo(screenMain, 1);
 		}
 #endif
-
+		offair_subtitleStop();
+		
 		appControlInfo.playbackInfo.savedStandbySource = streamSourceNone;
 #ifdef ENABLE_DVB
 		if (appControlInfo.dvbInfo.active) {

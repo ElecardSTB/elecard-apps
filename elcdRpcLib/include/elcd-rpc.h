@@ -77,6 +77,7 @@ typedef enum
 	elcmd_tvscan,
 	elcmd_tvtune,
 	elcmd_subtitle,
+	elcmd_stopsubtitle,
 	elcmd_reclist,
 	elcmd_getstream,
 	elcmd_TSsectionStreamOn,

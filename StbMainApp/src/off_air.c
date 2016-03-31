@@ -1495,6 +1495,25 @@ static int offair_subtitleControlHide(void *ignored)
 	return 0;
 }
 
+int offair_subtitleStop()
+{
+#ifdef STSDK
+	elcdRpcType_t type;
+	cJSON *res = NULL;
+	int ret = st_rpcSync (elcmd_stopsubtitle, NULL, &type, &res);
+	if (ret != 0 || type != elcdRpcResult) {
+		eprintf("%s: failed: %s\n", __FUNCTION__, jsonGetString(res, ""));
+		cJSON_Delete(res);
+		return -1;
+	}
+	cJSON_Delete(res);
+#endif
+	subtitle.visible = 0;
+	interface_displayMenu(1);
+	//interface_addEvent(offair_subtitleControlHide, NULL, 2000, 1);
+	return 0;
+}
+
 int offair_subtitleShow(uint16_t subtitle_pid)
 {
 #ifdef STSDK
