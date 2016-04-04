@@ -217,7 +217,6 @@ static struct {
 };
 
 static int32_t l_epg_thread_alive = 0;
-int32_t g_requestEpgStop = 0;
 pmysem_t epg_semaphore = 0;
 static pmysem_t offair_semaphore = 0;
 
@@ -772,6 +771,16 @@ static int32_t offair_getUserFrequency(interfaceMenu_t *pMenu, char *value, void
 	return -1;
 }
 
+int32_t offair_stopEPGthread(int32_t wait)
+{
+    l_epg_thread_alive = 0;
+    if(wait) {
+        mysem_get(epg_semaphore);
+        mysem_release(epg_semaphore);
+    }
+    return 0;
+}
+
 void offair_stopVideo(int which, int reset)
 {
     mysem_get(offair_semaphore);
@@ -782,9 +791,8 @@ void offair_stopVideo(int which, int reset)
 #ifdef ENABLE_DVB_DIAG
         interface_removeEvent(offair_updatePSI, NULL);
 #endif
-//         mysem_get(epg_semaphore);
-        l_epg_thread_alive = 0;
-//         mysem_release(epg_semaphore);
+        offair_stopEPGthread(0);
+
         interface_removeEvent(offair_updateEPG, NULL);
 #ifdef ENABLE_STATS
         interface_removeEvent(offair_updateStatsEvent, NULL);
@@ -3886,11 +3894,6 @@ static int offair_updateEPG(void* pArg)
     }
 
     mysem_get(epg_semaphore);
-	if (g_requestEpgStop == 1){
-		mysem_release(epg_semaphore);
-		g_requestEpgStop = 0;
-		return 0;
-	}
     // can be 0 if we switched from DVB when already updating
     if(!appControlInfo.dvbInfo.active
        || (my_channel != appControlInfo.dvbInfo.channel)
@@ -3907,12 +3910,6 @@ static int offair_updateEPG(void* pArg)
     dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
     dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
     dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );
-
-	if (g_requestEpgStop == 1){
-		mysem_release(epg_semaphore);
-		g_requestEpgStop = 0;
-		return 0;
-	}
 
     //double check after dvb_scanForEPG()
     // can be 0 if we switched from DVB when already updating

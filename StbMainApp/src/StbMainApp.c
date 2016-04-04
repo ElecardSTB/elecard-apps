@@ -436,9 +436,6 @@ static int PowerOff(void *pArg)
 	return system("poweroff");
 }
 
-extern int32_t g_requestEpgStop = 0;
-extern pmysem_t epg_semaphore = 0;
-
 static int toggleStandby(void)
 {
 	interfaceCommandEvent_t cmd;
@@ -460,7 +457,6 @@ static int toggleStandby(void)
 #ifdef ENABLE_DVB
 		if (appControlInfo.dvbInfo.active) {
 			appControlInfo.playbackInfo.savedStandbySource = streamSourceDVB;
-			g_requestEpgStop = 1;
 		}
 #endif
 #ifdef ENABLE_ANALOGTV
@@ -491,8 +487,7 @@ static int toggleStandby(void)
 		interface_displayMenu(1);
 
 #ifdef ENABLE_DVB
-		mysem_get(epg_semaphore);
-		mysem_release(epg_semaphore);
+        offair_stopEPGthread(1);
 #endif
 
 		system("standbyon");
