@@ -49,7 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "playlist.h"
 #include "list.h"
 #include "rtp_common.h"
-#include "output.h"
+#include "output_network.h"
 #include "m3u.h"
 #include "xmlconfig.h"
 #include "pvr.h"
@@ -1876,6 +1876,7 @@ static int rtp_setChannelFromURL(interfaceMenu_t *pMenu, char *value, char *desc
 
 		desc.media[0].fmt = payloadTypeMpegTS;
 		desc.media[0].type = mediaTypeVideo;
+		desc.media[0].proto = url.protocol;
 		desc.media[0].port = url.port;
 
 		desc.connection.addrtype = addrTypeIPv4;

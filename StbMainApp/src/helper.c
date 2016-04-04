@@ -40,10 +40,10 @@ typedef struct {
 /******************************************************************
 * FUNCTION IMPLEMENTATION                     <Module>_<Word>+    *
 *******************************************************************/
-int helperFileExists(const char* filename)
+int32_t helperFileExists(const char* filename)
 {
-	int file;
-	int ret = 0;
+	int32_t file;
+	int32_t ret = 0;
 #if (defined STB225)
 	const char *filename_t = filename;
 	const char *prefix = "file://";
@@ -559,7 +559,7 @@ const void *commonList_get(listHead_t *commonList, uint32_t number)
 	return NULL;
 }
 
-static int commonList_cmp_qsort_r(const void *p1, const void *p2, void *pArg)
+static int32_t commonList_cmp_qsort_r(const void *p1, const void *p2, void *pArg)
 {
 	listHead_t *commonList = (listHead_t *)pArg;
 
@@ -577,16 +577,16 @@ static int commonList_cmp_qsort_r(const void *p1, const void *p2, void *pArg)
 
 struct compar_data {
     void* arg;
-    int (*compar)(const void *, const void *, void *);
+    int32_t (*compar)(const void *, const void *, void *);
 };
 static struct compar_data compar_data;
 
-static int compar_wrapper(const void* a, const void* b) {
+static int32_t compar_wrapper(const void* a, const void* b) {
   return compar_data.compar(a, b, compar_data.arg);
 }
 
 static void qsort_r(void *base, size_t nmemb, size_t size,
-            int (*compar)(const void *, const void *, void *),
+            int32_t (*compar)(const void *, const void *, void *),
             void* arg)
 {
   compar_data.arg = arg;
@@ -630,4 +630,167 @@ int32_t commonList_sort(listHead_t *commonList)
 	commonList_resetLast(commonList);
 	free(array);
 	return 0;
+}
+
+
+int32_t helperReadLine(int32_t file, char* buffer)
+{
+    if ( file )
+    {
+        int32_t index = 0;
+        while ( 1 )
+        {
+            char c;
+
+            if ( read(file, &c, 1) < 1 )
+            {
+                if ( index > 0 )
+                {
+                    buffer[index] = '\0';
+                    return 0;
+                }
+                return -1;
+            }
+
+            if ( c == '\n' )
+            {
+                buffer[index] = '\0';
+                return 0;
+            } else if ( c == '\r' )
+            {
+                continue;
+            } else
+            {
+                buffer[index] = c;
+                index++;
+            }
+        }
+    }
+    return -1;
+}
+
+int32_t helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar)
+{
+    int32_t file, res;
+    char buf[BUFFER_SIZE];
+    char *pos, *end;
+
+    if (cmd != NULL)
+    {
+        /* empty output file */
+        sprintf(buf, "echo -n > %s", path);
+        system(buf);
+
+        sprintf(buf, "%s > %s", cmd, path);
+        system(buf);
+    }
+
+    res = 0;
+    file = open(path, O_RDONLY);
+    if (file > 0)
+    {
+        if (helperReadLine(file, buf) == 0 && strlen(buf) > 0)
+        {
+            if (pattern != NULL)
+            {
+                pos = strstr(buf, pattern);
+            } else
+            {
+                pos = buf;
+            }
+            if (pos != NULL)
+            {
+                if (out == NULL)
+                {
+                    res = 1;
+                } else
+                {
+                    if (pattern != NULL)
+                    {
+                        pos += strlen(pattern);
+                    }
+                    while(*pos == ' ')
+                    {
+                        pos++;
+                    }
+                    if ((end = strchr(pos, stopChar)) != NULL || (end = strchr(pos, '\r')) != NULL || (end = strchr(pos, '\n')) != NULL)
+                    {
+                        *end = 0;
+                    }
+                    strcpy(out, pos);
+                    res = 1;
+                }
+            }
+        }
+        close(file);
+    }
+
+    return res;
+}
+
+
+char *helperStrCpyTrimSystem(char *dst, char *src)
+{
+    char *ptr = dst;
+    while(*src) {
+        if((unsigned char)(*src) > 127) {
+            *ptr++ = *src;
+        } else if( *src >= ' ' ) {
+            switch(*src) {
+                case '"': case '*': case '/': case ':': case '|':
+                case '<': case '>': case '?': case '\\': case 127: break;
+                default: *ptr++ = *src;
+            }
+        }
+        src++;
+    }
+    *ptr = 0;
+    return dst;
+}
+
+int32_t helperSafeStrCpy(char **dest, const char *src)
+{
+    if(NULL == dest) {
+        return -2;
+    }
+
+    if(NULL == src) {
+        if(*dest) {
+            free(*dest);
+            *dest = NULL;
+        }
+        return 0;
+    }
+
+    size_t src_length = strlen(src);
+    if(NULL == *dest) {
+        if(NULL == (*dest = (char*)malloc(src_length + 1))) {
+            return 1;
+        }
+    } else {
+        if(strlen(*dest ) < src_length) {
+            char *new_str = (char*)realloc(*dest, src_length + 1);
+            if(NULL == new_str) {
+                free(*dest);
+                *dest = NULL;
+                return 1; // we don't want old content to stay
+            }
+            *dest = new_str;
+        }
+    }
+    memcpy(*dest, src, src_length + 1);
+
+    return 0;
+}
+
+int32_t Helper_IsTimeGreater(struct timeval t1, struct timeval t2)
+{
+    if(t1.tv_sec > t2.tv_sec)
+        return 1;
+    if(t1.tv_sec < t2.tv_sec)
+        return 0;
+    if(t1.tv_usec > t2.tv_usec)
+        return 1;
+
+    return 0;
 }

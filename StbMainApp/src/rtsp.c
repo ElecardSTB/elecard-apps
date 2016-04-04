@@ -50,7 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtp_common.h"
 #include "l10n.h"
 #include "playlist.h"
-#include "output.h"
+#include "output_network.h"
 #ifdef ENABLE_VIDIMAX
 #include "vidimax.h"
 #endif

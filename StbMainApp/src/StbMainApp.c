@@ -59,7 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtsp.h"
 #include "rutube.h"
 #include "off_air.h"
-#include "output.h"
+#include "output_network.h"
 #include "voip.h"
 #include "media.h"
 #include "playlist.h"
@@ -189,131 +189,35 @@ int gIgnoreEventTimestamp = 0;
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
 
-int helperReadLine(int file, char* buffer)
+int32_t helperParseMmio(int32_t addr)
 {
-	if ( file )
-	{
-		int index = 0;
-		while ( 1 )
-		{
-			char c;
+    int32_t file, num;
+    char buf[BUFFER_SIZE];
+    char *pos;
 
-			if ( read(file, &c, 1) < 1 )
-			{
-				if ( index > 0 )
-				{
-					buffer[index] = '\0';
-					return 0;
-				}
-				return -1;
-			}
+    sprintf(buf, INFO_MMIO_APP " 0x%X > " INFO_TEMP_FILE, addr);
+    system(buf);
 
-			if ( c == '\n' )
-			{
-				buffer[index] = '\0';
-				return 0;
-			} else if ( c == '\r' )
-			{
-				continue;
-			} else
-			{
-				buffer[index] = c;
-				index++;
-			}
-		}
-	}
-	return -1;
+    num = 0;
+
+    file = open(INFO_TEMP_FILE, O_RDONLY);
+    if (file > 0)
+    {
+        if (helperReadLine(file, buf) == 0 && strlen(buf) > 0)
+        {
+            pos = strstr(buf, INFO_ADDR_TEMPLATE);
+            if (pos != NULL)
+            {
+                pos += sizeof(INFO_ADDR_TEMPLATE)-1;
+                num = strtol(pos, NULL, 16);
+            }
+        }
+        close(file);
+    }
+
+    return num;
 }
 
-int helperParseMmio(int addr)
-{
-	int file, num;
-	char buf[BUFFER_SIZE];
-	char *pos;
-
-	sprintf(buf, INFO_MMIO_APP " 0x%X > " INFO_TEMP_FILE, addr);
-	system(buf);
-
-	num = 0;
-
-	file = open(INFO_TEMP_FILE, O_RDONLY);
-	if (file > 0)
-	{
-		if (helperReadLine(file, buf) == 0 && strlen(buf) > 0)
-		{
-			pos = strstr(buf, INFO_ADDR_TEMPLATE);
-			if (pos != NULL)
-			{
-				pos += sizeof(INFO_ADDR_TEMPLATE)-1;
-				num = strtol(pos, NULL, 16);
-			}
-		}
-		close(file);
-	}
-
-	return num;
-}
-
-
-
-int helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar )
-{
-	int file, res;
-	char buf[BUFFER_SIZE];
-	char *pos, *end;
-
-	if (cmd != NULL)
-	{
-		/* empty output file */
-		sprintf(buf, "echo -n > %s", path);
-		system(buf);
-
-		sprintf(buf, "%s > %s", cmd, path);
-		system(buf);
-	}
-
-	res = 0;
-	file = open(path, O_RDONLY);
-	if (file > 0)
-	{
-		if (helperReadLine(file, buf) == 0 && strlen(buf) > 0)
-		{
-			if (pattern != NULL)
-			{
-				pos = strstr(buf, pattern);
-			} else
-			{
-				pos = buf;
-			}
-			if (pos != NULL)
-			{
-				if (out == NULL)
-				{
-					res = 1;
-				} else
-				{
-					if (pattern != NULL)
-					{
-						pos += strlen(pattern);
-					}
-					while(*pos == ' ')
-					{
-						pos++;
-					}
-					if ((end = strchr(pos, stopChar)) != NULL || (end = strchr(pos, '\r')) != NULL || (end = strchr(pos, '\n')) != NULL)
-					{
-						*end = 0;
-					}
-					strcpy(out, pos);
-					res = 1;
-				}
-			}
-		}
-		close(file);
-	}
-
-	return res;
-}
 
 /* Handle any registered signal by requesting a graceful exit */
 void signal_handler(int signal)
@@ -521,18 +425,6 @@ static int helperIsEventValid(DFBEvent *event)
 		}
 	}
 	return valid;
-}
-
-static int32_t Helper_IsTimeGreater(struct timeval t1, struct timeval t2)
-{
-	if(t1.tv_sec > t2.tv_sec)
-		return 1;
-	if(t1.tv_sec < t2.tv_sec)
-		return 0;
-	if(t1.tv_usec > t2.tv_usec)
-		return 1;
-
-	return 0;
 }
 
 #define POWEROFF_TIMEOUT	3 //seconds
@@ -2457,95 +2349,6 @@ int main(int argc, char *argv[])
 
 	unlink("/var/run/mainapp.pid");
 	eprintf("App: Goodbye.\n");
-
-	return 0;
-}
-
-char *helperEthDevice(int i)
-{
-	static char temp[64];
-
-	switch( i )
-	{
-#ifdef ENABLE_PPP
-		case ifacePPP:
-			strcpy(temp, "ppp0");
-			break;
-#endif
-#ifdef ENABLE_WIFI
-		case ifaceWireless:
-			strcpy(temp, "wlan0");
-			break;
-#endif
-#ifdef STSDK
-		case ifaceLAN:
-			sprintf(temp, "br0");
-			break;
-#endif
-		case ifaceWAN:
-			if( output_isBridge() )
-			{
-				sprintf(temp, "br%d", i);
-				break;
-			}
-			// fall through
-		default:
-			sprintf(temp, "eth%d", i);
-			break;
-	}
-	return temp;
-}
-
-char *helperStrCpyTrimSystem(char *dst, char *src)
-{
-	char *ptr = dst;
-	while(*src) {
-		if((unsigned char)(*src) > 127) {
-			*ptr++ = *src;
-		} else if( *src >= ' ' ) {
-			switch(*src) {
-				case '"': case '*': case '/': case ':': case '|':
-				case '<': case '>': case '?': case '\\': case 127: break;
-				default: *ptr++ = *src;
-			}
-		}
-		src++;
-	}
-	*ptr = 0;
-	return dst;
-}
-
-int helperSafeStrCpy( char** dest, const char* src )
-{
-	if(NULL == dest) {
-		return -2;
-	}
-
-	if(NULL == src) {
-		if(*dest) {
-			free(*dest);
-			*dest = NULL;
-		}
-		return 0;
-	}
-
-	size_t src_length = strlen(src);
-	if(NULL == *dest) {
-		if(NULL == (*dest = (char*)dmalloc(src_length + 1))) {
-			return 1;
-		}
-	} else {
-		if(strlen(*dest ) < src_length) {
-			char *new_str = (char*)drealloc(*dest, src_length + 1);
-			if(NULL == new_str) {
-				free(*dest);
-				*dest = NULL;
-				return 1; // we don't want old content to stay
-			}
-			*dest = new_str;
-		}
-	}
-	memcpy(*dest, src, src_length + 1);
 
 	return 0;
 }

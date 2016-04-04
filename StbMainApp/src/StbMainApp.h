@@ -71,37 +71,17 @@ extern "C" {
 
 int  helperStartApp(const char* filename);
 
-int  helperReadLine(int file, char* buffer);
-
-int  helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar);
-
-int  helperParseMmio(int addr);
-
-/** strcpy without characters unsupported by FAT filesystem
- * @param[out] dst Destination pointer
- * @param[in]  src Source stream
- * @return     dst
- */
-char *helperStrCpyTrimSystem(char *dst, char *src);
+int32_t helperParseMmio(int32_t addr);
 
 void helperFlushEvents(void);
 
 interfaceCommand_t helperGetEvent(int flush);
-
-char *helperEthDevice(int i);
 
 void signal_handler(int signal);
 
 void tprintf(const char *str, ...);
 
 int  helperCheckUpdates(void);
-
-/** Copy src string to new dest buffer.
- * @param[out] dest If already allocated and have enough space, will be used without changing pointer. If buffer will not be big enough, realloc would be used on *dest.
- * @param[in]  stc  If null, *dest will be freed and nulled.
- * @return 0 if src was copied successfully
- */
-int  helperSafeStrCpy( char** dest, const char* src );
 
 /** UTC equivalent for mktime() */
 time_t gmktime(struct tm *t);

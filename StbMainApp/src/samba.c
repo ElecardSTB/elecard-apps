@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "l10n.h"
 #include "helper.h"
 #include "media.h"
+#include "output_network.h"
 
 #include <service.h>
 
@@ -162,12 +163,12 @@ static int samba_init()
 	{
 		int exists;
 
-		sprintf(temp, "/sys/class/net/%s", helperEthDevice(i));
+		sprintf(temp, "/sys/class/net/%s", outputNetwork_deviceName(i));
 		exists = helperCheckDirectoryExsists(temp);
 
 		if (exists)
 		{
-			sprintf(temp, "ifconfig %s | grep \"inet addr\"", helperEthDevice(i));
+			sprintf(temp, "ifconfig %s | grep \"inet addr\"", outputNetwork_deviceName(i));
 			if (helperParseLine(INFO_TEMP_FILE, temp, "inet addr:", buf, ' '))
 			{
 				*str = ' ';
@@ -177,7 +178,7 @@ static int samba_init()
 				strcpy(str, "/24");
 				str+=3;
 				res++;
-				/*sprintf(temp, "ifconfig %s | grep \"Mask:\"", helperEthDevice(i));
+				/*sprintf(temp, "ifconfig %s | grep \"Mask:\"", outputNetwork_deviceName(i));
 				if (helperParseLine(INFO_TEMP_FILE, temp, "Mask:", buf, ' '))
 				{
 					*str = '/';
@@ -195,12 +196,12 @@ static int samba_init()
 #ifdef ENABLE_WIFI
 	{
 		int exists;
-		sprintf(temp, "/sys/class/net/%s", helperEthDevice(ifaceWireless));
+		sprintf(temp, "/sys/class/net/%s", outputNetwork_deviceName(ifaceWireless));
 		exists = helperCheckDirectoryExsists(temp);
 
 		if (exists)
 		{
-			sprintf(temp, "ifconfig %s | grep \"inet addr\"", helperEthDevice(ifaceWireless));
+			sprintf(temp, "ifconfig %s | grep \"inet addr\"", outputNetwork_deviceName(ifaceWireless));
 			if (helperParseLine(INFO_TEMP_FILE, temp, "inet addr:", buf, ' '))
 			{
 				*str = ' ';

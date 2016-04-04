@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef ENABLE_WIFI
 
 #include "l10n.h"
-#include "output.h"
+#include "output_network.h"
 
 #include <common.h>
 

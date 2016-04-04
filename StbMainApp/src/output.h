@@ -40,7 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "interface.h"
 #include "app_info.h"
-#include "stb_wireless.h"
 
 /*******************
 * EXPORTED MACROS  *
@@ -92,9 +91,6 @@ extern interfaceListMenu_t OutputMenu;
 /********************************
 * EXPORTED FUNCTIONS PROTOTYPES *
 *********************************/
-void output_redrawMenu(interfaceMenu_t *pMenu);
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -118,45 +114,14 @@ int output_showDVBMenu(interfaceMenu_t *pMenu, void* notused);
 int output_checkProfile(void);
 #endif
 
-/**
-*   @brief Function used to clean up leading zeroes in IP addresses
-*
-*   @retval value
-*/
-char* inet_addr_prepare( char *value);
-
 long output_getColorValue(void *pArg);
 void output_setColorValue(long value, void *pArg);
-
-int output_isBridge(void);
-
-#ifdef ENABLE_WIFI
-extern interfaceListMenu_t WifiSubMenu;
-
-int output_changeWifiKey(interfaceMenu_t *pMenu, void* pArg);
-int output_setESSID(interfaceMenu_t *pMenu, char *value, void* pArg);
-/**
- * @param[in] pArg outputWifiAuth_t to change wireless authentification to
- */
-int output_setAuthMode(interfaceMenu_t *pMenu, void* pArg);
-
-/**
- * @param[in] pArg outputWifiEncryption_t to change wireless encryption to
- */
-int output_setWifiEncryption(interfaceMenu_t *pMenu, void* pArg);
-
-/**
- * @param[in] pArg outputWifiMode_t to change wireless mode to
- */
-int output_setWifiMode(interfaceMenu_t *pMenu, void* pArg);
-#endif
 
 int output_toggleZoom(void);
 
 int output_setZoom(zoomPreset_t preset);
 
 #ifdef STSDK
-int output_readInterfacesFile(void);
 int output_toggleOutputModes(void);
 
 int output_toggleInputs(void);
@@ -165,6 +130,24 @@ void output_onUpdate(int found);
 #endif
 
 int show_info(interfaceMenu_t* pMenu, void* pArg);
+
+/** Display message box if failed is non-zero and no previous failures occured.
+ *  Return non-zero if message was displayed (and display updated). */
+int output_warnIfFailed(int failed);
+
+/** Display message box if saveFailed and redraw menu */
+int output_saveAndRedraw(int saveFailed, interfaceMenu_t *pMenu);
+
+/** Refill menu using pActivatedAction and update display */
+void output_redrawMenu(interfaceMenu_t *pMenu);
+
+/** Refill menu using pActivatedAction
+ * Use this function in messageBox handlers, as display will be updated on exit automatically */
+static inline int output_refillMenu(interfaceMenu_t *pMenu)
+{
+    // assert (pMenu->pActivatedAction != NULL);
+    return pMenu->pActivatedAction(pMenu, pMenu->pArg);
+}
 
 #ifdef __cplusplus
 }
