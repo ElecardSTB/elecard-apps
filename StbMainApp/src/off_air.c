@@ -3907,6 +3907,15 @@ static int offair_updateEPG(void* pArg)
 //         offair_updatePSI(pArg);
 //     }
 
+	appControlInfo.dvbInfo.needRestart = 0;
+	dvb_scanForPMT(appControlInfo.dvbInfo.adapter, service);
+	if (appControlInfo.dvbInfo.needRestart > 0){
+		eprintf("%s(%d): PMT updated. Restart video.\n", __func__, __LINE__);
+		offair_stopVideo(screenMain, 0);
+		offair_startVideo(screenMain);
+		appControlInfo.dvbInfo.needRestart = 0;
+	}
+
     dprintf("%s: *** updating EPG [%s]***\n", __FUNCTION__, dvb_getServiceName(service));
     dvb_scanForEPG(appControlInfo.dvbInfo.adapter, &(service->media));
     dprintf("%s: *** EPG updated ***\n", __FUNCTION__ );

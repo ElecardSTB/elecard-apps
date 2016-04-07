@@ -854,6 +854,289 @@ static int32_t parse_atsc_section(list_element_t **head, uint32_t media_id, uint
 }
 #endif //#if (defined ENABLE_USE_DVB_APPS)
 
+static char checkSectionCrc(const uint8_t *section_bytes)
+{
+	uint32_t  section_length;
+	uint32_t  crc_read_index;
+	uint32_t  crc32val;
+	uint32_t  crc_32;
+
+	// Calculate CRC for a section
+	section_length = ((uint32_t)(section_bytes[1] & 0x0F) << 8) +
+					 (uint32_t)(section_bytes[2]);
+	crc_read_index = section_length + 3 - 4;
+	crc32val       = getCrcValue(section_bytes, crc_read_index);
+	crc_32         = ((uint32_t)(section_bytes[crc_read_index  ]) << 24) +
+					 ((uint32_t)(section_bytes[crc_read_index + 1]) << 16) +
+					 ((uint32_t)(section_bytes[crc_read_index + 2]) << 8) +
+					 ((uint32_t)(section_bytes[crc_read_index + 3]));
+
+	return((crc_32 == crc32val) ? 1 : 0);
+}
+
+int dvb_parsePmt(list_element_t **head, const uint8_t *ptr, uint16_t transport_stream_id, uint32_t media_id, EIT_media_config_t *media)
+{
+	list_element_t **ouiInfo = NULL;
+
+	uint16_t service_id;
+	uint8_t  version_number;
+	uint16_t elementary_PID;
+	uint16_t ES_info_length;
+	uint16_t PCR_PID;
+	uint16_t program_info_length;
+	uint8_t  stream_type;
+
+	uint8_t  descriptor_tag;
+	uint8_t  descriptor_length;
+	uint16_t data_broadcast_id;
+
+	uint32_t  section_length,
+			  section_number, last_section_number,
+			  current_next_indicator,
+			  CRC_32;
+	const uint8_t *srvc, *desc, *data, *bytes;
+
+	list_element_t *service_element  = NULL,
+					*info_element     = NULL,
+					 **head_element     = NULL,
+					   *previous_element = NULL;
+	EIT_service_t  *service          = NULL;
+	PID_info_t     *info             = NULL;
+	int updated = 0, need_update = 0;
+
+	if(!checkSectionCrc(ptr)) {
+		dprintf("ERROR: PMT Section CRC Mismatch\n");
+		return 0;
+	}
+
+	if(ptr[0] == 0x02) {
+		eprintf("PMT\n");
+	} else {
+		dprintf("ERROR: Incorrect PMT table_id 0x%X\n", ptr[0]);
+		return 0;
+	}
+
+	section_length         = ((ptr[1] & 0x0F) << 8) + ptr[2];
+	service_id             = (ptr[3] << 8) + ptr[4];
+	version_number         = (ptr[5] >> 1) & 0x1F;
+	current_next_indicator =   ptr[5] & 1;
+	section_number         =   ptr[6];
+	last_section_number    =   ptr[7];
+	PCR_PID                = ((ptr[8] & 0x1F) << 8) + ptr[9];
+	program_info_length    = ((ptr[10] & 0x0F) << 8) + ptr[11];
+	CRC_32                 = (ptr[section_length + 3 - 4]   << 24) +
+							 (ptr[section_length + 3 - 4 + 1] << 16) +
+							 (ptr[section_length + 3 - 4 + 2] <<  8) +
+							 ptr[section_length + 3 - 4 + 3];
+
+	dprintf("SECTION Len:%d TID:0x%02X VER:0x%02X SID:0x%04X  program_info_len %d\n", section_length, ptr[0], version_number, service_id, program_info_length);
+	dprintf("Kpy +SEC:0x%02X LSEC:0x%02X CURNXT:%01X CRC:0x%08X\n", section_number, last_section_number, current_next_indicator, CRC_32);
+
+	need_update = 0;
+
+	if(service_id != 0) {
+		service_element = find_or_allocate_service(head, service_id, transport_stream_id, media_id, 1);
+
+		if(service_element != NULL) {
+			service = (EIT_service_t *)service_element->data;
+
+			if((service->flags & serviceFlagHasPMT) == 0 || need_update) {
+				service->common.service_id          = service_id;
+				service->common.transport_stream_id = transport_stream_id;
+				service->common.media_id            = media_id;
+				service->flags |= serviceFlagHasPMT;
+				if(media != NULL && service->media.type == serviceMediaNone) {
+					service->media = *media;
+				}
+				dprintf("  +UPDATED\n");
+				updated = 1;
+				need_update = 1;
+			}
+
+			if(service->program_map.map.version_number != version_number || need_update) {
+				service->program_map.map.version_number = version_number;
+				service->program_map.map.PCR_PID        = PCR_PID;
+				dprintf("   +UPDATED\n");
+				updated = 1;
+				need_update = 1;
+
+				head_element = &service->program_map.map.streams;
+				info_element = *head_element;
+				while(info_element != NULL) {
+					info = (PID_info_t *)info_element->data;
+					eprintf("%s(%d): Remove ES with PID 0x%04X\n", __func__, __LINE__, info->elementary_PID);
+					info_element = remove_element(head_element, info_element);
+					if (!appControlInfo.dvbInfo.needRestart) appControlInfo.dvbInfo.needRestart = 1;
+				}
+			}
+		}
+	}
+
+	desc = ptr + 12;
+	while(desc - &ptr[12] < program_info_length) {
+		descriptor_tag		= desc[0];
+		descriptor_length	= desc[1];
+		data				= desc + 2;
+
+		if(descriptor_tag == 0x10) {
+			dprintf("      +smoothing_buffer_descriptor\n");
+		} else {
+			dprintf("      SKIP pmt 0x%02X (%s)\n", descriptor_tag, descriptor_tag < 0x40 ? "Invalid" : "Unknown");
+		}
+		desc = desc + descriptor_length + 2;
+	}
+
+	srvc = ptr + 12 + program_info_length;
+	while((unsigned)(srvc - &ptr[3]) < section_length - 4) { // 3 bytes sec header (not included in section_length) and 4 bytes crc (included in section_length)
+		stream_type		=   srvc[0];
+		elementary_PID	= ((srvc[1] & 0x1F) << 8) + srvc[2];
+		ES_info_length	= ((srvc[3] & 0x0F) << 8) + srvc[4];
+		if(ES_info_length) {
+			//dprintf("      Private stream tag (%d)\n", srvc[5]);
+			if((srvc[5] == 0x6a) || (srvc[5] == 0x7a)) {	// Im not sure about 0x7a, but it was mentioned by someone when I searched in google
+				stream_type = 0x81;
+			}
+		}
+
+		dprintf("  STREAM TYPE:0x%02X PID:0x%04X Len:%d\n", stream_type, elementary_PID, ES_info_length);
+
+		info = NULL;
+		if(service != NULL) {
+			head_element = &service->program_map.map.streams;
+
+			if(*head_element == NULL) {
+				*head_element = info_element = allocate_element(sizeof(PID_info_t));
+			} else {
+				info_element = find_element_by_short_header(*head_element, elementary_PID, &previous_element);
+				if(info_element == NULL) {
+					info_element = insert_sorted_element_by_id(head_element, elementary_PID, sizeof(PID_info_t));
+				}
+			}
+
+			if(info_element != NULL) {
+				info = (PID_info_t *)info_element->data;
+
+				if(need_update) {
+					eprintf("%s(%d): Replace PID 0x%04X -> 0x%04X\n", __func__, __LINE__, info->elementary_PID, elementary_PID);
+					info->elementary_PID = elementary_PID;
+					info->stream_type = stream_type;
+					memset(info->ISO_639_language_code, 0, sizeof(info->ISO_639_language_code));
+					if (!appControlInfo.dvbInfo.needRestart) appControlInfo.dvbInfo.needRestart = 1;
+				}
+			}
+		}
+
+		desc = &srvc[5];
+		while(desc - &srvc[5] < ES_info_length) {
+			descriptor_tag    =  desc[0];
+			descriptor_length =  desc[1];
+			data              = &desc[2];
+
+			switch(descriptor_tag) {
+				case 0x02:
+					dprintf("      +video_stream_descriptor\n");
+					break;
+				case 0x03:
+					dprintf("      +audio_stream_descriptor\n");
+					break;
+				case 0x09:
+					dprintf("      +CA_descriptor\n");
+					break;
+				case 0x0A:
+					dprintf("      +ISO_639_language_descriptor %c%c%c\n", data[0], data[1], data[2]);
+					memcpy(info->ISO_639_language_code, data, 3);
+					break;
+				case 0x0F:
+					dprintf("      +private_data_indicator_descriptor\n");
+					break;
+				case 0x11:
+					dprintf("      +STD_descriptor\n");
+					break;
+				case 0x13:
+					dprintf("      +carousel_identifier_descriptor \n");
+					break;
+				case 0x14:
+					dprintf("      +association_tag_descriptor\n");
+					break;
+				case 0x15:
+					dprintf("      +deferred_association_tags_descriptor\n");
+					break;
+				case 0x28:
+					dprintf("      +AVC_video_descriptor\n");
+					break;
+				case 0x2A:
+					dprintf("      +AVC_timing_and_HRD_descriptor\n");
+					break;
+				case 0x45:
+					dprintf("      +VBI_data_descriptor\n");
+					break;
+				case 0x50:
+					dprintf("      +component_descriptor\n");
+					if(info) {
+						info->component_descriptor.stream_content = data[0];
+						info->component_descriptor.component_type = data[1];
+					}
+					break;
+				case 0x52:
+					dprintf("      +stream_identifier_descriptor\n");
+					break;
+				case 0x56:
+					dprintf("      +teletext_descriptor\n");
+					break;
+				case 0x59:
+					dprintf("      +subtitling_descriptor\n");
+					if(info) {
+						memcpy(info->ISO_639_language_code, data, 3);
+						info->component_descriptor.stream_content = 0x03;
+						info->component_descriptor.component_type = data[3]; // subtitling_type
+						info->subtitling_descriptor.composition_page_id = (data[4] << 8) + data[5];
+						info->subtitling_descriptor.ancillary_page_id   = (data[6] << 8) + data[7];
+					}
+					break;
+				case 0x64:
+					dprintf("      +data_broadcast_descriptor\n");
+					break;
+				case 0x66:
+					dprintf("      +data_broadcast_id_descriptor\n");
+
+					data_broadcast_id = (data[0] << 8) + data[1];
+					bytes = &data[2];
+
+					dprintf("	     ID:0x%04X\n", data_broadcast_id);
+
+					switch(data_broadcast_id) {
+						case 0x0006:
+							dprintf("        +DSM-CC data carousel\n");
+							break;
+						case 0x000A:
+							dprintf("        +system_software_update_info\n");
+							break;
+						case 0x00F0:
+							dprintf("        +MHP object carousel\n");
+							break;
+						default:
+							dprintf("      SKIP pmt id 0x%04X\n", data_broadcast_id);
+							break;
+					}
+					break;
+				case 0x6A:
+					dprintf("      +AC-3_descriptor (see annex D)\n");
+					break;
+				case 0x6F:
+					dprintf("      +application_signalling_descriptor\n");
+					break;
+				default:
+					dprintf("      SKIP pmt es 0x%02X (%s)\n", descriptor_tag, descriptor_tag < 0x40 ? "Invalid" : "Unknown");
+					break;
+			}
+			desc = &desc[descriptor_length + 2];
+		}
+		srvc = &srvc[5 + ES_info_length];
+		dprintf("  +OFFS: %d\n", srvc - &ptr[3]);
+	}
+	dprintf("-------\n");
+	return updated;
+}
 
 /**
  *   returns 0 when more sections are expected
@@ -987,8 +1270,10 @@ static int dvb_sectionParse(struct section_buf *s)
 								service->program_map.program_map_PID,
 								service->common.service_id,
 								service->common.media_id);
-						updated = parse_pmt(services, (unsigned char *)s->buf,
+						updated = dvb_parsePmt(services, (unsigned char *)s->buf,
 											service->common.transport_stream_id, network_id, s->media);
+						//updated = parse_pmt(services, (unsigned char *)s->buf,
+						//					service->common.transport_stream_id, network_id, s->media);
 					}
 					cur = cur->next;
 				}
@@ -1216,6 +1501,44 @@ static int32_t dvb_scanForBouquetService(uint32_t adapter, EIT_service_t *servic
 		dvb_filterSetup(&sdt_filter, adapter, 0x11, 0x42, 5, pp_dvb_services, &service->media);
 		dvb_filterAdd(&sdt_filter);
 	}*/
+
+	do {
+		dvb_filtersRead();
+	} while(dvb_filtersHasAny());
+
+	dvb_filtersDisable();
+	mysem_release(dvb_filter_semaphore);
+
+	return -1;
+}
+
+int32_t dvb_scanForPMT(uint32_t adapter, EIT_service_t *service)
+{
+    struct section_buf pmt_filter;
+    list_element_t **pp_dvb_services = dvb_getSrvicesPP();
+	if(service == NULL) {
+		return -1;
+	}
+
+	mysem_get(dvb_filter_semaphore);
+	dvb_filtersEnable();
+
+	if(service->flags & serviceFlagHasPAT) {
+		dprintf("%s: new pmt filter ts %d, pid %d, service %d, media %d frequency = %d\n", __FUNCTION__,
+				service->common.transport_stream_id,
+				service->program_map.program_map_PID,
+				service->common.service_id,
+				service->common.media_id,
+				service->media.frequency);
+		dvb_filterSetup(&pmt_filter, adapter, service->program_map.program_map_PID, 0x02, 2, pp_dvb_services, &service->media);   /* PMT */
+		pmt_filter.transport_stream_id = service->common.transport_stream_id;
+		dvb_filterAdd(&pmt_filter);
+	} else {
+		eprintf("%s(%d): WARNING! NO serviceFlagHasPMT, we cant get PMT\n", __FUNCTION__, __LINE__);
+		dvb_filtersDisable();
+		mysem_release(dvb_filter_semaphore);
+		return -1;
+	}
 
 	do {
 		dvb_filtersRead();

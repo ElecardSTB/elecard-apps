@@ -239,6 +239,7 @@ typedef struct {
 	stb810_signalStatus	lastSignalStatus;
 	stb810_signalStatus	savedSignalStatus;
 	int32_t				reportedSignalStatus;
+	uint32_t            needRestart;
 } stb810_dvbInfo;
 
 typedef struct {

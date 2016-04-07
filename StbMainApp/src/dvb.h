@@ -231,6 +231,7 @@ void dvb_scanForEPG(uint32_t adapter, EIT_media_config_t *media);
 void dvb_scanForPSI(uint32_t adapter, EIT_media_config_t *media, list_element_t **out_list);
 
 int32_t dvb_scanForBouquet(uint32_t adapter, EIT_service_t *service);
+int32_t dvb_scanForPMT(uint32_t adapter, EIT_service_t *service);
 int32_t dvb_getCountOfServices(void);
 
 /**  @ingroup dvb_service
