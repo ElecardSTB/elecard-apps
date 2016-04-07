@@ -910,7 +910,7 @@ int dvb_parsePmt(list_element_t **head, const uint8_t *ptr, uint16_t transport_s
 	}
 
 	if(ptr[0] == 0x02) {
-		eprintf("PMT\n");
+		dprintf("PMT\n");
 	} else {
 		dprintf("ERROR: Incorrect PMT table_id 0x%X\n", ptr[0]);
 		return 0;
@@ -1017,7 +1017,7 @@ int dvb_parsePmt(list_element_t **head, const uint8_t *ptr, uint16_t transport_s
 				info = (PID_info_t *)info_element->data;
 
 				if(need_update) {
-					eprintf("%s(%d): Replace PID 0x%04X -> 0x%04X\n", __func__, __LINE__, info->elementary_PID, elementary_PID);
+					dprintf("%s(%d): Replace PID 0x%04X -> 0x%04X\n", __func__, __LINE__, info->elementary_PID, elementary_PID);
 					info->elementary_PID = elementary_PID;
 					info->stream_type = stream_type;
 					memset(info->ISO_639_language_code, 0, sizeof(info->ISO_639_language_code));
