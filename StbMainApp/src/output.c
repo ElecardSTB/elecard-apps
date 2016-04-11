@@ -191,6 +191,10 @@ static int output_toggleDiseqcUncommited(interfaceMenu_t *pMenu, void* pArg);
 static int output_toggleSortOrder(interfaceMenu_t *pMenu, void* pArg);
 static int output_clearDvbSettings(interfaceMenu_t *pMenu, void* pArg);
 static int output_confirmClearDvb(interfaceMenu_t *pMenu, pinterfaceCommandEvent_t cmd, void* pArg);
+#ifdef ENABLE_DVB_START_CHANNEL
+static int output_enterDvbStartMenu(interfaceMenu_t *startMenu, void *notused);
+static int output_toggleDvbStartChannel(interfaceMenu_t *pMenu, void *pChannelNumber);
+#endif // ENABLE_DVB_START_CHANNEL
 #endif // ENABLE_DVB
 
 #ifdef ENABLE_3D
@@ -232,6 +236,9 @@ static int output_toggleAdvancedVideoOutput(interfaceMenu_t *pMenu, void* pArg);
 #ifdef ENABLE_DVB
 static interfaceListMenu_t DVBSubMenu;
 static interfaceListMenu_t DiSEqCMenu;
+#ifdef ENABLE_DVB_START_CHANNEL
+static interfaceListMenu_t DvbStartMenu;
+#endif // ENABLE_DVB_START_CHANNEL
 
 static const char *diseqc_switch_names[] = DISEQC_SWITCH_NAMES;
 #endif
@@ -3066,6 +3073,21 @@ int output_enterPlaybackMenu(interfaceMenu_t *pMenu, void* notused)
 
 	interface_clearMenuEntries(pMenu);
 
+#ifdef ENABLE_DVB_START_CHANNEL
+	if (appControlInfo.offairInfo.startChannel <= 0)
+		str = _T("LAST_WATCHED");
+	else if (appControlInfo.offairInfo.startChannel < dvbChannel_getCount())
+		str = offair_getServiceName(appControlInfo.offairInfo.startChannel);
+	else
+#ifdef ENABLE_ANALOGTV
+		str = analogtv_getServiceName(appControlInfo.offairInfo.startChannel - dvbChannel_getCount());
+#else
+		str = _T("NOT_AVAILABLE_SHORT");
+#endif
+	snprintf(buf, sizeof(buf), "%s: %s", _T("DVB_START_CHANNEL"), str);
+	interface_addMenuEntry(pMenu, buf, interface_menuActionShowMenu, &DvbStartMenu, DvbStartMenu.baseMenu.logo);
+#endif // ENABLE_DVB_START_CHANNEL
+
 	sprintf( buf, "%s: %s", _T("RESUME_AFTER_START"), _T( appControlInfo.playbackInfo.bResumeAfterStart ? "ON" : "OFF" ) );
 	interface_addMenuEntry(pMenu, buf, output_toggleResumeAfterStart, NULL, settings_interface);
 
@@ -3229,6 +3251,10 @@ void output_buildMenu(interfaceMenu_t *pParent)
 		interfaceListMenuIconThumbnail, output_enterDVBMenu, NULL, NULL);
 	createListMenu(&DiSEqCMenu, "DiSEqC", settings_dvb, NULL, _M &DVBSubMenu,
 		interfaceListMenuIconThumbnail, output_enterDiseqcMenu, NULL, NULL);
+#ifdef ENABLE_DVB_START_CHANNEL
+	createListMenu(&DvbStartMenu, _T("DVB_START_CHANNEL"), settings_interface, NULL, _M &PlaybackMenu,
+		interfaceListMenuIconThumbnail, output_enterDvbStartMenu, NULL, NULL);
+#endif // ENABLE_DVB_START_CHANNEL
 	playlistEditor_init();
 #endif // ENABLE_DVB
 

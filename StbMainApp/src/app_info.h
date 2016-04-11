@@ -504,6 +504,7 @@ typedef struct __stb810_offairInfo
 	int                  tunerDebug;
 	char                 profileLocation[128]; /**< Profile location file name */
 	int                  wizardFinished;
+	int                  startChannel;    // channel to play on application start
 	int                  previousChannel; // previously watched channel
 	                                      // 0 means not defined
 	                                      // < offair_channelCount DVB channel

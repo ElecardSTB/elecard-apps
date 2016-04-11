@@ -48,7 +48,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 * EXPORTED MACROS  *
 ********************/
 
+#ifdef ENABLE_DVB
 //#define DVB_FAVORITES
+//#define ENABLE_DVB_START_CHANNEL
+#endif // ENABLE_DVB
 
 #define interfaceMenuEPG (3)
 
@@ -124,6 +127,7 @@ typedef struct
 	int currentService;
 	int highlightedService;
 	int serviceOffset;
+	int visibleServices; /* Current channel is always visible and not counted */
 
 	time_t curOffset;
 	time_t minOffset;

@@ -324,6 +324,7 @@ int loadAppSettings()
 		{
 			//dprintf("%s: service list %s\n", __FUNCTION__, appControlInfo.offairInfo.serviceList);
 		}
+		else if (sscanf(buf, "DVBSTARTCHANNEL=%d", &appControlInfo.offairInfo.startChannel) == 1) {}
 		else if (sscanf(buf, "LASTDVBCHANNEL=%d", &appControlInfo.dvbInfo.channel) == 1)
 		{
 			//dprintf("%s: Last DVB channel %d\n", __FUNCTION__, appControlInfo.dvbInfo.channel);
@@ -816,6 +817,7 @@ int saveAppSettings()
 	fprintf(fd, "SHOWSCRAMBLED=%d\n",             appControlInfo.offairInfo.dvbShowScrambled);
 	fprintf(fd, "DVBSORTING=%s\n",                table_IntStrLookup(g_serviceSortNames, appControlInfo.offairInfo.sorting, ""));
 	fprintf(fd, "DVBSERVICELIST=%s\n",            appControlInfo.offairInfo.serviceList);
+	fprintf(fd, "DVBSTARTCHANNEL=%d\n",           appControlInfo.offairInfo.startChannel);
 	fprintf(fd, "LASTDVBCHANNEL=%d\n",            appControlInfo.dvbInfo.channel);
 #endif
 #ifdef ENABLE_PVR
@@ -1064,6 +1066,7 @@ void appInfo_init(void)
 	appControlInfo.offairInfo.sorting             = serviceSortNone;
 	appControlInfo.offairInfo.serviceList[0]      = 0;
 	appControlInfo.offairInfo.tunerDebug          = 0;
+	appControlInfo.offairInfo.startChannel        = 0;
 	appControlInfo.offairInfo.previousChannel     = 0;
 #endif
 #ifdef ENABLE_PVR
