@@ -34,12 +34,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * INCLUDE FILES                                *
 ************************************************/
-
 #include "defines.h"
-
-#ifdef ENABLE_WIFI
-
 #include "interface.h"
+
 
 /***********************************************
 * EXPORTED MACROS                              *
@@ -91,13 +88,13 @@ typedef enum
 /***********************************************
 * EXPORTED DATA                                *
 ************************************************/
-
+#ifdef ENABLE_WIFI
 extern interfaceListMenu_t WirelessMenu;
+#endif
 
 /******************************************************************
 * EXPORTED FUNCTIONS PROTOTYPES               <Module>_<Word>+    *
 *******************************************************************/
-
 int  wireless_buildMenu(interfaceMenu_t *pParent );
 void wireless_cleanupMenu(void);
 
@@ -105,5 +102,4 @@ const char* wireless_mode_print( outputWifiMode_t mode );
 const char* wireless_auth_print( outputWifiAuth_t auth );
 const char* wireless_encr_print( outputWifiEncryption_t encr );
 
-#endif // ENABLE_WIFI
 #endif // __STB_WIRELESS_H

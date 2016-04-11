@@ -102,14 +102,6 @@ static int wireless_fullscan(void);
 * FUNCTION IMPLEMENTATION                     <Module>[_<Word>+]  *
 *******************************************************************/
 
-int wireless_buildMenu(interfaceMenu_t *pParent )
-{
-	createListMenu( &WirelessMenu, _T("WIRELESS_LIST"), thumbnail_search, NULL, pParent, interfaceListMenuIconThumbnail,
-		wireless_enterMenu, NULL, NULL
-	);
-	return 0;
-}
-
 static int wireles_initSocket(void)
 {
 	if( wl_skfd < 0 )
@@ -124,60 +116,7 @@ static int wireles_initSocket(void)
 	return 0;
 }
 
-void wireless_cleanupMenu(void )
-{
-	if( wl_thread != 0 )
-	{
-		eprintf("%s: waiting for wireless scan thread to finish\n", __FUNCTION__);
-		pthread_join( wl_thread, NULL );
-	}
-
-	if( wl_skfd >= 0 )
-	{
-		iw_sockets_close(wl_skfd);
-		wl_skfd = -1;
-	}
-
-	wl_result_count  = 0;
-	wl_selected      = -1;
-}
-
-const char* wireless_mode_print( outputWifiMode_t mode )
-{
-	switch( mode )
-	{
-		case wifiModeAdHoc:  return "Ad-Hoc";
-		case wifiModeMaster: return "AP";
-		default:;
-	}
-	return "Managed";
-}
-
-const char* wireless_auth_print( outputWifiAuth_t auth )
-{
-	switch( auth )
-	{
-		case wifiAuthOpen:    return "OPEN";
-		case wifiAuthWEP:     return "WEP";
-		case wifiAuthWPAPSK:  return "WPA-PSK";
-		case wifiAuthWPA2PSK: return "WPA2-PSK";
-		default:;
-	}
-	return "unknown";
-}
-
-const char* wireless_encr_print( outputWifiEncryption_t encr )
-{
-	switch( encr )
-	{
-		case wifiEncTKIP:  return "TKIP";
-		case wifiEncAES:   return "CCMP";
-		default:;
-	}
-	return "unknown";
-}
-
-void *wireless_scanThread(void *pArg)
+static void *wireless_scanThread(void *pArg)
 {
 	interfaceMenu_t* pMenu = pArg;
 	int icon = thumbnail_workstation;
@@ -242,7 +181,7 @@ thread_exit:
 	return NULL;
 }
 
-int wireless_enterMenu(interfaceMenu_t* pMenu, void *pArg)
+static int wireless_enterMenu(interfaceMenu_t* pMenu, void *pArg)
 {
 	if( wl_result_count == 0 )
 	{
@@ -251,7 +190,7 @@ int wireless_enterMenu(interfaceMenu_t* pMenu, void *pArg)
 	return 0;
 }
 
-int wireless_scanNetworks(interfaceMenu_t* pMenu, void *pArg)
+static int wireless_scanNetworks(interfaceMenu_t* pMenu, void *pArg)
 {
 	if( wl_thread == 0 )
 	{
@@ -280,7 +219,7 @@ int wireless_scanNetworks(interfaceMenu_t* pMenu, void *pArg)
 	return 0;
 }
 
-int wireless_changeNetwork(interfaceMenu_t* pMenu, void *pArg)
+static int wireless_changeNetwork(interfaceMenu_t* pMenu, void *pArg)
 {
 	wl_selected = (int)pArg;
 
@@ -294,7 +233,7 @@ int wireless_changeNetwork(interfaceMenu_t* pMenu, void *pArg)
 	return 0;
 }
 
-int wireless_setNetwork(interfaceMenu_t* pMenu, void *pArg)
+static int wireless_setNetwork(interfaceMenu_t* pMenu, void *pArg)
 {
 	output_setESSID         (_M &WifiSubMenu,        wl_list[wl_selected].essid, (void*)ifaceWireless);
 	output_setAuthMode      (_M &WifiSubMenu, (void*)wl_list[wl_selected].auth);
@@ -740,7 +679,7 @@ static inline void process_scanning_token(
 	}	/* switch(event->cmd) */
 }
 
-int wireless_fullscan(void)
+static int wireless_fullscan(void)
 {
 	struct timeval tv;             /* Select timeout */
 	int	timeout = 15000000;        /* 15s */
@@ -900,28 +839,75 @@ realloc:
 	return ap_index;
 }
 
-size_t os_strlcpy(char *dest, const char *src, size_t siz)
+int wireless_buildMenu(interfaceMenu_t *pParent )
 {
-	const char *s = src;
-	size_t left = siz;
-
-	if (left) {
-		/* Copy string up to the maximum size of the dest buffer */
-		while (--left != 0) {
-			if ((*dest++ = *s++) == '\0')
-				break;
-		}
-	}
-
-	if (left == 0) {
-		/* Not enough room for the string; force NUL-termination */
-		if (siz != 0)
-			*dest = '\0';
-		while (*s++)
-			; /* determine total src string length */
-	}
-
-	return s - src - 1;
+    createListMenu( &WirelessMenu, _T("WIRELESS_LIST"), thumbnail_search, NULL, pParent, interfaceListMenuIconThumbnail,
+        wireless_enterMenu, NULL, NULL
+    );
+    return 0;
 }
 
+void wireless_cleanupMenu(void )
+{
+    if( wl_thread != 0 )
+    {
+        eprintf("%s: waiting for wireless scan thread to finish\n", __FUNCTION__);
+        pthread_join( wl_thread, NULL );
+    }
+
+    if( wl_skfd >= 0 )
+    {
+        iw_sockets_close(wl_skfd);
+        wl_skfd = -1;
+    }
+
+    wl_result_count  = 0;
+    wl_selected      = -1;
+}
+#else // ENABLE_WIFI
+int wireless_buildMenu(interfaceMenu_t *pParent )
+{
+    return 0;
+}
+
+void wireless_cleanupMenu(void )
+{
+}
 #endif // ENABLE_WIFI
+
+
+
+const char* wireless_mode_print( outputWifiMode_t mode )
+{
+    switch( mode )
+    {
+        case wifiModeAdHoc:  return "Ad-Hoc";
+        case wifiModeMaster: return "AP";
+        default:;
+    }
+    return "Managed";
+}
+
+const char* wireless_auth_print( outputWifiAuth_t auth )
+{
+    switch( auth )
+    {
+        case wifiAuthOpen:    return "OPEN";
+        case wifiAuthWEP:     return "WEP";
+        case wifiAuthWPAPSK:  return "WPA-PSK";
+        case wifiAuthWPA2PSK: return "WPA2-PSK";
+        default:;
+    }
+    return "unknown";
+}
+
+const char* wireless_encr_print( outputWifiEncryption_t encr )
+{
+    switch( encr )
+    {
+        case wifiEncTKIP:  return "TKIP";
+        case wifiEncAES:   return "CCMP";
+        default:;
+    }
+    return "unknown";
+}

@@ -163,12 +163,12 @@ static int samba_init()
 	{
 		int exists;
 
-		sprintf(temp, "/sys/class/net/%s", outputNetwork_deviceName(i));
+		sprintf(temp, "/sys/class/net/%s", outputNetwork_virtIfaceName(i));
 		exists = helperCheckDirectoryExsists(temp);
 
 		if (exists)
 		{
-			sprintf(temp, "ifconfig %s | grep \"inet addr\"", outputNetwork_deviceName(i));
+			sprintf(temp, "ifconfig %s | grep \"inet addr\"", outputNetwork_virtIfaceName(i));
 			if (helperParseLine(INFO_TEMP_FILE, temp, "inet addr:", buf, ' '))
 			{
 				*str = ' ';
@@ -178,7 +178,7 @@ static int samba_init()
 				strcpy(str, "/24");
 				str+=3;
 				res++;
-				/*sprintf(temp, "ifconfig %s | grep \"Mask:\"", outputNetwork_deviceName(i));
+				/*sprintf(temp, "ifconfig %s | grep \"Mask:\"", outputNetwork_virtIfaceName(i));
 				if (helperParseLine(INFO_TEMP_FILE, temp, "Mask:", buf, ' '))
 				{
 					*str = '/';
@@ -196,12 +196,12 @@ static int samba_init()
 #ifdef ENABLE_WIFI
 	{
 		int exists;
-		sprintf(temp, "/sys/class/net/%s", outputNetwork_deviceName(ifaceWireless));
+		sprintf(temp, "/sys/class/net/%s", outputNetwork_virtIfaceName(ifaceWireless));
 		exists = helperCheckDirectoryExsists(temp);
 
 		if (exists)
 		{
-			sprintf(temp, "ifconfig %s | grep \"inet addr\"", outputNetwork_deviceName(ifaceWireless));
+			sprintf(temp, "ifconfig %s | grep \"inet addr\"", outputNetwork_virtIfaceName(ifaceWireless));
 			if (helperParseLine(INFO_TEMP_FILE, temp, "inet addr:", buf, ' '))
 			{
 				*str = ' ';

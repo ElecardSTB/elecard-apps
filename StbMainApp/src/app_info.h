@@ -90,19 +90,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /***********************************************
 * EXPORTED TYPEDEFS                            *
 ************************************************/
-
-typedef enum
-{
-	ifaceWAN = 0,
-	ifaceLAN = 1,
-#ifdef ENABLE_WIFI
-	ifaceWireless,
-#endif
-#ifdef ENABLE_PPP
-	ifacePPP,
-#endif
-} stb810_networkInterface_t;
-
 typedef enum
 {
 	playlistModeNone = 0,

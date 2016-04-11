@@ -12,7 +12,21 @@
  * See README and COPYING for more details.
  */
 
-#include "includes.h"
+#include "helper.h"
+
+#include <malloc.h>
+#include <string.h>
+#include <stdio.h>
+
+#define CONFIG_CTRL_IFACE
+#define CONFIG_CTRL_IFACE_UNIX
+
+#define os_malloc   malloc
+#define os_memset   memset
+#define os_free     free
+#define os_snprintf snprintf
+#define os_memcmp   memcmp
+
 
 #ifdef CONFIG_CTRL_IFACE
 

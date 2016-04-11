@@ -112,9 +112,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 //#define ENABLE_VIDIMAX 1
 
-/** @def ENABLE_LAN Enable LAN if STB has second network interface (defined in build scripts)
+/** @def ENABLE_ETH1 Enable LAN if STB has second network interface (defined in build scripts)
  */
-//#define ENABLE_LAN
+//#define ENABLE_ETH1
 
 /** @def ENABLE_PPP Enable PPP connections (defined in Makefile)
  */
@@ -219,7 +219,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #define ENABLE_MULTI_VIEW
 
-#ifdef ENABLE_LAN
+#ifdef ENABLE_ETH1
 	/** @def ENABLE_BRIDGE Enable BRIDGE option in networking menu
 	 */
 	#define ENABLE_BRIDGE

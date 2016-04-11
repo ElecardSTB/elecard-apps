@@ -783,6 +783,30 @@ int32_t helperSafeStrCpy(char **dest, const char *src)
     return 0;
 }
 
+size_t os_strlcpy(char *dest, const char *src, size_t siz)
+{
+    const char *s = src;
+    size_t left = siz;
+
+    if (left) {
+        /* Copy string up to the maximum size of the dest buffer */
+        while (--left != 0) {
+            if ((*dest++ = *s++) == '\0')
+                break;
+        }
+    }
+
+    if (left == 0) {
+        /* Not enough room for the string; force NUL-termination */
+        if (siz != 0)
+            *dest = '\0';
+        while (*s++)
+            ; /* determine total src string length */
+    }
+
+    return s - src - 1;
+}
+
 int32_t Helper_IsTimeGreater(struct timeval t1, struct timeval t2)
 {
     if(t1.tv_sec > t2.tv_sec)

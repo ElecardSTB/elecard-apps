@@ -39,11 +39,11 @@ ifeq ($(ARCH),mips)
 ifeq ($(_TMBSL),_stb225)     # --- STB225 ---
 STAGINGDIR = $(BUILDROOT)/staging
 
-ENABLE_LAN := 0
+ENABLE_ETH1 := 0
 ENABLE_XWORKS := 0
 ENABLE_DLNA := 0
 else                         # --- STB820 ---
-ENABLE_LAN ?= 1
+ENABLE_ETH1 ?= 1
 ENABLE_XWORKS ?= 1
 ENABLE_DLNA ?= 1
 ENABLE_PVR ?= 1
@@ -57,7 +57,7 @@ endif #ifeq ($(ARCH),mips)
 ifneq ($(STAPISDK_VERSION),) # --- STB83x/STB84x ---
 ARCH := sh4
 
-ENABLE_LAN ?= 0
+ENABLE_ETH1 ?= 0
 ENABLE_WIFI ?= 1
 ENABLE_PPP ?= 1
 ENABLE_XWORKS ?= 0
@@ -103,6 +103,7 @@ ENABLE_EXPAT ?= 0
 ENABLE_PPP ?= 0
 ENABLE_WIFI ?= 0
 ENABLE_MOBILE ?= 0
+ENABLE_WAN_BRIDGE ?= 0
 ENABLE_SCARDS ?= 0
 ENABLE_REGPLAT ?= 0
 PROVIDER_PROFILES ?= 0
@@ -300,12 +301,12 @@ ifeq ($(ENABLE_RUTUBE),1)
     LOCAL_CFLAGS += -DENABLE_RUTUBE=$(ENABLE_RUTUBE)
 endif
 
-ifeq ($(ENABLE_LAN),1)
-	LOCAL_CFLAGS += -DENABLE_LAN=$(ENABLE_LAN)
+ifeq ($(ENABLE_ETH1),1)
+	SEP_FLAGS_output_network.c += -DENABLE_ETH1=$(ENABLE_ETH1)
 endif
 
 ifeq ($(ENABLE_PPP),1)
-	LOCAL_CFLAGS += -DENABLE_PPP=$(ENABLE_PPP)
+	SEP_FLAGS_output_network.c += -DENABLE_PPP=$(ENABLE_PPP)
 endif
 
 ifeq ($(ENABLE_WIFI),1)
@@ -314,8 +315,12 @@ ifeq ($(ENABLE_WIFI),1)
 endif
 
 ifeq ($(ENABLE_MOBILE),1)
-	LOCAL_CFLAGS += -DENABLE_MOBILE=$(ENABLE_MOBILE)
+	SEP_FLAGS_output_network.c += -DENABLE_MOBILE=$(ENABLE_MOBILE)
 	LOCAL_LDFLAGS += -liw
+endif
+
+ifeq ($(ENABLE_WAN_BRIDGE),1)
+	SEP_FLAGS_output_network.c += -DENABLE_WAN_BRIDGE=1
 endif
 
 ifeq ($(ENABLE_PVR),1)

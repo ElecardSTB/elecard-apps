@@ -1504,7 +1504,7 @@ static int offair_subtitleControlHide(void *ignored)
 	return 0;
 }
 
-int offair_subtitleStop()
+int32_t offair_subtitleStop(void)
 {
 #ifdef STSDK
 	elcdRpcType_t type;
@@ -1523,7 +1523,7 @@ int offair_subtitleStop()
 	return 0;
 }
 
-int offair_subtitleShow(uint16_t subtitle_pid)
+static int32_t offair_subtitleShow(uint16_t subtitle_pid)
 {
 #ifdef STSDK
 	elcdRpcType_t type;

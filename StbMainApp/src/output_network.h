@@ -37,17 +37,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdint.h>
 #include "interface.h"
 
-/******************************************************************
-* EXPORTED MACROS                              [for headers only] *
-*******************************************************************/
 
 /******************************************************************
 * EXPORTED TYPEDEFS                            [for headers only] *
 *******************************************************************/
-
-/******************************************************************
-* EXPORTED DATA                                [for headers only] *
-*******************************************************************/
+typedef enum
+{
+    ifaceWAN = 0,
+    ifaceLAN = 1,
+    ifaceWireless,
+//     ifacePPP,
+//     ifaceBridge,
+} eVirtIface_t;
 
 
 /******************************************************************
@@ -71,7 +72,7 @@ int32_t outputNetwork_showNetwork(char *info_text);
 */
 char* inet_addr_prepare( char *value);
 
-char *outputNetwork_deviceName(int32_t i);
+const char *outputNetwork_virtIfaceName(eVirtIface_t i);
 int32_t output_readInterfacesFile(void);
 
 

@@ -122,18 +122,33 @@ int32_t strList_init(listHead_t *commonList, int32_t isCaseSensivity);
 
 
 int32_t Helper_IsTimeGreater(struct timeval t1, struct timeval t2);
+
 /** Copy src string to new dest buffer.
  * @param[out] dest If already allocated and have enough space, will be used without changing pointer. If buffer will not be big enough, realloc would be used on *dest.
  * @param[in]  stc  If null, *dest will be freed and nulled.
  * @return 0 if src was copied successfully
  */
 int32_t helperSafeStrCpy(char **dest, const char *src);
+
 /** strcpy without characters unsupported by FAT filesystem
  * @param[out] dst Destination pointer
  * @param[in]  src Source stream
  * @return     dst
  */
 char   *helperStrCpyTrimSystem(char *dst, char *src);
+
+/**
+ * os_strlcpy - Copy a string with size bound and NUL-termination
+ * @dest: Destination
+ * @src: Source
+ * @siz: Size of the target buffer
+ * Returns: Total length of the target string (length of src) (not including
+ * NUL-termination)
+ *
+ * This function matches in behavior with the strlcpy(3) function in OpenBSD.
+ */
+size_t os_strlcpy(char *dest, const char *src, size_t siz);
+
 int32_t helperParseLine(const char *path, const char *cmd, const char *pattern, char *out, char stopChar);
 int32_t helperReadLine(int32_t file, char* buffer);
 
