@@ -1076,6 +1076,7 @@ typedef struct _interfaceFusionObject_t {
 
 	char demoUrl[PATH_MAX];
 	fusion_mark_t marks[FUSION_MAX_MARKS];
+	char utcUrl[PATH_MAX];
 
 } interfaceFusionObject_t;
 

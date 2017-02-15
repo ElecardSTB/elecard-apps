@@ -64,6 +64,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define FUSION_DEFAULT_SERVER_PATH   "http://public.tv/api"
 #define FUSION_CFGDIR         "/var/etc/elecard/StbMainApp"
 #define FUSION_HWCONFIG       FUSION_CFGDIR"/fusion.hwconf"
+#define FUSION_DEFAULT_UTC_URI   "http://www.public.tv/index3.html"
 
 #define FUSION_REFRESH_DTMF_MS 5
 #define MAX_SAVED_DIGITS 65

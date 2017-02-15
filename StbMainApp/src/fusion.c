@@ -85,9 +85,12 @@ void * fusion_threadDownloadFirmware(void * param);
 void * fusion_threadFlipCreep (void * param);
 void fusion_wait (unsigned int timeout_ms);
 
+int fusion_removeAdLockFile();
+
 int fusion_getUtcWithWget (char * utcBuffer, int size);
 int fusion_getUtcFromTimeapi (char * utcBuffer, int size);
 int fusion_getUtcFromEarthtools (char * utcBuffer, int size);
+int fusion_getUtcFromCustomServiceByWget (char * customRequest, char * utcBuffer, int size);
 
 static char helper_checkAdsOnUsb ();
 int fusion_makeAdsPathFromUrl (char * fileUrl, char * resultPath, int duration, int size);
@@ -398,6 +401,7 @@ int fusion_readConfig()
 
 	FusionObject.checktime = FUSION_DEFAULT_CHECKTIME;
 	sprintf (FusionObject.server, "%s", FUSION_DEFAULT_SERVER_PATH);
+	sprintf (FusionObject.utcUrl, "%s", FUSION_DEFAULT_UTC_URI);
 
 	FusionObject.logoTopLeftX  = 100;
 	FusionObject.logoTopLeftY  = 100;
@@ -487,6 +491,13 @@ int fusion_readConfig()
 			g_shaping = atoi(ptr);
 			eprintf (" %s: band limit = %d\n",   __FUNCTION__, g_shaping);
 		}
+		//---------- UTC web service url ----------------------------- //
+		else if ((ptr = strcasestr((const char*) line, (const char*)"UTC ")) != NULL){
+			ptr += 4;
+			sprintf (FusionObject.utcUrl, "%s", ptr);
+			eprintf (" %s: UTC datetime server URI = %s\n",   __FUNCTION__, FusionObject.utcUrl);
+		}
+		//---------- end UTC web service url ------------------------- //
 	}
 	fclose (f);
 	return 0;
@@ -638,6 +649,8 @@ void fusion_startup()
 	system ("echo 3 >/proc/sys/vm/drop_caches");
 
 	system ("/opt/elecard/bin/elcd-watchdog.sh &");
+
+	fusion_readConfig();
 
 	fusion_removeAdLockFile();
 
@@ -818,17 +831,12 @@ int fusion_setMoscowDateTime()
 	char utcBuffer [1024];
 	memset(utcBuffer, 0, 1024);
 
-	if (fusion_getUtcFromEarthtools(utcBuffer, 1024) != 0) {
-		eprintf ("%s(%d): WARNING! Couldn't get UTC from www.earthtools.org.\n", __FUNCTION__, __LINE__);
-
-		if (fusion_getUtcWithWget(utcBuffer, 1024) != 0) {
-			eprintf ("%s(%d): WARNING! Couldn't get UTC with wget from www.timeapi.org.\n", __FUNCTION__, __LINE__);
-
-			// todo : use some extra ways to get UTC
-
-			return -1;
-		}
+	if (fusion_getUtcFromCustomServiceByWget(FusionObject.utcUrl, utcBuffer, 1024) != 0) {
+		eprintf ("%s(%d): WARNING! Couldn't get UTC with wget from %s.\n", __FUNCTION__, __LINE__, FusionObject.utcUrl);
+		// todo : use some extra ways to get UTC
+		return -1;
 	}
+
 	// format UTC: 2014-04-04 11:43:48
 	sprintf (setDateString, "date -u -s \"%s\"", utcBuffer);
 	eprintf ("%s: Command: %s\n", __FUNCTION__, setDateString);
@@ -965,6 +973,109 @@ int fusion_getUtcFromTimeapi (char * utcBuffer, int size)
 	}
 	snprintf (utcBuffer, min((unsigned)size, strlen (ans)), "%s", ans);
 	eprintf ("%s(%d): utcBuffer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
+	return 0;
+}
+
+char *trimwhitespace(char *str)
+{
+  char *end;
+
+  // Trim leading space
+  while(isspace((unsigned char)*str)) str++;
+
+  if(*str == 0)  // All spaces?
+    return str;
+
+  // Trim trailing space
+  end = str + strlen(str) - 1;
+  while(end > str && isspace((unsigned char)*end)) end--;
+
+  // Write new null terminator
+  *(end+1) = 0;
+
+  return str;
+}
+
+int fusion_getUtcFromCustomServiceByWget (char * customRequest, char * utcBuffer, int size)
+{
+	FILE * f;
+	char request[1024];
+	char ans[1024];
+	char log[1024];
+
+	if (!utcBuffer || !customRequest) {
+		eprintf ("%s(%d): WARNING! Invalid arg.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	sprintf (request, "wget \"%s\" -O /tmp/utc.txt 2>/tmp/wget.log", customRequest);  // 2>/dev/null
+	eprintf ("%s(%d): rq:  %s...\n",   __FUNCTION__, __LINE__, request);
+	system (request);
+
+	f = fopen("/tmp/wget.log", "rt");
+	if (f) {
+		fread(log, size, 1, f);
+		fclose(f);
+		if (strstr(log, "failed:") || strstr(log, "ERROR")){
+			eprintf ("%s(%d): Some error occured:\n%s\n",   __FUNCTION__, __LINE__, log);
+			return -1;
+		}
+	}
+	else {
+		eprintf ("%s(%d): Some error occured. No wget answer.\n",   __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	f = fopen("/tmp/utc.txt", "rt");
+	if (!f) {
+		eprintf ("%s(%d): ERROR! Couldn't open /tmp/utc.txt.\n",   __FUNCTION__, __LINE__);
+		return -1;
+	}
+	memset(ans, 0, 1024);
+	fread(ans, 1024, 1, f);
+	fclose(f);
+
+	char * trimmed = trimwhitespace(ans);
+
+	char * slashPtr = strstr(trimmed, "</");
+	if (slashPtr != NULL) {	// contains xml
+		// remove xml stuff from buffer
+		// assume format is like 
+		// <dateTime xmlns="http://tempuri.org/">2017-01-18T07:22:05.69Z</dateTime>
+		slashPtr[0] = '\0';
+		slashPtr = strrchr(trimmed, '>');
+		if (slashPtr != NULL){
+			strcpy(utcBuffer, slashPtr+1);
+			if (utcBuffer[strlen(utcBuffer) - 1] == 'Z'){
+				utcBuffer[strlen(utcBuffer) - 1] = '\0';
+			}
+			if ((slashPtr = strrchr(utcBuffer, 'T')) != NULL){
+				slashPtr[0] = ' ';
+			}
+		}
+		else {
+			eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
+			return -1;
+		}
+	}
+	else {
+		// plain text
+		if (strlen(trimmed) > 32){
+			eprintf ("%s(%d): ERROR! Incorrect answer: %s\n", __FUNCTION__, __LINE__, ans);
+			return -1;
+		}
+		int y, m, d, h, min, s;
+		if (sscanf(trimmed, "%04d-%02d-%02d %02d:%02d:%02d", &y, &m, &d, &h, &m, &s) != 6){
+			eprintf ("%s(%d): ERROR! Incorrect format of answer: %s\n", __FUNCTION__, __LINE__, trimmed);
+		}
+		strcpy(utcBuffer, trimmed);
+	}
+	eprintf ("UTC time is: %s\n", utcBuffer);
+
+	if (!strlen(utcBuffer) || !strchr(utcBuffer, ' ')) {
+		eprintf ("%s(%d): WARNING! Incorrect answer: %s\n", __FUNCTION__, __LINE__, utcBuffer);
+		return -1;
+	}
 	return 0;
 }
 

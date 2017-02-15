@@ -6209,7 +6209,6 @@ static int interface_refreshClock(void *pArg)
 
 void interface_displayClock(int detached)
 {
-#ifndef ENABLE_FUSION
 	time_t rawtime;
 	struct tm cur_time;
 
@@ -6222,6 +6221,7 @@ void interface_displayClock(int detached)
 		return;
 	}
 
+#ifndef ENABLE_FUSION
 	int x,y,w;
 	w = INTERFACE_CLOCK_DIGIT_WIDTH*4 + INTERFACE_CLOCK_COLON_WIDTH;
 	x = interfaceInfo.screenWidth - interfaceInfo.marginSize - w - INTERFACE_ROUND_CORNER_RADIUS/2;
