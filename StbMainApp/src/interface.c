@@ -2179,11 +2179,11 @@ void interface_updateFusionCreepSurface()
 	srcRect.y = 0;
 	srcRect.w = FusionObject.creepWidth + 10;//min(interfaceInfo.screenWidth - positionDst, FusionObject.creepWidth - positionSrc);
 	srcRect.h = FUSION_SURF_HEIGHT;
-/*
+
 	if ((positionSrc > 0) && (srcRect.w < interfaceInfo.screenWidth)){
 		srcRect.w = interfaceInfo.screenWidth;
 	}
-*/
+
 	dstX = positionDst;
 	dstY = FusionObject.creepY;
 
